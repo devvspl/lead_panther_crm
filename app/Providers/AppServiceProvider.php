@@ -35,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Super Admin Gate Bypass
+        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+            return ($user->hasRole('Super Admin') || $user->hasRole('super-admin')) ? true : null;
+        });
+
         Lead::observe(AuditLogObserver::class);
         CreditTransaction::observe(AuditLogObserver::class);
         LeadReplacement::observe(AuditLogObserver::class);

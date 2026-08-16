@@ -87,7 +87,7 @@
                             <td class="py-3 px-4 text-right">
                                 <button wire:click="testConnection({{ $acc->id }})"
                                     class="text-xs font-bold text-primary hover:underline">
-                                    Test Connection 🔌
+                                    Test Connection
                                 </button>
                             </td>
                         </tr>

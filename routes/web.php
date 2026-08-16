@@ -72,7 +72,7 @@ Route::get('/reports', ReportsContainer::class)->middleware(['auth'])->name('rep
 // Settings Routes
 Route::get('/settings/organization', OrganizationProfile::class)->middleware(['auth'])->name('settings.organization');
 
-Route::get('/settings/integrations', IntegrationsManager::class)->middleware(['auth'])->name('settings.integrations');
+Route::get('/settings/integrations', IntegrationsManager::class)->middleware(['auth', 'role:Super Admin|super-admin|Builder|builder'])->name('settings.integrations');
 
 Route::get('/settings/users', UserInvite::class)->middleware(['auth'])->name('settings.users');
 
@@ -84,7 +84,7 @@ Route::get('/documents/download/{path}', [\App\Http\Controllers\DocumentDownload
 Route::view('profile', 'profile')->middleware(['auth'])->name('profile');
 
 // Role-based Route Groups (Spatie Laravel-Permission)
-Route::middleware(['auth', 'role:Super Admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/credits', AdminCredits::class)->name('credits');
     Route::get('/webhook-logs', WebhookLogs::class)->name('webhook-logs');
@@ -98,21 +98,21 @@ Route::middleware(['auth', 'role:Super Admin'])->prefix('admin')->name('admin.')
     Route::get('/notification-templates', \App\Livewire\Admin\NotificationTemplates::class)->name('notification-templates');
 });
 
-Route::middleware(['auth', 'role:Builder'])->prefix('builder')->name('builder.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin|Builder|builder'])->prefix('builder')->name('builder.')->group(function () {
     Route::get('/dashboard', [BuilderDashboardController::class, 'index'])->name('dashboard');
     Route::get('/team', BuilderTeamManager::class)->name('team');
 });
 
-Route::middleware(['auth', 'role:Channel Partner'])->prefix('partner')->name('partner.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin|Channel Partner|channel-partner'])->prefix('partner')->name('partner.')->group(function () {
     Route::get('/dashboard', [PartnerDashboardController::class, 'index'])->name('dashboard');
     Route::get('/team', PartnerTeamManager::class)->name('team');
 });
 
-Route::middleware(['auth', 'role:Sales Executive'])->prefix('sales')->name('sales.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin|Sales Executive|sales-executive'])->prefix('sales')->name('sales.')->group(function () {
     Route::get('/dashboard', [SalesDashboardController::class, 'index'])->name('dashboard');
 });
 
-Route::middleware(['auth', 'role:Account Manager'])->prefix('client')->name('client.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin|Account Manager|account-manager|Client|client'])->prefix('client')->name('client.')->group(function () {
     Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
     Route::get('/leads', AccountManagerLeads::class)->name('leads');
 });

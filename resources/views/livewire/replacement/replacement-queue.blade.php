@@ -41,20 +41,18 @@
             <h2 class="text-base font-bold text-ink">Replacement Requests</h2>
 
             <div class="flex flex-wrap items-center gap-3">
-                <livewire:shared.searchable-select 
-                    :model="\App\Models\Client::class"
-                    :searchable="true"
-                    placeholder="All Clients"
+                <x-ui.themed-select 
                     wire:model.live="filterClient"
-                    key="filter-client"
+                    :options="array_merge(['' => 'All Clients'], $clients->pluck('name', 'id')->toArray())"
+                    placeholder="All Clients"
+                    searchable="true"
                 />
 
-                <livewire:shared.searchable-select 
-                    :model="\App\Models\Project::class"
-                    :searchable="true"
-                    placeholder="All Projects"
+                <x-ui.themed-select 
                     wire:model.live="filterProject"
-                    key="filter-project"
+                    :options="array_merge(['' => 'All Projects'], $projects->pluck('name', 'id')->toArray())"
+                    placeholder="All Projects"
+                    searchable="true"
                 />
 
                 <x-ui.themed-select 

@@ -45,7 +45,7 @@ class ClientReplacementHistory extends Component
 
         $headings = ['Requested At', 'Lead Code', 'Reason', 'Status', 'Resolution / Note'];
         $columns = [
-            fn($r) => $r->requested_at ? $r->requested_at->format('M d, Y H:i') : '',
+            fn($r) => $r->requested_at ? ($r->requested_at instanceof \Carbon\CarbonInterface ? $r->requested_at->format('M d, Y H:i') : \Carbon\Carbon::parse($r->requested_at)->format('M d, Y H:i')) : '',
             fn($r) => $r->lead?->lead_code ?: 'N/A',
             fn($r) => $r->reason?->reason_name ?: 'N/A',
             fn($r) => $r->status,

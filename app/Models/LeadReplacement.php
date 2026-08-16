@@ -10,6 +10,12 @@ class LeadReplacement extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'requested_at' => 'datetime',
+        'resolved_at' => 'datetime',
+        'sla_met' => 'boolean',
+    ];
+
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class, 'lead_id');
@@ -85,10 +91,8 @@ class LeadReplacement extends Model
             }
 
             // 4. Create new replacement lead
-            static $sequence = 9000;
-            $sequence++;
             $newLead = Lead::create([
-                'lead_code' => 'LP-' . date('Y') . '-REP' . str_pad($sequence, 5, '0', STR_PAD_LEFT),
+                'lead_code' => Lead::generateUniqueLeadCode('LP-REP'),
                 'client_id' => $lead->client_id,
                 'project_id' => $lead->project_id,
                 'campaign_id' => $lead->campaign_id,

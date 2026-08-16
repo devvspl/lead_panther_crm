@@ -16,10 +16,30 @@ class ReplacementQueue extends Component
     public ?int $rejectingReplacementId = null;
     public string $rejectionNote = '';
 
-    public string $filterClient = '';
-    public string $filterProject = '';
-    public string $filterStatus = '';
-    public string $filterDateRange = '';
+    public $filterClient = '';
+    public $filterProject = '';
+    public $filterStatus = '';
+    public $filterDateRange = '';
+
+    public function updatedFilterClient(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterProject(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterDateRange(): void
+    {
+        $this->resetPage();
+    }
 
     public function approveReplacement(int $id): void
     {
@@ -137,7 +157,7 @@ class ReplacementQueue extends Component
         $headings = ['Claim ID', 'Requested At', 'Original Lead', 'Reason', 'SLA Status', 'Eligible', 'Status', 'Resolution Note'];
         $columns = [
             'id',
-            fn($r) => $r->requested_at ? $r->requested_at->format('M d, Y H:i') : '',
+            fn($r) => $r->requested_at ? ($r->requested_at instanceof \Carbon\CarbonInterface ? $r->requested_at->format('M d, Y H:i') : \Carbon\Carbon::parse($r->requested_at)->format('M d, Y H:i')) : '',
             fn($r) => $r->lead?->lead_code ?: 'N/A',
             fn($r) => $r->reason?->reason_name ?: 'N/A',
             fn($r) => $r->sla_met ? 'SLA Met' : 'Missed',

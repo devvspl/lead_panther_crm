@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Thin Sidebar Scrollbar */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #E5E7EB transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: #E5E7EB;
+  border-radius: 9999px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Toast Progress Bar Drain Animation */
+@keyframes toast-drain {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Global Focus Ring Consistency */
+input:focus, textarea:focus, select:focus {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 2px #111827 !important; /* ink / accent token */
+}
+
+/* Livewire 3 Navigation Progress Bar Theming */
+:root {
+  --livewire-progress-bar-color: #111827;
+}
+
+#livewire-progress-bar,
+.livewire-progress-bar,
+div[data-livewire-progress-bar] {
+  background-color: #111827 !important;
+  color: #111827 !important;
+}

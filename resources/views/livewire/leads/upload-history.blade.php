@@ -3,12 +3,14 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Bulk Upload History & Audit Log</h1>
-            <p class="text-xs text-muted">Auditable record of all CSV/Excel lead imports with duplicate and error metrics.</p>
+            <p class="text-xs text-muted">Auditable record of all CSV/Excel lead imports with duplicate and error
+                metrics.</p>
         </div>
 
         <div class="flex items-center space-x-3">
             <x-ui.export-button target="exportExcel" />
-            <a href="{{ route('leads.upload') }}" class="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-hover transition shadow-sm">
+            <a href="{{ route('leads.upload') }}" wire:navigate
+                class="h-8 px-4 bg-accent hover:bg-black text-white text-xs font-bold rounded-lg transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer">
                 + New Bulk Import
             </a>
         </div>
@@ -43,10 +45,12 @@
                             <td class="py-3 px-4 font-mono font-bold text-emerald-600">{{ $b->imported_count }}</td>
                             <td class="py-3 px-4 font-mono font-bold text-amber-600">{{ $b->skipped_count }}</td>
                             <td class="py-3 px-4 font-mono font-bold text-red-600">{{ $b->failed_count }}</td>
-                            <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">{{ $b->created_at->format('Y-m-d H:i') }}</td>
+                            <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">
+                                {{ $b->created_at->format('Y-m-d H:i') }}</td>
                             <td class="py-3 px-4 text-right">
                                 @if($b->failed_count > 0)
-                                    <x-ui.button wire:click="downloadErrorCsv({{ $b->id }})" variant="secondary" class="text-[10px]">
+                                    <x-ui.button wire:click="downloadErrorCsv({{ $b->id }})" variant="secondary"
+                                        class="text-[10px]">
                                         Error CSV
                                     </x-ui.button>
                                 @else

@@ -6,22 +6,20 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
                 <label class="font-bold text-ink">Date & Time</label>
-                <input type="datetime-local" wire:model="scheduledAt" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="datetime-local" wire:model="scheduledAt"
+                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink transition mt-1">
             </div>
 
             <div>
                 <label class="font-bold text-ink">Meeting Mode</label>
-                <x-ui.themed-select 
-                    wire:model="meetingType"
-                    :options="['in_person' => 'In Person', 'virtual_zoom' => 'Virtual Google Meet / Zoom', 'site_office' => 'Site Experience Center']"
-                    placeholder="Meeting Mode"
-                    class="w-full mt-1"
-                />
+                <x-ui.themed-select wire:model="meetingType" :options="['in_person' => 'In Person', 'virtual_zoom' => 'Virtual Google Meet / Zoom', 'site_office' => 'Site Experience Center']" placeholder="Meeting Mode"
+                    class="w-full mt-1" />
             </div>
 
             <div class="md:col-span-2">
                 <label class="font-bold text-ink">Location / Link</label>
-                <input type="text" wire:model="location" placeholder="e.g. Bandra Sales Office or Google Meet Link" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="text" wire:model="location" placeholder="e.g. Bandra Sales Office or Google Meet Link"
+                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink transition mt-1">
             </div>
 
             <div class="md:col-span-2">
@@ -38,7 +36,8 @@
 
             <div class="md:col-span-2">
                 <label class="font-bold text-ink">Agenda & Notes</label>
-                <textarea wire:model="notes" rows="3" placeholder="Key topics to discuss..." class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
+                <textarea wire:model="notes" rows="3" placeholder="Key topics to discuss..."
+                    class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
             </div>
         </div>
 

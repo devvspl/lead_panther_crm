@@ -10,7 +10,7 @@
     wire:click="{{ $target }}"
     wire:loading.attr="disabled"
     wire:target="{{ $target }}"
-    {{ $attributes->merge(['class' => 'border border-border bg-white rounded-lg px-3.5 py-2 text-xs font-semibold text-ink hover:bg-canvas transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ' . $class]) }}
+    {{ $attributes->merge(['class' => 'h-8 border border-border bg-white rounded-lg px-3.5 text-xs font-semibold text-ink hover:bg-canvas transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ' . $class]) }}
 >
     <!-- Idle Icon (Spreadsheet) -->
     <svg wire:loading.remove wire:target="{{ $target }}" class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

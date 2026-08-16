@@ -25,7 +25,7 @@
             <span class="text-muted font-normal">vs last month</span>
         </div>
     </div>
-    <div class="h-10 w-10 rounded-full bg-canvas border border-border flex items-center justify-center text-ink flex-shrink-0">
+    <div class="h-8 w-10 rounded-full bg-canvas border border-border flex items-center justify-center text-ink flex-shrink-0">
         @if($cardIcon === 'users')
             <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         @elseif($cardIcon === 'wallet')

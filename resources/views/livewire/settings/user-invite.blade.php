@@ -16,12 +16,12 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
                 <label class="font-bold text-ink">Full Name</label>
-                <input type="text" wire:model="name" placeholder="e.g. Priya Sharma" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="text" wire:model="name" placeholder="e.g. Priya Sharma" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1">
             </div>
 
             <div>
                 <label class="font-bold text-ink">Work Email Address</label>
-                <input type="email" wire:model="email" placeholder="priya@company.com" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="email" wire:model="email" placeholder="priya@company.com" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1">
             </div>
 
             <div>

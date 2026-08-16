@@ -3,7 +3,8 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Builder Direct Team Management</h1>
-            <p class="text-xs text-muted">Manage your developer organization's sales executives and account managers.</p>
+            <p class="text-xs text-muted">Manage your developer organization's sales executives and account managers.
+            </p>
         </div>
     </div>
 
@@ -16,22 +17,19 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
                 <label class="font-bold text-ink">Full Name</label>
-                <input type="text" wire:model="memberName" placeholder="e.g. Vikram Sethi" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="text" wire:model="memberName" placeholder="e.g. Vikram Sethi"
+                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1">
             </div>
 
             <div>
                 <label class="font-bold text-ink">Email Address</label>
-                <input type="email" wire:model="memberEmail" placeholder="vikram@builder.com" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                <input type="email" wire:model="memberEmail" placeholder="vikram@builder.com"
+                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1">
             </div>
 
             <div>
                 <label class="font-bold text-ink">Role</label>
-                <x-ui.themed-select 
-                    wire:model="roleName"
-                    :options="['Sales Executive' => 'Sales Executive', 'Account Manager' => 'Account Manager']"
-                    placeholder="Role"
-                    class="w-full mt-1"
-                />
+                <x-ui.themed-select wire:model="roleName" :options="['Sales Executive' => 'Sales Executive', 'Account Manager' => 'Account Manager']" placeholder="Role" class="w-full mt-1" />
             </div>
         </div>
 
@@ -63,7 +61,8 @@
                             <td class="py-3 px-4 font-bold text-ink">{{ $m->name }}</td>
                             <td class="py-3 px-4 font-mono text-muted">{{ $m->email }}</td>
                             <td class="py-3 px-4">
-                                <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-purple-50 text-purple-700 border border-purple-200">
+                                <span
+                                    class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-purple-50 text-purple-700 border border-purple-200">
                                     {{ $m->roles->first()?->name ?? 'Sales Executive' }}
                                 </span>
                             </td>

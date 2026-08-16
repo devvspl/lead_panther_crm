@@ -16,7 +16,7 @@
                 type="text" 
                 wire:model.live.debounce.300ms="search" 
                 placeholder="Search user name or email..." 
-                class="text-xs p-2.5 rounded-lg border border-border bg-canvas text-ink w-64"
+                class="h-8 text-xs px-3.5 rounded-lg border border-border bg-canvas text-ink w-64 focus:outline-none focus:ring-2 focus:ring-ink transition"
             >
 
             <x-ui.themed-select 

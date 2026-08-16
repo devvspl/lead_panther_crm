@@ -6,7 +6,7 @@
             <p class="text-xs text-muted">Upload multi-lead spreadsheets, map column headers, and run through duplicate protection.</p>
         </div>
 
-        <a href="{{ route('leads.upload-history') }}" class="text-xs font-bold text-primary hover:underline">
+        <a href="{{ route('leads.upload-history') }}" wire:navigate class="text-xs font-bold text-primary hover:underline">
             View Upload History
         </a>
     </div>
@@ -42,7 +42,7 @@
             <div class="border-2 border-dashed border-border rounded-xl p-8 text-center bg-canvas/40 hover:bg-canvas transition space-y-3">
                 <input type="file" wire:model="file" id="fileUploadInput" class="hidden" accept=".csv,.xlsx,.xls,.txt">
                 <label for="fileUploadInput" class="cursor-pointer space-y-2 block">
-                    <svg class="w-10 h-10 mx-auto text-muted opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    <svg class="w-10 h-8 mx-auto text-muted opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                     <span class="text-xs font-bold text-ink block">Click to Browse or Drag CSV / Excel File</span>
                     <span class="text-[11px] text-muted block">Supports .csv, .xlsx, .xls (Max 10MB)</span>
                 </label>

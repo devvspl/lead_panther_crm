@@ -21,6 +21,8 @@ export default {
                 border: '#E5E7EB',
                 muted: '#6B7280',
                 accent: '#111827',
+                primary: '#111827',
+                'primary-hover': '#000000',
                 success: '#16A34A',
                 warning: '#F59E0B',
                 danger: '#DC2626',

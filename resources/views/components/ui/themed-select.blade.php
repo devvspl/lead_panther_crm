@@ -51,7 +51,7 @@
     <button 
         type="button" 
         @click="open = !open" 
-        class="text-xs px-2.5 py-1.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition flex items-center justify-between gap-2 min-w-[130px]"
+        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap"
     >
         <span class="truncate font-semibold" x-text="selectedLabel"></span>
         <svg class="w-3.5 h-3.5 text-muted transition-transform duration-150 shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,34 +73,34 @@
         @if($searchable)
             x-effect="if (open) $nextTick(() => $refs.searchInput && $refs.searchInput.focus())"
         @endif
-        class="absolute left-0 z-50 mt-1.5 w-56 bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1"
+        class="absolute left-0 z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5"
     >
         @if($searchable)
             <!-- Search Input Header -->
-            <div class="relative p-0.5">
+            <div class="relative">
                 <input 
                     x-ref="searchInput"
                     x-model="search"
                     type="text" 
                     placeholder="Search..." 
-                    class="w-full pl-7 pr-3 py-1.5 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-2 focus:ring-ink focus:outline-none"
+                    class="w-full h-9 pl-8 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:outline-none placeholder:text-muted transition"
                 />
-                <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
         @endif
 
-        <div class="max-h-52 overflow-y-auto sidebar-scroll space-y-0.5 pr-0.5">
+        <div class="max-h-52 overflow-y-auto sidebar-scroll space-y-0.5">
             <template x-for="opt in filteredOptions" :key="opt.value">
                 <button 
                     type="button" 
                     @click="select(opt.value)" 
-                    class="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
+                    class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between gap-3"
                     :class="String(value) === String(opt.value) ? 'bg-canvas text-ink font-bold' : 'text-ink'"
                 >
                     <span class="truncate" x-text="opt.label"></span>
-                    <span x-show="String(value) === String(opt.value)" class="text-ink text-xs font-bold">✓</span>
+                    <span x-show="String(value) === String(opt.value)" class="text-ink text-xs font-bold shrink-0">✓</span>
                 </button>
             </template>
             <div x-show="filteredOptions.length === 0" class="py-2 text-center text-muted text-[11px]">

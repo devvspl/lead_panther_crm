@@ -45,7 +45,7 @@
                             </td>
                             <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
                                 @if($req->status === 'pending')
-                                    <button wire:click="openApproveModal({{ $req->id }})" class="px-2.5 py-1 text-xs font-bold text-white bg-primary rounded hover:bg-primary-hover transition">
+                                    <button wire:click="openApproveModal({{ $req->id }})" class="px-2.5 py-1 text-xs font-bold text-white bg-accent rounded hover:bg-black transition">
                                         Approve ✓
                                     </button>
                                     <button wire:click="openRejectModal({{ $req->id }})" class="px-2.5 py-1 text-xs font-bold text-danger bg-canvas rounded hover:bg-red-50 border border-border transition">
@@ -84,7 +84,7 @@
 
                 <div class="flex justify-end space-x-2 pt-2">
                     <button wire:click="$set('showApproveModal', false)" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold">Cancel</button>
-                    <button wire:click="approveRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-primary rounded hover:bg-primary-hover">Confirm Approval ✓</button>
+                    <button wire:click="approveRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-accent rounded hover:bg-black">Confirm Approval ✓</button>
                 </div>
             </div>
         </div>

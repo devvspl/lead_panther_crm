@@ -63,30 +63,44 @@
 <script>
     (function() {
         function updateSidebarActiveNav() {
-            const rawPath = window.location.pathname.replace(/\/$/, '') || '/';
+            const rawPath = (window.location.pathname.replace(/\/$/, '') || '/').toLowerCase();
+            const navElements = Array.from(document.querySelectorAll('[data-nav-route]'));
             
-            document.querySelectorAll('[data-nav-route]').forEach(el => {
-                const route = (el.dataset.navRoute || '').replace(/^\//, '').replace(/\/$/, '');
-                const exact = el.dataset.navExact === 'true';
+            let bestElement = null;
+            let bestMatchLength = -1;
+            
+            navElements.forEach(el => {
+                const route = (el.dataset.navRoute || '').replace(/^\//, '').replace(/\/$/, '').toLowerCase();
                 const matchRoot = el.dataset.navRoot === 'true';
                 const target = '/' + route;
                 
-                let isActive = false;
+                let isMatch = false;
+                let matchLength = 0;
                 
                 if (matchRoot && (rawPath === '/' || rawPath === '/dashboard' || rawPath.endsWith('/dashboard'))) {
-                    isActive = true;
-                } else if (exact) {
-                    isActive = (rawPath === target || rawPath === target + '/kanban');
-                } else {
-                    isActive = (rawPath === target || rawPath.startsWith(target + '/'));
+                    isMatch = true;
+                    matchLength = 100;
+                } else if (rawPath === target) {
+                    isMatch = true;
+                    matchLength = target.length + 1000;
+                } else if (target !== '/' && (rawPath.startsWith(target + '/') || rawPath.startsWith(target + '-'))) {
+                    isMatch = true;
+                    matchLength = target.length;
                 }
                 
-                if (isActive) {
+                if (isMatch && matchLength > bestMatchLength) {
+                    bestMatchLength = matchLength;
+                    bestElement = el;
+                }
+            });
+            
+            navElements.forEach(el => {
+                if (el === bestElement) {
                     el.classList.add('bg-ink', 'text-white');
                     el.classList.remove('text-muted', 'hover:bg-canvas', 'hover:text-ink');
                 } else {
                     el.classList.remove('bg-ink', 'text-white');
-                    el.classList.add('text-muted');
+                    el.classList.add('text-muted', 'hover:bg-canvas', 'hover:text-ink');
                 }
             });
         }

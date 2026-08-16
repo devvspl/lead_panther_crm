@@ -4,9 +4,8 @@
          <!-- Filter Controls -->
         <div class="flex flex-wrap items-center gap-3">
             <!-- Search -->
-            <div class="relative w-44 sm:w-56">
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search leads..." class="w-full pl-8 pr-3 py-1.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:bg-surface">
-                <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <div class="relative w-40 sm:w-48">
+                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search leads..." class="w-full h-8 pl-3 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:bg-surface">
             </div>
 
             <!-- Sort By Filter -->
@@ -50,7 +49,7 @@
             />
 
             <!-- SLA Breached Toggle -->
-            <label class="flex items-center space-x-1.5 text-xs text-ink cursor-pointer bg-canvas px-2.5 py-1 rounded-lg border border-border select-none">
+            <label class="flex items-center space-x-1.5 h-8 text-xs text-ink cursor-pointer bg-canvas px-3.5 rounded-lg border border-border select-none">
                 <input type="checkbox" wire:model.live="sla_breached" class="rounded text-ink focus:ring-ink">
                 <span class="font-medium text-danger">SLA Breached Only</span>
             </label>
@@ -79,7 +78,39 @@
     @endif
 
     <!-- Kanban Board Grid (Horizontal Scrollable Container) -->
-    <div class="overflow-x-auto pb-6">
+    <div 
+        x-data="{
+            isMouseDown: false,
+            startX: 0,
+            scrollLeft: 0,
+            onMouseDown(e) {
+                if (e.button !== 0) return;
+                if (e.target.closest('button, input, select, a, [data-lead-id]')) return;
+                this.isMouseDown = true;
+                this.startX = e.pageX - $el.offsetLeft;
+                this.scrollLeft = $el.scrollLeft;
+            },
+            onMouseMove(e) {
+                if (!this.isMouseDown) return;
+                e.preventDefault();
+                const x = e.pageX - $el.offsetLeft;
+                const walk = (x - this.startX) * 1.5;
+                $el.scrollLeft = this.scrollLeft - walk;
+            },
+            onMouseUp() {
+                this.isMouseDown = false;
+            },
+            onMouseLeave() {
+                this.isMouseDown = false;
+            }
+        }"
+        @mousedown="onMouseDown($event)"
+        @mousemove="onMouseMove($event)"
+        @mouseup="onMouseUp()"
+        @mouseleave="onMouseLeave()"
+        :class="isMouseDown ? 'cursor-grabbing select-none' : 'cursor-grab'"
+        class="overflow-x-auto pb-6"
+    >
         <div class="flex items-start space-x-4 min-w-max">
             <!-- Main Flow Columns -->
             @foreach($mainStages as $stageKey => $stageLabel)

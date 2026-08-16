@@ -77,9 +77,24 @@ class SearchableSelect extends Component
 
             // Org Scoping for User model if non-super-admin user has organization_id
             $user = auth()->user();
-            if ($user && !$user->hasRole('Super Admin')) {
+            if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
                 if ($this->model === \App\Models\User::class && $user->organization_id) {
                     $query->where('organization_id', $user->organization_id);
+                }
+                if ($this->model === \App\Models\SalesTeam::class) {
+                    if ($user->hasRole('channel-partner') || $user->hasRole('Channel Partner')) {
+                        $query->where(function ($q) use ($user) {
+                            $q->where(function ($sub) use ($user) {
+                                $sub->where('ownable_type', \App\Models\Organization::class)
+                                    ->where('ownable_id', $user->organization_id);
+                            })->orWhereHas('members', function ($sub) use ($user) {
+                                $sub->where('user_id', $user->id);
+                            });
+                        });
+                    } elseif ($user->organization_id) {
+                        $query->where('ownable_type', \App\Models\Organization::class)
+                              ->where('ownable_id', $user->organization_id);
+                    }
                 }
             }
 

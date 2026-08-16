@@ -5,9 +5,12 @@ namespace Tests\Feature\Admin;
 use Tests\TestCase;
 use App\Models\User;
 use App\Livewire\Admin\BackupStatus;
+use App\Jobs\RunBackupJob;
 use Livewire\Livewire;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 
 class BackupAndErrorPagesTest extends TestCase
@@ -17,12 +20,14 @@ class BackupAndErrorPagesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Channel Partner']);
+        Role::firstOrCreate(['name' => 'Super Admin']);
+        Role::firstOrCreate(['name' => 'Channel Partner']);
     }
 
-    public function test_backup_status_view_renders_and_runs_backup(): void
+    public function test_backup_status_view_renders_and_dispatches_run_backup_job(): void
     {
+        Queue::fake();
+
         $admin = User::factory()->create();
         $admin->assignRole('Super Admin');
 
@@ -30,7 +35,27 @@ class BackupAndErrorPagesTest extends TestCase
             ->test(BackupStatus::class)
             ->assertSee('System Backups')
             ->assertSee('Available Backup Archives')
+            ->call('runBackup')
+            ->assertSet('backupRunning', true);
+
+        Queue::assertPushed(RunBackupJob::class);
+    }
+
+    public function test_check_backup_status_completes_when_cache_cleared(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $test = Livewire::actingAs($admin)
+            ->test(BackupStatus::class)
             ->call('runBackup');
+
+        // Simulate job completion by removing cache flag
+        Cache::forget('backup_running_' . $admin->id);
+
+        $test->call('checkBackupStatus')
+            ->assertSet('backupRunning', false)
+            ->assertDispatched('toast');
     }
 
     public function test_custom_403_error_page_renders_with_app_debug_false(): void

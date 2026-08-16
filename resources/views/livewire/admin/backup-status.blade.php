@@ -1,4 +1,8 @@
 <div class="space-y-6">
+    @if($backupRunning)
+        <div wire:poll.3s="checkBackupStatus"></div>
+    @endif
+
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -7,17 +11,34 @@
         </div>
 
         <div class="flex space-x-2">
-            <button wire:click="runBackup" wire:loading.attr="disabled" wire:target="runBackup" class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-black transition flex items-center gap-2 disabled:opacity-50">
-                <span wire:loading.remove wire:target="runBackup">Run Backup Now</span>
-                <span wire:loading wire:target="runBackup" class="flex items-center gap-2">
-                    <svg class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <button 
+                wire:click="runBackup" 
+                wire:loading.attr="disabled" 
+                wire:target="runBackup" 
+                @if($backupRunning) disabled @endif
+                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-xs"
+            >
+                @if(!$backupRunning)
+                    <span wire:loading.remove wire:target="runBackup">Run Backup Now</span>
+                @endif
+
+                <span 
+                    @if(!$backupRunning) wire:loading wire:target="runBackup" @else class="flex items-center gap-2" @endif
+                >
+                    <svg class="animate-spin h-3.5 w-3.5 text-ink" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     Executing Backup...
                 </span>
             </button>
-            <button wire:click="cleanBackups" wire:loading.attr="disabled" wire:target="cleanBackups" class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition flex items-center gap-2 disabled:opacity-50">
+
+            <button 
+                wire:click="cleanBackups" 
+                wire:loading.attr="disabled" 
+                wire:target="cleanBackups" 
+                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-xs"
+            >
                 <span wire:loading.remove wire:target="cleanBackups">Clean Old Backups</span>
                 <span wire:loading wire:target="cleanBackups" class="flex items-center gap-2">
                     <svg class="animate-spin h-3.5 w-3.5 text-ink" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -29,8 +50,6 @@
             </button>
         </div>
     </div>
-
-
 
     <!-- Backup Status Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -49,10 +49,15 @@
                                 {{ $b->created_at->format('Y-m-d H:i') }}</td>
                             <td class="py-3 px-4 text-right">
                                 @if($b->failed_count > 0)
-                                    <x-ui.button wire:click="downloadErrorCsv({{ $b->id }})" variant="secondary"
-                                        class="text-[10px]">
+                                    <a href="{{ route('leads.download-errors', $b->id) }}"
+                                        download="upload_errors_batch_{{ $b->id }}.csv"
+                                        data-navigate-skip
+                                        wire:navigate.skip
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="h-7 px-3 bg-canvas border border-border hover:bg-canvas/80 text-ink font-bold text-[10px] rounded-md transition shadow-sm inline-flex items-center gap-1 cursor-pointer">
                                         Error CSV
-                                    </x-ui.button>
+                                    </a>
                                 @else
                                     <span class="text-[10px] text-muted font-semibold">Clean Import</span>
                                 @endif

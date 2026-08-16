@@ -17,7 +17,7 @@ class BulkLeadUpload extends Component
 {
     use WithFileUploads;
 
-    public $file;
+    public $file = null;
     public int $step = 1;
 
     // File preview & stored row data
@@ -44,45 +44,92 @@ class BulkLeadUpload extends Component
         'requirement' => 'Requirement / Notes',
     ];
 
+    public function mount(): void
+    {
+        $this->resetMappingDefaults();
+    }
+
+    protected function resetMappingDefaults(): void
+    {
+        foreach ($this->availableFields as $fieldKey => $label) {
+            if (!isset($this->columnMapping[$fieldKey])) {
+                $this->columnMapping[$fieldKey] = '';
+            }
+        }
+    }
+
     public function updatedFile(): void
     {
+        $this->resetMappingDefaults();
+
         $this->validate([
             'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
-        $path = $this->file->getRealPath();
-        $handle = fopen($path, 'r');
+        try {
+            $path = $this->file->getRealPath();
+            $extension = strtolower($this->file->getClientOriginalExtension());
+            $rows = [];
 
-        if ($handle !== false) {
-            $this->headers = [];
-            $this->previewRows = [];
-            $this->allCsvRows = [];
+            if (in_array($extension, ['xlsx', 'xls'])) {
+                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+                $worksheet = $spreadsheet->getActiveSheet();
+                $rawRows = $worksheet->toArray();
 
-            // Read Header Row
-            $headerRow = fgetcsv($handle);
-            if ($headerRow) {
+                foreach ($rawRows as $r) {
+                    if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string)$v) !== ''))) {
+                        $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string)($v ?? '')), 'UTF-8', 'UTF-8'), $r);
+                    }
+                }
+            } else {
+                $handle = fopen($path, 'r');
+                if ($handle !== false) {
+                    while (($r = fgetcsv($handle)) !== false) {
+                        if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string)$v) !== ''))) {
+                            $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string)($v ?? '')), 'UTF-8', 'UTF-8'), $r);
+                        }
+                    }
+                    fclose($handle);
+                }
+            }
+
+            if (!empty($rows)) {
+                $this->headers = [];
+                $this->previewRows = [];
+                $this->allCsvRows = [];
+
+                // Detect actual header row (handling BaseStyledExport masthead banners)
+                $headerRowIndex = 0;
+                foreach ($rows as $idx => $r) {
+                    $rowText = strtolower(implode(' ', $r));
+                    if (
+                        str_contains($rowText, 'mobile') || 
+                        str_contains($rowText, 'phone') || 
+                        str_contains($rowText, 'email') || 
+                        str_contains($rowText, 'name')
+                    ) {
+                        $headerRowIndex = $idx;
+                        break;
+                    }
+                }
+
+                $headerRow = $rows[$headerRowIndex] ?? [];
                 foreach ($headerRow as $index => $col) {
                     $this->headers[$index] = trim($col);
                 }
+
+                $this->allCsvRows = array_slice($rows, $headerRowIndex + 1);
+                $this->previewRows = array_slice($this->allCsvRows, 0, 10);
+                $this->autoGuessColumnMapping();
             }
-
-            // Read All Data Rows
-            while (($row = fgetcsv($handle)) !== false) {
-                if (!empty(array_filter($row))) {
-                    $this->allCsvRows[] = $row;
-                }
-            }
-
-            fclose($handle);
-
-            $this->previewRows = array_slice($this->allCsvRows, 0, 10);
-            $this->autoGuessColumnMapping();
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Failed to parse file: ' . $e->getMessage());
         }
     }
 
     protected function autoGuessColumnMapping(): void
     {
-        $this->columnMapping = [];
+        $this->resetMappingDefaults();
 
         foreach ($this->headers as $index => $header) {
             $normalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', $header)));
@@ -95,11 +142,11 @@ class BulkLeadUpload extends Component
                 $this->columnMapping['email'] = (string) $index;
             } elseif (in_array($normalized, ['city', 'location', 'town', 'address'])) {
                 $this->columnMapping['city'] = (string) $index;
-            } elseif (in_array($normalized, ['budget', 'price', 'amount', 'investment'])) {
+            } elseif (in_array($normalized, ['budget', 'price', 'amount', 'investment', 'budgetinr'])) {
                 $this->columnMapping['budget'] = (string) $index;
             } elseif (in_array($normalized, ['propertytype', 'property', 'unittype', 'configuration', 'type'])) {
                 $this->columnMapping['property_type'] = (string) $index;
-            } elseif (in_array($normalized, ['requirement', 'notes', 'description', 'remarks', 'comments'])) {
+            } elseif (in_array($normalized, ['requirement', 'notes', 'description', 'remarks', 'comments', 'requirementnotes'])) {
                 $this->columnMapping['requirement'] = (string) $index;
             }
         }
@@ -174,13 +221,10 @@ class BulkLeadUpload extends Component
                 }
 
                 // Create Inbound Lead
-                static $seq = 5000;
-                $seq++;
-
                 $effectiveSourceId = $this->leadSourceId ?? (LeadSource::first()?->id ?? LeadSource::create(['name' => 'csv_import'])->id);
 
                 $lead = Lead::create([
-                    'lead_code' => 'LP-' . date('Y') . '-' . str_pad($seq, 8, '0', STR_PAD_LEFT),
+                    'lead_code' => Lead::generateUniqueLeadCode(),
                     'client_id' => $project->client_id,
                     'project_id' => $project->id,
                     'campaign_id' => $this->campaignId,
@@ -244,6 +288,11 @@ class BulkLeadUpload extends Component
 
             fclose($output);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    public function downloadTemplate(): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LeadImportTemplateExport(), 'Lead_Import_Template.xlsx');
     }
 
     public function render()

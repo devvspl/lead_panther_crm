@@ -6,9 +6,26 @@
             <p class="text-xs text-muted">Upload multi-lead spreadsheets, map column headers, and run through duplicate protection.</p>
         </div>
 
-        <a href="{{ route('leads.upload-history') }}" wire:navigate class="text-xs font-bold text-primary hover:underline">
-            View Upload History
-        </a>
+        <div class="flex items-center space-x-3">
+            <a 
+                href="{{ route('leads.download-template') }}" 
+                download="Lead_Import_Template.xlsx"
+                data-navigate-skip
+                wire:navigate.skip
+                target="_blank"
+                rel="noopener noreferrer"
+                class="h-9 px-3.5 border border-border bg-white rounded-lg text-xs font-semibold text-ink hover:bg-canvas transition inline-flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+                <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 01-2 2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Download Import Format (.xlsx)</span>
+            </a>
+
+            <a href="{{ route('leads.upload-history') }}" wire:navigate class="text-xs font-bold text-primary hover:underline">
+                View Upload History
+            </a>
+        </div>
     </div>
 
 
@@ -201,9 +218,17 @@
                     <span class="text-xs font-bold text-red-700">
                         {{ $completedBatch->failed_count }} rows failed validation. Download the Error CSV to review detailed failure reasons.
                     </span>
-                    <x-ui.button wire:click="downloadErrorCsv({{ $completedBatch->id }})" variant="danger" class="text-xs">
+                    <a 
+                        href="{{ route('leads.download-errors', $completedBatch->id) }}" 
+                        download="upload_errors_batch_{{ $completedBatch->id }}.csv"
+                        data-navigate-skip
+                        wire:navigate.skip
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="h-8 px-3.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+                    >
                         Download Error CSV
-                    </x-ui.button>
+                    </a>
                 </div>
             @endif
 

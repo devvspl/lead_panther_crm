@@ -48,6 +48,26 @@ Route::get('/leads/kanban', LeadKanban::class)->middleware(['auth'])->name('lead
 
 Route::get('/leads/upload', \App\Livewire\Leads\BulkLeadUpload::class)->middleware(['auth'])->name('leads.upload');
 
+Route::get('/leads/download-template', function () {
+    return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LeadImportTemplateExport(), 'Lead_Import_Template.xlsx');
+})->middleware(['auth'])->name('leads.download-template');
+
+Route::get('/leads/download-errors/{batch}', function (\App\Models\UploadBatch $batch) {
+    $errors = $batch->error_log ?? [];
+    $filename = "upload_errors_batch_{$batch->id}.csv";
+
+    return response()->streamDownload(function () use ($errors) {
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['Row Number', 'Raw Data', 'Failure Reason']);
+
+        foreach ($errors as $err) {
+            fputcsv($output, [$err['row'] ?? '', $err['data'] ?? '', $err['reason'] ?? '']);
+        }
+
+        fclose($output);
+    }, $filename, ['Content-Type' => 'text/csv']);
+})->middleware(['auth'])->name('leads.download-errors');
+
 Route::get('/leads/upload-history', \App\Livewire\Leads\UploadHistory::class)->middleware(['auth'])->name('leads.upload-history');
 
 // Client Credit Wallet Route

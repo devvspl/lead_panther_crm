@@ -19,6 +19,19 @@ class Lead extends Model
         'first_response_at' => 'datetime',
     ];
 
+    public static function generateUniqueLeadCode(string $prefix = 'LP'): string
+    {
+        $year = date('Y');
+        $maxId = (int) static::withoutGlobalScopes()->max('id');
+
+        do {
+            $maxId++;
+            $code = sprintf('%s-%s-%08d', $prefix, $year, $maxId);
+        } while (static::withoutGlobalScopes()->where('lead_code', $code)->exists());
+
+        return $code;
+    }
+
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
@@ -111,7 +124,7 @@ class Lead extends Model
         }
 
         // Outbound Message
-        if ($this->messages()->where('direction', 'outbound')->exists() || $this->communications()->where('direction', 'outbound')->exists()) {
+        if ($this->messages()->where('direction', 'outbound')->exists() || $this->communications()->exists()) {
             $score += $weights['engagement']['outbound_message_reply'] ?? 10;
         }
 

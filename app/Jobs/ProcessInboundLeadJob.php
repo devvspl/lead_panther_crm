@@ -91,10 +91,8 @@ class ProcessInboundLeadJob implements ShouldQueue
             }
 
             // 3. Create New Lead Master Record
-            static $num = 5000;
-            $num++;
             $lead = Lead::create([
-                'lead_code' => 'LP-' . date('Y') . '-' . str_pad($num, 5, '0', STR_PAD_LEFT),
+                'lead_code' => Lead::generateUniqueLeadCode(),
                 'client_id' => $clientId,
                 'project_id' => $projectId,
                 'campaign_id' => null,

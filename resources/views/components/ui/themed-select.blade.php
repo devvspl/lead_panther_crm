@@ -28,19 +28,21 @@
     x-data="{ 
         open: false, 
         search: '',
-        value: @if($wireModel) $wire.entangle('{{ $wireModel }}') @else '{{ $attributes->get('value', '') }}' @endif,
+        value: @if($wireModel) ($wire.entangle('{{ $wireModel }}') ?? '') @else '{{ $attributes->get('value', '') }}' @endif,
         options: {{ json_encode($normalizedOptions) }},
         get filteredOptions() {
-            if (!this.search || !this.search.trim()) return this.options;
+            if (!this.search || !this.search.trim()) return this.options || [];
             let q = this.search.toLowerCase().trim();
-            return this.options.filter(o => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+            return (this.options || []).filter(o => (o.label || '').toLowerCase().includes(q) || (o.value || '').toLowerCase().includes(q));
         },
         get selectedLabel() {
-            let found = this.options.find(o => String(o.value) === String(this.value));
+            if (this.value === undefined || this.value === null) return '{{ $placeholder }}';
+            let valStr = String(this.value);
+            let found = (this.options || []).find(o => String(o.value) === valStr);
             return found ? found.label : '{{ $placeholder }}';
         },
         select(val) {
-            this.value = val;
+            this.value = val ?? '';
             this.open = false;
             this.search = '';
         }

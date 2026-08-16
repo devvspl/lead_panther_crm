@@ -101,4 +101,32 @@ class BulkLeadUploadTest extends TestCase
         $this->assertNotNull($batch);
         $this->assertCount(1, $batch->error_log);
     }
+
+    public function test_download_import_template_executes_successfully(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(BulkLeadUpload::class)
+            ->call('downloadTemplate')
+            ->assertFileDownloaded('Lead_Import_Template.xlsx');
+    }
+
+    public function test_excel_upload_parses_headers_and_rows_without_json_error(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $csvContent = "Full Name,Mobile Number,Email Address\nTest Person,+919988776655,test@example.com\n";
+        $file = UploadedFile::fake()->createWithContent('test_leads.csv', $csvContent);
+
+        Livewire::actingAs($admin)
+            ->test(BulkLeadUpload::class)
+            ->set('file', $file)
+            ->assertSet('headers', ['Full Name', 'Mobile Number', 'Email Address'])
+            ->assertSet('columnMapping.mobile', '1')
+            ->assertSet('columnMapping.name', '0')
+            ->assertSet('columnMapping.email', '2');
+    }
 }

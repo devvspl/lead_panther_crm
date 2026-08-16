@@ -41,7 +41,6 @@ class BackfillFirstResponseCommand extends Command
 
             // Earliest Outbound Communication
             $earliestComm = LeadCommunication::where('lead_id', $lead->id)
-                ->where('direction', 'outbound')
                 ->min('created_at');
             if ($earliestComm) {
                 $earliestTimestamps[] = $earliestComm;

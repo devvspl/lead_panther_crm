@@ -69,4 +69,18 @@ class LeadKanbanTest extends TestCase
             'to_status' => 'contacted',
         ]);
     }
+
+    public function test_kanban_board_contains_searchable_select_for_projects_and_agents(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('super-admin');
+
+        Livewire::actingAs($user)
+            ->test(LeadKanban::class)
+            ->assertSeeLivewire('shared.searchable-select')
+            ->assertSee('Sort By')
+            ->assertSee('All Projects')
+            ->assertSee('All Agents')
+            ->assertSee('All Sources');
+    }
 }

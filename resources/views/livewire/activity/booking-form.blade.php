@@ -8,6 +8,7 @@
                 <label class="font-bold text-ink">Project Unit to Lock</label>
                 <livewire:shared.searchable-select 
                     :model="\App\Models\ProjectUnit::class"
+                    :searchable="true"
                     placeholder="Select Unit to Lock"
                     wire:model="projectUnitId"
                     key="book-unit"

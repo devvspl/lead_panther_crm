@@ -23,6 +23,7 @@
                 wire:model.live="roleFilter"
                 :options="['' => 'All Roles', 'super-admin' => 'Super Admin', 'builder' => 'Builder', 'channel-partner' => 'Channel Partner', 'sales-executive' => 'Sales Executive', 'account-manager' => 'Account Manager', 'client' => 'Client']"
                 placeholder="All Roles"
+                searchable="true"
             />
 
             <x-ui.export-button target="exportExcel" />

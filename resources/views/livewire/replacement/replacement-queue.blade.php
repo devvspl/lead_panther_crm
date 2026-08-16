@@ -43,6 +43,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <livewire:shared.searchable-select 
                     :model="\App\Models\Client::class"
+                    :searchable="true"
                     placeholder="All Clients"
                     wire:model.live="filterClient"
                     key="filter-client"
@@ -50,6 +51,7 @@
 
                 <livewire:shared.searchable-select 
                     :model="\App\Models\Project::class"
+                    :searchable="true"
                     placeholder="All Projects"
                     wire:model.live="filterProject"
                     key="filter-project"
@@ -59,12 +61,14 @@
                     wire:model.live="filterStatus"
                     :options="['' => 'All Statuses', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected']"
                     placeholder="All Statuses"
+                    searchable="true"
                 />
 
                 <x-ui.themed-select 
                     wire:model.live="filterDateRange"
                     :options="['' => 'All Time', 'today' => 'Today', 'week' => 'Last 7 Days', 'month' => 'Last 30 Days']"
                     placeholder="All Time"
+                    searchable="true"
                 />
 
                 <x-ui.export-button target="exportExcel" />

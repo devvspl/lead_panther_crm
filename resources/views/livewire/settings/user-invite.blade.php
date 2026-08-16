@@ -30,6 +30,7 @@
                     wire:model="roleName"
                     :options="['sales-executive' => 'Sales Executive', 'account-manager' => 'Account Manager', 'builder' => 'Builder Manager', 'channel-partner' => 'Channel Partner Manager']"
                     placeholder="Assigned Role"
+                    searchable="true"
                     class="w-full mt-1"
                 />
             </div>

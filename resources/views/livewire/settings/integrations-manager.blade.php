@@ -20,6 +20,7 @@
                     wire:model="portalType"
                     :options="['meta' => 'Meta Ads (Facebook & Instagram)', 'google' => 'Google Lead Form Ads', 'portal' => 'Property Portals (99acres / MagicBricks)', 'owned' => 'Owned Web Portals']"
                     placeholder="Portal / Integration Source"
+                    searchable="true"
                     class="w-full mt-1"
                 />
             </div>

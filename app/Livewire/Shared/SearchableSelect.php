@@ -16,6 +16,7 @@ class SearchableSelect extends Component
     public string $displayColumn = 'name';
     public string $placeholder = 'Select Option';
     public string $roleFilter = '';
+    public bool $searchable = true;
     public string $search = '';
     public int $page = 1;
     public int $perPage = 20;
@@ -27,6 +28,7 @@ class SearchableSelect extends Component
         string $displayColumn = 'name',
         string $placeholder = 'Select Option',
         string $roleFilter = '',
+        bool $searchable = true,
         $value = null
     ): void {
         $this->model = $model;
@@ -35,6 +37,7 @@ class SearchableSelect extends Component
         $this->displayColumn = $displayColumn;
         $this->placeholder = $placeholder;
         $this->roleFilter = $roleFilter;
+        $this->searchable = $searchable;
         $this->value = $value;
     }
 
@@ -69,10 +72,25 @@ class SearchableSelect extends Component
         if ($this->model && class_exists($this->model)) {
             $query = $this->model::query();
 
+            // Org Scoping for User model if non-super-admin user has organization_id
+            $user = auth()->user();
+            if ($user && !$user->hasRole('Super Admin')) {
+                if ($this->model === \App\Models\User::class && $user->organization_id) {
+                    $query->where('organization_id', $user->organization_id);
+                }
+            }
+
             if ($this->roleFilter) {
                 $roles = array_map('trim', explode(',', $this->roleFilter));
-                $query->whereHas('roles', function ($q) use ($roles) {
-                    $q->whereIn('name', $roles);
+                $query->where(function ($q) use ($roles) {
+                    $q->whereHas('roles', function ($rq) use ($roles) {
+                        $rq->whereIn('name', $roles);
+                    });
+                    if (in_array('sales-executive', $roles) || in_array('Sales Executive', $roles)) {
+                        $q->orWhereHas('salesTeamMembers', function ($sq) {
+                            $sq->where('is_active', true);
+                        });
+                    }
                 });
             }
 

@@ -17,6 +17,7 @@
                     wire:model.live="filterStatus"
                     :options="['' => 'All Statuses', 'processed' => 'Processed Cleanly', 'failed' => 'Failed / Errors', 'pending' => 'Pending']"
                     placeholder="All Statuses"
+                    searchable="true"
                 />
 
                 <x-ui.export-button target="exportExcel" />

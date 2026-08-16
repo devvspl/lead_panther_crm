@@ -9,6 +9,7 @@
                 wire:model.live="days"
                 :options="['7' => 'Last 7 Days', '30' => 'Last 30 Days', '90' => 'Last 90 Days']"
                 placeholder="Last 30 Days"
+                searchable="true"
             />
             <x-ui.export-button target="exportExcel" />
         </div>

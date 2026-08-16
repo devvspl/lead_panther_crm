@@ -8,7 +8,7 @@
 
         <div class="flex items-center space-x-2">
             <span class="px-2.5 py-1 text-xs font-bold rounded-pill bg-purple-50 text-purple-700 border border-purple-200">
-                🔒 PII Masking Enforced
+                PII Masking Enforced
             </span>
         </div>
     </div>
@@ -27,6 +27,7 @@
                 wire:model.live="stageFilter"
                 :options="['' => 'All Stages', 'new' => 'New', 'assigned' => 'Assigned', 'connected' => 'Connected', 'qualified' => 'Qualified', 'meeting' => 'Meeting', 'site_visit' => 'Site Visit', 'booking' => 'Booking', 'closed_won' => 'Closed Won', 'closed_lost' => 'Closed Lost']"
                 placeholder="All Stages"
+                searchable="true"
             />
 
             <x-ui.export-button target="exportExcel" />

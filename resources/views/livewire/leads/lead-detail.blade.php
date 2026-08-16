@@ -138,6 +138,7 @@
                                 <livewire:shared.searchable-select 
                                     :model="\App\Models\ReplacementReason::class"
                                     displayColumn="label"
+                                    :searchable="true"
                                     placeholder="Select reason..."
                                     wire:model="replacementReasonId"
                                     key="detail-repl-reason"

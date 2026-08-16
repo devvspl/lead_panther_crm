@@ -15,6 +15,10 @@ class CreditTransaction extends Model
     public $timestamps = false;
     protected $guarded = [];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
     public function client()
     {
         return $this->belongsTo(Client::class);

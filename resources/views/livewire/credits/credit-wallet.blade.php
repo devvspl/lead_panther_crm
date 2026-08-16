@@ -117,12 +117,14 @@
                     wire:model.live="filterType"
                     :options="['' => 'All Transaction Types', 'reserve' => 'Reserve', 'deduct' => 'Deduct', 'refund' => 'Refund', 'recharge' => 'Recharge']"
                     placeholder="All Transaction Types"
+                    searchable="true"
                 />
 
                 <x-ui.themed-select 
                     wire:model.live="filterDateRange"
                     :options="['' => 'All Time', 'today' => 'Today', 'week' => 'Last 7 Days', 'month' => 'Last 30 Days']"
                     placeholder="All Time"
+                    searchable="true"
                 />
 
                 <x-ui.export-button target="exportExcel" />

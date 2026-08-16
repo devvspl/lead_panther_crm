@@ -8,6 +8,7 @@
                 <label class="font-bold text-ink">Project Unit</label>
                 <livewire:shared.searchable-select 
                     :model="\App\Models\ProjectUnit::class"
+                    :searchable="true"
                     placeholder="Select Unit"
                     wire:model="projectUnitId"
                     key="prop-unit"

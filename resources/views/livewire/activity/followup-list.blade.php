@@ -79,6 +79,7 @@
                             wire:model="newStage"
                             :options="['' => 'Keep Current Stage', 'connected' => 'Connected', 'qualified' => 'Qualified', 'meeting' => 'Meeting Scheduled', 'site_visit' => 'Site Visit', 'negotiation' => 'Negotiation']"
                             placeholder="Keep Current Stage"
+                            searchable="true"
                             class="w-full mt-1"
                         />
                     </div>

@@ -8,6 +8,7 @@
                 <label class="font-bold text-ink">Associated Booking</label>
                 <livewire:shared.searchable-select 
                     :model="\App\Models\Booking::class"
+                    :searchable="true"
                     placeholder="Select Booking"
                     wire:model="bookingId"
                     key="pay-booking"
@@ -26,6 +27,7 @@
                     wire:model="paymentMethod"
                     :options="['bank_transfer' => 'NEFT / RTGS Bank Transfer', 'cheque' => 'Cheque', 'upi' => 'UPI / Online Gateway', 'cash' => 'Cash Token']"
                     placeholder="Payment Method"
+                    searchable="true"
                     class="w-full mt-1"
                 />
             </div>

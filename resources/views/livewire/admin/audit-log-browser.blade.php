@@ -19,6 +19,7 @@
 
             <livewire:shared.searchable-select 
                 :model="\App\Models\User::class"
+                :searchable="true"
                 placeholder="All Performing Users"
                 wire:model.live="selectedUserId"
                 key="audit-user"
@@ -28,6 +29,7 @@
                 wire:model.live="subjectType"
                 :options="['' => 'All Subject Models', 'Lead' => 'Lead', 'CreditTransaction' => 'CreditTransaction', 'LeadReplacement' => 'LeadReplacement', 'User' => 'User']"
                 placeholder="All Subject Models"
+                searchable="true"
             />
 
             <x-ui.export-button target="exportExcel" />

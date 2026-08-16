@@ -82,6 +82,7 @@
                     wire:model.live="filterType"
                     :options="['' => 'All Types', 'reserve' => 'Reserve', 'deduct' => 'Deduct', 'refund' => 'Refund', 'recharge' => 'Recharge']"
                     placeholder="All Types"
+                    searchable="true"
                 />
 
                 <x-ui.export-button target="exportExcel" />

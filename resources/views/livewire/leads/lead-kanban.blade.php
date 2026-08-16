@@ -12,6 +12,7 @@
             <!-- Sort By Filter -->
             <x-ui.themed-select 
                 wire:model.live="sort_by"
+                searchable="true"
                 :options="[
                     'created_desc' => 'Latest Created',
                     'score_desc' => 'Score: High to Low',
@@ -23,6 +24,7 @@
             <!-- Project Filter -->
             <livewire:shared.searchable-select 
                 :model="\App\Models\Project::class"
+                :searchable="true"
                 placeholder="All Projects"
                 wire:model.live="project"
                 key="select-project"
@@ -32,6 +34,7 @@
             <livewire:shared.searchable-select 
                 :model="\App\Models\User::class"
                 roleFilter="sales-executive, Sales Executive"
+                :searchable="true"
                 placeholder="All Agents"
                 wire:model.live="executive"
                 key="select-executive"
@@ -40,6 +43,7 @@
             <!-- Lead Source Filter -->
             <livewire:shared.searchable-select 
                 :model="\App\Models\LeadSource::class"
+                :searchable="true"
                 placeholder="All Sources"
                 wire:model.live="source"
                 key="select-source"

@@ -30,22 +30,26 @@
         x-transition:leave="transition ease-in duration-75" 
         x-transition:leave-start="transform opacity-100 scale-100" 
         x-transition:leave-end="transform opacity-0 scale-95" 
-        x-effect="if (open) $nextTick(() => $refs.searchInput.focus())"
+        @if($searchable ?? true)
+            x-effect="if (open) $nextTick(() => $refs.searchInput && $refs.searchInput.focus())"
+        @endif
         class="absolute left-0 z-50 mt-1.5 w-64 bg-surface rounded-card border border-border shadow-xl p-2.5 text-xs space-y-2"
     >
-        <!-- Search Input Header -->
-        <div class="relative">
-            <input 
-                x-ref="searchInput"
-                type="text" 
-                wire:model.live.debounce.300ms="search" 
-                placeholder="Search..." 
-                class="w-full pl-7 pr-3 py-1.5 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-2 focus:ring-ink focus:outline-none"
-            />
-            <svg class="w-3.5 h-3.5 text-muted absolute left-2 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-        </div>
+        @if($searchable ?? true)
+            <!-- Search Input Header -->
+            <div class="relative">
+                <input 
+                    x-ref="searchInput"
+                    type="text" 
+                    wire:model.live.debounce.300ms="search" 
+                    placeholder="Search..." 
+                    class="w-full pl-7 pr-3 py-1.5 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-2 focus:ring-ink focus:outline-none"
+                />
+                <svg class="w-3.5 h-3.5 text-muted absolute left-2 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+        @endif
 
         <!-- Results List -->
         <div class="max-h-52 overflow-y-auto sidebar-scroll space-y-0.5 pr-0.5">

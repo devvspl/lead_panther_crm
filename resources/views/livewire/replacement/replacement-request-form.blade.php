@@ -20,6 +20,7 @@
                         <livewire:shared.searchable-select 
                             :model="\App\Models\ReplacementReason::class"
                             displayColumn="label"
+                            :searchable="true"
                             placeholder="Select Replacement Reason"
                             wire:model="reasonId"
                             key="repl-reason"

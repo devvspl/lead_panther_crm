@@ -68,4 +68,47 @@ class SearchableSelectTest extends TestCase
         ->assertSet('page', 2)
         ->assertSee('Project 25');
     }
+
+    public function test_searchable_select_filters_users_by_agent_role_and_search(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Agent Org', 'type' => 'builder']);
+        $role = \Spatie\Permission\Models\Role::create(['name' => 'sales-executive']);
+        $otherRole = \Spatie\Permission\Models\Role::create(['name' => 'client']);
+
+        $agent1 = User::create([
+            'name' => 'Alice Agent',
+            'email' => 'alice@test.com',
+            'password' => bcrypt('password'),
+            'organization_id' => $org->id,
+        ]);
+        $agent1->assignRole($role);
+
+        $agent2 = User::create([
+            'name' => 'Bob Sales Exec',
+            'email' => 'bob@test.com',
+            'password' => bcrypt('password'),
+            'organization_id' => $org->id,
+        ]);
+        $agent2->assignRole($role);
+
+        $clientUser = User::create([
+            'name' => 'Charlie Client',
+            'email' => 'charlie@test.com',
+            'password' => bcrypt('password'),
+            'organization_id' => $org->id,
+        ]);
+        $clientUser->assignRole($otherRole);
+
+        Livewire::test(SearchableSelect::class, [
+            'model' => User::class,
+            'roleFilter' => 'sales-executive, Sales Executive',
+            'placeholder' => 'All Agents',
+        ])
+        ->assertSee('Alice Agent')
+        ->assertSee('Bob Sales Exec')
+        ->assertDontSee('Charlie Client')
+        ->set('search', 'Alice')
+        ->assertSee('Alice Agent')
+        ->assertDontSee('Bob Sales Exec');
+    }
 }

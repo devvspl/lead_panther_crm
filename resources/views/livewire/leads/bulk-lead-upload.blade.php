@@ -67,6 +67,7 @@
                                     wire:model="columnMapping.{{ $fieldKey }}"
                                     :options="array_merge(['' => '-- Unmapped --'], collect($headers)->mapWithKeys(fn($h, $i) => [(string)$i => $h . ' (Col #' . ($i + 1) . ')'])->toArray())"
                                     placeholder="-- Unmapped --"
+                                    searchable="true"
                                     class="w-full"
                                 />
                             </div>
@@ -119,6 +120,7 @@
                     <label class="text-xs font-bold text-ink">Target Project (Required) *</label>
                     <livewire:shared.searchable-select 
                         :model="\App\Models\Project::class"
+                        :searchable="true"
                         placeholder="-- Select Target Project --"
                         wire:model="projectId"
                         key="upload-project"
@@ -129,6 +131,7 @@
                     <label class="text-xs font-bold text-ink">Campaign (Optional)</label>
                     <livewire:shared.searchable-select 
                         :model="\App\Models\Campaign::class"
+                        :searchable="true"
                         placeholder="-- Select Campaign --"
                         wire:model="campaignId"
                         key="upload-campaign"
@@ -139,6 +142,7 @@
                     <label class="text-xs font-bold text-ink">Lead Source (Optional)</label>
                     <livewire:shared.searchable-select 
                         :model="\App\Models\LeadSource::class"
+                        :searchable="true"
                         placeholder="-- Select Lead Source --"
                         wire:model="leadSourceId"
                         key="upload-source"

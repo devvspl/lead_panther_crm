@@ -8,6 +8,7 @@
                 <label class="font-bold text-ink">Project Unit / Sample Flat</label>
                 <livewire:shared.searchable-select 
                     :model="\App\Models\ProjectUnit::class"
+                    :searchable="true"
                     placeholder="Select Unit"
                     wire:model="projectUnitId"
                     key="site-unit"
@@ -26,6 +27,7 @@
                     wire:model="outcome"
                     :options="['interested' => 'High Interest (Loved the layout)', 'needs_followup' => 'Needs Second Visit / Family Decision', 'booked' => 'Booked Spot Token', 'not_interested' => 'Not Interested (Budget Out-of-Range)']"
                     placeholder="Visit Outcome"
+                    searchable="true"
                     class="w-full mt-1"
                 />
             </div>

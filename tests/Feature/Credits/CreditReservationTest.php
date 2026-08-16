@@ -196,4 +196,46 @@ class CreditReservationTest extends TestCase
             'notifiable_type' => Client::class,
         ]);
     }
+
+    public function test_credit_wallet_export_excel_with_date_range_filters_executes_without_error(): void
+    {
+        $org = Organization::create(['name' => 'Org Export', 'type' => 'builder']);
+        $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Export']);
+        $user = User::factory()->create(['organization_id' => $org->id]);
+        $user->assignRole('client');
+
+        CreditWallet::create(['client_id' => $client->id, 'balance' => 100.00]);
+
+        CreditTransaction::create([
+            'client_id' => $client->id,
+            'lead_id' => null,
+            'credit_before' => 0.00,
+            'credit_used' => 100.00,
+            'credit_after' => 100.00,
+            'transaction_type' => 'recharge',
+            'created_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        \Maatwebsite\Excel\Facades\Excel::fake();
+
+        // Default 'All Time' export
+        Livewire::actingAs($user)
+            ->test(CreditWalletComponent::class)
+            ->call('exportExcel');
+
+        // Export with 'today' date range filter
+        Livewire::actingAs($user)
+            ->test(CreditWalletComponent::class)
+            ->set('filterDateRange', 'today')
+            ->set('filterType', 'recharge')
+            ->call('exportExcel');
+
+        // Export with 'week' date range filter
+        Livewire::actingAs($user)
+            ->test(CreditWalletComponent::class)
+            ->set('filterDateRange', 'week')
+            ->call('exportExcel');
+
+        \Maatwebsite\Excel\Facades\Excel::assertDownloaded("credit-transactions_client-export_" . now()->format('Y-m-d') . ".xlsx");
+    }
 }

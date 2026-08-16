@@ -15,6 +15,7 @@
             <label class="text-xs font-bold text-ink">Rule Target Scope (Channel Partner / Builder Team)</label>
             <livewire:shared.searchable-select 
                 :model="\App\Models\ChannelPartner::class"
+                :searchable="true"
                 placeholder="Direct Builder In-house Sales Team"
                 wire:model="channelPartnerId"
                 key="dist-cp"
@@ -114,6 +115,7 @@
                         <livewire:shared.searchable-select 
                             :model="\App\Models\User::class"
                             roleFilter="sales-executive, Sales Executive"
+                            :searchable="true"
                             placeholder="Select Executive"
                             wire:model="locationRows.{{ $index }}.user_id"
                             key="dist-user-{{ $index }}"

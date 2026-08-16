@@ -48,11 +48,22 @@ class ProcessInboundLeadJob implements ShouldQueue
                 default => (new MetaLeadMapper())->map($raw),
             };
 
+            // Check form mapping for project and campaign routing
+            $formId = $mapped['form'] ?? null;
+            $mapping = null;
+            if ($account && $formId) {
+                $mapping = \App\Models\LeadFormMapping::where('portal_account_id', $account->id)
+                    ->where('form_id', $formId)
+                    ->first();
+            }
+
             // Determine Client & Project & LeadSource
             $client = Client::first();
             $clientId = $client?->id ?: 1;
-            $project = Project::where('client_id', $clientId)->first();
+            $project = $mapping?->project ?: Project::where('client_id', $clientId)->first();
             $projectId = $project?->id ?: 1;
+            $clientId = $project?->client_id ?: $clientId;
+            $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
 
             $mobile = $mapped['mobile'] ?? '9999999999';
@@ -95,7 +106,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 'lead_code' => Lead::generateUniqueLeadCode(),
                 'client_id' => $clientId,
                 'project_id' => $projectId,
-                'campaign_id' => null,
+                'campaign_id' => $campaignId,
                 'lead_source_id' => $leadSource->id,
                 'name' => $mapped['name'] ?? 'Inbound Lead',
                 'mobile' => $mobile,

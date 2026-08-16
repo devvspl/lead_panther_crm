@@ -33,6 +33,8 @@ class LeadKanban extends Component
 
     public string $viewMode = 'kanban';
     public string $analyticsRange = 'month';
+    public ?string $analyticsCustomFrom = null;
+    public ?string $analyticsCustomTo = null;
     public string $breakdownTab = 'builder';
 
     public bool $otherColumnExpanded = false;
@@ -79,7 +81,17 @@ class LeadKanban extends Component
 
         if (auth()->check()) {
             $this->viewMode = GeneralSetting::getValue(auth()->id(), 'leads_view_mode', 'kanban') ?: 'kanban';
-            $this->analyticsRange = GeneralSetting::getValue(auth()->id(), 'leads_analytics_range', 'month') ?: 'month';
+            $savedRange = GeneralSetting::getValue(auth()->id(), 'leads_analytics_range', 'month') ?: 'month';
+            if (str_starts_with($savedRange, '{')) {
+                $decoded = json_decode($savedRange, true);
+                if (is_array($decoded)) {
+                    $this->analyticsRange = $decoded['range'] ?? 'custom';
+                    $this->analyticsCustomFrom = $decoded['from'] ?? null;
+                    $this->analyticsCustomTo = $decoded['to'] ?? null;
+                }
+            } else {
+                $this->analyticsRange = $savedRange;
+            }
         }
     }
 
@@ -96,7 +108,48 @@ class LeadKanban extends Component
     public function updatedAnalyticsRange(string $range): void
     {
         if (auth()->check()) {
-            GeneralSetting::setValue(auth()->id(), 'leads_analytics_range', $range);
+            if ($range === 'custom') {
+                $this->persistCustomAnalyticsRange();
+            } else {
+                GeneralSetting::setValue(auth()->id(), 'leads_analytics_range', $range);
+            }
+        }
+    }
+
+    public function updatedAnalyticsCustomFrom(): void
+    {
+        $this->persistCustomAnalyticsRange();
+    }
+
+    public function updatedAnalyticsCustomTo(): void
+    {
+        $this->persistCustomAnalyticsRange();
+    }
+
+    #[On('date-range-applied')]
+    public function handleDateRangeApplied(string|array $range = 'custom', ?string $from = null, ?string $to = null): void
+    {
+        if (is_array($range)) {
+            $this->analyticsRange = $range['range'] ?? 'custom';
+            $this->analyticsCustomFrom = $range['from'] ?? null;
+            $this->analyticsCustomTo = $range['to'] ?? null;
+        } else {
+            $this->analyticsRange = $range ?: 'custom';
+            $this->analyticsCustomFrom = $from;
+            $this->analyticsCustomTo = $to;
+        }
+        $this->persistCustomAnalyticsRange();
+    }
+
+    protected function persistCustomAnalyticsRange(): void
+    {
+        if (auth()->check() && $this->analyticsRange === 'custom') {
+            $payload = json_encode([
+                'range' => 'custom',
+                'from' => $this->analyticsCustomFrom,
+                'to' => $this->analyticsCustomTo,
+            ]);
+            GeneralSetting::setValue(auth()->id(), 'leads_analytics_range', $payload);
         }
     }
 
@@ -281,12 +334,25 @@ class LeadKanban extends Component
         $analyticsQuery = (clone $scopedBase);
         if ($this->analyticsRange === 'today') {
             $analyticsQuery->where('created_at', '>=', now()->startOfDay());
+        } elseif ($this->analyticsRange === 'yesterday') {
+            $analyticsQuery->whereDate('created_at', now()->subDay()->toDateString());
         } elseif ($this->analyticsRange === 'week') {
             $analyticsQuery->where('created_at', '>=', now()->startOfWeek());
+        } elseif ($this->analyticsRange === 'last7') {
+            $analyticsQuery->where('created_at', '>=', now()->subDays(7));
         } elseif ($this->analyticsRange === 'month') {
             $analyticsQuery->where('created_at', '>=', now()->startOfMonth());
+        } elseif ($this->analyticsRange === 'lastMonth') {
+            $analyticsQuery->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
         } elseif ($this->analyticsRange === 'quarter') {
             $analyticsQuery->where('created_at', '>=', now()->startOfQuarter());
+        } elseif ($this->analyticsRange === 'year') {
+            $analyticsQuery->where('created_at', '>=', now()->startOfYear());
+        } elseif ($this->analyticsRange === 'custom' && $this->analyticsCustomFrom && $this->analyticsCustomTo) {
+            $analyticsQuery->whereBetween('created_at', [
+                $this->analyticsCustomFrom . ' 00:00:00',
+                $this->analyticsCustomTo . ' 23:59:59',
+            ]);
         }
 
         $totalLeads = (clone $analyticsQuery)->count();

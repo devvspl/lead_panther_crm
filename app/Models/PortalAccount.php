@@ -13,4 +13,15 @@ class PortalAccount extends Model
     {
         return $this->hasMany(IntegrationCredential::class);
     }
+
+    public function formMappings(): HasMany
+    {
+        return $this->hasMany(LeadFormMapping::class);
+    }
+
+    public function getCredential(string $key): ?string
+    {
+        $cred = $this->credentials->firstWhere('key_name', $key);
+        return $cred ? $cred->encrypted_value : null;
+    }
 }

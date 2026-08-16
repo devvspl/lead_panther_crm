@@ -120,11 +120,11 @@
                     searchable="true"
                 />
 
-                <x-ui.themed-select 
+                <x-ui.date-range-picker 
                     wire:model.live="filterDateRange"
-                    :options="['' => 'All Time', 'today' => 'Today', 'week' => 'Last 7 Days', 'month' => 'Last 30 Days']"
+                    wire:custom-from="customFrom"
+                    wire:custom-to="customTo"
                     placeholder="All Time"
-                    searchable="true"
                 />
 
                 <x-ui.export-button target="exportExcel" />

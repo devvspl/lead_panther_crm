@@ -19,6 +19,8 @@ class CreditWallet extends Component
 
     public string $filterType = '';
     public string $filterDateRange = '';
+    public ?string $customFrom = null;
+    public ?string $customTo = null;
 
     public function mount(): void
     {
@@ -88,6 +90,8 @@ class CreditWallet extends Component
                 $txQuery->where('created_at', '>=', now()->subDays(7));
             } elseif ($this->filterDateRange === 'month') {
                 $txQuery->where('created_at', '>=', now()->subDays(30));
+            } elseif ($this->filterDateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $txQuery->whereBetween('created_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
             }
         }
 
@@ -128,6 +132,8 @@ class CreditWallet extends Component
                 $txQuery->where('created_at', '>=', now()->subDays(7));
             } elseif ($this->filterDateRange === 'month') {
                 $txQuery->where('created_at', '>=', now()->subDays(30));
+            } elseif ($this->filterDateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $txQuery->whereBetween('created_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
             }
         }
 

@@ -15,6 +15,9 @@ class AuditLogBrowser extends Component
     public ?int $selectedUserId = null;
     public string $actionType = '';
     public string $subjectType = '';
+    public string $dateRange = '';
+    public ?string $customFrom = null;
+    public ?string $customTo = null;
 
     public function render()
     {
@@ -34,6 +37,18 @@ class AuditLogBrowser extends Component
 
         if ($this->subjectType) {
             $query->where('subject_type', 'like', '%' . $this->subjectType . '%');
+        }
+
+        if ($this->dateRange) {
+            if ($this->dateRange === 'today') {
+                $query->whereDate('created_at', now());
+            } elseif ($this->dateRange === 'week') {
+                $query->where('created_at', '>=', now()->subDays(7));
+            } elseif ($this->dateRange === 'month') {
+                $query->where('created_at', '>=', now()->subDays(30));
+            } elseif ($this->dateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $query->whereBetween('created_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
+            }
         }
 
         $logs = $query->latest('id')->paginate(15);
@@ -63,6 +78,18 @@ class AuditLogBrowser extends Component
 
         if ($this->subjectType) {
             $query->where('subject_type', 'like', '%' . $this->subjectType . '%');
+        }
+
+        if ($this->dateRange) {
+            if ($this->dateRange === 'today') {
+                $query->whereDate('created_at', now());
+            } elseif ($this->dateRange === 'week') {
+                $query->where('created_at', '>=', now()->subDays(7));
+            } elseif ($this->dateRange === 'month') {
+                $query->where('created_at', '>=', now()->subDays(30));
+            } elseif ($this->dateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $query->whereBetween('created_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
+            }
         }
 
         $data = $query->latest('id')->get();

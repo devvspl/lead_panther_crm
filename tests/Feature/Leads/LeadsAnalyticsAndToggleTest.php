@@ -105,4 +105,56 @@ class LeadsAnalyticsAndToggleTest extends TestCase
             ->set('breakdownTab', 'source')
             ->assertSet('breakdownTab', 'source');
     }
+
+    public function test_custom_date_range_filters_analytics_and_persists_in_general_settings(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('super-admin');
+
+        $org = Organization::create(['name' => 'Org Custom Range', 'type' => 'builder']);
+        $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Custom Range']);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Project Custom Range']);
+        $source = LeadSource::create(['name' => 'meta']);
+
+        // Lead within custom range (June 2026)
+        Lead::factory()->create([
+            'client_id' => $client->id,
+            'project_id' => $project->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'closed_won',
+            'created_at' => '2026-06-15 10:00:00',
+        ]);
+
+        // Lead outside custom range (January 2026)
+        Lead::factory()->create([
+            'client_id' => $client->id,
+            'project_id' => $project->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'closed_won',
+            'created_at' => '2026-01-10 10:00:00',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LeadKanban::class)
+            ->dispatch('date-range-applied', [
+                'range' => 'custom',
+                'from' => '2026-06-01',
+                'to' => '2026-06-30',
+            ])
+            ->assertSet('analyticsRange', 'custom')
+            ->assertSet('analyticsCustomFrom', '2026-06-01')
+            ->assertSet('analyticsCustomTo', '2026-06-30');
+
+        $this->assertDatabaseHas('general_settings', [
+            'user_id' => $user->id,
+            'key' => 'leads_analytics_range',
+        ]);
+
+        // Verify restoring on new mount
+        Livewire::actingAs($user)
+            ->test(LeadKanban::class)
+            ->assertSet('analyticsRange', 'custom')
+            ->assertSet('analyticsCustomFrom', '2026-06-01')
+            ->assertSet('analyticsCustomTo', '2026-06-30');
+    }
 }

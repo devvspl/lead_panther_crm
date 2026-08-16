@@ -9,15 +9,10 @@
             </div>
             <div class="flex items-center space-x-3">
                 <span class="text-xs font-semibold text-muted">Analytics Range:</span>
-                <x-ui.themed-select 
+                <x-ui.date-range-picker 
                     wire:model.live="analyticsRange"
-                    :options="[
-                        'today' => 'Today',
-                        'week' => 'This Week',
-                        'month' => 'This Month',
-                        'quarter' => 'This Quarter',
-                        'all' => 'All Time'
-                    ]"
+                    wire:custom-from="analyticsCustomFrom"
+                    wire:custom-to="analyticsCustomTo"
                     placeholder="This Month"
                 />
             </div>

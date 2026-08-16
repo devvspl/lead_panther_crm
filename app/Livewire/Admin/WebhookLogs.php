@@ -12,8 +12,16 @@ class WebhookLogs extends Component
     use WithPagination;
 
     public string $filterStatus = ''; // processed, failed, pending
+    public string $dateRange = '';
+    public ?string $customFrom = null;
+    public ?string $customTo = null;
 
     public function updatingFilterStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingDateRange(): void
     {
         $this->resetPage();
     }
@@ -39,6 +47,18 @@ class WebhookLogs extends Component
             $query->where('processed', false);
         }
 
+        if ($this->dateRange) {
+            if ($this->dateRange === 'today') {
+                $query->whereDate('received_at', now());
+            } elseif ($this->dateRange === 'week') {
+                $query->where('received_at', '>=', now()->subDays(7));
+            } elseif ($this->dateRange === 'month') {
+                $query->where('received_at', '>=', now()->subDays(30));
+            } elseif ($this->dateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $query->whereBetween('received_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
+            }
+        }
+
         $logs = $query->latest('received_at')->paginate(15);
 
         return view('livewire.admin.webhook-logs', [
@@ -56,6 +76,18 @@ class WebhookLogs extends Component
             $query->whereNotNull('error_message');
         } elseif ($this->filterStatus === 'pending') {
             $query->where('processed', false);
+        }
+
+        if ($this->dateRange) {
+            if ($this->dateRange === 'today') {
+                $query->whereDate('received_at', now());
+            } elseif ($this->dateRange === 'week') {
+                $query->where('received_at', '>=', now()->subDays(7));
+            } elseif ($this->dateRange === 'month') {
+                $query->where('received_at', '>=', now()->subDays(30));
+            } elseif ($this->dateRange === 'custom' && $this->customFrom && $this->customTo) {
+                $query->whereBetween('received_at', [$this->customFrom . ' 00:00:00', $this->customTo . ' 23:59:59']);
+            }
         }
 
         $data = $query->latest('received_at')->get();

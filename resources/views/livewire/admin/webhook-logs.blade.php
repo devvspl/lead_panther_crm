@@ -20,6 +20,13 @@
                     searchable="true"
                 />
 
+                <x-ui.date-range-picker 
+                    wire:model.live="dateRange"
+                    wire:custom-from="customFrom"
+                    wire:custom-to="customTo"
+                    placeholder="All Time"
+                />
+
                 <x-ui.export-button target="exportExcel" />
             </div>
         </div>

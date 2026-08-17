@@ -256,4 +256,86 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals('644872052329370', $account->getCredential('page_id'));
         $this->assertEquals('okGOBm9u7U4qt69AVXSL0JmRowNHLiZQ', $account->getCredential('verify_token'));
     }
+
+    public function test_meta_webhook_get_verification_successful(): void
+    {
+        $account = PortalAccount::create([
+            'name' => 'Meta Live Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'verify_token',
+            'encrypted_value' => 'my_secret_verify_token_123',
+        ]);
+
+        $response = $this->get("/api/webhooks/meta/{$account->id}?hub.mode=subscribe&hub.verify_token=my_secret_verify_token_123&hub.challenge=1122334455");
+
+        $response->assertStatus(200);
+        $this->assertEquals('1122334455', $response->getContent());
+    }
+
+    public function test_meta_webhook_get_verification_fails_with_invalid_token(): void
+    {
+        $account = PortalAccount::create([
+            'name' => 'Meta Live Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'verify_token',
+            'encrypted_value' => 'my_secret_verify_token_123',
+        ]);
+
+        $response = $this->get("/api/webhooks/meta/{$account->id}?hub.mode=subscribe&hub.verify_token=WRONG_TOKEN&hub.challenge=1122334455");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_meta_webhook_post_lead_event_success(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Live Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'app_secret',
+            'encrypted_value' => 'meta_app_secret_hash',
+        ]);
+
+        $payload = [
+            'object' => 'page',
+            'entry' => [
+                [
+                    'id' => '644872052329370',
+                    'time' => 1718000000,
+                    'changes' => [
+                        [
+                            'field' => 'leadgen',
+                            'value' => [
+                                'leadgen_id' => 'lead_99887766',
+                                'page_id' => '644872052329370',
+                                'form_id' => 'form_12345678',
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        $response = $this->postJson("/api/webhooks/meta/{$account->id}", $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['status' => 'queued']);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProcessInboundLeadJob::class);
+    }
 }

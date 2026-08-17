@@ -15,30 +15,37 @@ class MetaWebhookController extends Controller
 
     public function handle(PortalAccount $portalAccount, Request $request)
     {
-        $log = $this->logWebhookPayload($portalAccount, $request);
+        // 1. Meta Webhook Verification (GET request / Hub Challenge Handshake)
+        if ($request->isMethod('GET')) {
+            $mode = $request->query('hub_mode') ?? $request->query('hub.mode');
+            $verifyToken = $request->query('hub_verify_token') ?? $request->query('hub.verify_token');
+            $challenge = $request->query('hub_challenge') ?? $request->query('hub.challenge');
 
-        // Verification check for Meta Webhook challenge setup
-        $hubMode = $request->get('hub_mode') ?? $request->get('hub.mode');
-        $hubChallenge = $request->get('hub_challenge') ?? $request->get('hub.challenge');
-        $hubVerifyToken = $request->get('hub_verify_token') ?? $request->get('hub.verify_token');
-
-        if ($hubMode === 'subscribe' || !empty($hubChallenge)) {
-            $savedVerifyToken = IntegrationCredential::where('portal_account_id', $portalAccount->id)
-                ->where('key_name', 'verify_token')
-                ->value('encrypted_value');
-
-            if ($savedVerifyToken && $hubVerifyToken && $hubVerifyToken !== $savedVerifyToken) {
-                $log->update(['error_message' => '403 Forbidden: Invalid hub_verify_token']);
+            if ($mode !== 'subscribe' || empty($challenge)) {
                 return response('Forbidden', 403);
             }
 
-            return response($hubChallenge, 200);
+            $expectedToken = $portalAccount->getCredential('verify_token')
+                ?? IntegrationCredential::where('portal_account_id', $portalAccount->id)
+                    ->where('key_name', 'verify_token')
+                    ->first()?->encrypted_value;
+
+            if ($expectedToken && $verifyToken && hash_equals((string) $expectedToken, (string) $verifyToken)) {
+                return response($challenge, 200)->header('Content-Type', 'text/plain');
+            }
+
+            return response('Forbidden', 403);
         }
 
+        // 2. Incoming Meta Webhook Event (POST request)
+        $log = $this->logWebhookPayload($portalAccount, $request);
+
         // Signature authentication check
-        $secret = IntegrationCredential::where('portal_account_id', $portalAccount->id)
-            ->where('key_name', 'app_secret')
-            ->value('encrypted_value') ?? 'meta_test_secret';
+        $secret = $portalAccount->getCredential('app_secret')
+            ?? IntegrationCredential::where('portal_account_id', $portalAccount->id)
+                ->where('key_name', 'app_secret')
+                ->first()?->encrypted_value
+            ?? 'meta_test_secret';
 
         $signature = $request->header('X-Hub-Signature-256') ?? $request->input('signature');
 
@@ -49,6 +56,6 @@ class MetaWebhookController extends Controller
 
         ProcessInboundLeadJob::dispatch($log);
 
-        return response()->json(['status' => 'queued', 'log_id' => $log->id]);
+        return response()->json(['status' => 'queued', 'log_id' => $log->id], 200);
     }
 }

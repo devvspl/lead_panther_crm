@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\Webhooks\ManualLeadController;
 use App\Http\Controllers\Api\LeadApiController;
 
 Route::prefix('webhooks')->middleware('throttle:60,1')->group(function () {
-    Route::post('/meta/{portal_account}', [MetaWebhookController::class, 'handle'])->name('webhooks.meta');
+    Route::match(['GET', 'POST'], '/meta/{portal_account}', [MetaWebhookController::class, 'handle'])->name('webhooks.meta');
     Route::post('/google/{portal_account}', [GoogleWebhookController::class, 'handle'])->name('webhooks.google');
     Route::post('/portal/{portal_account}', [PortalWebhookController::class, 'handle'])->name('webhooks.portal');
     Route::post('/owned/{portal_account}', [OwnedPortalWebhookController::class, 'handle'])->name('webhooks.owned');

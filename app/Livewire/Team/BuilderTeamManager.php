@@ -7,7 +7,8 @@ use App\Models\User;
 use App\Models\SalesTeamMember;
 use App\Models\SalesTeam;
 use App\Models\Organization;
-
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Livewire\WithPagination;
 
 class BuilderTeamManager extends Component
@@ -17,18 +18,21 @@ class BuilderTeamManager extends Component
     public string $memberName = '';
     public string $memberEmail = '';
     public string $roleName = 'Sales Executive';
+    public string $password = '';
+    public ?string $generatedInviteLink = null;
 
     public function addMember(): void
     {
         $this->validate([
             'memberName' => 'required|string|max:255',
             'memberEmail' => 'required|email|unique:users,email',
+            'roleName' => 'required|string',
         ]);
 
         $user = User::create([
             'name' => $this->memberName,
             'email' => $this->memberEmail,
-            'password' => bcrypt('Password123!'),
+            'password' => bcrypt($this->password ?: Str::random(16)),
             'organization_id' => auth()->user()?->organization_id,
         ]);
 
@@ -46,8 +50,15 @@ class BuilderTeamManager extends Component
             'is_active' => true,
         ]);
 
-        $this->reset(['memberName', 'memberEmail']);
-        $this->dispatch('toast', type: 'success', message: 'Builder team member added successfully.');
+        // Generate temporary password activation link
+        $token = Password::createToken($user);
+        $this->generatedInviteLink = url(route('password.reset', [
+            'token' => $token,
+            'email' => $user->email,
+        ], false));
+
+        $this->reset(['memberName', 'memberEmail', 'password']);
+        $this->dispatch('toast', type: 'success', message: "Team member '{$user->name}' added successfully.");
     }
 
     public function render()

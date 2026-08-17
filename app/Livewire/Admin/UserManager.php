@@ -5,7 +5,10 @@ namespace App\Livewire\Admin;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\User;
+use App\Models\Organization;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class UserManager extends Component
 {
@@ -13,6 +16,15 @@ class UserManager extends Component
 
     public string $search = '';
     public string $roleFilter = '';
+
+    // Create User Offcanvas State
+    public bool $showCreateUserOffcanvas = false;
+    public string $newUserName = '';
+    public string $newUserEmail = '';
+    public ?int $newUserOrganizationId = null;
+    public string $newUserRole = 'sales-executive';
+    public string $newUserPassword = '';
+    public ?string $generatedInviteLink = null;
 
     public function updatingSearch(): void
     {
@@ -22,6 +34,50 @@ class UserManager extends Component
     public function updatingRoleFilter(): void
     {
         $this->resetPage();
+    }
+
+    public function openCreateUserOffcanvas(): void
+    {
+        $this->reset(['newUserName', 'newUserEmail', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
+        $this->newUserRole = 'sales-executive';
+        $this->showCreateUserOffcanvas = true;
+        $this->dispatch('open-offcanvas', 'create-user-drawer');
+    }
+
+    public function closeCreateUserOffcanvas(): void
+    {
+        $this->showCreateUserOffcanvas = false;
+        $this->reset(['newUserName', 'newUserEmail', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
+        $this->dispatch('close-offcanvas', 'create-user-drawer');
+    }
+
+    public function createUser(): void
+    {
+        $this->validate([
+            'newUserName' => 'required|string|max:255',
+            'newUserEmail' => 'required|email|unique:users,email',
+            'newUserRole' => 'required|string',
+            'newUserOrganizationId' => 'nullable|exists:organizations,id',
+        ]);
+
+        $user = User::create([
+            'name' => $this->newUserName,
+            'email' => $this->newUserEmail,
+            'password' => bcrypt($this->newUserPassword ?: Str::random(16)),
+            'organization_id' => $this->newUserOrganizationId,
+        ]);
+
+        $user->assignRole($this->newUserRole);
+
+        // Generate temporary password reset / invite activation link
+        $token = Password::createToken($user);
+        $this->generatedInviteLink = url(route('password.reset', [
+            'token' => $token,
+            'email' => $user->email,
+        ], false));
+
+        $this->reset(['newUserName', 'newUserEmail', 'newUserPassword', 'newUserOrganizationId']);
+        $this->dispatch('toast', type: 'success', message: "User '{$user->name}' created successfully.");
     }
 
     public function updateUserRole(int $userId, string $roleName): void
@@ -52,10 +108,12 @@ class UserManager extends Component
 
         $users = $query->latest('id')->paginate(10);
         $roles = Role::all();
+        $organizations = Organization::where('status', 'active')->orderBy('name')->get();
 
         return view('livewire.admin.user-manager', [
             'users' => $users,
             'roles' => $roles,
+            'organizations' => $organizations,
         ])->layout('layouts.app');
     }
 

@@ -8,7 +8,8 @@ use App\Models\SalesTeamMember;
 use App\Models\SalesTeam;
 use App\Models\Organization;
 use App\Models\Project;
-
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Livewire\WithPagination;
 
 class PartnerTeamManager extends Component
@@ -18,6 +19,8 @@ class PartnerTeamManager extends Component
     public string $memberName = '';
     public string $memberEmail = '';
     public string $mobile = '';
+    public string $password = '';
+    public ?string $generatedInviteLink = null;
 
     public function addTeamMember(): void
     {
@@ -30,7 +33,7 @@ class PartnerTeamManager extends Component
         $user = User::create([
             'name' => $this->memberName,
             'email' => $this->memberEmail,
-            'password' => bcrypt('Password123!'),
+            'password' => bcrypt($this->password ?: Str::random(16)),
             'organization_id' => auth()->user()?->organization_id,
         ]);
 
@@ -48,7 +51,14 @@ class PartnerTeamManager extends Component
             'is_active' => true,
         ]);
 
-        $this->reset(['memberName', 'memberEmail', 'mobile']);
+        // Generate temporary password activation link
+        $token = Password::createToken($user);
+        $this->generatedInviteLink = url(route('password.reset', [
+            'token' => $token,
+            'email' => $user->email,
+        ], false));
+
+        $this->reset(['memberName', 'memberEmail', 'mobile', 'password']);
         $this->dispatch('toast', type: 'success', message: 'Channel Partner team member added successfully.');
     }
 

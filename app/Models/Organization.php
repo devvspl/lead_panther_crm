@@ -14,6 +14,11 @@ class Organization extends Model
         return $this->hasMany(Client::class);
     }
 
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
     public function getIsActiveAttribute(): bool
     {
         return ($this->attributes['status'] ?? 'active') === 'active';

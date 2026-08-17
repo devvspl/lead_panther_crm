@@ -140,4 +140,55 @@ class SuperAdminSuiteTest extends TestCase
             'action' => 'user.impersonate_stop',
         ]);
     }
+
+    public function test_organization_manager_creates_user_assigned_to_organization(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Brigade Group', 'type' => 'builder', 'status' => 'active']);
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationManager::class)
+            ->call('openUserOffcanvas', $org->id)
+            ->assertSet('selectedOrgId', $org->id)
+            ->set('newUserName', 'Rohan Verma')
+            ->set('newUserEmail', 'rohan@brigadegroup.com')
+            ->set('newUserRole', 'Sales Executive')
+            ->call('createUserForOrganization');
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'Rohan Verma',
+            'email' => 'rohan@brigadegroup.com',
+            'organization_id' => $org->id,
+        ]);
+
+        $createdUser = User::where('email', 'rohan@brigadegroup.com')->first();
+        $this->assertTrue($createdUser->hasRole('Sales Executive'));
+    }
+
+    public function test_user_manager_creates_user_with_parent_organization(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Godrej Properties', 'type' => 'builder', 'status' => 'active']);
+
+        Livewire::actingAs($admin)
+            ->test(UserManager::class)
+            ->set('newUserName', 'Sneha Patel')
+            ->set('newUserEmail', 'sneha@godrej.com')
+            ->set('newUserOrganizationId', $org->id)
+            ->set('newUserRole', 'Sales Executive')
+            ->call('createUser');
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'Sneha Patel',
+            'email' => 'sneha@godrej.com',
+            'organization_id' => $org->id,
+        ]);
+
+        $createdUser = User::where('email', 'sneha@godrej.com')->first();
+        $this->assertTrue($createdUser->hasRole('Sales Executive'));
+    }
 }

@@ -22,7 +22,7 @@ class UserManager extends Component
     public string $newUserName = '';
     public string $newUserEmail = '';
     public ?int $newUserOrganizationId = null;
-    public string $newUserRole = 'sales-executive';
+    public string $newUserRole = 'Sales Executive';
     public string $newUserPassword = '';
     public ?string $generatedInviteLink = null;
 
@@ -39,7 +39,7 @@ class UserManager extends Component
     public function openCreateUserOffcanvas(): void
     {
         $this->reset(['newUserName', 'newUserEmail', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
-        $this->newUserRole = 'sales-executive';
+        $this->newUserRole = 'Sales Executive';
         $this->showCreateUserOffcanvas = true;
         $this->dispatch('open-offcanvas', 'create-user-drawer');
     }
@@ -67,7 +67,9 @@ class UserManager extends Component
             'organization_id' => $this->newUserOrganizationId,
         ]);
 
-        $user->assignRole($this->newUserRole);
+        // Find or create role to prevent Spatie RoleDoesNotExist errors
+        $role = Role::firstOrCreate(['name' => $this->newUserRole, 'guard_name' => 'web']);
+        $user->assignRole($role->name);
 
         // Generate temporary password reset / invite activation link
         $token = Password::createToken($user);
@@ -84,27 +86,42 @@ class UserManager extends Component
     {
         $user = User::find($userId);
         if ($user) {
-            $user->syncRoles([$roleName]);
-            $this->dispatch('toast', type: 'success', message: "Role for {$user->name} updated to '{$roleName}'.");
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            $user->syncRoles([$role->name]);
+            $this->dispatch('toast', type: 'success', message: "Role for {$user->name} updated to '{$role->name}'.");
         }
     }
 
-    public function render()
+    protected function applyFilters($query)
     {
-        $query = User::with(['roles', 'organization']);
-
-        if ($this->search) {
+        if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
                   ->orWhere('email', 'like', '%' . $this->search . '%');
             });
         }
 
-        if ($this->roleFilter) {
-            $query->whereHas('roles', function ($q) {
-                $q->where('name', $this->roleFilter);
+        if (!empty($this->roleFilter)) {
+            $filter = $this->roleFilter;
+            $spaced = str_replace('-', ' ', $filter);
+            $kebab = str_replace(' ', '-', strtolower($filter));
+
+            $query->whereHas('roles', function ($q) use ($filter, $spaced, $kebab) {
+                $q->where('name', $filter)
+                  ->orWhere('name', $spaced)
+                  ->orWhere('name', $kebab)
+                  ->orWhereRaw('LOWER(name) = ?', [strtolower($filter)])
+                  ->orWhereRaw('LOWER(REPLACE(name, "-", " ")) = ?', [strtolower($spaced)]);
             });
         }
+
+        return $query;
+    }
+
+    public function render()
+    {
+        $query = User::with(['roles', 'organization']);
+        $this->applyFilters($query);
 
         $users = $query->latest('id')->paginate(10);
         $roles = Role::all();
@@ -120,47 +137,25 @@ class UserManager extends Component
     public function exportExcel()
     {
         $query = User::with(['roles', 'organization']);
-
-        if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('email', 'like', '%' . $this->search . '%');
-            });
-        }
-
-        if ($this->roleFilter) {
-            $query->whereHas('roles', function ($q) {
-                $q->where('name', $this->roleFilter);
-            });
-        }
+        $this->applyFilters($query);
 
         $data = $query->latest('id')->get();
         $filename = "users-and-roles-directory_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['User ID', 'Full Name', 'Email Address', 'Organization', 'Current Role', 'Registered At'];
-        $columns = [
-            'id',
-            'name',
-            'email',
-            fn($u) => $u->organization?->name ?: 'Platform HQ',
-            fn($u) => $u->roles->pluck('name')->implode(', ') ?: 'No Role',
-            fn($u) => $u->created_at ? $u->created_at->format('M d, Y H:i') : '',
-        ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->search ? " | Search: {$this->search}" : '') . ($this->roleFilter ? " | Role: {$this->roleFilter}" : '');
+        $rows = [];
+        foreach ($data as $u) {
+            $rows[] = [
+                $u->id,
+                $u->name,
+                $u->email,
+                $u->organization ? $u->organization->name . ' (' . strtoupper($u->organization->type) . ')' : 'Platform HQ',
+                $u->getRoleNames()->first() ?? 'No Role Assigned',
+                $u->created_at->format('Y-m-d H:i:s'),
+            ];
+        }
 
-        $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
-
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\BaseStyledExport(
-                data: $data,
-                title: 'Users & Roles Directory',
-                subtitle: $subtitle,
-                headings: $headings,
-                columns: $columns,
-                statusColumns: ['current_role']
-            ),
-            $filename
-        );
+        return app(\App\Services\ExportService::class)->downloadExcel($filename, $headings, $rows);
     }
 }

@@ -1,9 +1,17 @@
+@php
+    $dbRoles = [];
+    foreach ($roles as $r) {
+        $dbRoles[$r->name] = $r->name;
+    }
+    $filterRoleOptions = ['' => 'All Roles'] + $dbRoles;
+@endphp
+
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Global User Management</h1>
-            <p class="text-xs text-muted">Assign Spatie roles, create users across multi-tenant organizations, and impersonate accounts with audited trace logging.</p>
+            <p class="text-xs text-muted">Assign database roles, create users across multi-tenant organizations, and impersonate accounts with audited trace logging.</p>
         </div>
 
         <div class="flex items-center space-x-3">
@@ -15,7 +23,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                 </svg>
-                <span>Create User</span>
+                <span>+ Create User</span>
             </button>
 
             <x-ui.export-button target="exportExcel" />
@@ -34,7 +42,7 @@
 
             <x-ui.themed-select 
                 wire:model.live="roleFilter" 
-                :options="['' => 'All Roles', 'super-admin' => 'Super Admin', 'builder' => 'Builder', 'channel-partner' => 'Channel Partner', 'sales-executive' => 'Sales Executive', 'account-manager' => 'Account Manager', 'client' => 'Client']"
+                :options="$filterRoleOptions"
                 placeholder="All Roles" 
                 searchable="true" 
             />
@@ -57,6 +65,9 @@
                 </thead>
                 <tbody class="divide-y divide-border">
                     @forelse($users as $user)
+                        @php
+                            $userRole = $user->getRoleNames()->first();
+                        @endphp
                         <tr class="hover:bg-canvas/50 transition">
                             <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $user->id }}</td>
                             <td class="py-3 px-4 font-bold text-ink">{{ $user->name }}</td>
@@ -71,9 +82,10 @@
                             </td>
                             <td class="py-3 px-4">
                                 <x-ui.themed-select 
-                                    :value="$user->getRoleNames()->first()"
-                                    :options="['super-admin' => 'Super Admin', 'builder' => 'Builder', 'channel-partner' => 'Channel Partner', 'sales-executive' => 'Sales Executive', 'account-manager' => 'Account Manager', 'client' => 'Client']"
-                                    x-effect="$watch('value', val => @this.call('updateUserRole', {{ $user->id }}, val))"
+                                    :value="$userRole"
+                                    :options="$dbRoles"
+                                    placeholder="Select Role"
+                                    x-effect="$watch('value', val => { if(val) @this.call('updateUserRole', {{ $user->id }}, val) })"
                                 />
                             </td>
                             <td class="py-3 px-4 text-right space-x-2">
@@ -161,15 +173,9 @@
                 <label class="font-bold text-ink">CRM Access Role <span class="text-red-500">*</span></label>
                 <x-ui.themed-select 
                     wire:model="newUserRole" 
-                    :options="[
-                        'builder' => 'Builder Admin',
-                        'channel-partner' => 'Channel Partner Admin',
-                        'sales-executive' => 'Sales Executive',
-                        'account-manager' => 'Account Manager',
-                        'client' => 'Client User',
-                        'super-admin' => 'Super Admin'
-                    ]"
+                    :options="$dbRoles"
                     placeholder="Select Role" 
+                    searchable="true"
                     class="w-full mt-1" 
                 />
                 @error('newUserRole') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror

@@ -141,6 +141,33 @@ class SuperAdminSuiteTest extends TestCase
         ]);
     }
 
+    public function test_user_manager_filters_by_role_and_search(): void
+    {
+        $admin = User::factory()->create(['name' => 'Main Admin', 'email' => 'admin@leadpanther.com']);
+        $admin->assignRole('Super Admin');
+
+        $salesUser = User::factory()->create(['name' => 'Amit Sales', 'email' => 'amit@sales.com']);
+        $salesUser->assignRole('Sales Executive');
+
+        $builderUser = User::factory()->create(['name' => 'Dev Builder', 'email' => 'dev@builder.com']);
+        Role::firstOrCreate(['name' => 'Builder']);
+        $builderUser->assignRole('Builder');
+
+        // Test filtering by role
+        Livewire::actingAs($admin)
+            ->test(UserManager::class)
+            ->set('roleFilter', 'Sales Executive')
+            ->assertSee('Amit Sales')
+            ->assertDontSee('Dev Builder')
+            ->set('roleFilter', 'Builder')
+            ->assertSee('Dev Builder')
+            ->assertDontSee('Amit Sales')
+            ->set('roleFilter', '')
+            ->set('search', 'amit@sales.com')
+            ->assertSee('Amit Sales')
+            ->assertDontSee('Dev Builder');
+    }
+
     public function test_organization_manager_creates_user_assigned_to_organization(): void
     {
         $admin = User::factory()->create();

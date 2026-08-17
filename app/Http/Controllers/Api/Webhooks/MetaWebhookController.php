@@ -18,8 +18,21 @@ class MetaWebhookController extends Controller
         $log = $this->logWebhookPayload($portalAccount, $request);
 
         // Verification check for Meta Webhook challenge setup
-        if ($request->has('hub_mode') && $request->has('hub_challenge')) {
-            return response($request->get('hub_challenge'), 200);
+        $hubMode = $request->get('hub_mode') ?? $request->get('hub.mode');
+        $hubChallenge = $request->get('hub_challenge') ?? $request->get('hub.challenge');
+        $hubVerifyToken = $request->get('hub_verify_token') ?? $request->get('hub.verify_token');
+
+        if ($hubMode === 'subscribe' || !empty($hubChallenge)) {
+            $savedVerifyToken = IntegrationCredential::where('portal_account_id', $portalAccount->id)
+                ->where('key_name', 'verify_token')
+                ->value('encrypted_value');
+
+            if ($savedVerifyToken && $hubVerifyToken && $hubVerifyToken !== $savedVerifyToken) {
+                $log->update(['error_message' => '403 Forbidden: Invalid hub_verify_token']);
+                return response('Forbidden', 403);
+            }
+
+            return response($hubChallenge, 200);
         }
 
         // Signature authentication check

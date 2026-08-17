@@ -43,6 +43,7 @@
                     placeholder="e.g. Bandra Campaign Account"
                     class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                 />
+                @error('accountName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
             </div>
         </div>
 
@@ -50,41 +51,44 @@
         <div x-show="source === 'meta'" class="space-y-4 pt-2 border-t border-border">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div>
-                    <label class="font-bold text-ink">Facebook Page ID</label>
+                    <label class="font-bold text-ink">Facebook Page ID <span class="text-red-500">*</span></label>
                     <input 
                         type="text" 
                         wire:model="metaPageId" 
-                        placeholder="e.g. 102938475610293"
+                        placeholder="e.g. 644872052329370"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
+                    @error('metaPageId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     <p class="text-[10px] text-muted mt-1">Found in your Meta Business Suite &gt; Page About info.</p>
                 </div>
 
                 <div>
-                    <label class="font-bold text-ink">Meta App ID</label>
+                    <label class="font-bold text-ink">Meta App ID <span class="text-muted font-normal">(Optional)</span></label>
                     <input 
                         type="text" 
                         wire:model="metaAppId" 
                         placeholder="e.g. 987654321098765"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
+                    @error('metaAppId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     <p class="text-[10px] text-muted mt-1">Found in Meta for Developers app dashboard.</p>
                 </div>
 
                 <div>
-                    <label class="font-bold text-ink">Meta App Secret (Encrypted)</label>
+                    <label class="font-bold text-ink">Meta App Secret <span class="text-muted font-normal">(Optional)</span></label>
                     <input 
                         type="password" 
                         wire:model="metaAppSecret" 
                         placeholder="••••••••••••••••••••••••"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
+                    @error('metaAppSecret') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     <p class="text-[10px] text-muted mt-1">Used for webhook payload HMAC-SHA256 signature verification.</p>
                 </div>
 
                 <div>
                     <div class="flex items-center justify-between">
-                        <label class="font-bold text-ink">Page Access Token (Encrypted)</label>
+                        <label class="font-bold text-ink">Page Access Token <span class="text-red-500">*</span></label>
                         <span class="text-[10px] text-primary hover:underline cursor-pointer inline-flex items-center gap-1" title="Generate via Business Manager > System Users > Generate New Token with leads_retrieval & pages_show_list">
                             <span>System User Token Guide</span>
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><line x1="12" y1="16" x2="12" y2="12" stroke-width="2"></line><line x1="12" y1="8" x2="12.01" y2="8" stroke-width="2"></line></svg>
@@ -93,9 +97,10 @@
                     <input 
                         type="password" 
                         wire:model="metaAccessToken" 
-                        placeholder="EAABw... (Never-expiring System User Token)"
+                        placeholder="EAABw... (Never-expiring System User Token or Graph Token)"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
+                    @error('metaAccessToken') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     <p class="text-[10px] text-muted mt-1">Requires <code class="font-bold text-ink">leads_retrieval</code> and <code class="font-bold text-ink">pages_show_list</code> permissions.</p>
                 </div>
             </div>
@@ -115,6 +120,7 @@
                         placeholder="Random verification token"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
+                    @error('metaVerifyToken') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     <p class="text-[10px] text-muted mt-1">Paste this into Meta App Dashboard &gt; Webhooks &gt; Verify Token.</p>
                 </div>
 

@@ -235,4 +235,25 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals($project->id, $mapping->project_id);
         $this->assertEquals($campaign->id, $mapping->campaign_id);
     }
+
+    public function test_saves_meta_credentials_with_page_id_and_token_only(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->set('portalType', 'meta')
+            ->set('accountName', 'Page Explorer Connection')
+            ->set('metaPageId', '644872052329370')
+            ->set('metaAccessToken', 'EAAWcsuKdLX8BSKgksCP9cbKez7MOrnfhwkCOzkRsErHg8NW3eHLjulSNRbgXK7NVW6NQICHP91jgg91C6OfvMfNVmd0ziF4TgTBnUTDZAu7ceaP8Lhb7Stg3Ua9GTKWUmZA7M9SQZBBS2YJgdfc4JbbZAzws6nvXvk2E2KzWXKd344EViiMOSoua1ZAqzWfcXOaEcBdaexkk27IeHFErARgCeQ9BbJ6QUJSSUGpvCjJzvTM7ZA0FfUm4ntVFxNkXxBjrrtvIozglFfNl5V3ZAQang0QvAZDZD')
+            ->set('metaVerifyToken', 'okGOBm9u7U4qt69AVXSL0JmRowNHLiZQ')
+            ->call('saveAccount')
+            ->assertDispatched('toast');
+
+        $account = PortalAccount::where('name', 'Page Explorer Connection')->first();
+        $this->assertNotNull($account);
+        $this->assertEquals('644872052329370', $account->getCredential('page_id'));
+        $this->assertEquals('okGOBm9u7U4qt69AVXSL0JmRowNHLiZQ', $account->getCredential('verify_token'));
+    }
 }

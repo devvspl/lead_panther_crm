@@ -186,19 +186,18 @@
                         @error('newUserEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
+                    @php
+                        $dbRoles = [];
+                        foreach ($roles as $r) {
+                            $dbRoles[$r->name] = $r->name;
+                        }
+                    @endphp
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="font-bold text-ink">Assign Role <span class="text-red-500">*</span></label>
                             <x-ui.themed-select 
                                 wire:model="newUserRole" 
-                                :options="[
-                                    'builder' => 'Builder Admin',
-                                    'channel-partner' => 'Channel Partner Admin',
-                                    'sales-executive' => 'Sales Executive',
-                                    'account-manager' => 'Account Manager',
-                                    'client' => 'Client User',
-                                    'super-admin' => 'Super Admin'
-                                ]"
+                                :options="$dbRoles"
                                 placeholder="Select Role" 
                                 class="w-full mt-1" 
                             />

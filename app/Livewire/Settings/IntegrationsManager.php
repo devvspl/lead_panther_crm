@@ -92,10 +92,13 @@ class IntegrationsManager extends Component
                 $this->validate([
                     'accountName' => 'required|string|max:255',
                     'metaPageId' => 'required|string',
-                    'metaAppId' => 'required|string',
-                    'metaAppSecret' => 'required|string',
                     'metaAccessToken' => 'required|string',
-                    'metaVerifyToken' => 'required|string',
+                    'metaVerifyToken' => 'nullable|string',
+                    'metaAppId' => 'nullable|string',
+                    'metaAppSecret' => 'nullable|string',
+                ], [
+                    'metaPageId.required' => 'Facebook Page ID is required.',
+                    'metaAccessToken.required' => 'Page Access Token is required.',
                 ]);
             }
         } elseif ($this->portalType === 'google') {
@@ -130,20 +133,26 @@ class IntegrationsManager extends Component
         ]);
 
         if ($this->portalType === 'meta') {
+            if (empty($this->metaVerifyToken)) {
+                $this->metaVerifyToken = Str::random(32);
+            }
+
             if (!empty($this->metaPageId)) {
                 $credentials = [
                     'page_id' => $this->metaPageId,
-                    'app_id' => $this->metaAppId,
-                    'app_secret' => $this->metaAppSecret,
                     'access_token' => $this->metaAccessToken,
                     'verify_token' => $this->metaVerifyToken,
+                    'app_id' => $this->metaAppId,
+                    'app_secret' => $this->metaAppSecret,
                 ];
 
                 foreach ($credentials as $key => $val) {
-                    IntegrationCredential::updateOrCreate(
-                        ['portal_account_id' => $account->id, 'key_name' => $key],
-                        ['encrypted_value' => $val]
-                    );
+                    if ($val !== null && $val !== '') {
+                        IntegrationCredential::updateOrCreate(
+                            ['portal_account_id' => $account->id, 'key_name' => $key],
+                            ['encrypted_value' => $val]
+                        );
+                    }
                 }
             }
 

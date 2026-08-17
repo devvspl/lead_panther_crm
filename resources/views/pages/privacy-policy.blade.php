@@ -411,8 +411,7 @@
                         <div class="flex items-center gap-2">
                             <span
                                 class="text-xs px-2 py-0.5 rounded-pill bg-canvas border border-border text-muted font-mono font-bold">12</span>
-                            <h2 class="text-lg sm:text-xl font-bold tracking-tight text-ink">User Data Deletion
-                                Instructions</h2>
+                            <h2 class="text-lg sm:text-xl font-bold tracking-tight text-ink">User Data Deletion Instructions</h2>
                         </div>
                         <p>
                             If you have submitted your contact information through a Lead Panther CRM form, or via a

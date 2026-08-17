@@ -48,6 +48,30 @@ class LeadKanban extends Component
     // Per-column limits
     public array $stageLimits = [];
 
+    // Manual Lead Ingestion & Meta Pull Modal State
+    public bool $showPullLeadsModal = false;
+    public string $pullMode = 'meta'; // 'meta' | 'manual'
+    public ?int $selectedPortalAccountId = null;
+    public string $customFormId = '';
+    public string $customPageAccessToken = '';
+    public int $pullLimit = 25;
+    public ?int $syncProjectId = null;
+    public ?int $syncCampaignId = null;
+    public bool $isPulling = false;
+    public ?array $pullSummary = null;
+
+    // Single Manual Lead Ingestion State
+    public string $manualName = '';
+    public string $manualMobile = '';
+    public string $manualEmail = '';
+    public string $manualCity = 'Mumbai';
+    public string $manualBudget = '₹75.0L';
+    public string $manualPropertyType = '2 BHK';
+    public string $manualRequirement = '';
+    public ?int $manualProjectId = null;
+    public ?int $manualCampaignId = null;
+    public ?int $manualLeadSourceId = null;
+
     public array $mainStages = [
         'new' => 'New',
         'assigned' => 'Assigned',
@@ -493,13 +517,265 @@ class LeadKanban extends Component
             }
         }
 
+        $portalAccounts = \App\Models\PortalAccount::where('status', 'active')->get();
+        $allProjects = Project::orderBy('name')->get();
+        $allCampaigns = \App\Models\Campaign::orderBy('name')->get();
+        $allLeadSources = LeadSource::orderBy('name')->get();
+
         return view('livewire.leads.lead-kanban', [
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
             'tableLeads' => $tableLeads,
             'analytics' => $analytics,
             'availableTeams' => $availableTeams,
+            'portalAccounts' => $portalAccounts,
+            'allProjects' => $allProjects,
+            'allCampaigns' => $allCampaigns,
+            'allLeadSources' => $allLeadSources,
         ])->layout('layouts.app');
+    }
+
+    public function openPullLeadsModal(): void
+    {
+        $this->showPullLeadsModal = true;
+        $this->pullSummary = null;
+        $firstAccount = \App\Models\PortalAccount::where('type', 'meta')->first();
+        if ($firstAccount && !$this->selectedPortalAccountId) {
+            $this->selectedPortalAccountId = $firstAccount->id;
+        }
+    }
+
+    public function closePullLeadsModal(): void
+    {
+        $this->showPullLeadsModal = false;
+        $this->pullSummary = null;
+    }
+
+    public function pullMetaLeads(): void
+    {
+        $this->isPulling = true;
+        $this->pullSummary = null;
+
+        try {
+            $account = null;
+            if ($this->selectedPortalAccountId) {
+                $account = \App\Models\PortalAccount::with(['credentials', 'formMappings'])->find($this->selectedPortalAccountId);
+            }
+
+            $pageId = $account?->getCredential('page_id') ?? '';
+            $accessToken = $this->customPageAccessToken ?: ($account?->getCredential('access_token') ?? '');
+            $formId = $this->customFormId;
+
+            if (empty($accessToken)) {
+                $this->dispatch('toast', type: 'error', message: 'No Page Access Token found. Please enter or configure credentials in Settings > Integrations.');
+                $this->isPulling = false;
+                return;
+            }
+
+            // Determine Target Form IDs
+            $targetFormIds = [];
+            if (!empty($formId)) {
+                $targetFormIds[] = $formId;
+            } elseif ($account && $account->formMappings->isNotEmpty()) {
+                $targetFormIds = $account->formMappings->pluck('form_id')->toArray();
+            } elseif (!empty($pageId)) {
+                // Discover active forms for page from Graph API
+                $formsResponse = \Illuminate\Support\Facades\Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
+                    'access_token' => $accessToken,
+                    'fields' => 'id,name,status',
+                ]);
+
+                if ($formsResponse->successful() && is_array($formsResponse->json('data'))) {
+                    foreach ($formsResponse->json('data') as $f) {
+                        $targetFormIds[] = $f['id'];
+                    }
+                }
+            }
+
+            if (empty($targetFormIds)) {
+                $this->dispatch('toast', type: 'error', message: 'No Leadgen Form ID found. Please specify a Form ID or configure Form Mappings.');
+                $this->isPulling = false;
+                return;
+            }
+
+            $totalFetched = 0;
+            $totalCreated = 0;
+            $totalDuplicates = 0;
+            $totalErrors = 0;
+
+            $metaMapper = new \App\Support\LeadMappers\MetaLeadMapper();
+            $client = \App\Models\Client::first();
+            $clientId = $client?->id ?: 1;
+            $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
+
+            foreach ($targetFormIds as $currentFormId) {
+                $leadsResponse = \Illuminate\Support\Facades\Http::timeout(15)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", [
+                    'access_token' => $accessToken,
+                    'limit' => $this->pullLimit ?: 25,
+                    'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
+                ]);
+
+                if (!$leadsResponse->successful()) {
+                    $totalErrors++;
+                    continue;
+                }
+
+                $leadsData = $leadsResponse->json('data') ?? [];
+                $totalFetched += count($leadsData);
+
+                // Match form mapping for project & campaign assignment
+                $mapping = $account ? \App\Models\LeadFormMapping::where('portal_account_id', $account->id)->where('form_id', $currentFormId)->first() : null;
+                $projectId = $this->syncProjectId ?: ($mapping?->project_id ?: (Project::where('client_id', $clientId)->first()?->id ?: 1));
+                $campaignId = $this->syncCampaignId ?: ($mapping?->campaign_id ?: null);
+
+                foreach ($leadsData as $rawLead) {
+                    try {
+                        $rawLead['form_id'] = $currentFormId;
+                        $mapped = $metaMapper->map($rawLead);
+
+                        $mobile = $mapped['mobile'] ?: '9876543210';
+                        $email = $mapped['email'] ?: 'meta_user@example.com';
+
+                        // 90-Day Duplicate Check
+                        $existingLead = Lead::where('client_id', $clientId)
+                            ->where('created_at', '>=', now()->subDays(90))
+                            ->where(function ($q) use ($mobile, $email) {
+                                $q->where('mobile', $mobile);
+                                if ($email && $email !== 'meta_user@example.com') {
+                                    $q->orWhere('email', $email);
+                                }
+                            })
+                            ->first();
+
+                        if ($existingLead) {
+                            $totalDuplicates++;
+                            continue;
+                        }
+
+                        // Create Lead
+                        $lead = Lead::create([
+                            'lead_code' => Lead::generateUniqueLeadCode(),
+                            'client_id' => $clientId,
+                            'project_id' => $projectId,
+                            'campaign_id' => $campaignId,
+                            'lead_source_id' => $leadSource->id,
+                            'name' => $mapped['name'] ?? 'Meta Lead',
+                            'mobile' => $mobile,
+                            'email' => $email,
+                            'city' => $mapped['city'] ?? 'Mumbai',
+                            'budget' => $mapped['budget'] ?? '₹75.0L',
+                            'property_type' => $mapped['property_type'] ?? '2 BHK',
+                            'requirement' => $mapped['requirement'] ?? 'Manual sync from Meta Ads Form #' . $currentFormId,
+                            'status' => 'new',
+                            'current_stage' => 'new',
+                            'assigned_to' => null,
+                        ]);
+
+                        // Save Metadata
+                        LeadMetadata::create([
+                            'lead_id' => $lead->id,
+                            'key' => 'meta_leadgen_id',
+                            'value' => $rawLead['id'] ?? '',
+                        ]);
+
+                        LeadMetadata::create([
+                            'lead_id' => $lead->id,
+                            'key' => 'raw_json',
+                            'value' => json_encode($rawLead),
+                        ]);
+
+                        // Dispatch Event for Credit Reservation / Auto Distribution
+                        event(new \App\Events\LeadCreated($lead));
+
+                        $totalCreated++;
+                    } catch (\Throwable $e) {
+                        $totalErrors++;
+                    }
+                }
+            }
+
+            $this->pullSummary = [
+                'fetched' => $totalFetched,
+                'created' => $totalCreated,
+                'duplicates' => $totalDuplicates,
+                'errors' => $totalErrors,
+            ];
+
+            $this->dispatch('toast', type: 'success', title: 'Sync Completed', message: "Pulled {$totalCreated} new leads from Meta ({$totalDuplicates} duplicates skipped).");
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Sync failed: ' . $e->getMessage());
+        } finally {
+            $this->isPulling = false;
+        }
+    }
+
+    public function createManualLead(): void
+    {
+        $this->validate([
+            'manualName' => 'required|string|max:255',
+            'manualMobile' => 'required|string|min:10',
+            'manualEmail' => 'nullable|email',
+            'manualProjectId' => 'required|exists:projects,id',
+        ], [
+            'manualName.required' => 'Lead Name is required.',
+            'manualMobile.required' => 'Mobile number is required.',
+            'manualProjectId.required' => 'Please select an associated project.',
+        ]);
+
+        $client = \App\Models\Client::first();
+        $clientId = $client?->id ?: 1;
+        $leadSourceId = $this->manualLeadSourceId ?: (LeadSource::firstOrCreate(['name' => 'direct'])->id);
+
+        $mobile = preg_replace('/[^0-9]/', '', $this->manualMobile);
+        $email = $this->manualEmail ?: null;
+
+        // 90-Day Duplicate Check
+        $existingLead = Lead::where('client_id', $clientId)
+            ->where('created_at', '>=', now()->subDays(90))
+            ->where(function ($q) use ($mobile, $email) {
+                $q->where('mobile', $mobile);
+                if ($email) {
+                    $q->orWhere('email', $email);
+                }
+            })
+            ->first();
+
+        if ($existingLead) {
+            $this->dispatch('toast', type: 'warning', title: 'Duplicate Detected', message: "Lead with mobile '{$mobile}' already exists (#{$existingLead->lead_code}).");
+            return;
+        }
+
+        $lead = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'client_id' => $clientId,
+            'project_id' => $this->manualProjectId,
+            'campaign_id' => $this->manualCampaignId ?: null,
+            'lead_source_id' => $leadSourceId,
+            'name' => $this->manualName,
+            'mobile' => $mobile,
+            'email' => $email ?: 'direct_entry@leadpanther.com',
+            'city' => $this->manualCity ?: 'Mumbai',
+            'budget' => $this->manualBudget ?: '₹75.0L',
+            'property_type' => $this->manualPropertyType ?: '2 BHK',
+            'requirement' => $this->manualRequirement ?: 'Manual lead entry via Lead Manager',
+            'status' => 'new',
+            'current_stage' => 'new',
+            'assigned_to' => null,
+        ]);
+
+        event(new \App\Events\LeadCreated($lead));
+
+        $this->reset([
+            'manualName',
+            'manualMobile',
+            'manualEmail',
+            'manualRequirement',
+            'manualProjectId',
+            'manualCampaignId',
+        ]);
+
+        $this->showPullLeadsModal = false;
+        $this->dispatch('toast', type: 'success', message: "Lead '{$lead->name}' (#{$lead->lead_code}) added to pipeline.");
     }
 
     public function exportExcel()

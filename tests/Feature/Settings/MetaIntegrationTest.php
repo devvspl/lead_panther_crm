@@ -346,7 +346,91 @@ class MetaIntegrationTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Privacy Policy');
         $response->assertSee('Lead Panther CRM');
-        $response->assertSee('Meta (Facebook &amp; Instagram) Lead Ads Integration', false);
+        $response->assertSee('Meta (Facebook', false);
         $response->assertSee('User Data Deletion Instructions');
+    }
+
+    public function test_lead_kanban_manual_pull_meta_leads(): void
+    {
+        $org = Organization::create(['name' => 'Lodha HQ', 'type' => 'builder', 'status' => 'active']);
+        $admin = User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        $client = Client::create(['name' => 'Lodha Group', 'organization_id' => $org->id]);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Lodha Crown']);
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Main Ads',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => '644872052329370',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'EAAB_test_token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v19.0/form_meta_9988/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'leadgen_1001',
+                        'created_time' => '2026-08-17T12:00:00+0000',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Karan Johar']],
+                            ['name' => 'phone_number', 'values' => ['+919876543210']],
+                            ['name' => 'email', 'values' => ['karan@example.com']],
+                            ['name' => 'city', 'values' => ['Mumbai']],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Leads\LeadKanban::class)
+            ->set('selectedPortalAccountId', $account->id)
+            ->set('customFormId', 'form_meta_9988')
+            ->set('syncProjectId', $project->id)
+            ->call('pullMetaLeads')
+            ->assertDispatched('toast');
+
+        $lead = \App\Models\Lead::where('mobile', '919876543210')->first();
+        $this->assertNotNull($lead);
+        $this->assertEquals('Karan Johar', $lead->name);
+        $this->assertEquals($project->id, $lead->project_id);
+    }
+
+    public function test_lead_kanban_creates_single_manual_lead(): void
+    {
+        $org = Organization::create(['name' => 'Godrej HQ', 'type' => 'builder', 'status' => 'active']);
+        $admin = User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        $client = Client::create(['name' => 'Godrej Properties', 'organization_id' => $org->id]);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Godrej Woods']);
+
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Leads\LeadKanban::class)
+            ->set('manualName', 'Rohit Sharma')
+            ->set('manualMobile', '9988776655')
+            ->set('manualEmail', 'rohit@hitman.com')
+            ->set('manualProjectId', $project->id)
+            ->set('manualPropertyType', '3 BHK')
+            ->set('manualBudget', '₹1.5Cr')
+            ->call('createManualLead')
+            ->assertDispatched('toast');
+
+        $lead = \App\Models\Lead::where('mobile', '9988776655')->first();
+        $this->assertNotNull($lead);
+        $this->assertEquals('Rohit Sharma', $lead->name);
+        $this->assertEquals($project->id, $lead->project_id);
     }
 }

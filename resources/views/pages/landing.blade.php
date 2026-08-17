@@ -482,10 +482,9 @@
             <div class="space-y-3">
                 <div class="font-bold text-ink uppercase tracking-wider text-[11px]">Resources &amp; Legal</div>
                 <ul class="space-y-2">
-                    <li><a href="#" class="hover:text-ink transition">Documentation</a></li>
-                    <li><a href="#" class="hover:text-ink transition">API Reference</a></li>
-                    <li><a href="#" class="hover:text-ink transition">Privacy Policy</a></li>
-                    <li><a href="#" class="hover:text-ink transition">Terms of Service</a></li>
+                    <li><a href="{{ route('privacy-policy') }}" class="hover:text-ink transition">Privacy Policy</a></li>
+                    <li><a href="{{ route('privacy-policy') }}#meta-lead-ads" class="hover:text-ink transition">Meta Lead Ads Terms</a></li>
+                    <li><a href="{{ route('privacy-policy') }}#data-deletion" class="hover:text-ink transition">Data Deletion Instructions</a></li>
                 </ul>
             </div>
         </div>
@@ -494,9 +493,9 @@
             class="max-w-7xl mx-auto px-6 border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>&copy; {{ date('Y') }} Lead Panther CRM. All rights reserved.</div>
             <div class="flex space-x-6 text-muted">
-                <a href="#" class="hover:text-ink transition">Privacy</a>
-                <a href="#" class="hover:text-ink transition">Security</a>
-                <a href="#" class="hover:text-ink transition">Status</a>
+                <a href="{{ route('privacy-policy') }}" class="hover:text-ink transition">Privacy</a>
+                <a href="{{ route('privacy-policy') }}#data-security" class="hover:text-ink transition">Security</a>
+                <a href="{{ route('privacy-policy') }}#contact" class="hover:text-ink transition">Contact</a>
             </div>
         </div>
     </footer>

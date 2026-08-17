@@ -338,4 +338,15 @@ class MetaIntegrationTest extends TestCase
         $response->assertJson(['status' => 'queued']);
         \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProcessInboundLeadJob::class);
     }
+
+    public function test_privacy_policy_page_is_publicly_accessible(): void
+    {
+        $response = $this->get('/privacy-policy');
+
+        $response->assertStatus(200);
+        $response->assertSee('Privacy Policy');
+        $response->assertSee('Lead Panther CRM');
+        $response->assertSee('Meta (Facebook &amp; Instagram) Lead Ads Integration', false);
+        $response->assertSee('User Data Deletion Instructions');
+    }
 }

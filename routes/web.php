@@ -29,8 +29,9 @@ use App\Livewire\Settings\UserInvite;
 // Signed Public Proposal Viewer Route
 Route::get('/proposals/view/{proposal}', [\App\Http\Controllers\ProposalViewerController::class, 'view'])->name('proposals.public_view')->middleware('signed');
 
-// Public Landing Page
+// Public Landing & Legal Pages
 Route::view('/', 'pages.landing')->name('landing');
+Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 
 // Pending Approval Route
 Route::view('pending-approval', 'pages.auth.pending-approval')->middleware(['auth'])->name('auth.pending-approval');

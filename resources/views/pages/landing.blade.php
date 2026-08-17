@@ -7,7 +7,7 @@
     <meta name="description"
         content="Lead Panther CRM - Automated multi-source lead capture, credit-based distribution, and real-time SLA tracking for real estate builders, channel partners, and sales teams.">
     <title>Lead Panther CRM - Turn Every Lead Into a Closed Deal</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <x-ui.vite-assets />
 </head>
 
 <body class="bg-canvas text-ink font-sans antialiased selection:bg-accent selection:text-white">

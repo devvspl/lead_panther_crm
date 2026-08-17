@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commercial Proposal - Lead Panther CRM</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <x-ui.vite-assets />
 </head>
 <body class="bg-canvas text-ink min-h-screen p-6 flex flex-col items-center">
     <div class="max-w-2xl w-full bg-surface rounded-card border border-border p-8 shadow-lg space-y-6">

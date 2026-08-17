@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>404 Page Not Found - {{ config('app.name', 'Lead Panther CRM') }}</title>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <x-ui.vite-assets />
     </head>
     <body class="bg-canvas text-ink font-sans antialiased min-h-screen flex items-center justify-center p-4">
         @php

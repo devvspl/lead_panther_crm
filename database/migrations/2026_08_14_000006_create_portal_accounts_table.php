@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('portal_accounts', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->enum('type', ['meta', 'google', 'portal', 'owned'])->default('meta')->index();
+            $table->string('type')->default('meta')->index();
             $table->string('credentials_ref')->nullable();
             $table->string('status')->default('active')->index();
             $table->timestamps();

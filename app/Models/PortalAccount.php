@@ -21,7 +21,20 @@ class PortalAccount extends Model
 
     public function getCredential(string $key): ?string
     {
-        $cred = $this->credentials->firstWhere('key_name', $key);
+        $cred = $this->credentials()->where('key_name', $key)->first();
         return $cred ? $cred->encrypted_value : null;
+    }
+
+    public function setCredential(string $key, ?string $value): void
+    {
+        if ($value === null) {
+            $this->credentials()->where('key_name', $key)->delete();
+            return;
+        }
+
+        $this->credentials()->updateOrCreate(
+            ['key_name' => $key],
+            ['encrypted_value' => $value]
+        );
     }
 }

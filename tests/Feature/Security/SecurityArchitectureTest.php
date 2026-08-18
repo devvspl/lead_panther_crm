@@ -98,7 +98,7 @@ class SecurityArchitectureTest extends TestCase
         $response = $this->postJson("/api/webhooks/meta/{$portalAccount->id}", [
             'name' => 'John Doe',
             'mobile' => '9876543210',
-            'access_token' => 'EAAC123456789SecretToken',
+            'access_token' => 'mock_secret_token_12345',
             'app_secret' => 'super_secret_app_key',
         ]);
 
@@ -106,7 +106,7 @@ class SecurityArchitectureTest extends TestCase
 
         $log = WebhookLog::where('portal_account_id', $portalAccount->id)->first();
         $this->assertNotNull($log);
-        $this->assertStringNotContainsString('EAAC123456789SecretToken', $log->payload);
+        $this->assertStringNotContainsString('mock_secret_token_12345', $log->payload);
         $this->assertStringContainsString('[REDACTED_SECRET]', $log->payload);
     }
 

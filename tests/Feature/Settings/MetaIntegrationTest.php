@@ -52,7 +52,7 @@ class MetaIntegrationTest extends TestCase
         $pageId = '109283746501928';
         $appId = '998877665544332';
         $appSecret = 'sec_meta_secret_hash_9988';
-        $token = 'EAABw_system_user_token_long_lived';
+        $token = 'mock_system_user_token_long_lived';
         $verifyToken = 'custom_verify_token_32chars';
 
         Livewire::actingAs($admin)
@@ -92,7 +92,7 @@ class MetaIntegrationTest extends TestCase
         $admin->assignRole('Super Admin');
 
         $pageId = '109283746501928';
-        $token = 'EAABw_valid_token';
+        $token = 'mock_valid_access_token';
 
         Http::fake([
             "https://graph.facebook.com/v19.0/{$pageId}*" => Http::response([
@@ -245,16 +245,16 @@ class MetaIntegrationTest extends TestCase
             ->test(IntegrationsManager::class)
             ->set('portalType', 'meta')
             ->set('accountName', 'Page Explorer Connection')
-            ->set('metaPageId', '644872052329370')
-            ->set('metaAccessToken', 'EAAWcsuKdLX8BSKgksCP9cbKez7MOrnfhwkCOzkRsErHg8NW3eHLjulSNRbgXK7NVW6NQICHP91jgg91C6OfvMfNVmd0ziF4TgTBnUTDZAu7ceaP8Lhb7Stg3Ua9GTKWUmZA7M9SQZBBS2YJgdfc4JbbZAzws6nvXvk2E2KzWXKd344EViiMOSoua1ZAqzWfcXOaEcBdaexkk27IeHFErARgCeQ9BbJ6QUJSSUGpvCjJzvTM7ZA0FfUm4ntVFxNkXxBjrrtvIozglFfNl5V3ZAQang0QvAZDZD')
-            ->set('metaVerifyToken', 'okGOBm9u7U4qt69AVXSL0JmRowNHLiZQ')
+            ->set('metaPageId', '109283746501928')
+            ->set('metaAccessToken', 'mock_page_token_abc_1234567890')
+            ->set('metaVerifyToken', 'mock_verify_token_dummy_xyz123')
             ->call('saveAccount')
             ->assertDispatched('toast');
 
         $account = PortalAccount::where('name', 'Page Explorer Connection')->first();
         $this->assertNotNull($account);
-        $this->assertEquals('644872052329370', $account->getCredential('page_id'));
-        $this->assertEquals('okGOBm9u7U4qt69AVXSL0JmRowNHLiZQ', $account->getCredential('verify_token'));
+        $this->assertEquals('109283746501928', $account->getCredential('page_id'));
+        $this->assertEquals('mock_verify_token_dummy_xyz123', $account->getCredential('verify_token'));
     }
 
     public function test_meta_webhook_get_verification_successful(): void
@@ -316,14 +316,14 @@ class MetaIntegrationTest extends TestCase
             'object' => 'page',
             'entry' => [
                 [
-                    'id' => '644872052329370',
+                    'id' => '109283746501928',
                     'time' => 1718000000,
                     'changes' => [
                         [
                             'field' => 'leadgen',
                             'value' => [
                                 'leadgen_id' => 'lead_99887766',
-                                'page_id' => '644872052329370',
+                                'page_id' => '109283746501928',
                                 'form_id' => 'form_12345678',
                             ]
                         ]
@@ -368,13 +368,13 @@ class MetaIntegrationTest extends TestCase
         IntegrationCredential::create([
             'portal_account_id' => $account->id,
             'key_name' => 'page_id',
-            'encrypted_value' => '644872052329370',
+            'encrypted_value' => '109283746501928',
         ]);
 
         IntegrationCredential::create([
             'portal_account_id' => $account->id,
             'key_name' => 'access_token',
-            'encrypted_value' => 'EAAB_test_token',
+            'encrypted_value' => 'mock_test_access_token',
         ]);
 
         Http::fake([

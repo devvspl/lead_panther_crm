@@ -32,7 +32,7 @@ class NavigationConfig
             'super-admin' => array_merge([
                 'dashboard', 'leads', 'bulk-import', 'distribution', 'credits',
                 'replacements', 'reports', 'integrations', 'organizations', 'users', 'audit-logs',
-                'failed-jobs', 'recharge-queue', 'backups'
+                'failed-jobs', 'recharge-queue', 'backups', 'git-sync'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
                 'dashboard', 'leads', 'bulk-import', 'distribution', 'reports', 'integrations', 'team'
@@ -214,6 +214,15 @@ class NavigationConfig
                 'data_nav_exact' => 'true',
                 'section' => 'database',
                 'icon' => '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2-2V9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>',
+            ],
+            'git-sync' => [
+                'key' => 'git-sync',
+                'label' => 'Git Sync & Deploy',
+                'url' => route('admin.git-sync'),
+                'data_nav_route' => 'admin/git-sync',
+                'data_nav_exact' => 'true',
+                'section' => 'database',
+                'icon' => '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>',
             ],
             'dev-tools' => [
                 'key' => 'dev-tools',

@@ -55,7 +55,7 @@
                     <input 
                         type="text" 
                         wire:model="metaPageId" 
-                        placeholder="e.g. 644872052329370"
+                        placeholder="e.g. 109283746501928"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
                     @error('metaPageId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror

@@ -119,7 +119,12 @@ class GitSyncService
         }
 
         // Redact any tokens that may be present in error output
-        $sanitizedError = $token ? str_replace($token, '[REDACTED_TOKEN]', $result['stderr'] ?: $result['stdout']) : ($result['stderr'] ?: $result['stdout']);
+        $rawOutput = trim($result['stderr'] ?: $result['stdout']);
+        if (empty($rawOutput)) {
+            $rawOutput = 'Command returned exit code ' . $result['exit_code'] . ' with no error output.';
+        }
+
+        $sanitizedError = $token ? str_replace($token, '[REDACTED_TOKEN]', $rawOutput) : $rawOutput;
 
         return [
             'successful' => false,
@@ -753,10 +758,29 @@ class GitSyncService
     {
         $process = new Process($command, $this->workingDir);
         $process->setTimeout($timeout);
-        $process->setEnv([
-            'GIT_TERMINAL_PROMPT' => '0',
-            'GIT_ASKPASS' => 'echo',
-        ]);
+
+        // Inherit parent environment so Windows Winsock, DNS (getaddrinfo), PATH, SystemRoot are available
+        $systemEnv = getenv();
+        if (empty($systemEnv) || !is_array($systemEnv)) {
+            $systemEnv = $_SERVER;
+        }
+
+        $envVars = array_merge(
+            $systemEnv,
+            [
+                'GIT_TERMINAL_PROMPT' => '0',
+                'GIT_ASKPASS' => 'echo',
+                'SystemRoot' => getenv('SystemRoot') ?: (getenv('SYSTEMROOT') ?: ($_SERVER['SystemRoot'] ?? 'C:\\Windows')),
+                'SYSTEMROOT' => getenv('SystemRoot') ?: (getenv('SYSTEMROOT') ?: ($_SERVER['SystemRoot'] ?? 'C:\\Windows')),
+                'WINDIR' => getenv('WINDIR') ?: ($_SERVER['WINDIR'] ?? 'C:\\Windows'),
+                'PATH' => getenv('PATH') ?: ($_SERVER['PATH'] ?? ''),
+                'USERPROFILE' => getenv('USERPROFILE') ?: ($_SERVER['USERPROFILE'] ?? ''),
+                'TEMP' => getenv('TEMP') ?: ($_SERVER['TEMP'] ?? ''),
+                'TMP' => getenv('TMP') ?: ($_SERVER['TMP'] ?? ''),
+            ]
+        );
+
+        $process->setEnv($envVars);
 
         try {
             $process->run();

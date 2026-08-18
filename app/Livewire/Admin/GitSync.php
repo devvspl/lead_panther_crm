@@ -161,7 +161,7 @@ class GitSync extends Component
             $this->dispatch('toast', type: 'success', message: 'Git remote connection verified successfully.');
             $this->refreshStatus($gitService);
         } else {
-            $this->dispatch('toast', type: 'error', message: 'Connection test failed. Check token permissions.');
+            $this->dispatch('toast', type: 'error', message: $this->connectionTestResult['message'] ?: 'Connection test failed. Check token permissions.');
         }
     }
 

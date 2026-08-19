@@ -5,25 +5,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global Layout Boundaries - Prevent Horizontal Scrollbar */
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+}
+
 /* Hide Alpine cloak elements before initialization */
 [x-cloak] {
   display: none !important;
 }
 
-/* Custom Thin Sidebar Scrollbar */
-.sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #E5E7EB transparent;
+/* Completely Hide Scrollbar from Sidebar & Elements with .no-scrollbar / .sidebar-scroll */
+.no-scrollbar,
+.sidebar-scroll,
+#sidebar-main,
+#sidebar-main * {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
 }
-.sidebar-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: #E5E7EB;
-  border-radius: 9999px;
-}
-.sidebar-scroll::-webkit-scrollbar-track {
-  background: transparent;
+
+.no-scrollbar::-webkit-scrollbar,
+.sidebar-scroll::-webkit-scrollbar,
+#sidebar-main::-webkit-scrollbar,
+#sidebar-main *::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
 /* Toast Progress Bar Drain Animation */

@@ -1,6 +1,6 @@
 @persist('topbar')
-<header id="topbar-main" wire:persist="topbar" class="sticky top-0 z-50 h-16 bg-surface border-b border-border px-4 sm:px-6 flex items-center justify-between flex-shrink-0">
-    <div class="flex items-center space-x-2">
+<header id="topbar-main" wire:persist="topbar" class="sticky top-0 z-40 h-16 bg-surface border-b border-border px-4 sm:px-6 flex items-center justify-between flex-shrink-0 max-w-full overflow-x-hidden">
+    <div class="flex items-center space-x-2 min-w-0">
         <!-- Hamburger Icon Button (Mobile Only: md:hidden) -->
         <button 
             x-on:click="sidebarOpen = !sidebarOpen" 
@@ -10,6 +10,19 @@
         >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
+
+        <!-- Desktop Sidebar Toggle Button (md:flex) -->
+        <button 
+            x-on:click="toggleSidebar()" 
+            type="button" 
+            class="hidden md:flex p-2 -ml-2 rounded-lg text-muted hover:text-ink hover:bg-canvas focus:outline-none flex-shrink-0 transition cursor-pointer" 
+            :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            aria-label="Toggle desktop sidebar"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
             </svg>
         </button>
 

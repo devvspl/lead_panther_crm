@@ -2,89 +2,51 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Recharge Approval Queue</h1>
-            <p class="text-xs text-muted">Review and confirm client credit recharge requests.</p>
+            <div class="flex items-center space-x-2 text-xs text-muted mb-1">
+                <span>Billing &amp; Credits</span>
+                <span>/</span>
+                <span class="text-ink font-semibold">Recharge Requests</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
+                <svg class="w-6 h-6 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span>Recharge Approval Queue</span>
+            </h1>
+            <p class="text-xs text-muted">Review, verify payment references, and approve wallet recharge requests.</p>
         </div>
     </div>
 
-
-
-    <!-- Recharge Requests Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Request ID</th>
-                        <th class="py-3 px-4">Client / Org</th>
-                        <th class="py-3 px-4">Package</th>
-                        <th class="py-3 px-4">Credits</th>
-                        <th class="py-3 px-4">Price</th>
-                        <th class="py-3 px-4">Requested At</th>
-                        <th class="py-3 px-4">Status</th>
-                        <th class="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($requests as $req)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $req->id }}</td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $req->client->name ?? 'Client #'.$req->client_id }}</td>
-                            <td class="py-3 px-4 font-semibold text-ink">{{ $req->package->name ?? 'Custom Package' }}</td>
-                            <td class="py-3 px-4 font-mono font-bold text-primary">+{{ $req->package->credit_count ?? ($req->amount / 10) }} Cr</td>
-                            <td class="py-3 px-4 font-mono font-bold text-ink">₹{{ number_format($req->amount, 2) }}</td>
-                            <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">{{ $req->requested_at }}</td>
-                            <td class="py-3 px-4 whitespace-nowrap">
-                                @if($req->status === 'pending')
-                                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-amber-50 text-amber-700 border border-amber-200">Pending</span>
-                                @elseif($req->status === 'approved')
-                                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-green-50 text-green-700 border border-green-200">Approved</span>
-                                @else
-                                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-red-50 text-red-700 border border-red-200">Rejected</span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4 text-right space-x-2 whitespace-nowrap">
-                                @if($req->status === 'pending')
-                                    <button wire:click="openApproveModal({{ $req->id }})" class="px-2.5 py-1 text-xs font-bold text-white bg-accent rounded hover:bg-black transition">
-                                        Approve ✓
-                                    </button>
-                                    <button wire:click="openRejectModal({{ $req->id }})" class="px-2.5 py-1 text-xs font-bold text-danger bg-canvas rounded hover:bg-red-50 border border-border transition">
-                                        Reject ✕
-                                    </button>
-                                @else
-                                    <span class="text-[11px] text-muted italic">Processed</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="py-6 text-center text-muted">No recharge requests found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $requests->links('vendor.pagination.tailwind') }}
-        </div>
-    </div>
+    <!-- Advanced Table Component -->
+    <x-ui.advanced-table 
+        :columns="$this->tableColumns()"
+        :rows="$requests"
+        :quickFilters="$this->quickFilters()"
+        :activeStatus="$statusFilter"
+        :visibleColumns="$visibleColumns"
+        :sortField="$sortField"
+        :sortDirection="$sortDirection"
+        :filterCount="$this->activeFilterCount"
+        searchPlaceholder="Search client name, amount, or reference UTR..."
+        emptyTitle="No Recharge Requests Found"
+        emptyMessage="No wallet recharge requests match your current filters."
+    />
 
     <!-- APPROVE CONFIRMATION MODAL -->
     @if($showApproveModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
-            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-xl border border-border space-y-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4">
                 <h3 class="text-base font-bold text-ink">Approve Credit Recharge Request</h3>
                 <p class="text-xs text-muted">Confirming this request will immediately credit the client's wallet with the requested credit balance.</p>
 
                 <div>
                     <label class="block text-xs font-semibold text-ink mb-1">Payment Reference / Note (Optional)</label>
-                    <input type="text" wire:model="referenceNote" placeholder="e.g. Bank Transfer Ref #12345 or Cash Payment" class="w-full text-xs rounded border border-border p-2 bg-canvas focus:ring-1 focus:ring-ink">
+                    <input type="text" wire:model="referenceNote" placeholder="e.g. Bank Transfer Ref #12345 or Cash Payment" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary">
                 </div>
 
-                <div class="flex justify-end space-x-2 pt-2">
-                    <button wire:click="$set('showApproveModal', false)" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold">Cancel</button>
-                    <button wire:click="approveRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-accent rounded hover:bg-black">Confirm Approval ✓</button>
+                <div class="flex justify-end space-x-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('showApproveModal', false)" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold cursor-pointer">Cancel</button>
+                    <button type="button" wire:click="approveRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs cursor-pointer">Confirm Approval ✓</button>
                 </div>
             </div>
         </div>
@@ -92,20 +54,20 @@
 
     <!-- REJECT MODAL -->
     @if($showRejectModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
-            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-xl border border-border space-y-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4">
                 <h3 class="text-base font-bold text-ink">Decline Credit Recharge Request</h3>
                 <p class="text-xs text-muted">Please specify a reason for rejecting this recharge request. This will be sent to the client.</p>
 
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">Rejection Reason (Required)</label>
-                    <textarea wire:model="rejectionReason" rows="3" placeholder="e.g. Payment receipt not verified or incorrect amount." class="w-full text-xs rounded border border-border p-2 bg-canvas focus:ring-1 focus:ring-ink"></textarea>
-                    @error('rejectionReason') <span class="text-red-500 text-[10px]">{{ $message }}</span> @enderror
+                    <label class="block text-xs font-semibold text-ink mb-1">Rejection Reason <span class="text-rose-500">*</span></label>
+                    <textarea wire:model="rejectionReason" rows="3" placeholder="e.g. Payment receipt not verified or incorrect amount." class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
+                    @error('rejectionReason') <span class="text-rose-500 text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
 
-                <div class="flex justify-end space-x-2 pt-2">
-                    <button wire:click="$set('showRejectModal', false)" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold">Cancel</button>
-                    <button wire:click="rejectRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-danger rounded hover:opacity-90">Decline Request ✕</button>
+                <div class="flex justify-end space-x-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('showRejectModal', false)" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold cursor-pointer">Cancel</button>
+                    <button type="button" wire:click="rejectRequest" class="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-2xs cursor-pointer">Decline Request ✕</button>
                 </div>
             </div>
         </div>

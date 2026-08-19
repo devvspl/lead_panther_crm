@@ -151,4 +151,35 @@ class Lead extends Model
         $maxScore = $weights['max_score'] ?? 100;
         return (int) min($maxScore, max(0, $score));
     }
+
+    public function getProjectNameAttribute(): string
+    {
+        return $this->project?->name ?: 'N/A';
+    }
+
+    public function getLeadSourceNameAttribute(): string
+    {
+        return $this->leadSource?->name ?: 'Direct';
+    }
+
+    public function getBudgetFormattedAttribute(): string
+    {
+        return is_numeric($this->budget) ? '₹' . number_format($this->budget / 100000, 1) . 'L' : ($this->budget ?: 'N/A');
+    }
+
+    public function getAssignedToUserAttribute(): array
+    {
+        return $this->assignedTo ? [$this->assignedTo] : [];
+    }
+
+    public function getSlaBadgeAttribute(): string
+    {
+        if ($this->first_response_at) {
+            return 'SLA Met';
+        }
+        if ($this->created_at && Carbon::parse($this->created_at)->diffInMinutes(now()) > 15) {
+            return 'SLA Breached';
+        }
+        return 'SLA Pending';
+    }
 }

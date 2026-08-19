@@ -32,4 +32,27 @@ class UploadBatch extends Model
     {
         return $this->belongsTo(LeadSource::class);
     }
+
+    public function getUploaderNameAttribute(): string
+    {
+        return $this->uploader?->name ?: 'System';
+    }
+
+    public function getProjectNameAttribute(): string
+    {
+        return $this->project?->name ?: 'N/A';
+    }
+
+    public function getStatusBadgeAttribute(): string
+    {
+        if ($this->total_rows === 0) return 'Empty';
+        if ($this->failed_count > 0 && $this->imported_count > 0) return 'Partial';
+        if ($this->failed_count > 0 && $this->imported_count === 0) return 'Failed';
+        return 'Completed';
+    }
+
+    public function getSuccessProgressAttribute(): int
+    {
+        return $this->total_rows > 0 ? (int) round(($this->imported_count / $this->total_rows) * 100) : 0;
+    }
 }

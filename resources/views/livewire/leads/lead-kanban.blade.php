@@ -330,77 +330,29 @@
 
     <!-- PART 3: BOARD CONTENT (KANBAN OR TABLE) -->
     @if($viewMode === 'table')
-        <!-- Table View -->
-        <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-ink border-collapse">
-                    <thead>
-                        <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                            <th class="py-3 px-4">Lead ID</th>
-                            <th class="py-3 px-4">Name & Contact</th>
-                            <th class="py-3 px-4">Project</th>
-                            <th class="py-3 px-4">Stage</th>
-                            <th class="py-3 px-4">Source</th>
-                            <th class="py-3 px-4">Budget</th>
-                            <th class="py-3 px-4">Assigned To</th>
-                            <th class="py-3 px-4">SLA Status</th>
-                            <th class="py-3 px-4">Score</th>
-                            <th class="py-3 px-4">Created Date</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($tableLeads as $lead)
-                            <tr 
-                                @click="$dispatch('open-lead-detail', { id: {{ $lead->id }} })" 
-                                class="hover:bg-canvas/50 transition cursor-pointer"
-                            >
-                                <td class="py-3 px-4 font-mono font-bold text-ink">{{ $lead->lead_code }}</td>
-                                <td class="py-3 px-4">
-                                    <div class="font-bold text-ink">{{ $lead->name }}</div>
-                                    <div class="text-[10px] text-muted">{{ $lead->city ?: 'Location N/A' }} • {{ $lead->mobile }}</div>
-                                </td>
-                                <td class="py-3 px-4 font-medium">{{ $lead->project?->name ?: 'N/A' }}</td>
-                                <td class="py-3 px-4">
-                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill bg-canvas border border-border text-ink">
-                                        {{ ucfirst(str_replace('_', ' ', $lead->current_stage)) }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4 text-muted">{{ $lead->leadSource?->name ?: 'Direct' }}</td>
-                                <td class="py-3 px-4 font-mono font-bold">{{ is_numeric($lead->budget) ? '₹' . number_format($lead->budget / 100000, 1) . 'L' : $lead->budget }}</td>
-                                <td class="py-3 px-4">
-                                    <div class="font-medium text-ink">{{ $lead->assignedTo?->name ?: 'Unassigned' }}</div>
-                                    @if($lead->assignedTo?->salesTeamMembers?->first()?->salesTeam)
-                                        <div class="text-[10px] text-muted font-medium flex items-center space-x-1 mt-0.5">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-info flex-shrink-0"></span>
-                                            <span class="truncate">{{ $lead->assignedTo->salesTeamMembers->first()->salesTeam->name }}</span>
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="py-3 px-4">
-                                    @if($lead->first_response_at)
-                                        <span class="px-2 py-0.5 rounded-pill bg-green-50 text-green-700 font-bold text-[10px]">SLA Met</span>
-                                    @elseif(\Carbon\Carbon::parse($lead->created_at)->diffInMinutes(now()) > 30)
-                                        <span class="px-2 py-0.5 rounded-pill bg-red-50 text-red-700 font-bold text-[10px]">SLA Breached</span>
-                                    @else
-                                        <span class="px-2 py-0.5 rounded-pill bg-amber-50 text-amber-700 font-semibold text-[10px]">Pending</span>
-                                    @endif
-                                </td>
-                                <td class="py-3 px-4 font-mono font-bold text-info">⚡ {{ $lead->lead_score ?? 0 }}</td>
-                                <td class="py-3 px-4 text-muted">{{ $lead->created_at ? $lead->created_at->format('M d, Y H:i') : '' }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10" class="py-8 text-center text-muted">No leads found matching current filters.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pt-2">
-                {{ $tableLeads->links('vendor.pagination.tailwind') }}
-            </div>
-        </div>
+        <!-- Advanced Table View -->
+        <x-ui.advanced-table 
+            :columns="$this->tableColumns()"
+            :rows="$tableLeads"
+            :quickFilters="$this->quickFilters()"
+            :activeStatus="$statusFilter"
+            :visibleColumns="$visibleColumns"
+            :sortField="$sortField"
+            :sortDirection="$sortDirection"
+            searchPlaceholder="Search leads by code, name, phone, city..."
+            emptyTitle="No Leads Found"
+            emptyMessage="No leads matched your search and filter criteria."
+        >
+            <x-slot:action>
+                <div class="flex items-center gap-2">
+                    <x-ui.export-button action="export" class="text-xs" />
+                    <x-ui.button wire:click="openPullLeadsModal" variant="primary" class="text-xs flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Add / Ingest Leads</span>
+                    </x-ui.button>
+                </div>
+            </x-slot:action>
+        </x-ui.advanced-table>
     @else
         <!-- PART 4: KANBAN BOARD GRID (CONTAINED HORIZONTAL SCROLL) -->
         <div 

@@ -2,24 +2,33 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Organizations Management</h1>
+            <div class="flex items-center space-x-2 text-xs text-muted mb-1">
+                <span>System Administration</span>
+                <span>/</span>
+                <span class="text-ink font-semibold">Organizations</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
+                <svg class="w-6 h-6 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                <span>Organizations Management</span>
+            </h1>
             <p class="text-xs text-muted">Manage Real Estate Builder, Channel Partner, and Platform multi-tenant organizations.</p>
         </div>
-        <x-ui.export-button target="exportExcel" />
     </div>
 
-    <!-- Create Organization Card -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Register New Organization</h2>
+    <!-- Create Organization Inline Card -->
+    <div class="bg-surface rounded-card border border-border p-5 shadow-2xs space-y-3">
+        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Quick Register Organization</h2>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div>
                 <label class="font-bold text-ink">Organization Name</label>
                 <input 
                     type="text" 
                     wire:model="name" 
                     placeholder="e.g. Prestige Developers Ltd"
-                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
+                    class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
                 >
                 @error('name') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
             </div>
@@ -28,7 +37,7 @@
                 <label class="font-bold text-ink">Organization Type</label>
                 <x-ui.themed-select 
                     wire:model="type" 
-                    :options="['builder' => 'Builder / Real Estate Developer', 'channel_partner' => 'Channel Partner Agency', 'platform' => 'Platform Admin Org']"
+                    :options="['builder' => 'Builder / Developer', 'channel_partner' => 'Channel Partner', 'platform' => 'Platform Admin Org']"
                     placeholder="Organization Type" 
                     class="w-full mt-1" 
                 />
@@ -46,93 +55,32 @@
             </div>
         </div>
 
-        <div class="flex justify-end pt-2">
+        <div class="flex justify-end pt-1">
             <x-ui.button wire:click="createOrganization" variant="primary" class="text-xs">
                 Save Organization
             </x-ui.button>
         </div>
     </div>
 
-    <!-- Organizations List Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Registered Organizations</h2>
-
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Org ID</th>
-                        <th class="py-3 px-4">Organization Name</th>
-                        <th class="py-3 px-4">Type</th>
-                        <th class="py-3 px-4">Users</th>
-                        <th class="py-3 px-4">Clients Count</th>
-                        <th class="py-3 px-4">Status</th>
-                        <th class="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($organizations as $org)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $org->id }}</td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $org->name }}</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border">
-                                    {{ str_replace('_', ' ', $org->type) }}
-                                </span>
-                            </td>
-                            <td class="py-3 px-4">
-                                <button 
-                                    wire:click="openUserOffcanvas({{ $org->id }})"
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-canvas text-ink border border-border hover:bg-neutral-200 transition"
-                                >
-                                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-                                    </svg>
-                                    <span>{{ $org->users_count }} users</span>
-                                </button>
-                            </td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $org->clients_count }} clients</td>
-                            <td class="py-3 px-4">
-                                @if($org->status === 'active')
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-green-50 text-green-700 border border-green-200">ACTIVE</span>
-                                @else
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-red-50 text-red-700 border border-red-200">SUSPENDED</span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4 text-right space-x-2">
-                                <button 
-                                    wire:click="openUserOffcanvas({{ $org->id }})"
-                                    class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
-                                >
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                                    </svg>
-                                    <span>+ Add User</span>
-                                </button>
-
-                                <span class="text-border">|</span>
-
-                                <button 
-                                    wire:click="toggleStatus({{ $org->id }})"
-                                    class="text-xs font-bold text-muted hover:text-ink hover:underline"
-                                >
-                                    {{ $org->status === 'active' ? 'Suspend' : 'Activate' }}
-                                </button>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="py-8 text-center text-muted">No organizations registered yet.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $organizations->links('vendor.pagination.tailwind') }}
-        </div>
-    </div>
+    <!-- Advanced Table Component -->
+    <x-ui.advanced-table 
+        :columns="$this->tableColumns()"
+        :rows="$organizations"
+        :quickFilters="$this->quickFilters()"
+        :activeStatus="$statusFilter"
+        :visibleColumns="$visibleColumns"
+        :sortField="$sortField"
+        :sortDirection="$sortDirection"
+        :filterCount="$this->activeFilterCount"
+        searchPlaceholder="Search organization name or type..."
+        emptyTitle="No Organizations Found"
+        emptyMessage="No organizations match your current search and filters."
+    >
+        <!-- Primary Action Slot -->
+        <x-slot:action>
+            <x-ui.export-button target="exportExcel" class="text-xs" />
+        </x-slot:action>
+    </x-ui.advanced-table>
 
     <!-- Offcanvas Slide-over Drawer for Organization User Management -->
     <x-ui.offcanvas 
@@ -158,7 +106,7 @@
                         <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                         </svg>
-                        <span>Create & Assign New User</span>
+                        <span>Create &amp; Assign New User</span>
                     </h4>
                     <span class="text-[10px] text-muted uppercase font-mono font-bold">{{ str_replace('_', ' ', $selectedOrg->type) }}</span>
                 </div>
@@ -219,12 +167,12 @@
                         <button 
                             type="button"
                             wire:click="createUserForOrganization"
-                            class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5"
+                            class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                         >
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                             </svg>
-                            <span>Create & Assign User</span>
+                            <span>Create &amp; Assign User</span>
                         </button>
                     </div>
 
@@ -250,7 +198,7 @@
                                     type="button" 
                                     x-data="{ copied: false }" 
                                     @click="navigator.clipboard.writeText('{{ $generatedInviteLink }}'); copied = true; $wire.dispatch('toast', { type: 'success', title: 'Copied', message: 'Activation link copied to clipboard.' }); setTimeout(() => copied = false, 2000)" 
-                                    class="px-3 h-8 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition shrink-0 flex items-center gap-1.5 shadow-xs"
+                                    class="px-3 h-8 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition shrink-0 flex items-center gap-1.5 shadow-xs cursor-pointer"
                                 >
                                     <svg x-show="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -303,7 +251,7 @@
                                 <button 
                                     type="button"
                                     wire:click="removeUserFromOrganization({{ $member->id }})"
-                                    class="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
+                                    class="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition cursor-pointer"
                                     title="Unassign from Organization"
                                 >
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +273,7 @@
             <button 
                 type="button" 
                 wire:click="closeUserOffcanvas" 
-                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
+                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer"
             >
                 Done
             </button>

@@ -3,14 +3,14 @@
 namespace App\Livewire\Replacement;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\LeadReplacement;
 use App\Models\Client;
 use App\Models\Project;
 
 class ReplacementQueue extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public bool $showRejectModal = false;
     public ?int $rejectingReplacementId = null;
@@ -18,27 +18,41 @@ class ReplacementQueue extends Component
 
     public $filterClient = '';
     public $filterProject = '';
-    public $filterStatus = '';
-    public $filterDateRange = '';
 
-    public function updatedFilterClient(): void
+    public function mount(): void
     {
-        $this->resetPage();
+        $this->loadColumnPreferences();
     }
 
-    public function updatedFilterProject(): void
+    public function tableColumns(): array
     {
-        $this->resetPage();
+        return [
+            ['key' => 'id', 'label' => 'Claim ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'requested_at', 'label' => 'Requested At', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i'],
+            ['key' => 'lead_summary', 'label' => 'Original Lead', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+            ['key' => 'reason_name', 'label' => 'Reason', 'type' => 'text', 'priority' => 1],
+            ['key' => 'requested_by_name', 'label' => 'Requested By', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted'],
+            ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+                'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
+                'SLA Missed' => 'bg-amber-50 text-amber-700 border border-amber-200',
+            ]],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'approved' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'rejected' => 'bg-red-50 text-red-700 border border-red-200',
+            ]],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'replacement_actions', 'priority' => 1],
+        ];
     }
 
-    public function updatedFilterStatus(): void
+    public function quickFilters(): array
     {
-        $this->resetPage();
-    }
-
-    public function updatedFilterDateRange(): void
-    {
-        $this->resetPage();
+        return [
+            ['key' => 'all', 'label' => 'All Claims'],
+            ['key' => 'pending', 'label' => 'Pending Review'],
+            ['key' => 'approved', 'label' => 'Approved'],
+            ['key' => 'rejected', 'label' => 'Rejected'],
+        ];
     }
 
     public function approveReplacement(int $id): void
@@ -80,9 +94,21 @@ class ReplacementQueue extends Component
         $this->closeRejectModal();
     }
 
-    public function render()
+    protected function getFilteredQuery()
     {
         $query = LeadReplacement::with(['lead', 'reason', 'requestedBy', 'replacementLead']);
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->whereHas('lead', function ($lq) {
+                    $lq->where('name', 'like', '%' . $this->search . '%')
+                       ->orWhere('lead_code', 'like', '%' . $this->search . '%')
+                       ->orWhere('mobile', 'like', '%' . $this->search . '%');
+                })->orWhereHas('reason', function ($rq) {
+                    $rq->where('reason_name', 'like', '%' . $this->search . '%');
+                });
+            });
+        }
 
         if ($this->filterClient) {
             $query->whereHas('lead', function ($q) {
@@ -96,21 +122,26 @@ class ReplacementQueue extends Component
             });
         }
 
-        if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
+        if ($this->statusFilter === 'pending') {
+            $query->where('status', 'pending');
+        } elseif ($this->statusFilter === 'approved') {
+            $query->where('status', 'approved');
+        } elseif ($this->statusFilter === 'rejected') {
+            $query->where('status', 'rejected');
         }
 
-        if ($this->filterDateRange) {
-            if ($this->filterDateRange === 'today') {
-                $query->whereDate('requested_at', now());
-            } elseif ($this->filterDateRange === 'week') {
-                $query->where('requested_at', '>=', now()->subDays(7));
-            } elseif ($this->filterDateRange === 'month') {
-                $query->where('requested_at', '>=', now()->subDays(30));
-            }
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('requested_at');
         }
 
-        $replacements = $query->latest('requested_at')->paginate(15);
+        return $query;
+    }
+
+    public function render()
+    {
+        $replacements = $this->getFilteredQuery()->paginate($this->perPage);
         $clients = Client::all();
         $projects = Project::all();
 
@@ -123,35 +154,7 @@ class ReplacementQueue extends Component
 
     public function exportExcel()
     {
-        $query = LeadReplacement::with(['lead', 'reason', 'requestedBy', 'replacementLead']);
-
-        if ($this->filterClient) {
-            $query->whereHas('lead', function ($q) {
-                $q->where('client_id', $this->filterClient);
-            });
-        }
-
-        if ($this->filterProject) {
-            $query->whereHas('lead', function ($q) {
-                $q->where('project_id', $this->filterProject);
-            });
-        }
-
-        if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
-        }
-
-        if ($this->filterDateRange) {
-            if ($this->filterDateRange === 'today') {
-                $query->whereDate('requested_at', now());
-            } elseif ($this->filterDateRange === 'week') {
-                $query->where('requested_at', '>=', now()->subDays(7));
-            } elseif ($this->filterDateRange === 'month') {
-                $query->where('requested_at', '>=', now()->subDays(30));
-            }
-        }
-
-        $data = $query->latest('requested_at')->get();
+        $data = $this->getFilteredQuery()->get();
         $filename = "replacement-requests-queue_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Claim ID', 'Requested At', 'Original Lead', 'Reason', 'SLA Status', 'Eligible', 'Status', 'Resolution Note'];
@@ -166,7 +169,7 @@ class ReplacementQueue extends Component
             fn($r) => $r->resolution_note ?: ($r->replacementLead ? "Replaced by {$r->replacementLead->lead_code}" : ''),
         ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->filterStatus ? " | Status: {$this->filterStatus}" : '');
+        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->statusFilter ? " | Status: {$this->statusFilter}" : '');
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 

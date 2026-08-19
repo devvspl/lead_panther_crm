@@ -3,7 +3,7 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 use Illuminate\Support\Facades\DB;
 use App\Models\CreditTransaction;
 use App\Models\CreditWallet;
@@ -12,7 +12,7 @@ use App\Models\AuditLog;
 
 class AdminCredits extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public bool $showAdjustModal = false;
     public ?int $selectedClientId = null;
@@ -21,7 +21,39 @@ class AdminCredits extends Component
     public string $reason = '';
 
     public string $filterClient = '';
-    public string $filterType = '';
+
+    public function mount(): void
+    {
+        $this->loadColumnPreferences();
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'created_at', 'label' => 'Date & Time', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i'],
+            ['key' => 'client_name', 'label' => 'Client / Organization', 'type' => 'text', 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'transaction_type', 'label' => 'Type', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'recharge' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'refund' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'reserve' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'deduct' => 'bg-purple-50 text-purple-700 border border-purple-200',
+            ]],
+            ['key' => 'lead_summary', 'label' => 'Associated Lead', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted'],
+            ['key' => 'credit_used_formatted', 'label' => 'Credits In / Out', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'credit_after_formatted', 'label' => 'Balance After', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-primary font-bold'],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Transactions'],
+            ['key' => 'recharge', 'label' => 'Recharges'],
+            ['key' => 'reserve', 'label' => 'Lead Deductions'],
+            ['key' => 'refund', 'label' => 'Refunds / Adjustments'],
+        ];
+    }
 
     public function openAdjustModal(): void
     {
@@ -97,19 +129,42 @@ class AdminCredits extends Component
         $this->closeAdjustModal();
     }
 
-    public function render()
+    protected function getFilteredQuery()
     {
         $query = CreditTransaction::with(['client', 'lead', 'package']);
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('transaction_type', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('client', fn($cq) => $cq->where('name', 'like', '%' . $this->search . '%'))
+                  ->orWhereHas('lead', fn($lq) => $lq->where('lead_code', 'like', '%' . $this->search . '%')->orWhere('name', 'like', '%' . $this->search . '%'));
+            });
+        }
 
         if ($this->filterClient) {
             $query->where('client_id', $this->filterClient);
         }
 
-        if ($this->filterType) {
-            $query->where('transaction_type', $this->filterType);
+        if ($this->statusFilter === 'recharge') {
+            $query->where('transaction_type', 'recharge');
+        } elseif ($this->statusFilter === 'reserve') {
+            $query->whereIn('transaction_type', ['reserve', 'deduct']);
+        } elseif ($this->statusFilter === 'refund') {
+            $query->where('transaction_type', 'refund');
         }
 
-        $transactions = $query->latest('created_at')->paginate(15);
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
+        }
+
+        return $query;
+    }
+
+    public function render()
+    {
+        $transactions = $this->getFilteredQuery()->paginate($this->perPage);
         $clients = Client::all();
 
         return view('livewire.admin.admin-credits', [
@@ -120,17 +175,7 @@ class AdminCredits extends Component
 
     public function exportExcel()
     {
-        $query = CreditTransaction::with(['client', 'lead', 'package']);
-
-        if ($this->filterClient) {
-            $query->where('client_id', $this->filterClient);
-        }
-
-        if ($this->filterType) {
-            $query->where('transaction_type', $this->filterType);
-        }
-
-        $data = $query->latest('created_at')->get();
+        $data = $this->getFilteredQuery()->get();
         $filename = "admin-credit-transactions_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Date & Time', 'Client', 'Transaction Type', 'Lead Code', 'Credit Before', 'Credit Used/Added', 'Credit After'];
@@ -144,7 +189,7 @@ class AdminCredits extends Component
             'credit_after',
         ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->filterType ? " | Type: {$this->filterType}" : '') . ($this->filterClient ? " | ClientID: {$this->filterClient}" : '');
+        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->statusFilter ? " | Type: {$this->statusFilter}" : '');
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 

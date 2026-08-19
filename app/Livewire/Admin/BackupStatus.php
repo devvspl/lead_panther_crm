@@ -3,29 +3,50 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
+use App\Livewire\Concerns\HasAdvancedTable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use App\Jobs\RunBackupJob;
 use Throwable;
-
-use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class BackupStatus extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public bool $backupRunning = false;
     public ?int $backupStartedAt = null;
 
     public function mount(): void
     {
+        $this->loadColumnPreferences();
+
         $userId = auth()->id() ?? 0;
         if (Cache::has('backup_running_' . $userId)) {
             $this->backupRunning = true;
             $this->backupStartedAt = (int) Cache::get('backup_start_time_' . $userId, time());
         }
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'name', 'label' => 'Archive File Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'size', 'label' => 'Archive Size', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-primary'],
+            ['key' => 'modified_at', 'label' => 'Timestamp', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i:s'],
+            ['key' => 'status', 'label' => 'Integrity Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+                'Verified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+            ]],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Backups'],
+            ['key' => 'recent', 'label' => 'Recent (7 Days)'],
+        ];
     }
 
     public function runBackup(): void
@@ -116,6 +137,7 @@ class BackupStatus extends Component
                     'path' => $file,
                     'size' => number_format($size / (1024 * 1024), 2) . ' MB',
                     'modified_at' => date('Y-m-d H:i:s', $time),
+                    'status' => 'Verified',
                 ];
             }
 
@@ -128,8 +150,29 @@ class BackupStatus extends Component
         }
 
         $allCollection = collect($files);
+
+        if (!empty($this->search)) {
+            $allCollection = $allCollection->filter(function ($item) {
+                return str_contains(strtolower($item['name']), strtolower($this->search));
+            });
+        }
+
+        if ($this->statusFilter === 'recent') {
+            $sevenDaysAgo = now()->subDays(7)->toDateTimeString();
+            $allCollection = $allCollection->filter(function ($item) use ($sevenDaysAgo) {
+                return $item['modified_at'] >= $sevenDaysAgo;
+            });
+        }
+
+        if (!empty($this->sortField)) {
+            $field = $this->sortField;
+            $allCollection = $this->sortDirection === 'asc' 
+                ? $allCollection->sortBy($field) 
+                : $allCollection->sortByDesc($field);
+        }
+
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 15;
+        $perPage = $this->perPage;
         $items = $allCollection->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
         $paginatedArchives = new LengthAwarePaginator(

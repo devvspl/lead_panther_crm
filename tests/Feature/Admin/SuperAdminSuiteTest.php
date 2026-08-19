@@ -75,9 +75,9 @@ class SuperAdminSuiteTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(AuditLogBrowser::class)
-            ->assertSee('lead.created')
+            ->assertSee('Lead.created')
             ->set('actionType', 'lead')
-            ->assertSee('lead.created');
+            ->assertSee('Lead.created');
     }
 
     public function test_organization_manager_creates_and_toggles_status(): void

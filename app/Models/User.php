@@ -55,4 +55,14 @@ class User extends Authenticatable
     {
         return ($this->attributes['status'] ?? 'active') === 'active';
     }
+
+    public function getPrimaryRoleNameAttribute(): string
+    {
+        return $this->getRoleNames()->first() ?: 'No Role';
+    }
+
+    public function getOrganizationNameAttribute(): string
+    {
+        return $this->organization?->name ?: 'Platform HQ';
+    }
 }

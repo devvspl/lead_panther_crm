@@ -161,4 +161,24 @@ class LeadReplacement extends Model
             return true;
         });
     }
+
+    public function getLeadSummaryAttribute(): string
+    {
+        return $this->lead ? $this->lead->lead_code . ' (' . $this->lead->name . ')' : 'N/A';
+    }
+
+    public function getReasonNameAttribute(): string
+    {
+        return $this->reason?->reason_name ?: 'Standard Replacement';
+    }
+
+    public function getRequestedByNameAttribute(): string
+    {
+        return $this->requestedBy?->name ?: 'System';
+    }
+
+    public function getSlaBadgeAttribute(): string
+    {
+        return $this->sla_met ? 'SLA Met' : 'SLA Missed';
+    }
 }

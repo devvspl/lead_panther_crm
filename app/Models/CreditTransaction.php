@@ -94,4 +94,25 @@ class CreditTransaction extends Model
             }
         });
     }
+
+    public function getClientNameAttribute(): string
+    {
+        return $this->client?->name ?: 'System';
+    }
+
+    public function getLeadSummaryAttribute(): string
+    {
+        return $this->lead ? $this->lead->lead_code . ' (' . $this->lead->name . ')' : '—';
+    }
+
+    public function getCreditUsedFormattedAttribute(): string
+    {
+        $prefix = in_array($this->transaction_type, ['recharge', 'refund']) ? '+' : '-';
+        return $prefix . number_format((float)$this->credit_used, 1) . ' Cr';
+    }
+
+    public function getCreditAfterFormattedAttribute(): string
+    {
+        return number_format((float)$this->credit_after, 1) . ' Cr';
+    }
 }

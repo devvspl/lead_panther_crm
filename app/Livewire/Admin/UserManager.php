@@ -3,7 +3,7 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\User;
 use App\Models\Organization;
 use Spatie\Permission\Models\Role;
@@ -12,10 +12,10 @@ use Illuminate\Support\Str;
 
 class UserManager extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
-    public string $search = '';
     public string $roleFilter = '';
+    public ?int $filterOrganizationId = null;
 
     // Create User Offcanvas State
     public bool $showCreateUserOffcanvas = false;
@@ -26,14 +26,44 @@ class UserManager extends Component
     public string $newUserPassword = '';
     public ?string $generatedInviteLink = null;
 
-    public function updatingSearch(): void
+    public function mount(): void
     {
-        $this->resetPage();
+        $this->loadColumnPreferences();
     }
 
-    public function updatingRoleFilter(): void
+    public function tableColumns(): array
     {
-        $this->resetPage();
+        return [
+            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'name', 'label' => 'Full Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'email', 'label' => 'Email Address', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted'],
+            ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2],
+            ['key' => 'primary_role_name', 'label' => 'Role', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
+                'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                'super-admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
+                'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
+            ]],
+            ['key' => 'created_at', 'label' => 'Registered', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'user_actions', 'priority' => 1],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Users'],
+            ['key' => 'super_admin', 'label' => 'Super Admins'],
+            ['key' => 'sales_executive', 'label' => 'Sales Executives'],
+            ['key' => 'channel_partner', 'label' => 'Channel Partners'],
+            ['key' => 'account_manager', 'label' => 'Account Managers'],
+        ];
     }
 
     public function openCreateUserOffcanvas(): void
@@ -92,8 +122,10 @@ class UserManager extends Component
         }
     }
 
-    protected function applyFilters($query)
+    protected function getFilteredQuery()
     {
+        $query = User::with(['roles', 'organization']);
+
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
@@ -101,18 +133,33 @@ class UserManager extends Component
             });
         }
 
-        if (!empty($this->roleFilter)) {
-            $filter = $this->roleFilter;
-            $spaced = str_replace('-', ' ', $filter);
-            $kebab = str_replace(' ', '-', strtolower($filter));
+        if ($this->filterOrganizationId) {
+            $query->where('organization_id', $this->filterOrganizationId);
+        }
 
-            $query->whereHas('roles', function ($q) use ($filter, $spaced, $kebab) {
-                $q->where('name', $filter)
-                  ->orWhere('name', $spaced)
-                  ->orWhere('name', $kebab)
-                  ->orWhereRaw('LOWER(name) = ?', [strtolower($filter)])
-                  ->orWhereRaw('LOWER(REPLACE(name, "-", " ")) = ?', [strtolower($spaced)]);
-            });
+        // Role Filter (from legacy or direct select)
+        if (!empty($this->roleFilter)) {
+            $rf = $this->roleFilter;
+            $rfSpaced = str_replace('-', ' ', $rf);
+            $rfKebab = str_replace(' ', '-', strtolower($rf));
+            $query->whereHas('roles', fn($q) => $q->where('name', $rf)->orWhere('name', $rfSpaced)->orWhere('name', $rfKebab));
+        }
+
+        // Quick filter pills
+        if ($this->statusFilter === 'super_admin') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Super Admin', 'super-admin', 'super_admin']));
+        } elseif ($this->statusFilter === 'sales_executive') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Sales Executive', 'sales-executive', 'sales_executive']));
+        } elseif ($this->statusFilter === 'channel_partner') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Channel Partner', 'channel-partner', 'channel_partner']));
+        } elseif ($this->statusFilter === 'account_manager') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Account Manager', 'account-manager', 'account_manager']));
+        }
+
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
         }
 
         return $query;
@@ -120,10 +167,7 @@ class UserManager extends Component
 
     public function render()
     {
-        $query = User::with(['roles', 'organization']);
-        $this->applyFilters($query);
-
-        $users = $query->latest('id')->paginate(10);
+        $users = $this->getFilteredQuery()->paginate($this->perPage);
         $roles = Role::all();
         $organizations = Organization::where('status', 'active')->orderBy('name')->get();
 
@@ -136,10 +180,7 @@ class UserManager extends Component
 
     public function exportExcel()
     {
-        $query = User::with(['roles', 'organization']);
-        $this->applyFilters($query);
-
-        $data = $query->latest('id')->get();
+        $data = $this->getFilteredQuery()->get();
         $filename = "users-and-roles-directory_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['User ID', 'Full Name', 'Email Address', 'Organization', 'Current Role', 'Registered At'];

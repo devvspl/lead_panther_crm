@@ -15,13 +15,15 @@ use App\Models\SalesTeamMember;
 use App\Models\LeadStatusHistory;
 use App\Models\GeneralSetting;
 use App\Events\LeadStageChanged;
+use App\Livewire\Concerns\HasAdvancedTable;
 use Livewire\Attributes\On;
 
 class LeadKanban extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     #[Url] public string $search = '';
+    #[Url] public string $statusFilter = 'all';
     #[Url] public string $project = '';
     #[Url] public string $partner = '';
     #[Url] public string $executive = '';
@@ -102,6 +104,8 @@ class LeadKanban extends Component
         foreach (array_merge(array_keys($this->mainStages), array_keys($this->otherStages)) as $stage) {
             $this->stageLimits[$stage] = 20;
         }
+
+        $this->loadColumnPreferences();
 
         if (auth()->check()) {
             $this->viewMode = GeneralSetting::getValue(auth()->id(), 'leads_view_mode', 'kanban') ?: 'kanban';
@@ -348,6 +352,19 @@ class LeadKanban extends Component
                   ->where('created_at', '<', now()->subMinutes(15));
         }
 
+        // Advanced Table Quick-Filter Pills
+        if ($this->statusFilter === 'new') {
+            $query->where('current_stage', 'new');
+        } elseif ($this->statusFilter === 'assigned') {
+            $query->where('current_stage', 'assigned');
+        } elseif ($this->statusFilter === 'sla_breached') {
+            $query->whereNull('first_response_at')->where('created_at', '<', now()->subMinutes(15));
+        } elseif ($this->statusFilter === 'unassigned') {
+            $query->whereNull('assigned_to');
+        } elseif ($this->statusFilter === 'closed_won') {
+            $query->where('current_stage', 'closed_won');
+        }
+
         return $query;
     }
 
@@ -488,7 +505,9 @@ class LeadKanban extends Component
 
         if ($this->viewMode === 'table') {
             $tableQuery = (clone $baseQuery);
-            if ($this->sort_by === 'score_desc') {
+            if (!empty($this->sortField)) {
+                $tableQuery->orderBy($this->sortField, $this->sortDirection);
+            } elseif ($this->sort_by === 'score_desc') {
                 $tableQuery->orderByDesc('lead_score')->latest('id');
             } elseif ($this->sort_by === 'score_asc') {
                 $tableQuery->orderBy('lead_score')->latest('id');
@@ -496,7 +515,7 @@ class LeadKanban extends Component
                 $tableQuery->latest();
             }
 
-            $tableLeads = $tableQuery->paginate(15);
+            $tableLeads = $tableQuery->paginate($this->perPage);
         } else {
             $allStages = array_merge($this->mainStages, $this->otherStages);
 
@@ -533,6 +552,47 @@ class LeadKanban extends Component
             'allCampaigns' => $allCampaigns,
             'allLeadSources' => $allLeadSources,
         ])->layout('layouts.app');
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 2],
+            ['key' => 'current_stage', 'label' => 'Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'connected' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'qualified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
+                'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
+            ]],
+            ['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2],
+            ['key' => 'budget_formatted', 'label' => 'Budget', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'assigned_to_user', 'label' => 'Assigned To', 'type' => 'avatar-stack', 'priority' => 1],
+            ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+                'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
+                'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
+                'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
+            ]],
+            ['key' => 'lead_score', 'label' => 'Score', 'type' => 'progress', 'sortable' => true, 'priority' => 1],
+            ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Leads'],
+            ['key' => 'new', 'label' => 'New'],
+            ['key' => 'assigned', 'label' => 'Assigned'],
+            ['key' => 'sla_breached', 'label' => 'SLA Breached'],
+            ['key' => 'unassigned', 'label' => 'Unassigned'],
+            ['key' => 'closed_won', 'label' => 'Closed Won'],
+        ];
     }
 
     public function openPullLeadsModal(): void

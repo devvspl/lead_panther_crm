@@ -3,22 +3,25 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\Organization;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Livewire\WithPagination;
 
 class OrganizationManager extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public string $name = '';
     public string $type = 'builder';
     public string $status = 'active';
 
     public ?int $editingOrganizationId = null;
+
+    // Create Organization Modal
+    public bool $showCreateOrgModal = false;
 
     // Organization Users Management Offcanvas
     public bool $showUserOffcanvas = false;
@@ -30,6 +33,43 @@ class OrganizationManager extends Component
     public string $newUserRole = 'builder';
     public string $newUserPassword = '';
     public ?string $generatedInviteLink = null;
+
+    public function mount(): void
+    {
+        $this->loadColumnPreferences();
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'name', 'label' => 'Organization Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'type', 'label' => 'Type', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'builder' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'channel_partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'platform' => 'bg-purple-50 text-purple-700 border border-purple-200',
+            ]],
+            ['key' => 'users_count', 'label' => 'Users Count', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink font-mono'],
+            ['key' => 'clients_count', 'label' => 'Clients Count', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'suspended' => 'bg-red-50 text-red-700 border border-red-200',
+            ]],
+            ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'org_actions', 'priority' => 1],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Organizations'],
+            ['key' => 'active', 'label' => 'Active'],
+            ['key' => 'builder', 'label' => 'Builders'],
+            ['key' => 'channel_partner', 'label' => 'Channel Partners'],
+            ['key' => 'suspended', 'label' => 'Suspended'],
+        ];
+    }
 
     public function createOrganization(): void
     {
@@ -45,6 +85,7 @@ class OrganizationManager extends Component
         ]);
 
         $this->reset(['name', 'type', 'status']);
+        $this->showCreateOrgModal = false;
         $this->dispatch('toast', type: 'success', message: 'Organization created successfully.');
     }
 
@@ -68,7 +109,6 @@ class OrganizationManager extends Component
             return;
         }
 
-        // Set default recommended role based on organization type
         if ($this->selectedOrg->type === 'channel_partner') {
             $this->newUserRole = 'channel-partner';
         } elseif ($this->selectedOrg->type === 'platform') {
@@ -109,7 +149,6 @@ class OrganizationManager extends Component
 
         $user->assignRole($this->newUserRole);
 
-        // Generate temporary password activation link
         $token = Password::createToken($user);
         $this->generatedInviteLink = url(route('password.reset', [
             'token' => $token,
@@ -142,9 +181,39 @@ class OrganizationManager extends Component
         }
     }
 
+    protected function getFilteredQuery()
+    {
+        $query = Organization::withCount(['clients', 'users']);
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->search . '%')
+                  ->orWhere('type', 'like', '%' . $this->search . '%');
+            });
+        }
+
+        if ($this->statusFilter === 'active') {
+            $query->where('status', 'active');
+        } elseif ($this->statusFilter === 'suspended') {
+            $query->where('status', 'suspended');
+        } elseif ($this->statusFilter === 'builder') {
+            $query->where('type', 'builder');
+        } elseif ($this->statusFilter === 'channel_partner') {
+            $query->where('type', 'channel_partner');
+        }
+
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
+        }
+
+        return $query;
+    }
+
     public function render()
     {
-        $organizations = Organization::withCount(['clients', 'users'])->latest('id')->paginate(10);
+        $organizations = $this->getFilteredQuery()->paginate($this->perPage);
         $roles = Role::all();
 
         return view('livewire.admin.organization-manager', [
@@ -155,7 +224,7 @@ class OrganizationManager extends Component
 
     public function exportExcel()
     {
-        $data = Organization::withCount(['clients', 'users'])->latest('id')->get();
+        $data = $this->getFilteredQuery()->get();
         $filename = "organizations-directory_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Org ID', 'Organization Name', 'Type', 'Users Count', 'Clients Count', 'Status', 'Created At'];

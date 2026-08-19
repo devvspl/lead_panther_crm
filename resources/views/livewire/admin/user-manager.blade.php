@@ -3,114 +3,73 @@
     foreach ($roles as $r) {
         $dbRoles[$r->name] = $r->name;
     }
-    $filterRoleOptions = ['' => 'All Roles'] + $dbRoles;
 @endphp
 
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Global User Management</h1>
-            <p class="text-xs text-muted">Assign database roles, create users across multi-tenant organizations, and impersonate accounts with audited trace logging.</p>
-        </div>
-
-        <div class="flex items-center space-x-3">
-            <button 
-                type="button" 
-                wire:click="openCreateUserOffcanvas"
-                class="inline-flex items-center gap-1.5 px-3.5 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            <div class="flex items-center space-x-2 text-xs text-muted mb-1">
+                <span>System Administration</span>
+                <span>/</span>
+                <span class="text-ink font-semibold">Users &amp; Roles</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
+                <svg class="w-6 h-6 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span>+ Create User</span>
-            </button>
-
-            <x-ui.export-button target="exportExcel" />
+                <span>Global User Management</span>
+            </h1>
+            <p class="text-xs text-muted">Assign database roles, create users across organizations, and manage role permissions.</p>
         </div>
     </div>
 
-    <!-- Filters Bar -->
-    <div class="bg-surface rounded-card border border-border p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-center space-x-3 w-full md:w-auto">
-            <input 
-                type="text" 
-                wire:model.live.debounce.300ms="search" 
-                placeholder="Search user name or email..." 
-                class="h-8 text-xs px-3.5 rounded-lg border border-border bg-canvas text-ink w-64 focus:outline-none focus:ring-2 focus:ring-ink transition"
-            >
+    <!-- Advanced Table Component -->
+    <x-ui.advanced-table 
+        :columns="$this->tableColumns()"
+        :rows="$users"
+        :quickFilters="$this->quickFilters()"
+        :activeStatus="$statusFilter"
+        :visibleColumns="$visibleColumns"
+        :sortField="$sortField"
+        :sortDirection="$sortDirection"
+        :filterCount="$this->activeFilterCount"
+        searchPlaceholder="Search user name or email..."
+        emptyTitle="No Users Found"
+        emptyMessage="No users matched your current search and filters."
+    >
+        <!-- Filter Dropdown Slot -->
+        <x-slot:filters>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[11px] font-bold text-ink block mb-1">Filter Organization</label>
+                    <select wire:model.live="filterOrganizationId" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
+                        <option value="">All Organizations</option>
+                        @foreach($organizations as $org)
+                            <option value="{{ $org->id }}">{{ $org->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+        </x-slot:filters>
 
-            <x-ui.themed-select 
-                wire:model.live="roleFilter" 
-                :options="$filterRoleOptions"
-                placeholder="All Roles" 
-                searchable="true" 
-            />
-        </div>
-    </div>
-
-    <!-- Users List Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">User ID</th>
-                        <th class="py-3 px-4">User Name</th>
-                        <th class="py-3 px-4">Email</th>
-                        <th class="py-3 px-4">Organization</th>
-                        <th class="py-3 px-4">Current Role</th>
-                        <th class="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($users as $user)
-                        @php
-                            $userRole = $user->getRoleNames()->first();
-                        @endphp
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $user->id }}</td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $user->name }}</td>
-                            <td class="py-3 px-4 font-mono text-muted">{{ $user->email }}</td>
-                            <td class="py-3 px-4">
-                                @if($user->organization)
-                                    <span class="font-bold text-ink">{{ $user->organization->name }}</span>
-                                    <span class="text-[10px] text-muted uppercase block">{{ str_replace('_', ' ', $user->organization->type) }}</span>
-                                @else
-                                    <span class="text-muted italic">Platform HQ</span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4">
-                                <x-ui.themed-select 
-                                    :value="$userRole"
-                                    :options="$dbRoles"
-                                    placeholder="Select Role"
-                                    x-effect="$watch('value', val => { if(val) @this.call('updateUserRole', {{ $user->id }}, val) })"
-                                />
-                            </td>
-                            <td class="py-3 px-4 text-right space-x-2">
-                                @if(auth()->id() !== $user->id)
-                                    <a href="{{ route('admin.users.impersonate', $user->id) }}" class="text-xs font-bold text-purple-700 hover:underline">
-                                        Impersonate
-                                    </a>
-                                @else
-                                    <span class="text-[10px] text-muted font-bold">(You)</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="py-8 text-center text-muted">No users found matching query.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $users->links('vendor.pagination.tailwind') }}
-        </div>
-    </div>
+        <!-- Primary Action Slot -->
+        <x-slot:action>
+            <div class="flex items-center gap-2">
+                <x-ui.export-button target="exportExcel" class="text-xs" />
+                <button 
+                    type="button" 
+                    wire:click="openCreateUserOffcanvas"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs cursor-pointer"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    <span>Create User</span>
+                </button>
+            </div>
+        </x-slot:action>
+    </x-ui.advanced-table>
 
     <!-- Create User Offcanvas Drawer -->
     <x-ui.offcanvas 
@@ -232,14 +191,14 @@
             <button 
                 type="button" 
                 wire:click="closeCreateUserOffcanvas" 
-                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
+                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer"
             >
                 Cancel
             </button>
             <button 
                 type="button" 
                 wire:click="createUser" 
-                class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5"
+                class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>

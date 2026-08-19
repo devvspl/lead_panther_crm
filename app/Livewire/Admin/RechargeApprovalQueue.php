@@ -3,7 +3,7 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\RechargeRequest;
 use App\Models\CreditWallet;
 use App\Models\CreditTransaction;
@@ -13,23 +13,9 @@ use App\Models\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-/**
- * ============================================================================
- * PAYMENT GATEWAY WEBHOOK INTEGRATION STUB (TODO)
- * ============================================================================
- *
- * In production, when integrating a payment gateway like Razorpay or Stripe:
- * 1. The webhook controller (e.g., RazorpayWebhookController@handle) will receive
- *    the `payment.captured` event.
- * 2. It will look up the corresponding `recharge_requests` row by gateway order_id.
- * 3. It will invoke the exact same atomic transaction logic as `approveRequest()`
- *    below to credit the wallet, log the transaction, and notify the client.
- * ============================================================================
- */
-
 class RechargeApprovalQueue extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public ?int $selectedRequestId = null;
     public string $referenceNote = '';
@@ -37,6 +23,40 @@ class RechargeApprovalQueue extends Component
 
     public bool $showApproveModal = false;
     public bool $showRejectModal = false;
+
+    public function mount(): void
+    {
+        $this->loadColumnPreferences();
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'Req ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'client_name', 'label' => 'Client / Organization', 'type' => 'text', 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'package_name', 'label' => 'Package', 'type' => 'text', 'priority' => 2],
+            ['key' => 'amount_formatted', 'label' => 'Amount', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'credits_formatted', 'label' => 'Credits', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-primary font-bold'],
+            ['key' => 'payment_reference', 'label' => 'Reference / UTR', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'approved' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'rejected' => 'bg-red-50 text-red-700 border border-red-200',
+            ]],
+            ['key' => 'created_at', 'label' => 'Requested', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'recharge_actions', 'priority' => 1],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Requests'],
+            ['key' => 'pending', 'label' => 'Pending Approval'],
+            ['key' => 'approved', 'label' => 'Approved'],
+            ['key' => 'rejected', 'label' => 'Rejected'],
+        ];
+    }
 
     public function openApproveModal(int $id): void
     {
@@ -192,11 +212,38 @@ class RechargeApprovalQueue extends Component
         }
     }
 
+    protected function getFilteredQuery()
+    {
+        $query = RechargeRequest::with(['client', 'package']);
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('payment_reference', 'like', '%' . $this->search . '%')
+                  ->orWhere('amount', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('client', fn($cq) => $cq->where('name', 'like', '%' . $this->search . '%'));
+            });
+        }
+
+        if ($this->statusFilter === 'pending') {
+            $query->where('status', 'pending');
+        } elseif ($this->statusFilter === 'approved') {
+            $query->where('status', 'approved');
+        } elseif ($this->statusFilter === 'rejected') {
+            $query->where('status', 'rejected');
+        }
+
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
+        }
+
+        return $query;
+    }
+
     public function render()
     {
-        $requests = RechargeRequest::with(['client', 'package'])
-            ->latest('id')
-            ->paginate(10);
+        $requests = $this->getFilteredQuery()->paginate($this->perPage);
 
         return view('livewire.admin.recharge-approval-queue', [
             'requests' => $requests,

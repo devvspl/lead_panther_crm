@@ -3,13 +3,48 @@
 namespace App\Livewire\Leads;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\UploadBatch;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UploadHistory extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
+
+    public function mount(): void
+    {
+        $this->loadColumnPreferences();
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'Batch ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'created_at', 'label' => 'Upload Date', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i'],
+            ['key' => 'filename', 'label' => 'Source File', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-xs font-bold text-ink truncate max-w-xs'],
+            ['key' => 'uploader_name', 'label' => 'Uploaded By', 'type' => 'text', 'priority' => 2, 'class' => 'text-ink font-semibold'],
+            ['key' => 'project_name', 'label' => 'Target Project', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted'],
+            ['key' => 'total_rows', 'label' => 'Total Rows', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'imported_count', 'label' => 'Imported', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-emerald-600'],
+            ['key' => 'failed_count', 'label' => 'Failed', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono font-bold text-rose-600'],
+            ['key' => 'status_badge', 'label' => 'Status', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
+                'Completed' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'Partial' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'Failed' => 'bg-red-50 text-red-700 border border-red-200',
+                'Empty' => 'bg-slate-50 text-slate-700 border border-slate-200',
+            ]],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'upload_actions', 'priority' => 1],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Batches'],
+            ['key' => 'completed', 'label' => 'Clean Imports'],
+            ['key' => 'failed', 'label' => 'Has Failures'],
+        ];
+    }
 
     public function downloadErrorCsv(int $batchId): StreamedResponse
     {
@@ -30,11 +65,36 @@ class UploadHistory extends Component
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    protected function getFilteredQuery()
+    {
+        $query = UploadBatch::with(['uploader', 'project', 'campaign', 'leadSource']);
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('filename', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('uploader', fn($uq) => $uq->where('name', 'like', '%' . $this->search . '%'))
+                  ->orWhereHas('project', fn($pq) => $pq->where('name', 'like', '%' . $this->search . '%'));
+            });
+        }
+
+        if ($this->statusFilter === 'completed') {
+            $query->where('failed_count', 0)->where('imported_count', '>', 0);
+        } elseif ($this->statusFilter === 'failed') {
+            $query->where('failed_count', '>', 0);
+        }
+
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
+        }
+
+        return $query;
+    }
+
     public function render()
     {
-        $batches = UploadBatch::with(['uploader', 'project', 'campaign', 'leadSource'])
-            ->latest('id')
-            ->paginate(15);
+        $batches = $this->getFilteredQuery()->paginate($this->perPage);
 
         return view('livewire.leads.upload-history', [
             'batches' => $batches,
@@ -43,9 +103,7 @@ class UploadHistory extends Component
 
     public function exportExcel()
     {
-        $data = UploadBatch::with(['uploader', 'project', 'campaign', 'leadSource'])
-            ->latest('id')
-            ->get();
+        $data = $this->getFilteredQuery()->get();
         $filename = "bulk-upload-batches_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Batch ID', 'Filename', 'Uploaded By', 'Project', 'Total Rows', 'Imported Count', 'Skipped Count', 'Failed Count', 'Created At'];

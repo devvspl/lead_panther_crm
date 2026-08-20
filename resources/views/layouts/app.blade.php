@@ -56,18 +56,6 @@
             }
         </style>
 
-        <script>
-            (function() {
-                const mode = '{{ $currentTheme['theme_mode'] ?? 'light' }}';
-                const isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (isDark) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-            })();
-        </script>
-
         <style>
             [x-cloak] { display: none !important; }
             html, body {
@@ -198,19 +186,37 @@
             sidebarOpen: false,
             sidebarCollapsed: JSON.parse(localStorage.getItem('leadpanther_sidebar_collapsed') || 'false'),
             sidebarActiveStyle: localStorage.getItem('leadpanther_sidebar_active_style') || 'highlighted',
+            sidebarTooltip: {
+                show: false,
+                text: '',
+                top: 0
+            },
             toggleSidebar() {
                 this.sidebarCollapsed = !this.sidebarCollapsed;
                 localStorage.setItem('leadpanther_sidebar_collapsed', JSON.stringify(this.sidebarCollapsed));
+                this.hideSidebarTooltip();
             },
             setSidebarActiveStyle(style) {
                 this.sidebarActiveStyle = style;
                 localStorage.setItem('leadpanther_sidebar_active_style', style);
                 window.dispatchEvent(new CustomEvent('sidebar-style-changed', { detail: style }));
+            },
+            showSidebarTooltip(e, text) {
+                if (!this.sidebarCollapsed) return;
+                const r = e.currentTarget.getBoundingClientRect();
+                this.sidebarTooltip = {
+                    show: true,
+                    text: text,
+                    top: Math.round(r.top + (r.height / 2))
+                };
+            },
+            hideSidebarTooltip() {
+                this.sidebarTooltip.show = false;
             }
         }" 
         x-bind:class="{ 'overflow-hidden': sidebarOpen }"
-        x-on:popstate.window="sidebarOpen = false"
-        x-on:livewire:navigated.window="sidebarOpen = false"
+        x-on:popstate.window="sidebarOpen = false; hideSidebarTooltip()"
+        x-on:livewire:navigated.window="sidebarOpen = false; hideSidebarTooltip()"
         class="font-sans antialiased bg-canvas text-ink selection:bg-accent selection:text-white min-h-screen overflow-x-hidden w-full max-w-full"
     >
         <!-- Mobile Sidebar Backdrop -->
@@ -229,6 +235,25 @@
 
         <!-- Sidebar Component -->
         <x-ui.sidebar />
+
+        <!-- Global Floating Sidebar Tooltip in Collapsed Mode -->
+        <div 
+            x-cloak
+            x-show="sidebarCollapsed && sidebarTooltip.show"
+            x-transition:enter="transition ease-out duration-150"
+            x-transition:enter-start="opacity-0 translate-x-1 scale-95"
+            x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+            x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+            :style="`top: ${sidebarTooltip.top}px; left: 72px;`"
+            class="fixed -translate-y-1/2 z-[9999] pointer-events-none px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg shadow-xl border border-neutral-700/60 whitespace-nowrap flex items-center select-none"
+            style="display: none;"
+        >
+            <!-- Tooltip Pointer Arrow -->
+            <span class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-ink border-l border-b border-neutral-700/60 rotate-45"></span>
+            <span class="relative z-10" x-text="sidebarTooltip.text"></span>
+        </div>
 
         <!-- Main Content Wrapper -->
         <div 
@@ -258,6 +283,9 @@
 
         <!-- Theme Settings Offcanvas Customizer -->
         <x-ui.theme-customizer />
+
+        <!-- Global Reusable Confirmation Modal -->
+        <x-ui.confirmation-modal />
 
         @livewireScripts
     </body>

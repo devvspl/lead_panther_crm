@@ -511,8 +511,14 @@
 
                                 <button 
                                     type="button" 
-                                    wire:click="restoreBackup('{{ $backup['name'] }}')"
-                                    wire:confirm="Are you sure you want to restore codebase to backup snapshot '{{ $backup['name'] }}'?"
+                                    @click="$dispatch('confirm-action', {
+                                        title: 'Restore Backup Snapshot?',
+                                        message: 'Are you sure you want to restore the codebase to backup snapshot \'{{ $backup['name'] }}\'? Local files will be replaced with this snapshot.',
+                                        confirmText: 'Yes, Restore Backup',
+                                        cancelText: 'Cancel',
+                                        variant: 'warning',
+                                        onConfirm: function() { return $wire.restoreBackup('{{ $backup['name'] }}'); }
+                                    })"
                                     class="px-3 py-1.5 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition shadow-2xs flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
                                 >
                                     <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>

@@ -45,7 +45,6 @@ class ThemeSettingsTest extends TestCase
             'theme_font_family' => 'Outfit, sans-serif',
             'theme_font_size' => '15px',
             'theme_border_radius' => '0.75rem',
-            'theme_mode' => 'dark',
         ];
 
         $response = $this->postJson(route('settings.theme.update'), $payload);
@@ -71,7 +70,6 @@ class ThemeSettingsTest extends TestCase
         $theme = ThemeService::getUserTheme($user->id);
         $this->assertEquals('#3B82F6', $theme['theme_primary_color']);
         $this->assertEquals('text_only', $theme['theme_active_menu_style']);
-        $this->assertEquals('dark', $theme['theme_mode']);
     }
 
     public function test_updating_single_setting_preserves_other_settings(): void
@@ -79,10 +77,9 @@ class ThemeSettingsTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        // Step 1: Save primary color and mode
+        // Step 1: Save primary color
         $this->postJson(route('settings.theme.update'), [
             'theme_primary_color' => '#E11D48',
-            'theme_mode' => 'dark',
         ]);
 
         // Step 2: Update only header background
@@ -94,7 +91,6 @@ class ThemeSettingsTest extends TestCase
 
         $theme = ThemeService::getUserTheme($user->id);
         $this->assertEquals('#E11D48', $theme['theme_primary_color'], 'Primary color must be preserved');
-        $this->assertEquals('dark', $theme['theme_mode'], 'Dark mode must be preserved');
         $this->assertEquals('#18181B', $theme['theme_header_bg'], 'Header background must be updated');
     }
 
@@ -104,7 +100,6 @@ class ThemeSettingsTest extends TestCase
         $this->actingAs($user);
 
         GeneralSetting::setValue($user->id, 'theme_primary_color', '#FF0000');
-        GeneralSetting::setValue($user->id, 'theme_mode', 'dark');
 
         $this->assertDatabaseHas('general_settings', [
             'user_id' => $user->id,
@@ -127,7 +122,6 @@ class ThemeSettingsTest extends TestCase
 
         $theme = ThemeService::getUserTheme($user->id);
         $this->assertEquals(ThemeService::DEFAULTS['theme_primary_color'], $theme['theme_primary_color']);
-        $this->assertEquals(ThemeService::DEFAULTS['theme_mode'], $theme['theme_mode']);
     }
 
     public function test_dashboard_renders_theme_customizer_and_style_tags(): void
@@ -142,6 +136,7 @@ class ThemeSettingsTest extends TestCase
         $response->assertSee('theme-dynamic-styles', false);
         $response->assertSee('Theme Customizer', false);
         $response->assertSee('theme_active_menu_style', false);
-        $response->assertDontSee('Midnight Dark', false);
+        $response->assertDontSee('Appearance Mode', false);
+        $response->assertDontSee('setAppearanceMode', false);
     }
 }

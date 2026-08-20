@@ -25,10 +25,10 @@
                     window.initSafeChart('sourcePerfChart', {
                         type: 'bar',
                         data: {
-                            labels: data.map(d => d.source_name),
+                            labels: data.map(function(d) { return d.source_name; }),
                             datasets: [{
                                 label: 'Total Leads',
-                                data: data.map(d => d.total_leads),
+                                data: data.map(function(d) { return d.total_leads; }),
                                 backgroundColor: '#0A0A0A',
                                 borderRadius: 6,
                             }]
@@ -45,7 +45,7 @@
                     });
                 }
             }"
-            x-init="$nextTick(() => renderChart())"
+            x-init="$nextTick(function() { renderChart(); })"
             class="h-64 relative"
         >
             <canvas id="sourcePerfChart"></canvas>

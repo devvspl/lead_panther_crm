@@ -29,7 +29,6 @@ class ThemeSettingsController extends Controller
         'theme_font_family',
         'theme_font_size',
         'theme_border_radius',
-        'theme_mode',
     ];
 
     /**

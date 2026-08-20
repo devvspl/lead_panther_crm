@@ -139,7 +139,7 @@
                             x-on:click="
                                 navigator.clipboard.writeText(document.getElementById('metaWebhookUrl').value);
                                 copied = true;
-                                setTimeout(() => copied = false, 2000);
+                                setTimeout(function() { copied = false; }, 2000);
                             "
                             class="px-3 h-8 bg-surface border border-border rounded-lg text-ink font-semibold text-xs hover:bg-canvas transition flex items-center gap-1.5 shrink-0"
                         >

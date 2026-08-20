@@ -37,7 +37,7 @@
                         });
                     }
                 }"
-                x-init="$nextTick(() => renderChart())"
+                x-init="$nextTick(function() { renderChart(); })"
                 class="w-48 h-48 relative"
             >
                 <canvas id="slaDonutChart"></canvas>

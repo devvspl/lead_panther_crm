@@ -52,7 +52,7 @@
                     });
                 }
             }"
-            x-init="$nextTick(() => renderChart())"
+            x-init="$nextTick(function() { renderChart(); })"
             class="h-64 relative"
         >
             <canvas id="revenueChart"></canvas>

@@ -34,14 +34,14 @@
                             maintainAspectRatio: false,
                             plugins: { legend: { display: false } },
                             scales: {
-                                y: { grid: { color: '#E5E7EB' }, ticks: { font: { size: 10 }, callback: v => v + '%' } },
+                                y: { grid: { color: '#E5E7EB' }, ticks: { font: { size: 10 }, callback: function(v) { return v + '%'; } } },
                                 x: { grid: { display: false }, ticks: { font: { size: 11 } } }
                             }
                         }
                     });
                 }
             }"
-            x-init="$nextTick(() => renderChart())"
+            x-init="$nextTick(function() { renderChart(); })"
             class="h-64 relative"
         >
             <canvas id="replacementTrendChart"></canvas>

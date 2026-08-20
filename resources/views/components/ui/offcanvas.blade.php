@@ -37,7 +37,7 @@ $maxWidthClass = match ($maxWidth) {
                 $dispatch('offcanvas-closed', '{{ $name }}');
             }
         }"
-        x-init="$watch('show', value => {
+        x-init="$watch('show', function(value) {
             if (value) document.body.classList.add('overflow-hidden');
             else document.body.classList.remove('overflow-hidden');
         })"

@@ -26,8 +26,9 @@
         <div class="flex items-center space-x-3 overflow-hidden">
             <div 
                 x-on:click="if (sidebarCollapsed) toggleSidebar()"
+                x-on:mouseenter="showSidebarTooltip($event, 'Lead Panther CRM')"
+                x-on:mouseleave="hideSidebarTooltip()"
                 :class="sidebarCollapsed ? 'cursor-pointer hover:scale-105 transition-transform' : ''"
-                :title="sidebarCollapsed ? 'Click to expand sidebar' : 'Lead Panther CRM'"
                 class="h-9 w-9 rounded-xl bg-ink text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0 select-none"
             >
                 LP
@@ -48,7 +49,7 @@
     </div>
 
     <!-- Scrollable Nav Container -->
-    <div class="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll no-scrollbar min-h-0 space-y-4 py-1">
+    <div class="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll no-scrollbar min-h-0 space-y-4 py-1" x-on:scroll.passive="hideSidebarTooltip()">
         <nav class="space-y-4">
             <!-- Primary Nav -->
             <div class="space-y-1">
@@ -57,9 +58,11 @@
                        data-nav-route="{{ $item['data_nav_route'] }}"
                        data-nav-exact="{{ $item['data_nav_exact'] }}"
                        @if(isset($item['data_nav_root'])) data-nav-root="true" @endif
+                       x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
+                       x-on:mouseleave="hideSidebarTooltip()"
+                       x-on:click="hideSidebarTooltip()"
                        :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
                        class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
-                       title="{{ $item['label'] }}"
                     >
                         <div class="flex-shrink-0 flex items-center justify-center">
                             {!! $item['icon'] !!}
@@ -73,16 +76,6 @@
                         >
                             {{ $item['label'] }}
                         </span>
-
-                        <!-- Floating Tooltip in Collapsed Mode -->
-                        <div 
-                            x-show="sidebarCollapsed"
-                            class="fixed left-16 ml-3 px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg shadow-xl whitespace-nowrap pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 flex items-center border border-neutral-700"
-                            style="display: none;"
-                        >
-                            <span class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-ink rotate-45 border-l border-b border-neutral-700"></span>
-                            <span>{{ $item['label'] }}</span>
-                        </div>
                     </a>
                 @endforeach
             </div>
@@ -105,9 +98,11 @@
                             <a href="{{ $item['url'] }}" wire:navigate
                                data-nav-route="{{ $item['data_nav_route'] }}"
                                data-nav-exact="{{ $item['data_nav_exact'] }}"
+                               x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
+                               x-on:mouseleave="hideSidebarTooltip()"
+                               x-on:click="hideSidebarTooltip()"
                                :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
                                class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
-                               title="{{ $item['label'] }}"
                             >
                                 <div class="flex-shrink-0 flex items-center justify-center">
                                     {!! $item['icon'] !!}
@@ -121,16 +116,6 @@
                                 >
                                     {{ $item['label'] }}
                                 </span>
-
-                                <!-- Floating Tooltip in Collapsed Mode -->
-                                <div 
-                                    x-show="sidebarCollapsed"
-                                    class="fixed left-16 ml-3 px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg shadow-xl whitespace-nowrap pointer-events-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 flex items-center border border-neutral-700"
-                                    style="display: none;"
-                                >
-                                    <span class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-ink rotate-45 border-l border-b border-neutral-700"></span>
-                                    <span>{{ $item['label'] }}</span>
-                                </div>
                             </a>
                         @endforeach
                     </div>

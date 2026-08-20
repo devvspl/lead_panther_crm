@@ -1,8 +1,7 @@
 @php
     $theme = \App\Support\ThemeService::getUserTheme();
     $themeJson = json_encode($theme);
-    $defaultLightJson = json_encode(\App\Support\ThemeService::DEFAULT_LIGHT);
-    $defaultDarkJson = json_encode(\App\Support\ThemeService::DEFAULT_DARK);
+    $defaultsJson = json_encode(\App\Support\ThemeService::DEFAULTS);
 @endphp
 
 <div 
@@ -11,21 +10,10 @@
         saving: false,
         resetting: false,
         theme: {{ $themeJson }},
-        defaultLight: {{ $defaultLightJson }},
-        defaultDark: {{ $defaultDarkJson }},
+        defaults: {{ $defaultsJson }},
 
         init() {
             this.applyThemeToDOM();
-
-            // Listen for system color-scheme updates if in system mode
-            if (window.matchMedia) {
-                const mq = window.matchMedia('(prefers-color-scheme: dark)');
-                mq.addEventListener('change', (e) => {
-                    if (this.theme.theme_mode === 'system') {
-                        this.handleSystemThemeChange(e.matches);
-                    }
-                });
-            }
 
             window.addEventListener('open-theme-customizer', () => {
                 this.open = true;
@@ -35,38 +23,6 @@
                     this.open = false;
                 }
             });
-        },
-
-        handleSystemThemeChange(isDark) {
-            const palette = isDark ? this.defaultDark : this.defaultLight;
-            Object.keys(palette).forEach(k => {
-                if (k !== 'theme_font_family' && k !== 'theme_font_size' && k !== 'theme_border_radius') {
-                    this.theme[k] = palette[k];
-                }
-            });
-            this.applyThemeToDOM();
-        },
-
-        setAppearanceMode(mode) {
-            this.theme.theme_mode = mode;
-            if (mode === 'dark') {
-                Object.keys(this.defaultDark).forEach(k => {
-                    if (k !== 'theme_font_family' && k !== 'theme_font_size' && k !== 'theme_border_radius') {
-                        this.theme[k] = this.defaultDark[k];
-                    }
-                });
-            } else if (mode === 'light') {
-                Object.keys(this.defaultLight).forEach(k => {
-                    if (k !== 'theme_font_family' && k !== 'theme_font_size' && k !== 'theme_border_radius') {
-                        this.theme[k] = this.defaultLight[k];
-                    }
-                });
-            } else if (mode === 'system') {
-                const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                this.handleSystemThemeChange(isDark);
-                return;
-            }
-            this.applyThemeToDOM();
         },
 
         applyThemeToDOM() {
@@ -86,13 +42,6 @@
             root.style.setProperty('--theme-font-family', this.theme.theme_font_family);
             root.style.setProperty('--theme-font-size', this.theme.theme_font_size);
             root.style.setProperty('--theme-border-radius', this.theme.theme_border_radius);
-
-            const isDark = this.theme.theme_mode === 'dark' || (this.theme.theme_mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            if (isDark) {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
 
             // Notify sidebar navigation active style handler
             localStorage.setItem('leadpanther_sidebar_active_style', this.theme.theme_active_menu_style === 'text_only' ? 'text-only' : 'highlighted');
@@ -144,35 +93,44 @@
         },
 
         resetTheme() {
-            if (!confirm('Are you sure you want to reset all theme customizations to system defaults?')) {
-                return;
-            }
-            this.resetting = true;
-            fetch('{{ route('settings.theme.reset') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Accept': 'application/json'
+            const self = this;
+            window.dispatchEvent(new CustomEvent('confirm-action', {
+                detail: {
+                    title: 'Reset Theme Settings?',
+                    message: 'This will remove all your custom theme customizations and restore the default system appearance. You can customize the theme again at any time.',
+                    confirmText: 'Yes, Reset Theme',
+                    cancelText: 'Cancel',
+                    variant: 'warning',
+                    onConfirm: function() {
+                        self.resetting = true;
+                        return fetch('{{ route('settings.theme.reset') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            }
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            self.resetting = false;
+                            if (data.success) {
+                                self.theme = Object.assign({}, self.defaults);
+                                self.applyThemeToDOM();
+                                window.dispatchEvent(new CustomEvent('toast-alert', { 
+                                    detail: { type: 'info', message: data.message || 'Theme reset to defaults!' } 
+                                }));
+                            }
+                        })
+                        .catch(function(err) {
+                            self.resetting = false;
+                            window.dispatchEvent(new CustomEvent('toast-alert', { 
+                                detail: { type: 'error', message: 'Error resetting theme.' } 
+                            }));
+                        });
+                    }
                 }
-            })
-            .then(res => res.json())
-            .then(data => {
-                this.resetting = false;
-                if (data.success) {
-                    this.theme = { ...this.defaultLight };
-                    this.applyThemeToDOM();
-                    window.dispatchEvent(new CustomEvent('toast-alert', { 
-                        detail: { type: 'info', message: data.message || 'Theme reset to defaults!' } 
-                    }));
-                }
-            })
-            .catch(err => {
-                this.resetting = false;
-                window.dispatchEvent(new CustomEvent('toast-alert', { 
-                    detail: { type: 'error', message: 'Error resetting theme.' } 
-                }));
-            });
+            }));
         }
     }"
     class="relative z-50"
@@ -356,8 +314,7 @@
                                 theme_header_text: '#0A0A0A',
                                 theme_page_bg: '#F5F5F5',
                                 theme_card_bg: '#FFFFFF',
-                                theme_border_color: '#E5E7EB',
-                                theme_mode: 'light'
+                                theme_border_color: '#E5E7EB'
                             })"
                             class="p-2 border border-border rounded-lg text-left hover:border-ink transition bg-white text-xs space-y-1 cursor-pointer"
                         >
@@ -385,8 +342,7 @@
                                 theme_header_text: '#064E3B',
                                 theme_page_bg: '#F8FAFC',
                                 theme_card_bg: '#FFFFFF',
-                                theme_border_color: '#E2E8F0',
-                                theme_mode: 'light'
+                                theme_border_color: '#E2E8F0'
                             })"
                             class="p-2 border border-border rounded-lg text-left hover:border-emerald-600 transition bg-emerald-50 text-xs space-y-1 cursor-pointer"
                         >
@@ -396,40 +352,6 @@
                                 <span class="w-3 h-3 rounded-full bg-[#FFFFFF]"></span>
                             </div>
                             <div class="font-semibold text-emerald-900 text-[11px]">Emerald Fresh</div>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Section: Appearance & Mode -->
-                <div class="space-y-3 pt-3 border-t border-border">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider">Appearance Mode</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button 
-                            type="button"
-                            x-on:click="setAppearanceMode('light')"
-                            :class="theme.theme_mode === 'light' ? 'border-ink bg-ink text-white font-bold shadow-xs' : 'border-border bg-canvas text-ink hover:bg-surface'"
-                            class="py-2 px-3 text-xs rounded-lg border text-center transition cursor-pointer flex items-center justify-center space-x-1.5"
-                        >
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                            <span>Light</span>
-                        </button>
-                        <button 
-                            type="button"
-                            x-on:click="setAppearanceMode('dark')"
-                            :class="theme.theme_mode === 'dark' ? 'border-ink bg-ink text-white font-bold shadow-xs' : 'border-border bg-canvas text-ink hover:bg-surface'"
-                            class="py-2 px-3 text-xs rounded-lg border text-center transition cursor-pointer flex items-center justify-center space-x-1.5"
-                        >
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                            <span>Dark</span>
-                        </button>
-                        <button 
-                            type="button"
-                            x-on:click="setAppearanceMode('system')"
-                            :class="theme.theme_mode === 'system' ? 'border-ink bg-ink text-white font-bold shadow-xs' : 'border-border bg-canvas text-ink hover:bg-surface'"
-                            class="py-2 px-3 text-xs rounded-lg border text-center transition cursor-pointer flex items-center justify-center space-x-1.5"
-                        >
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                            <span>System</span>
                         </button>
                     </div>
                 </div>

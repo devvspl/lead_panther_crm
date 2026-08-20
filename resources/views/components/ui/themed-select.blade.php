@@ -73,7 +73,7 @@
         x-transition:leave-start="transform opacity-100 scale-100" 
         x-transition:leave-end="transform opacity-0 scale-95" 
         @if($searchable)
-            x-effect="if (open) $nextTick(() => $refs.searchInput && $refs.searchInput.focus())"
+            x-effect="if (open) $nextTick(function() { if ($refs.searchInput) $refs.searchInput.focus(); })"
         @endif
         class="absolute left-0 z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5"
     >

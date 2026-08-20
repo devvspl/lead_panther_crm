@@ -17,10 +17,10 @@
                     window.initSafeChart('followupChart', {
                         type: 'bar',
                         data: {
-                            labels: data.map(d => d.executive_name),
+                            labels: data.map(function(d) { return d.executive_name; }),
                             datasets: [
-                                { label: 'On Time', data: data.map(d => d.on_time), backgroundColor: '#16A34A', borderRadius: 4 },
-                                { label: 'Overdue', data: data.map(d => d.overdue), backgroundColor: '#DC2626', borderRadius: 4 }
+                                { label: 'On Time', data: data.map(function(d) { return d.on_time; }), backgroundColor: '#16A34A', borderRadius: 4 },
+                                { label: 'Overdue', data: data.map(function(d) { return d.overdue; }), backgroundColor: '#DC2626', borderRadius: 4 }
                             ]
                         },
                         options: {
@@ -36,7 +36,7 @@
                     });
                 }
             }"
-            x-init="$nextTick(() => renderChart())"
+            x-init="$nextTick(function() { renderChart(); })"
             class="h-64 relative"
         >
             <canvas id="followupChart"></canvas>

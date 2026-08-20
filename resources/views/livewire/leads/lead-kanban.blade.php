@@ -168,7 +168,7 @@
                         });
                     }
                 }"
-                x-init="$nextTick(() => renderChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])))"
+                x-init="$nextTick(function() { renderChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])); })"
                 class="h-64 relative"
             >
                 <canvas id="leadsBreakdownChart"></canvas>
@@ -402,7 +402,7 @@
                                         group: 'kanban', 
                                         animation: 150, 
                                         ghostClass: 'opacity-50',
-                                        onEnd: (evt) => { 
+                                        onEnd: function(evt) { 
                                             const leadId = evt.item.getAttribute('data-lead-id'); 
                                             const toStage = evt.to.getAttribute('data-stage-key'); 
                                             $wire.updateLeadStage(leadId, toStage); 
@@ -515,7 +515,7 @@
                                     </div>
                                     <div 
                                         data-stage-key="{{ $oStageKey }}"
-                                        x-data="{ initSortable() { new Sortable($el, { group: 'kanban', animation: 150, onEnd: (evt) => { const leadId = evt.item.getAttribute('data-lead-id'); const toStage = evt.to.getAttribute('data-stage-key'); $wire.updateLeadStage(leadId, toStage); } }); } }"
+                                        x-data="{ initSortable() { new Sortable($el, { group: 'kanban', animation: 150, onEnd: function(evt) { const leadId = evt.item.getAttribute('data-lead-id'); const toStage = evt.to.getAttribute('data-stage-key'); $wire.updateLeadStage(leadId, toStage); } }); } }"
                                         x-init="initSortable()"
                                         class="space-y-2 min-h-[60px]"
                                     >

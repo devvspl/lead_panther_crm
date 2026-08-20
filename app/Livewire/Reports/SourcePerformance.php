@@ -21,6 +21,17 @@ class SourcePerformance extends Component
 
     public int $days = 30;
 
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'source_name', 'label' => 'Lead Source', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'cost_per_lead', 'label' => 'Est. Cost Per Lead', 'prefix' => '₹', 'formatter' => fn($v) => number_format((float)$v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function updatingDays(): void
     {
         $this->resetPage();

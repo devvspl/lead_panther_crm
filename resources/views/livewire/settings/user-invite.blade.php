@@ -51,43 +51,20 @@
         @endif
     </div>
 
-    <!-- Invited Organization Users Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+    <!-- Invited Organization Users Table Component -->
+    <div class="space-y-2">
         <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Organization Users</h2>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">User ID</th>
-                        <th class="py-3 px-4">Name</th>
-                        <th class="py-3 px-4">Email</th>
-                        <th class="py-3 px-4">Role</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($invitedUsers as $u)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $u->id }}</td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $u->name }}</td>
-                            <td class="py-3 px-4 font-mono text-muted">{{ $u->email }}</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-purple-50 text-purple-700 border border-purple-200">
-                                    {{ $u->roles->first()?->name ?? 'User' }}
-                                </span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="4" class="py-6 text-center text-muted">No users invited yet.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $invitedUsers->links('vendor.pagination.tailwind') }}
-        </div>
+        <x-ui.advanced-table 
+            :columns="$this->tableColumns()"
+            :rows="$invitedUsers"
+            :visibleColumns="$visibleColumns"
+            :sortField="$sortField"
+            :sortDirection="$sortDirection"
+            :showFilterDropdown="false"
+            searchPlaceholder="Search users by name, email, ID..."
+            emptyTitle="No Organization Users Found"
+            emptyMessage="No users invited to this organization yet."
+        />
     </div>
 </div>

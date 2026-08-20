@@ -140,19 +140,16 @@
                 x-data="{
                     chart: null,
                     renderChart(labels, counts) {
-                        const ctx = document.getElementById('leadsBreakdownChart')?.getContext('2d');
-                        if (!ctx) return;
-                        if (this.chart) {
-                            this.chart.destroy();
-                        }
-                        if (typeof Chart === 'undefined') return;
-                        this.chart = new Chart(ctx, {
+                        const l = (labels && labels.length) ? labels : ['No Data'];
+                        const c = (counts && counts.length) ? counts : [0];
+
+                        this.chart = window.initSafeChart('leadsBreakdownChart', {
                             type: 'bar',
                             data: {
-                                labels: labels && labels.length ? labels : ['No Data'],
+                                labels: l,
                                 datasets: [{
                                     label: 'Total Leads',
-                                    data: counts && counts.length ? counts : [0],
+                                    data: c,
                                     backgroundColor: '#0A0A0A',
                                     borderRadius: 6,
                                     barThickness: 18
@@ -172,38 +169,31 @@
                     }
                 }"
                 x-init="$nextTick(() => renderChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])))"
-                x-effect="renderChart(@js($analytics['chartLabels']), @js($analytics['chartCounts']))"
                 class="h-64 relative"
             >
                 <canvas id="leadsBreakdownChart"></canvas>
             </div>
 
-            <!-- Breakdown Performance Table -->
-            <div class="overflow-x-auto border-t border-border pt-4">
-                <table class="w-full text-left text-xs text-ink border-collapse">
-                    <thead>
-                        <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                            <th class="py-3 px-4">Group Name</th>
-                            <th class="py-3 px-4">Total Leads</th>
-                            <th class="py-3 px-4">Conversion Rate</th>
-                            <th class="py-3 px-4">Avg SLA Response Time</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($analytics['breakdownRows'] as $row)
-                            <tr class="hover:bg-canvas/50 transition">
-                                <td class="py-3 px-4 font-bold text-ink">{{ $row['name'] }}</td>
-                                <td class="py-3 px-4 font-mono font-bold">{{ number_format($row['total_leads']) }}</td>
-                                <td class="py-3 px-4 font-mono font-bold text-emerald-600">{{ $row['conversion_rate'] }}%</td>
-                                <td class="py-3 px-4 font-mono text-muted">{{ $row['avg_sla_time'] }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="py-6 text-center text-muted">No breakdown data available for this range.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <!-- Breakdown Performance Table Component -->
+            <div class="border-t border-border pt-4">
+                @php
+                    $breakdownColumns = [
+                        ['key' => 'name', 'label' => 'Group Name', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
+                        ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+                        ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => false, 'priority' => 1],
+                        ['key' => 'avg_sla_time', 'label' => 'Avg SLA Response Time', 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+                    ];
+                @endphp
+
+                <x-ui.advanced-table 
+                    :columns="$breakdownColumns"
+                    :rows="$analytics['breakdownRows']"
+                    :showSearch="false"
+                    :showFilterDropdown="false"
+                    :showConfigurations="false"
+                    emptyTitle="No Breakdown Data"
+                    emptyMessage="No breakdown data available for this range."
+                />
             </div>
         </div>
     </div>
@@ -868,7 +858,6 @@
         </x-slot:footer>
     </x-ui.offcanvas>
 
-    <!-- CDN Script for Chart.js & SortableJS -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CDN Script for SortableJS -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </div>

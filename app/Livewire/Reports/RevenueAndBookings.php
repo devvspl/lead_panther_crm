@@ -14,6 +14,18 @@ use App\Models\Lead;
 
 class RevenueAndBookings extends Component
 {
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'client_name', 'label' => 'Client Organization', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'credits_spent', 'label' => 'Credits Consumed', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 2],
+            ['key' => 'credits_spent_amount', 'label' => 'Cost Equivalent', 'prefix' => '₹', 'formatter' => fn($v) => number_format((float)$v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'bookings_closed', 'label' => 'Bookings Closed', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'revenue', 'label' => 'Closed Sales Volume', 'formatter' => fn($v) => '₹' . number_format(((float)$v) / 100000, 1) . ' Lakhs', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'roi_ratio', 'label' => 'ROI Ratio', 'suffix' => 'x', 'formatter' => fn($v) => number_format((float)$v, 1), 'class' => 'font-mono font-bold text-purple-700', 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function exportExcel()
     {
         $rows = collect($this->getClientRoiData());

@@ -13,6 +13,16 @@ use App\Models\LeadCommunication;
 
 class FollowupPerformance extends Component
 {
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'executive_name', 'label' => 'Sales Executive', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'on_time', 'label' => 'Completed On Time', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'overdue', 'label' => 'Overdue / Delayed', 'class' => 'font-mono font-bold text-danger', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'on_time_rate', 'label' => 'On-Time Execution Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function exportExcel()
     {
         $rows = collect($this->getFollowupData());

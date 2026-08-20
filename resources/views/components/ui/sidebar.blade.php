@@ -144,6 +144,7 @@
         function updateSidebarActiveNav() {
             const rawPath = (window.location.pathname.replace(/\/$/, '') || '/').toLowerCase();
             const navElements = Array.from(document.querySelectorAll('[data-nav-route]'));
+            const activeStyle = localStorage.getItem('leadpanther_sidebar_active_style') || 'highlighted';
             
             let bestElement = null;
             let bestMatchLength = -1;
@@ -173,13 +174,36 @@
                 }
             });
             
+            const allStyletypes = [
+                'bg-ink', 'text-white', 
+                'bg-canvas', 'text-ink', 'font-semibold', 'font-bold', 'font-medium',
+                'border', 'border-border/60', 'shadow-2xs', 'bg-transparent'
+            ];
+            
             navElements.forEach(el => {
+                el.classList.remove(...allStyletypes);
+                el.style.color = '';
+                el.style.backgroundColor = '';
+                el.style.borderColor = '';
+
                 if (el === bestElement) {
-                    el.classList.add('bg-ink', 'text-white');
-                    el.classList.remove('text-muted', 'hover:bg-canvas', 'hover:text-ink');
+                    el.classList.remove('text-muted');
+                    if (activeStyle === 'text-only' || activeStyle === 'text_only') {
+                        // Option 1: Text Only - Solid active color text & icon, transparent background
+                        el.classList.add('font-bold', 'bg-transparent');
+                        el.style.color = 'var(--theme-active-menu-color, #0A0A0A)';
+                        el.style.backgroundColor = 'transparent';
+                    } else {
+                        // Option 2: Highlighted Background - Custom active background with custom active color
+                        el.classList.add('font-semibold', 'border', 'shadow-2xs');
+                        el.style.color = 'var(--theme-active-menu-color, #0A0A0A)';
+                        el.style.backgroundColor = 'var(--theme-active-menu-bg, #F5F5F5)';
+                        el.style.borderColor = 'var(--theme-border-color, #E5E7EB)';
+                    }
                 } else {
-                    el.classList.remove('bg-ink', 'text-white');
-                    el.classList.add('text-muted', 'hover:bg-canvas', 'hover:text-ink');
+                    // Inactive items: custom sidebar text color with hover
+                    el.classList.add('font-medium', 'hover:bg-canvas');
+                    el.style.color = 'var(--theme-sidebar-text, #6B7280)';
                 }
             });
         }
@@ -187,6 +211,7 @@
         document.addEventListener('livewire:navigated', updateSidebarActiveNav);
         document.addEventListener('DOMContentLoaded', updateSidebarActiveNav);
         window.addEventListener('popstate', updateSidebarActiveNav);
+        window.addEventListener('sidebar-style-changed', updateSidebarActiveNav);
         updateSidebarActiveNav();
     })();
 </script>

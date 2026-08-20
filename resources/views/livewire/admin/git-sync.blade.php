@@ -211,32 +211,29 @@
                             </p>
                         </div>
 
-                        <!-- Recent Commits Table -->
+                        <!-- Recent Commits Table Component -->
                         @if(!empty($repoStatus['recent_commits']))
                             <div class="space-y-2">
                                 <div class="text-xs font-bold text-ink">Recent Local Commit History</div>
-                                <div class="border border-border rounded-xl overflow-hidden text-xs bg-surface">
-                                    <table class="w-full text-left">
-                                        <thead class="bg-canvas border-b border-border text-[10px] uppercase text-muted font-bold tracking-wider">
-                                            <tr>
-                                                <th class="py-2 px-3 font-mono">Hash</th>
-                                                <th class="py-2 px-3">Message</th>
-                                                <th class="py-2 px-3">Author</th>
-                                                <th class="py-2 px-3">Date</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-border">
-                                            @foreach($repoStatus['recent_commits'] as $c)
-                                                <tr class="hover:bg-canvas/50">
-                                                    <td class="py-2 px-3 font-mono font-bold text-primary">{{ $c['hash'] }}</td>
-                                                    <td class="py-2 px-3 font-medium text-ink truncate max-w-xs">{{ $c['message'] }}</td>
-                                                    <td class="py-2 px-3 text-muted">{{ $c['author'] }}</td>
-                                                    <td class="py-2 px-3 text-muted">{{ $c['date'] }}</td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
+                                
+                                @php
+                                    $localCommitCols = [
+                                        ['key' => 'hash', 'label' => 'Hash', 'class' => 'font-mono font-bold text-primary', 'sortable' => false, 'priority' => 1],
+                                        ['key' => 'message', 'label' => 'Message', 'render' => fn($row) => '<span class="font-medium text-ink truncate max-w-xs block" title="' . e(is_array($row) ? $row['message'] : $row->message) . '">' . e(is_array($row) ? $row['message'] : $row->message) . '</span>', 'sortable' => false, 'priority' => 1],
+                                        ['key' => 'author', 'label' => 'Author', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
+                                        ['key' => 'date', 'label' => 'Date', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
+                                    ];
+                                @endphp
+
+                                <x-ui.advanced-table 
+                                    :columns="$localCommitCols"
+                                    :rows="$repoStatus['recent_commits']"
+                                    :showSearch="false"
+                                    :showFilterDropdown="false"
+                                    :showConfigurations="false"
+                                    emptyTitle="No Recent Commits"
+                                    emptyMessage="No recent local commits found."
+                                />
                             </div>
                         @endif
                     </div>
@@ -536,54 +533,30 @@
                     </div>
                 </div>
 
-                <div class="border border-border rounded-xl overflow-hidden bg-surface text-xs">
-                    <table class="w-full text-left">
-                        <thead class="bg-canvas border-b border-border text-[10px] uppercase text-muted font-bold tracking-wider">
-                            <tr>
-                                <th class="py-2.5 px-3.5 font-mono">Commit</th>
-                                <th class="py-2.5 px-3.5">Message</th>
-                                <th class="py-2.5 px-3.5">Author</th>
-                                <th class="py-2.5 px-3.5">Date</th>
-                                <th class="py-2.5 px-3.5 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            @forelse($commitHistory as $c)
-                                <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-2.5 px-3.5 font-mono font-bold text-primary flex items-center gap-1.5">
-                                        @if(($repoStatus['short_commit'] ?? '') === $c['short_hash'])
-                                            <span class="w-2 h-2 rounded-full bg-emerald-500" title="Current HEAD"></span>
-                                        @endif
-                                        <span>{{ $c['short_hash'] }}</span>
-                                    </td>
-                                    <td class="py-2.5 px-3.5 font-medium text-ink max-w-md truncate">
-                                        {{ $c['message'] }}
-                                    </td>
-                                    <td class="py-2.5 px-3.5 text-muted">
-                                        {{ $c['author'] }}
-                                    </td>
-                                    <td class="py-2.5 px-3.5 text-muted font-mono text-[11px]">
-                                        {{ \Carbon\Carbon::parse($c['date'])->diffForHumans() }}
-                                    </td>
-                                    <td class="py-2.5 px-3.5 text-right">
-                                        <button 
-                                            type="button" 
-                                            wire:click="openRevertModal('{{ $c['hash'] }}')"
-                                            class="px-2.5 py-1 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:border-danger hover:text-danger transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/></svg>
-                                            <span>Revert to here</span>
-                                        </button>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="py-8 text-center text-muted">No commit history found.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                @php
+                    $commitColumns = [
+                        ['key' => 'short_hash', 'label' => 'Commit', 'render' => function($row) use ($repoStatus) {
+                            $short = is_array($row) ? $row['short_hash'] : $row->short_hash;
+                            $isHead = ($repoStatus['short_commit'] ?? '') === $short;
+                            $dot = $isHead ? '<span class="w-2 h-2 rounded-full bg-emerald-500" title="Current HEAD"></span>' : '';
+                            return '<div class="font-mono font-bold text-primary flex items-center gap-1.5">' . $dot . '<span>' . e($short) . '</span></div>';
+                        }, 'sortable' => false, 'priority' => 1],
+                        ['key' => 'message', 'label' => 'Message', 'render' => fn($row) => '<div class="font-medium text-ink max-w-md truncate" title="' . e(is_array($row) ? $row['message'] : $row->message) . '">' . e(is_array($row) ? $row['message'] : $row->message) . '</div>', 'sortable' => false, 'priority' => 1],
+                        ['key' => 'author', 'label' => 'Author', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
+                        ['key' => 'date', 'label' => 'Date', 'render' => fn($row) => '<span class="text-muted font-mono text-[11px]">' . \Carbon\Carbon::parse(is_array($row) ? $row['date'] : $row->date)->diffForHumans() . '</span>', 'sortable' => false, 'priority' => 2],
+                        ['key' => 'action', 'label' => 'Action', 'align' => 'right', 'render' => fn($row) => '<div class="flex items-center justify-end"><button type="button" wire:click="openRevertModal(\'' . (is_array($row) ? $row['hash'] : $row->hash) . '\')" class="px-2.5 py-1 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:border-danger hover:text-danger transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/></svg><span>Revert to here</span></button></div>', 'sortable' => false, 'priority' => 1],
+                    ];
+                @endphp
+
+                <x-ui.advanced-table 
+                    :columns="$commitColumns"
+                    :rows="$commitHistory"
+                    :showSearch="false"
+                    :showFilterDropdown="false"
+                    :showConfigurations="false"
+                    emptyTitle="No Commit History"
+                    emptyMessage="No commit history found on branch {{ $selectedBranch }}."
+                />
 
                 <!-- Last Revert Output Console & Follow-ups -->
                 @if($lastJobResult && in_array($lastJobResult['action'] ?? '', ['revert_safe', 'revert_hard', 'restore_backup']))
@@ -745,42 +718,29 @@
                 </div>
             </div>
 
-            <div class="border border-border rounded-xl overflow-hidden bg-surface text-xs">
-                <table class="w-full text-left">
-                    <thead class="bg-canvas border-b border-border text-[10px] uppercase text-muted font-bold tracking-wider">
-                        <tr>
-                            <th class="py-2.5 px-3.5">Action</th>
-                            <th class="py-2.5 px-3.5">User</th>
-                            <th class="py-2.5 px-3.5">Details</th>
-                            <th class="py-2.5 px-3.5">Timestamp</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($gitAuditLogs as $log)
-                            <tr class="hover:bg-canvas/50">
-                                <td class="py-2.5 px-3.5">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono {{ str_contains($log->action, 'push') || str_contains($log->action, 'hard') ? 'bg-red-100 text-red-800' : (str_contains($log->action, 'pull') || str_contains($log->action, 'safe') ? 'bg-blue-100 text-blue-800' : 'bg-canvas text-ink') }}">
-                                        {{ $log->action }}
-                                    </span>
-                                </td>
-                                <td class="py-2.5 px-3.5 font-medium text-ink">
-                                    {{ $log->user?->name ?: 'System' }}
-                                </td>
-                                <td class="py-2.5 px-3.5 font-mono text-[11px] text-muted truncate max-w-md">
-                                    {{ $log->to_value }}
-                                </td>
-                                <td class="py-2.5 px-3.5 text-muted">
-                                    {{ $log->created_at ? $log->created_at->format('M d, Y H:i:s') : 'N/A' }}
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="py-6 text-center text-muted">No Git deployment audit logs recorded yet.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            @php
+                $auditColumns = [
+                    ['key' => 'action', 'label' => 'Action', 'render' => function($row) {
+                        $isHigh = str_contains($row->action, 'push') || str_contains($row->action, 'hard');
+                        $isMed = str_contains($row->action, 'pull') || str_contains($row->action, 'safe');
+                        $badgeClass = $isHigh ? 'bg-red-100 text-red-800' : ($isMed ? 'bg-blue-100 text-blue-800' : 'bg-canvas text-ink');
+                        return '<span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ' . $badgeClass . '">' . e($row->action) . '</span>';
+                    }, 'sortable' => false, 'priority' => 1],
+                    ['key' => 'user', 'label' => 'User', 'render' => fn($row) => '<span class="font-medium text-ink">' . e($row->user?->name ?: 'System') . '</span>', 'sortable' => false, 'priority' => 1],
+                    ['key' => 'to_value', 'label' => 'Details', 'render' => fn($row) => '<span class="font-mono text-[11px] text-muted truncate max-w-md block" title="' . e($row->to_value) . '">' . e($row->to_value) . '</span>', 'sortable' => false, 'priority' => 2],
+                    ['key' => 'created_at', 'label' => 'Timestamp', 'render' => fn($row) => '<span class="text-muted text-[11px] font-mono">' . ($row->created_at ? $row->created_at->format('M d, Y H:i:s') : 'N/A') . '</span>', 'sortable' => false, 'priority' => 2],
+                ];
+            @endphp
+
+            <x-ui.advanced-table 
+                :columns="$auditColumns"
+                :rows="$gitAuditLogs"
+                :showSearch="false"
+                :showFilterDropdown="false"
+                :showConfigurations="false"
+                emptyTitle="No Audit Logs"
+                emptyMessage="No Git deployment audit logs recorded yet."
+            />
         </div>
     @endif
 

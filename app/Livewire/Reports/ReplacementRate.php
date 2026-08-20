@@ -14,6 +14,17 @@ use App\Models\LeadReplacement;
 
 class ReplacementRate extends Component
 {
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'client_name', 'label' => 'Client Organization', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_leads', 'label' => 'Total Ingested Leads', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_claims', 'label' => 'Replacement Claims', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 2],
+            ['key' => 'approved_claims', 'label' => 'Approved Replacements', 'class' => 'font-mono font-bold text-purple-700', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'replacement_rate', 'label' => 'Effective Replacement Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function exportExcel()
     {
         $rows = collect($this->getReplacementRatesData());

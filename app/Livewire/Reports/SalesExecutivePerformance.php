@@ -16,6 +16,17 @@ class SalesExecutivePerformance extends Component
     public string $sortField = 'bookings_closed';
     public string $sortDirection = 'desc';
 
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'executive_name', 'label' => 'Executive Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
+            ['key' => 'assigned_leads', 'label' => 'Leads Assigned', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => true, 'priority' => 1],
+            ['key' => 'sla_contacted_rate', 'label' => 'Contacted Within SLA (%)', 'suffix' => '%', 'class' => 'font-mono font-bold text-purple-700', 'sortable' => true, 'priority' => 1],
+            ['key' => 'site_visits', 'label' => 'Site Visits Logged', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => true, 'priority' => 1],
+            ['key' => 'bookings_closed', 'label' => 'Bookings Closed', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => true, 'priority' => 1],
+        ];
+    }
+
     public function sortBy(string $field): void
     {
         if ($this->sortField === $field) {

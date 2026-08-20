@@ -10,46 +10,27 @@
 
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Template List Table -->
-        <div class="lg:col-span-2 bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+        <!-- Template List Table Component -->
+        <div class="lg:col-span-2 space-y-2">
             <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Configured Message Templates</h2>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-ink border-collapse">
-                    <thead>
-                        <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                            <th class="py-3 px-4">Template Key</th>
-                            <th class="py-3 px-4">Channel</th>
-                            <th class="py-3 px-4">Body Snippet</th>
-                            <th class="py-3 px-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($templates as $tpl)
-                            <tr class="hover:bg-canvas/50 transition">
-                                <td class="py-3 px-4 font-bold text-ink">{{ $tpl->key }}</td>
-                                <td class="py-3 px-4">
-                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border">
-                                        {{ $tpl->channel }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4 text-muted truncate max-w-xs">{{ Str::limit($tpl->body, 50) }}</td>
-                                <td class="py-3 px-4 text-right">
-                                    <button wire:click="editTemplate({{ $tpl->id }})" class="text-xs font-semibold text-accent hover:underline">Edit</button>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="py-6 text-center text-muted">No custom templates defined yet. Default fallback copy will be used.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pt-2">
-                {{ $templates->links('vendor.pagination.tailwind') }}
-            </div>
+            <x-ui.advanced-table 
+                :columns="$this->tableColumns()"
+                :rows="$templates"
+                :visibleColumns="$visibleColumns"
+                :sortField="$sortField"
+                :sortDirection="$sortDirection"
+                :quickFilters="[
+                    ['key' => 'all', 'label' => 'All Channels'],
+                    ['key' => 'whatsapp', 'label' => 'WhatsApp'],
+                    ['key' => 'email', 'label' => 'Email'],
+                    ['key' => 'sms', 'label' => 'SMS'],
+                ]"
+                :activeStatus="$statusFilter"
+                searchPlaceholder="Search key, channel, body..."
+                emptyTitle="No Templates Found"
+                emptyMessage="No notification templates defined yet. Default fallback copy will be used."
+            />
         </div>
 
         <!-- Template Form -->

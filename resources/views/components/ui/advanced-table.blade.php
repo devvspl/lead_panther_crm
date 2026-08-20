@@ -460,8 +460,17 @@
                                                     <span class="text-[11px] text-muted font-semibold">Clean Import</span>
                                                 @endif
                                             </div>
+                                        @elseif($type === 'html' || isset($col['render']))
+                                            {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}
                                         @else
-                                            <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $val ?: ($col['default'] ?? '—') }}</span>
+                                            @php
+                                                $displayVal = $val;
+                                                if (isset($col['formatter']) && is_callable($col['formatter'])) {
+                                                    $displayVal = $col['formatter']($val, $row);
+                                                }
+                                                $formattedText = ($col['prefix'] ?? '') . ($displayVal !== null && $displayVal !== '' ? $displayVal : ($col['default'] ?? '—')) . ($col['suffix'] ?? '');
+                                            @endphp
+                                            <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $formattedText }}</span>
                                         @endif
                                     </td>
                                 @endforeach
@@ -670,8 +679,17 @@
                                                 <span class="text-[11px] text-muted font-semibold">Clean Import</span>
                                             @endif
                                         </div>
+                                    @elseif($type === 'html' || isset($col['render']))
+                                        {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}
                                     @else
-                                        <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $val ?: '—' }}</span>
+                                        @php
+                                            $displayValMobile = $val;
+                                            if (isset($col['formatter']) && is_callable($col['formatter'])) {
+                                                $displayValMobile = $col['formatter']($val, $row);
+                                            }
+                                            $formattedTextMobile = ($col['prefix'] ?? '') . ($displayValMobile !== null && $displayValMobile !== '' ? $displayValMobile : ($col['default'] ?? '—')) . ($col['suffix'] ?? '');
+                                        @endphp
+                                        <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $formattedTextMobile }}</span>
                                     @endif
                                 </div>
                             </div>

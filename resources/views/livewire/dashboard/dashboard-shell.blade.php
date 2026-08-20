@@ -60,32 +60,18 @@
         </div>
     </x-ui.card>
 
-    <!-- Chart.js Initialization Script -->
+    <!-- Chart.js Safe Initialization Script -->
     <script>
-        document.addEventListener('livewire:navigated', () => {
-            initDashboardChart();
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            initDashboardChart();
-        });
-
-        function initDashboardChart() {
-            const ctx = document.getElementById('dashboardRevenueChart');
-            if (!ctx) return;
-            
-            if (window.myDashboardChart) {
-                window.myDashboardChart.destroy();
-            }
-
-            window.myDashboardChart = new Chart(ctx, {
+        function renderDashboardRevenueChart() {
+            const chartData = @json($chartData);
+            window.initSafeChart('dashboardRevenueChart', {
                 type: 'line',
                 data: {
-                    labels: @json($chartData['labels']),
+                    labels: chartData.labels || [],
                     datasets: [
                         {
                             label: 'Lead Ingestion',
-                            data: @json($chartData['leads']),
+                            data: chartData.leads || [],
                             borderColor: '#0A0A0A',
                             backgroundColor: 'rgba(10, 10, 10, 0.05)',
                             borderWidth: 2,
@@ -96,7 +82,7 @@
                         },
                         {
                             label: 'Closed Revenue (₹ Lacs)',
-                            data: @json($chartData['revenue']),
+                            data: chartData.revenue || [],
                             borderColor: '#6B7280',
                             borderWidth: 2,
                             borderDash: [4, 4],
@@ -134,5 +120,9 @@
                 }
             });
         }
+
+        document.addEventListener('livewire:navigated', renderDashboardRevenueChart);
+        document.addEventListener('DOMContentLoaded', renderDashboardRevenueChart);
+        document.addEventListener('livewire:initialized', renderDashboardRevenueChart);
     </script>
 </div>

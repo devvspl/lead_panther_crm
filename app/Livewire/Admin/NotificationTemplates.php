@@ -4,18 +4,28 @@ namespace App\Livewire\Admin;
 
 use Livewire\Component;
 use App\Models\NotificationTemplate;
-
-use Livewire\WithPagination;
+use App\Livewire\Concerns\HasAdvancedTable;
 
 class NotificationTemplates extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public ?int $selectedId = null;
     public string $key = '';
     public string $channel = 'whatsapp';
     public string $subject = '';
     public string $body = '';
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'key', 'label' => 'Template Key', 'class' => 'font-bold font-mono text-ink', 'sortable' => true, 'priority' => 1],
+            ['key' => 'channel', 'label' => 'Channel', 'class' => 'px-2 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border inline-block', 'sortable' => true, 'priority' => 1],
+            ['key' => 'subject', 'label' => 'Subject / Header', 'class' => 'text-ink font-medium', 'default' => '—', 'sortable' => false, 'priority' => 2],
+            ['key' => 'body', 'label' => 'Body Preview', 'render' => fn($row) => '<span class="text-muted truncate max-w-xs block" title="' . e($row->body) . '">' . e(\Illuminate\Support\Str::limit($row->body, 50)) . '</span>', 'sortable' => false, 'priority' => 1],
+            ['key' => 'actions', 'label' => 'Actions', 'align' => 'right', 'render' => fn($row) => '<div class="flex items-center justify-end"><button wire:click="editTemplate(' . $row->id . ')" class="text-xs font-semibold text-accent hover:underline cursor-pointer">Edit</button></div>', 'sortable' => false, 'priority' => 1],
+        ];
+    }
 
     public function editTemplate(int $id): void
     {
@@ -62,7 +72,25 @@ class NotificationTemplates extends Component
 
     public function render()
     {
-        $templates = NotificationTemplate::latest('id')->paginate(15);
+        $query = NotificationTemplate::query();
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('key', 'like', "%{$this->search}%")
+                  ->orWhere('channel', 'like', "%{$this->search}%")
+                  ->orWhere('subject', 'like', "%{$this->search}%")
+                  ->orWhere('body', 'like', "%{$this->search}%");
+            });
+        }
+
+        if ($this->statusFilter && $this->statusFilter !== 'all') {
+            $query->where('channel', $this->statusFilter);
+        }
+
+        $sortField = in_array($this->sortField, ['key', 'channel', 'id']) ? $this->sortField : 'id';
+        $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
+
+        $templates = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);
 
         return view('livewire.admin.notification-templates', [
             'templates' => $templates,

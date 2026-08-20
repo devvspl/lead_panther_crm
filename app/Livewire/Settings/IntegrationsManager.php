@@ -69,6 +69,97 @@ class IntegrationsManager extends Component
         }
     }
 
+    public function availableFormsTableColumns(): array
+    {
+        return [
+            ['key' => 'form_name', 'label' => 'Form Name & ID', 'render' => function($row) {
+                $fId = is_array($row) ? $row['id'] : $row->id;
+                $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form ' . $fId;
+                return '<div class="font-bold text-ink">' . e($fName) . '</div><div class="font-mono text-muted text-[10px] mt-0.5">ID: ' . e($fId) . '</div>';
+            }, 'priority' => 1],
+            ['key' => 'meta_status', 'label' => 'Meta Status', 'render' => function($row) {
+                $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
+                return '<span class="px-2 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">' . e($status) . '</span>';
+            }, 'priority' => 1],
+            ['key' => 'project', 'label' => 'Assigned CRM Project', 'render' => function($row) {
+                $fId = is_array($row) ? $row['id'] : $row->id;
+                $selected = $this->formProjectMap[$fId] ?? '';
+                $projects = Project::where('is_active', true)->get();
+                $html = '<select wire:model="formProjectMap.' . $fId . '" class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"><option value="">-- Select Project --</option>';
+                foreach ($projects as $p) {
+                    $sel = $selected == $p->id ? ' selected' : '';
+                    $html .= '<option value="' . $p->id . '"' . $sel . '>' . e($p->name) . '</option>';
+                }
+                $html .= '</select>';
+                return $html;
+            }, 'priority' => 1],
+            ['key' => 'campaign', 'label' => 'Assigned CRM Campaign', 'render' => function($row) {
+                $fId = is_array($row) ? $row['id'] : $row->id;
+                $selected = $this->formCampaignMap[$fId] ?? '';
+                $campaigns = Campaign::where('status', 'active')->get();
+                $html = '<select wire:model="formCampaignMap.' . $fId . '" class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"><option value="">-- Optional Campaign --</option>';
+                foreach ($campaigns as $c) {
+                    $sel = $selected == $c->id ? ' selected' : '';
+                    $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name) . '</option>';
+                }
+                $html .= '</select>';
+                return $html;
+            }, 'priority' => 1],
+            ['key' => 'mapping_status', 'label' => 'Mapping Status', 'render' => function($row) {
+                $fId = is_array($row) ? $row['id'] : $row->id;
+                $isMapped = !empty($this->formProjectMap[$fId]);
+                if ($isMapped) {
+                    return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1"><svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg><span>Mapped</span></span>';
+                }
+                return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1"><svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span>Unmapped</span></span>';
+            }, 'priority' => 1],
+            ['key' => 'action', 'label' => 'Action', 'align' => 'right', 'render' => function($row) {
+                $fId = is_array($row) ? $row['id'] : $row->id;
+                $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form ' . $fId;
+                return '<button wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3 py-1 bg-ink text-white font-semibold text-[11px] rounded-lg hover:bg-neutral-800 transition">Save</button>';
+            }, 'priority' => 1],
+        ];
+    }
+
+    public function accountsTableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'Account ID', 'prefix' => '#', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'name', 'label' => 'Account Name', 'render' => function($row) {
+                $pageId = $row->type === 'meta' ? $row->getCredential('page_id') : null;
+                $html = '<div class="font-bold text-ink">' . e($row->name) . '</div>';
+                if ($pageId) {
+                    $html .= '<div class="text-[10px] font-mono text-muted">Page ID: ' . e($pageId) . '</div>';
+                }
+                return $html;
+            }, 'sortable' => false, 'priority' => 1],
+            ['key' => 'type', 'label' => 'Source Type', 'render' => function($row) {
+                if ($row->type === 'meta') {
+                    return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>META ADS</span>';
+                } elseif ($row->type === 'google') {
+                    return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-red-50 text-red-700 border border-red-200">GOOGLE ADS</span>';
+                }
+                return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border">' . e(strtoupper($row->type)) . '</span>';
+            }, 'sortable' => false, 'priority' => 1],
+            ['key' => 'encryption', 'label' => 'Encryption Status', 'render' => fn($row) => '<span class="text-emerald-700 font-semibold text-[11px] inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg><span>Encrypted (AES-256)</span></span>', 'sortable' => false, 'priority' => 2],
+            ['key' => 'health', 'label' => 'Health Status', 'render' => function($row) {
+                $statusText = $this->connectionStatus[$row->id] ?? ($row->health_message ?: 'Untested');
+                $isHealthy = str_starts_with($statusText, 'Connected');
+                $isError = str_starts_with($statusText, 'Error:');
+                if ($isHealthy) {
+                    return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>' . e($statusText) . '</span></span>';
+                } elseif ($isError) {
+                    return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1.5" title="' . e($statusText) . '"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span><span>' . e(Str::limit($statusText, 35)) . '</span></span>';
+                }
+                return '<span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-canvas text-muted border border-border inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-neutral-400"></span><span>Untested</span></span>';
+            }, 'sortable' => false, 'priority' => 1],
+            ['key' => 'actions', 'label' => 'Actions', 'align' => 'right', 'render' => function($row) {
+                $mapBtn = $row->type === 'meta' ? '<button wire:click="fetchLeadForms(' . $row->id . ')" class="px-2 py-1 text-[11px] font-bold text-ink hover:bg-canvas rounded transition cursor-pointer" title="Configure Lead Form mappings">Map Forms</button>' : '';
+                return '<div class="inline-flex items-center justify-end space-x-2"><button wire:click="testConnection(' . $row->id . ')" class="px-2 py-1 text-[11px] font-bold text-primary hover:bg-canvas rounded transition cursor-pointer" title="Test API connectivity">Test</button>' . $mapBtn . '<button wire:click="editAccount(' . $row->id . ')" class="px-2 py-1 text-[11px] font-medium text-muted hover:text-ink hover:bg-canvas rounded transition cursor-pointer">Edit</button><button wire:click="deleteAccount(' . $row->id . ')" wire:confirm="Are you sure you want to remove this connection and its encrypted credentials?" class="px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 rounded transition cursor-pointer">Remove</button></div>';
+            }, 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function regenerateVerifyToken(): void
     {
         $this->metaVerifyToken = Str::random(32);

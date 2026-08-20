@@ -247,216 +247,33 @@
                 </button>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-ink border-collapse">
-                    <thead>
-                        <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                            <th class="py-3 px-4">Form Name & ID</th>
-                            <th class="py-3 px-4">Meta Status</th>
-                            <th class="py-3 px-4">Assigned CRM Project</th>
-                            <th class="py-3 px-4">Assigned CRM Campaign</th>
-                            <th class="py-3 px-4">Mapping Status</th>
-                            <th class="py-3 px-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($availableForms as $form)
-                            @php
-                                $formId = $form['id'];
-                                $formName = $form['name'] ?? 'Lead Form ' . $formId;
-                                $isMapped = !empty($formProjectMap[$formId]);
-                            @endphp
-                            <tr class="hover:bg-canvas/50 transition">
-                                <td class="py-3 px-4">
-                                    <div class="font-bold text-ink">{{ $formName }}</div>
-                                    <div class="font-mono text-muted text-[10px] mt-0.5">ID: {{ $formId }}</div>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        {{ $form['status'] ?? 'ACTIVE' }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <select 
-                                        wire:model="formProjectMap.{{ $formId }}" 
-                                        class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"
-                                    >
-                                        <option value="">-- Select Project --</option>
-                                        @foreach($projects as $p)
-                                            <option value="{{ $p->id }}">{{ $p->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <select 
-                                        wire:model="formCampaignMap.{{ $formId }}" 
-                                        class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"
-                                    >
-                                        <option value="">-- Optional Campaign --</option>
-                                        @foreach($campaigns as $c)
-                                            <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td class="py-3 px-4">
-                                    @if($isMapped)
-                                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-                                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                                            <span>Mapped</span>
-                                        </span>
-                                    @else
-                                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1">
-                                            <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                            <span>Unmapped</span>
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="py-3 px-4 text-right">
-                                    <button 
-                                        wire:click="saveFormMapping('{{ $formId }}', '{{ addslashes($formName) }}')" 
-                                        class="px-3 py-1 bg-ink text-white font-semibold text-[11px] rounded-lg hover:bg-neutral-800 transition"
-                                    >
-                                        Save
-                                    </button>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="py-6 text-center text-muted">
-                                    No lead forms found on this Meta Page. Click "Refresh Lead Forms" to query Graph API.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            <x-ui.advanced-table 
+                :columns="$this->availableFormsTableColumns()"
+                :rows="$availableForms"
+                :showSearch="false"
+                :showFilterDropdown="false"
+                :showConfigurations="false"
+                emptyTitle="No Lead Forms Found"
+                emptyMessage="No lead forms found on this Meta Page. Click 'Refresh Lead Forms' to query Graph API."
+            />
         </div>
     @endif
 
     <!-- Configured Portal Accounts Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+    <div class="space-y-2">
         <div class="flex items-center justify-between">
             <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Configured Portal Accounts</h2>
             <span class="text-xs text-muted font-medium">{{ $accounts->total() }} Active Connections</span>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Account ID</th>
-                        <th class="py-3 px-4">Account Name</th>
-                        <th class="py-3 px-4">Source Type</th>
-                        <th class="py-3 px-4">Encryption Status</th>
-                        <th class="py-3 px-4">Health Status</th>
-                        <th class="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($accounts as $acc)
-                        @php
-                            $statusText = $connectionStatus[$acc->id] ?? ($acc->health_message ?: 'Untested');
-                            $isHealthy = str_starts_with($statusText, 'Connected');
-                            $isError = str_starts_with($statusText, 'Error:');
-                        @endphp
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $acc->id }}</td>
-                            <td class="py-3 px-4">
-                                <div class="font-bold text-ink">{{ $acc->name }}</div>
-                                @if($acc->type === 'meta' && $acc->getCredential('page_id'))
-                                    <div class="text-[10px] font-mono text-muted">Page ID: {{ $acc->getCredential('page_id') }}</div>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4">
-                                @if($acc->type === 'meta')
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                                        META ADS
-                                    </span>
-                                @elseif($acc->type === 'google')
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-red-50 text-red-700 border border-red-200">
-                                        GOOGLE ADS
-                                    </span>
-                                @else
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border">
-                                        {{ strtoupper($acc->type) }}
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4">
-                                <span class="text-emerald-700 font-semibold text-[11px] inline-flex items-center gap-1.5">
-                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                                    <span>Encrypted (AES-256)</span>
-                                </span>
-                            </td>
-                            <td class="py-3 px-4">
-                                @if($isHealthy)
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                        <span>{{ $statusText }}</span>
-                                    </span>
-                                @elseif($isError)
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1.5" title="{{ $statusText }}">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                        <span>{{ Str::limit($statusText, 35) }}</span>
-                                    </span>
-                                @else
-                                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-canvas text-muted border border-border inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>
-                                        <span>Untested</span>
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4 text-right">
-                                <div class="inline-flex items-center space-x-2">
-                                    <button 
-                                        wire:click="testConnection({{ $acc->id }})"
-                                        class="px-2 py-1 text-[11px] font-bold text-primary hover:bg-canvas rounded transition"
-                                        title="Test API connectivity"
-                                    >
-                                        Test
-                                    </button>
-
-                                    @if($acc->type === 'meta')
-                                        <button 
-                                            wire:click="fetchLeadForms({{ $acc->id }})"
-                                            class="px-2 py-1 text-[11px] font-bold text-ink hover:bg-canvas rounded transition"
-                                            title="Configure Lead Form mappings"
-                                        >
-                                            Map Forms
-                                        </button>
-                                    @endif
-
-                                    <button 
-                                        wire:click="editAccount({{ $acc->id }})"
-                                        class="px-2 py-1 text-[11px] font-medium text-muted hover:text-ink hover:bg-canvas rounded transition"
-                                    >
-                                        Edit
-                                    </button>
-
-                                    <button 
-                                        wire:click="deleteAccount({{ $acc->id }})"
-                                        wire:confirm="Are you sure you want to remove this connection and its encrypted credentials?"
-                                        class="px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 rounded transition"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="py-8 text-center text-muted">
-                                No portal account credentials configured. Add your first Meta Ads connection above.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $accounts->links('vendor.pagination.tailwind') }}
-        </div>
+        <x-ui.advanced-table 
+            :columns="$this->accountsTableColumns()"
+            :rows="$accounts"
+            :showSearch="false"
+            :showFilterDropdown="false"
+            :showConfigurations="false"
+            emptyTitle="No Portal Accounts"
+            emptyMessage="No integration portal accounts have been connected yet."
+        />
     </div>
 </div>

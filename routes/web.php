@@ -143,4 +143,10 @@ Route::middleware(['auth', 'role:Super Admin|super-admin|Account Manager|account
     Route::get('/leads', AccountManagerLeads::class)->name('leads');
 });
 
+// Theme Customization Offcanvas Routes
+Route::middleware(['auth'])->prefix('settings/theme')->name('settings.theme.')->group(function () {
+    Route::post('/', [\App\Http\Controllers\ThemeSettingsController::class, 'update'])->name('update');
+    Route::post('/reset', [\App\Http\Controllers\ThemeSettingsController::class, 'reset'])->name('reset');
+});
+
 require __DIR__.'/auth.php';

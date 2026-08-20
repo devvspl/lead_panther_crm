@@ -14,7 +14,32 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="md:col-span-1 bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col items-center justify-center">
             <h3 class="text-xs font-bold uppercase text-muted tracking-wider mb-2">SLA Distribution</h3>
-            <div class="w-48 h-48 relative">
+            <div 
+                x-data="{
+                    renderChart() {
+                        const b = @json($buckets) || { excellent: 0, acceptable: 0, breached: 0 };
+                        window.initSafeChart('slaDonutChart', {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Excellent', 'Acceptable', 'Breached'],
+                                datasets: [{
+                                    data: [b.excellent || 0, b.acceptable || 0, b.breached || 0],
+                                    backgroundColor: ['#16A34A', '#F59E0B', '#DC2626'],
+                                    borderWidth: 2,
+                                    borderColor: '#FFFFFF'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+                            }
+                        });
+                    }
+                }"
+                x-init="$nextTick(() => renderChart())"
+                class="w-48 h-48 relative"
+            >
                 <canvas id="slaDonutChart"></canvas>
             </div>
         </div>
@@ -38,73 +63,18 @@
         </div>
     </div>
 
-    <!-- Breached Leads Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+    <!-- Breached Leads Table Component -->
+    <div class="space-y-2">
         <h3 class="text-base font-bold text-ink">Breached & Delayed Lead Operations</h3>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Lead Code</th>
-                        <th class="py-3 px-4">Lead Name</th>
-                        <th class="py-3 px-4">Assigned To</th>
-                        <th class="py-3 px-4">Ingested At</th>
-                        <th class="py-3 px-4">Minutes Over Target</th>
-                        <th class="py-3 px-4">Current SLA Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($breachedLeads as $row)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-bold text-ink">{{ $row['lead_code'] }}</td>
-                            <td class="py-3 px-4 font-semibold">{{ $row['name'] }}</td>
-                            <td class="py-3 px-4 text-muted">{{ $row['assigned_name'] }}</td>
-                            <td class="py-3 px-4 text-muted">{{ $row['created_at'] }}</td>
-                            <td class="py-3 px-4 font-mono font-bold text-danger">+{{ $row['minutes_over'] }} mins</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill {{ $row['is_unresponded'] ? 'bg-red-100 text-red-800 animate-pulse' : 'bg-amber-50 text-amber-800' }}">
-                                    {{ $row['status_label'] }}
-                                </span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="py-8 text-center text-muted">No breached leads in queue! All response SLAs met.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
 
-        <div class="pt-2">
-            {{ $breachedLeads->links('vendor.pagination.tailwind') }}
-        </div>
+        <x-ui.advanced-table 
+            :columns="$this->tableColumns()"
+            :rows="$breachedLeads"
+            :showSearch="false"
+            :showFilterDropdown="false"
+            :showConfigurations="false"
+            emptyTitle="No Breached Leads"
+            emptyMessage="No breached leads in queue! All response SLAs met."
+        />
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('livewire:initialized', () => {
-            const ctx = document.getElementById('slaDonutChart')?.getContext('2d');
-            if (ctx) {
-                const b = @json($buckets);
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Excellent', 'Acceptable', 'Breached'],
-                        datasets: [{
-                            data: [b.excellent, b.acceptable, b.breached],
-                            backgroundColor: ['#16A34A', '#F59E0B', '#DC2626'],
-                            borderWidth: 2,
-                            borderColor: '#FFFFFF'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
-                    }
-                });
-            }
-        });
-    </script>
 </div>

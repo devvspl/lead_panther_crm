@@ -99,47 +99,20 @@
         @endif
     </div>
 
-    <!-- Team Members Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+    <!-- Team Members Table Component -->
+    <div class="space-y-2">
         <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Active Agency Sales Executives</h2>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Member ID</th>
-                        <th class="py-3 px-4">Name</th>
-                        <th class="py-3 px-4">Email</th>
-                        <th class="py-3 px-4">Role</th>
-                        <th class="py-3 px-4">Assigned Projects</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($members as $m)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 font-mono font-bold text-ink">#{{ $m->id }}</td>
-                            <td class="py-3 px-4 font-bold text-ink">{{ $m->name }}</td>
-                            <td class="py-3 px-4 font-mono text-muted">{{ $m->email }}</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-pill bg-blue-50 text-blue-700 border border-blue-200">
-                                    Sales Executive
-                                </span>
-                            </td>
-                            <td class="py-3 px-4 text-muted">
-                                {{ $projects->first()?->name ?? 'All Authorized Projects' }}
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="py-6 text-center text-muted">No sales team members registered yet.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pt-2">
-            {{ $members->links('vendor.pagination.tailwind') }}
-        </div>
+        <x-ui.advanced-table 
+            :columns="$this->tableColumns()"
+            :rows="$members"
+            :visibleColumns="$visibleColumns"
+            :sortField="$sortField"
+            :sortDirection="$sortDirection"
+            :showFilterDropdown="false"
+            searchPlaceholder="Search team members by name, email, ID..."
+            emptyTitle="No Sales Team Members Found"
+            emptyMessage="No sales team members registered yet."
+        />
     </div>
 </div>

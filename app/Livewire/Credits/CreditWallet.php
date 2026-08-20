@@ -3,16 +3,16 @@
 namespace App\Livewire\Credits;
 
 use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\CreditWallet as WalletModel;
 use App\Models\CreditTransaction;
 use App\Models\CreditPackage;
 use App\Models\RechargeRequest;
 use App\Models\Client;
+use App\Livewire\Concerns\HasAdvancedTable;
 
 class CreditWallet extends Component
 {
-    use WithPagination;
+    use HasAdvancedTable;
 
     public bool $showRechargeModal = false;
     public ?int $selectedPackageId = null;
@@ -21,6 +21,28 @@ class CreditWallet extends Component
     public string $filterDateRange = '';
     public ?string $customFrom = null;
     public ?string $customTo = null;
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'created_at', 'label' => 'Date & Time', 'type' => 'date', 'sortable' => true, 'priority' => 1],
+            ['key' => 'transaction_type', 'label' => 'Type', 'type' => 'badge', 'badgeMap' => [
+                'recharge' => 'bg-green-50 text-green-700 border border-green-200',
+                'reserve' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'refund' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                'deduct' => 'bg-blue-50 text-blue-700 border border-blue-200',
+            ], 'sortable' => true, 'priority' => 1],
+            ['key' => 'lead', 'label' => 'Associated Lead', 'render' => fn($row) => $row->lead ? '<a href="' . route('leads.index') . '" class="font-semibold font-mono text-ink hover:underline">' . e($row->lead->lead_code) . '</a>' : '<span class="text-muted">—</span>', 'sortable' => false, 'priority' => 1],
+            ['key' => 'credit_before', 'label' => 'Credit Before', 'formatter' => fn($v) => number_format((float)$v), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credit_used', 'label' => 'Used / Added', 'render' => function($row) {
+                $isPlus = $row->transaction_type === 'recharge' || $row->transaction_type === 'refund';
+                $sign = $isPlus ? '+' : '-';
+                $color = $isPlus ? 'text-success' : 'text-danger';
+                return '<span class="font-mono font-bold ' . $color . '">' . $sign . number_format((float)$row->credit_used) . '</span>';
+            }, 'sortable' => false, 'priority' => 1],
+            ['key' => 'credit_after', 'label' => 'Credit After', 'formatter' => fn($v) => number_format((float)$v), 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 2],
+        ];
+    }
 
     public function mount(): void
     {
@@ -79,6 +101,16 @@ class CreditWallet extends Component
 
         $txQuery = $client ? CreditTransaction::with(['lead', 'package'])->where('client_id', $client->id) : CreditTransaction::query()->whereRaw('1 = 0');
 
+        if (!empty($this->search)) {
+            $txQuery->where(function ($q) {
+                $q->where('transaction_type', 'like', "%{$this->search}%")
+                  ->orWhereHas('lead', function ($lq) {
+                      $lq->where('lead_code', 'like', "%{$this->search}%")
+                         ->orWhere('name', 'like', "%{$this->search}%");
+                  });
+            });
+        }
+
         if ($this->filterType) {
             $txQuery->where('transaction_type', $this->filterType);
         }
@@ -95,7 +127,10 @@ class CreditWallet extends Component
             }
         }
 
-        $transactions = $txQuery->latest('created_at')->paginate(10);
+        $sortField = in_array($this->sortField, ['created_at', 'transaction_type', 'id']) ? $this->sortField : 'created_at';
+        $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
+
+        $transactions = $txQuery->orderBy($sortField, $sortDir)->paginate($this->perPage);
         $packages = CreditPackage::all();
 
         $rechargeRequests = $client ? RechargeRequest::with('package')

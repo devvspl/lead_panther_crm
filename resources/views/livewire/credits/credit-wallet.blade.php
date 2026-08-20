@@ -106,76 +106,51 @@
         </div>
     @endif
 
-    <!-- Transaction History Table -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 class="text-base font-bold text-ink">Credit Transaction Log</h2>
-
-            <!-- Filters -->
-            <div class="flex items-center space-x-3">
-                <x-ui.themed-select 
-                    wire:model.live="filterType"
-                    :options="['' => 'All Transaction Types', 'reserve' => 'Reserve', 'deduct' => 'Deduct', 'refund' => 'Refund', 'recharge' => 'Recharge']"
-                    placeholder="All Transaction Types"
-                    searchable="true"
-                />
-
-                <x-ui.date-range-picker 
-                    wire:model.live="filterDateRange"
-                    wire:custom-from="customFrom"
-                    wire:custom-to="customTo"
-                    placeholder="All Time"
-                />
-
-                <x-ui.export-button target="exportExcel" />
-            </div>
+    <!-- Transactions Table Component -->
+    <div class="space-y-2">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Transaction Ledger</h2>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
-                <thead>
-                    <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas">
-                        <th class="py-3 px-4">Date & Time</th>
-                        <th class="py-3 px-4">Type</th>
-                        <th class="py-3 px-4">Associated Lead</th>
-                        <th class="py-3 px-4">Credit Before</th>
-                        <th class="py-3 px-4">Used / Added</th>
-                        <th class="py-3 px-4">Credit After</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @forelse($transactions as $tx)
-                        <tr class="hover:bg-canvas/50 transition">
-                            <td class="py-3 px-4 text-muted">{{ \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') }}</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill {{ $tx->transaction_type === 'recharge' ? 'bg-green-50 text-green-700' : ($tx->transaction_type === 'reserve' ? 'bg-amber-50 text-amber-700' : ($tx->transaction_type === 'refund' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700')) }}">
-                                    {{ ucfirst($tx->transaction_type) }}
-                                </span>
-                            </td>
-                            <td class="py-3 px-4">
-                                @if($tx->lead)
-                                    <a href="{{ route('leads.index') }}" class="font-semibold text-ink hover:underline">{{ $tx->lead->lead_code }}</a>
-                                @else
-                                    <span class="text-muted">—</span>
-                                @endif
-                            </td>
-                            <td class="py-3 px-4 font-mono">{{ number_format($tx->credit_before) }}</td>
-                            <td class="py-3 px-4 font-mono font-bold {{ $tx->transaction_type === 'recharge' || $tx->transaction_type === 'refund' ? 'text-success' : 'text-danger' }}">
-                                {{ $tx->transaction_type === 'recharge' || $tx->transaction_type === 'refund' ? '+' : '-' }}{{ number_format($tx->credit_used) }}
-                            </td>
-                            <td class="py-3 px-4 font-mono font-bold">{{ number_format($tx->credit_after) }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="py-8 text-center text-muted">No credit transactions found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <x-ui.advanced-table 
+            :columns="$this->tableColumns()"
+            :rows="$transactions"
+            :visibleColumns="$visibleColumns"
+            :sortField="$sortField"
+            :sortDirection="$sortDirection"
+            searchPlaceholder="Search lead code, transaction type..."
+            emptyTitle="No Credit Transactions Found"
+            emptyMessage="No credit transaction ledger records match your current filters."
+        >
+            <!-- Custom Filters Slot -->
+            <x-slot:filters>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[11px] font-bold text-ink block mb-1">Transaction Type</label>
+                        <x-ui.themed-select 
+                            wire:model.live="filterType"
+                            :options="['' => 'All Transaction Types', 'reserve' => 'Reserve', 'deduct' => 'Deduct', 'refund' => 'Refund', 'recharge' => 'Recharge']"
+                            placeholder="All Transaction Types"
+                            searchable="true"
+                        />
+                    </div>
 
-        <div class="pt-2">
-            {{ $transactions->links('vendor.pagination.tailwind') }}
-        </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-ink block mb-1">Date Range</label>
+                        <x-ui.date-range-picker 
+                            wire:model.live="filterDateRange"
+                            wire:custom-from="customFrom"
+                            wire:custom-to="customTo"
+                            placeholder="All Time"
+                        />
+                    </div>
+                </div>
+            </x-slot:filters>
+
+            <!-- Custom Action Slot -->
+            <x-slot:action>
+                <x-ui.export-button target="exportExcel" class="text-xs" />
+            </x-slot:action>
+        </x-ui.advanced-table>
     </div>
 </div>

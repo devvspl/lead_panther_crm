@@ -18,6 +18,18 @@ class SlaDashboard extends Component
 {
     use WithPagination;
 
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'lead_code', 'label' => 'Lead Code', 'class' => 'font-bold font-mono text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'name', 'label' => 'Lead Name', 'class' => 'font-semibold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'assigned_name', 'label' => 'Assigned To', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'created_at', 'label' => 'Ingested At', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
+            ['key' => 'minutes_over', 'label' => 'Minutes Over Target', 'prefix' => '+', 'suffix' => ' mins', 'class' => 'font-mono font-bold text-danger', 'sortable' => false, 'priority' => 1],
+            ['key' => 'status_label', 'label' => 'Current SLA Status', 'type' => 'badge', 'badgeStyle' => fn($val, $row) => (!empty($row['is_unresponded']) ? 'bg-red-100 text-red-800 animate-pulse border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'), 'sortable' => false, 'priority' => 1],
+        ];
+    }
+
     public function exportExcel()
     {
         $breached = collect($this->getBreachedLeadsData());

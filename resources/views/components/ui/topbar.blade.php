@@ -38,10 +38,27 @@
         @endif
     </div>
 
-    <!-- Right Section: Help, Notifications, and User Profile -->
-    <div class="flex items-center space-x-3 sm:space-x-4 flex-shrink-0">
+    <!-- Right Section: Theme Customizer, Help, Notifications, and User Profile -->
+    <div class="flex items-center space-x-2 sm:space-x-3.5 flex-shrink-0">
+        <!-- Theme Customization Button (Placed before Help Center) -->
+        <button 
+            type="button"
+            x-on:click="$dispatch('open-theme-customizer')"
+            class="p-2 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer flex items-center justify-center relative focus:outline-none"
+            title="Customize Theme"
+            aria-label="Customize Theme"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+            </svg>
+        </button>
+
         <!-- Help Center Link -->
-        <a href="#" class="text-xs font-medium text-muted hover:text-ink transition hidden md:flex items-center space-x-1.5 px-2 py-1.5 rounded-lg hover:bg-canvas">
+        <a href="#" class="text-xs font-medium text-muted hover:text-ink transition hidden md:flex items-center space-x-1.5 px-2 py-1.5 rounded-lg hover:bg-canvas" title="Help Center">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>Help Center</span>
         </a>
@@ -70,6 +87,20 @@
                 </div>
                 
                 <div class="py-1">
+                    <button 
+                        type="button" 
+                        x-on:click="$dispatch('open-theme-customizer')" 
+                        class="w-full flex items-center space-x-2 px-4 py-2 text-xs font-medium text-ink hover:bg-canvas transition text-left cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5 text-muted flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                        </svg>
+                        <span>Theme / Customize</span>
+                    </button>
                     <a href="{{ route('profile') }}" wire:navigate class="flex items-center px-4 py-2 text-xs font-medium text-ink hover:bg-canvas transition">
                         Profile Settings
                     </a>

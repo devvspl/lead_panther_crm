@@ -234,7 +234,7 @@
 
             <div class="flex justify-end pt-2">
                 <a href="{{ route('leads.kanban') }}" class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-black transition">
-                    View Leads in Kanban →
+                    View Leads
                 </a>
             </div>
         </div>

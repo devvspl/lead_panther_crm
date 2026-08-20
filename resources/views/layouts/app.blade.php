@@ -7,14 +7,66 @@
 
         <title>{{ config('app.name', 'Lead Panther CRM') }}</title>
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
+        <!-- Google Fonts for Theme Customization -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
-        <!-- Chart.js & Flatpickr -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        @php
+            $currentTheme = \App\Support\ThemeService::getUserTheme();
+        @endphp
+
+        <style id="theme-dynamic-styles">
+            :root {
+                --theme-primary: {{ $currentTheme['theme_primary_color'] }};
+                --theme-secondary: {{ $currentTheme['theme_secondary_color'] }};
+                --theme-accent: {{ $currentTheme['theme_accent_color'] }};
+                --theme-sidebar-bg: {{ $currentTheme['theme_sidebar_bg'] }};
+                --theme-sidebar-text: {{ $currentTheme['theme_sidebar_text'] }};
+                --theme-active-menu-color: {{ $currentTheme['theme_active_menu_color'] }};
+                --theme-active-menu-bg: {{ $currentTheme['theme_active_menu_bg'] }};
+                --theme-header-bg: {{ $currentTheme['theme_header_bg'] }};
+                --theme-header-text: {{ $currentTheme['theme_header_text'] }};
+                --theme-page-bg: {{ $currentTheme['theme_page_bg'] }};
+                --theme-card-bg: {{ $currentTheme['theme_card_bg'] }};
+                --theme-border-color: {{ $currentTheme['theme_border_color'] }};
+                --theme-font-family: {{ $currentTheme['theme_font_family'] }};
+                --theme-font-size: {{ $currentTheme['theme_font_size'] }};
+                --theme-border-radius: {{ $currentTheme['theme_border_radius'] }};
+            }
+
+            body {
+                background-color: var(--theme-page-bg) !important;
+                font-family: var(--theme-font-family) !important;
+                font-size: var(--theme-font-size) !important;
+            }
+
+            #sidebar-main {
+                background-color: var(--theme-sidebar-bg) !important;
+                border-color: var(--theme-border-color) !important;
+            }
+
+            #topbar-main {
+                background-color: var(--theme-header-bg) !important;
+                border-color: var(--theme-border-color) !important;
+            }
+
+            .rounded-card, .rounded-xl {
+                border-radius: var(--theme-border-radius) !important;
+            }
+        </style>
+
+        <script>
+            (function() {
+                const mode = '{{ $currentTheme['theme_mode'] ?? 'light' }}';
+                const isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            })();
+        </script>
 
         <style>
             [x-cloak] { display: none !important; }
@@ -35,6 +87,108 @@
             }
         </style>
 
+        <!-- Chart.js & Safe Chart Initialization Engine -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            window.__leadPantherCharts = window.__leadPantherCharts || new Map();
+
+            window.initSafeChart = function(canvasOrId, config, callback) {
+                if (typeof window.Chart === 'undefined') {
+                    setTimeout(() => window.initSafeChart(canvasOrId, config, callback), 50);
+                    return null;
+                }
+
+                const getCanvas = () => {
+                    if (typeof canvasOrId === 'string') {
+                        return document.getElementById(canvasOrId);
+                    }
+                    return canvasOrId;
+                };
+
+                const canvas = getCanvas();
+                if (!canvas) {
+                    return null;
+                }
+
+                if (!document.body.contains(canvas)) {
+                    return null;
+                }
+
+                // If canvas or its parent is currently hidden (e.g. in inactive tab or modal)
+                const isHidden = canvas.offsetParent === null && window.getComputedStyle(canvas).display === 'none';
+                if (isHidden) {
+                    if (window.IntersectionObserver) {
+                        const observer = new IntersectionObserver((entries, obs) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting && canvas.offsetParent !== null) {
+                                    obs.disconnect();
+                                    window.initSafeChart(canvas, config, callback);
+                                }
+                            });
+                        });
+                        observer.observe(canvas);
+                    }
+                    return null;
+                }
+
+                // Destroy any existing chart instance on this canvas
+                try {
+                    if (canvas.__chartInstance && typeof canvas.__chartInstance.destroy === 'function') {
+                        canvas.__chartInstance.destroy();
+                        canvas.__chartInstance = null;
+                    }
+                    if (typeof window.Chart.getChart === 'function') {
+                        const existing = window.Chart.getChart(canvas);
+                        if (existing && typeof existing.destroy === 'function') {
+                            existing.destroy();
+                        }
+                    }
+                } catch (e) {
+                    console.warn('SafeChart cleanup error:', e);
+                }
+
+                let ctx = null;
+                try {
+                    ctx = canvas.getContext('2d');
+                } catch (e) {
+                    console.warn('SafeChart 2D context error:', e);
+                    return null;
+                }
+
+                if (!ctx) {
+                    return null;
+                }
+
+                try {
+                    const chartInstance = new window.Chart(ctx, config);
+                    canvas.__chartInstance = chartInstance;
+                    if (typeof callback === 'function') {
+                        callback(chartInstance);
+                    }
+                    return chartInstance;
+                } catch (err) {
+                    console.error('SafeChart initialization error:', err);
+                    return null;
+                }
+            };
+
+            // Global navigation and unmount cleanup
+            document.addEventListener('livewire:navigating', () => {
+                document.querySelectorAll('canvas').forEach(c => {
+                    try {
+                        if (c.__chartInstance) {
+                            c.__chartInstance.destroy();
+                            c.__chartInstance = null;
+                        }
+                        if (window.Chart && typeof window.Chart.getChart === 'function') {
+                            const instance = window.Chart.getChart(c);
+                            if (instance) instance.destroy();
+                        }
+                    } catch (e) {}
+                });
+            });
+        </script>
+
         <!-- Scripts & Styles -->
         <x-ui.vite-assets />
         @livewireStyles
@@ -43,9 +197,15 @@
         x-data="{ 
             sidebarOpen: false,
             sidebarCollapsed: JSON.parse(localStorage.getItem('leadpanther_sidebar_collapsed') || 'false'),
+            sidebarActiveStyle: localStorage.getItem('leadpanther_sidebar_active_style') || 'highlighted',
             toggleSidebar() {
                 this.sidebarCollapsed = !this.sidebarCollapsed;
                 localStorage.setItem('leadpanther_sidebar_collapsed', JSON.stringify(this.sidebarCollapsed));
+            },
+            setSidebarActiveStyle(style) {
+                this.sidebarActiveStyle = style;
+                localStorage.setItem('leadpanther_sidebar_active_style', style);
+                window.dispatchEvent(new CustomEvent('sidebar-style-changed', { detail: style }));
             }
         }" 
         x-bind:class="{ 'overflow-hidden': sidebarOpen }"
@@ -95,6 +255,9 @@
 
         <!-- Global Toast Container -->
         <x-ui.toast />
+
+        <!-- Theme Settings Offcanvas Customizer -->
+        <x-ui.theme-customizer />
 
         @livewireScripts
     </body>

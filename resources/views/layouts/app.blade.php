@@ -76,7 +76,7 @@
                 'md:ml-16': sidebarCollapsed,
                 'md:ml-60': !sidebarCollapsed
             }"
-            class="min-h-screen flex flex-col flex-1 min-w-0 ml-0 overflow-x-hidden max-w-full transition-all duration-300 ease-in-out"
+            class="min-h-screen flex flex-col flex-1 min-w-0 ml-0 max-w-full transition-all duration-300 ease-in-out relative"
         >
             <!-- Topbar Component -->
             <x-ui.topbar />

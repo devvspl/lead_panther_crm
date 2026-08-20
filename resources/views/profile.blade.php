@@ -55,9 +55,18 @@
             </div>
 
             <!-- Far Right Action & Metadata Area -->
-            <div
-                class="flex items-center gap-3 flex-wrap md:flex-nowrap shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-border">
-                <livewire:profile.delete-user-form />
+            <div class="flex items-center gap-3 flex-wrap md:flex-nowrap shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-border">
+                <div class="px-3.5 py-1.5 rounded-lg bg-canvas border border-border flex flex-col hidden sm:flex">
+                    <span class="text-[10px] font-bold uppercase text-muted tracking-wider">Access Scope</span>
+                    <span class="text-xs font-semibold text-ink">{{ $roleName }}</span>
+                </div>
+                <div class="px-3.5 py-1.5 rounded-lg bg-canvas border border-border flex flex-col hidden sm:flex">
+                    <span class="text-[10px] font-bold uppercase text-muted tracking-wider">Organization</span>
+                    <span class="text-xs font-semibold text-ink truncate max-w-[130px]">{{ $orgName }}</span>
+                </div>
+                <div class="pl-1">
+                    <livewire:profile.delete-user-form />
+                </div>
             </div>
         </div>
 

@@ -23,7 +23,7 @@ class DevTools extends Component
 
     public function mount(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'testing'])) {
+        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
             abort(404);
         }
 
@@ -51,7 +51,7 @@ class DevTools extends Component
 
     public function reseedDatabase(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'testing'])) {
+        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
             abort(404);
         }
 
@@ -94,7 +94,7 @@ class DevTools extends Component
 
     public function clearAllData(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'testing'])) {
+        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
             abort(404);
         }
 

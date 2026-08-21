@@ -62,6 +62,8 @@ class GitSyncTest extends TestCase
             ->set('username', $user)
             ->set('accessToken', $token)
             ->set('defaultBranch', $branch)
+            ->set('committerName', 'Mock Deployer')
+            ->set('committerEmail', 'deployer@example.com')
             ->call('saveSettings')
             ->assertDispatched('toast');
 
@@ -71,6 +73,8 @@ class GitSyncTest extends TestCase
         $this->assertEquals($user, $account->getCredential('username'));
         $this->assertEquals($token, $account->getCredential('access_token'));
         $this->assertEquals($branch, $account->getCredential('default_branch'));
+        $this->assertEquals('Mock Deployer', $account->getCredential('committer_name'));
+        $this->assertEquals('deployer@example.com', $account->getCredential('committer_email'));
 
         // Verify stored in DB is encrypted
         $rawSecret = \DB::table('integration_credentials')

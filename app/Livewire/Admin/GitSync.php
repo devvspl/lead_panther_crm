@@ -16,6 +16,8 @@ class GitSync extends Component
     public string $username = '';
     public string $accessToken = '';
     public string $defaultBranch = 'main';
+    public string $committerName = '';
+    public string $committerEmail = '';
     public bool $hasStoredToken = false;
     public bool $isReplacingToken = false;
 
@@ -64,9 +66,11 @@ class GitSync extends Component
     public function loadSettingsAndStatus(GitSyncService $gitService): void
     {
         $creds = $gitService->getCredentials();
-        $this->remoteUrl = $creds['remote_url'] ?: '';
-        $this->username = $creds['username'] ?: '';
-        $this->defaultBranch = $creds['default_branch'] ?: 'main';
+        $this->remoteUrl = $creds['remote_url'] ?? '';
+        $this->username = $creds['username'] ?? '';
+        $this->defaultBranch = $creds['default_branch'] ?? 'main';
+        $this->committerName = $creds['committer_name'] ?? (auth()->user()?->name ?: 'Lead Panther Deployer');
+        $this->committerEmail = $creds['committer_email'] ?? (auth()->user()?->email ?: 'deploy@leadpanther.com');
         $this->selectedBranch = $this->defaultBranch;
         $this->hasStoredToken = !empty($creds['access_token']);
 
@@ -151,6 +155,8 @@ class GitSync extends Component
             'remoteUrl' => 'required|string|url|max:255',
             'username' => 'nullable|string|max:100',
             'defaultBranch' => 'required|string|max:100',
+            'committerName' => 'required|string|max:100',
+            'committerEmail' => 'required|email|max:150',
         ]);
 
         if (empty($this->accessToken) && !$this->hasStoredToken) {
@@ -163,7 +169,9 @@ class GitSync extends Component
                 remoteUrl: $this->remoteUrl,
                 username: $this->username,
                 token: !empty($this->accessToken) ? $this->accessToken : null,
-                defaultBranch: $this->defaultBranch
+                defaultBranch: $this->defaultBranch,
+                committerName: $this->committerName,
+                committerEmail: $this->committerEmail
             );
 
             $this->accessToken = '';
@@ -233,7 +241,8 @@ class GitSync extends Component
             if ($result['successful']) {
                 $this->dispatch('toast', type: 'success', title: 'Pull Completed', message: "Pulled latest commits for '{$this->selectedBranch}'.");
             } else {
-                $this->dispatch('toast', type: 'error', title: 'Pull Failed', message: $result['has_conflicts'] ? 'Merge conflict detected!' : ($result['stderr'] ?: 'Git pull encountered errors.'));
+                $msg = $result['friendly_error'] ?? ($result['has_conflicts'] ? 'Merge conflict detected! Please resolve conflicts before pulling.' : ($result['stderr'] ?: 'Git pull encountered errors.'));
+                $this->dispatch('toast', type: 'error', title: 'Pull Failed', message: $msg);
             }
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', title: 'Pull Error', message: $e->getMessage());
@@ -292,7 +301,8 @@ class GitSync extends Component
                 $this->secretScanResult = null;
                 $this->dispatch('toast', type: 'success', title: 'Push Succeeded', message: "Pushed changes to origin/{$this->selectedBranch}.");
             } else {
-                $this->dispatch('toast', type: 'error', title: 'Push Failed', message: $result['stderr'] ?: 'Error pushing to remote repository.');
+                $msg = $result['friendly_error'] ?? ($result['stderr'] ?: 'Error pushing to remote repository.');
+                $this->dispatch('toast', type: 'error', title: 'Push Failed', message: $msg);
             }
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', title: 'Push Error', message: $e->getMessage());

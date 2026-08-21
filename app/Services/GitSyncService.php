@@ -32,25 +32,40 @@ class GitSyncService
     }
 
     /**
-     * Get stored Git credentials decrypted.
+     * Get stored Git credentials decrypted without static hardcoded fallbacks.
      */
     public function getCredentials(): array
     {
         $account = $this->getGitAccount();
+        $user = auth()->user();
+
+        $gitConfigName = trim($this->runCommand(['git', 'config', 'user.name'])['stdout'] ?? '');
+        $gitConfigEmail = trim($this->runCommand(['git', 'config', 'user.email'])['stdout'] ?? '');
+
+        $committerName = $account->getCredential('committer_name') ?: ($gitConfigName ?: ($user?->name ?: ''));
+        $committerEmail = $account->getCredential('committer_email') ?: ($gitConfigEmail ?: ($user?->email ?: ''));
 
         return [
             'remote_url' => $account->getCredential('remote_url') ?: $this->detectRemoteUrl(),
             'username' => $account->getCredential('username') ?: '',
             'access_token' => $account->getCredential('access_token') ?: '',
             'default_branch' => $account->getCredential('default_branch') ?: $this->detectCurrentBranch(),
+            'committer_name' => $committerName,
+            'committer_email' => $committerEmail,
         ];
     }
 
     /**
      * Save Git credentials encrypted in integration_credentials.
      */
-    public function saveCredentials(string $remoteUrl, string $username, ?string $token, string $defaultBranch): void
-    {
+    public function saveCredentials(
+        string $remoteUrl,
+        string $username,
+        ?string $token,
+        string $defaultBranch,
+        ?string $committerName = null,
+        ?string $committerEmail = null
+    ): void {
         $account = $this->getGitAccount();
         $account->update(['status' => 'active', 'name' => 'Git Repository Integration']);
 
@@ -58,9 +73,56 @@ class GitSyncService
         $account->setCredential('username', trim($username));
         $account->setCredential('default_branch', trim($defaultBranch));
 
+        $name = trim($committerName ?? '');
+        $email = trim($committerEmail ?? '');
+
+        if (!empty($name)) {
+            $account->setCredential('committer_name', $name);
+            $this->runCommand(['git', 'config', 'user.name', $name]);
+        }
+
+        if (!empty($email)) {
+            $account->setCredential('committer_email', $email);
+            $this->runCommand(['git', 'config', 'user.email', $email]);
+        }
+
         if (!empty($token)) {
             $account->setCredential('access_token', trim($token));
         }
+    }
+
+    /**
+     * Translate cryptic Git errors into clear, actionable messages for the user.
+     */
+    public function translateGitError(string $rawError): string
+    {
+        $lower = strtolower($rawError);
+
+        if (str_contains($lower, 'invalid username or token') || str_contains($lower, 'password authentication is not supported') || str_contains($lower, 'authentication failed')) {
+            return 'GitHub Authentication Failed: The Personal Access Token is invalid, expired, or missing repository write permissions. Please generate a token with repo / Contents (write) scope and update it in Repository Connection.';
+        }
+
+        if (str_contains($lower, 'empty ident name') || str_contains($lower, 'author identity unknown') || str_contains($lower, 'tell me who you are')) {
+            return 'Git Author Identity Missing: Git requires an Author Name and Email to create commits. Please fill in your Author Name and Email in the Repository Connection tab.';
+        }
+
+        if (str_contains($lower, 'permission') && str_contains($lower, 'denied')) {
+            return 'Permission Denied: Your GitHub user or token does not have write access to push to this repository.';
+        }
+
+        if ((str_contains($lower, 'rejected') && str_contains($lower, 'fetch first')) || str_contains($lower, 'remote contains work') || str_contains($lower, 'non-fast-forward')) {
+            return 'Remote Repository Ahead: The remote branch has new commits that are not present locally. Please click "1. Pull Latest" to merge remote updates before pushing.';
+        }
+
+        if (str_contains($lower, 'conflict') || str_contains($lower, 'merge conflict')) {
+            return 'Merge Conflict Detected: There are conflicting changes between local files and the remote branch. Please resolve conflicts before continuing.';
+        }
+
+        if (str_contains($lower, 'could not resolve host')) {
+            return 'Network Error: Could not resolve git remote host. Please verify server internet connectivity and the Remote URL.';
+        }
+
+        return $rawError ?: 'Unknown Git error occurred. Check the console output below.';
     }
 
     /**
@@ -73,7 +135,7 @@ class GitSyncService
     }
 
     /**
-     * Detect current active branch.
+     * Detect current local git branch name.
      */
     public function detectCurrentBranch(): string
     {
@@ -125,10 +187,11 @@ class GitSyncService
         }
 
         $sanitizedError = $token ? str_replace($token, '[REDACTED_TOKEN]', $rawOutput) : $rawOutput;
+        $friendlyMessage = $this->translateGitError($sanitizedError);
 
         return [
             'successful' => false,
-            'message' => 'Failed to connect to Git remote: ' . $sanitizedError,
+            'message' => $friendlyMessage,
             'output' => $sanitizedError,
         ];
     }
@@ -289,12 +352,24 @@ class GitSyncService
     public function pull(string $branch, ?int $userId = null): array
     {
         $creds = $this->getCredentials();
-        $authUrl = $this->buildAuthenticatedUrl($creds['remote_url'], $creds['username'], $creds['access_token']);
 
+        if (empty($creds['remote_url']) || empty($creds['access_token'])) {
+            return [
+                'successful' => false,
+                'commit_before' => 'unknown',
+                'commit_after' => 'unknown',
+                'stdout' => '',
+                'stderr' => 'Git repository is not configured. Please enter your Remote URL and Personal Access Token in the Repository Connection tab.',
+                'friendly_error' => 'Git repository is not configured. Please enter your Remote URL and Personal Access Token in the Repository Connection tab.',
+                'has_conflicts' => false,
+            ];
+        }
+
+        $authUrl = $this->buildAuthenticatedUrl($creds['remote_url'], $creds['username'], $creds['access_token']);
         $commitBefore = trim($this->runCommand(['git', 'rev-parse', 'HEAD'])['stdout'] ?? 'unknown');
 
         // Fetch first
-        $this->runCommand(['git', 'fetch', $authUrl, $branch], timeout: 90);
+        $fetchRes = $this->runCommand(['git', 'fetch', $authUrl, $branch], timeout: 90);
 
         // Pull with merge
         $pullRes = $this->runCommand(['git', 'pull', $authUrl, $branch], timeout: 120);
@@ -305,6 +380,9 @@ class GitSyncService
         $token = $creds['access_token'];
         $stdout = $token ? str_replace($token, '[REDACTED_TOKEN]', $pullRes['stdout']) : $pullRes['stdout'];
         $stderr = $token ? str_replace($token, '[REDACTED_TOKEN]', $pullRes['stderr']) : $pullRes['stderr'];
+
+        $hasConflicts = str_contains(strtolower($stdout . $stderr), 'conflict') || str_contains(strtolower($stdout . $stderr), 'merge conflict');
+        $friendlyError = !$pullRes['successful'] ? $this->translateGitError($stderr ?: $stdout) : null;
 
         // Write to audit log
         $this->logAudit(
@@ -329,7 +407,8 @@ class GitSyncService
             'commit_after' => $commitAfter,
             'stdout' => $stdout,
             'stderr' => $stderr,
-            'has_conflicts' => str_contains(strtolower($stdout . $stderr), 'conflict') || str_contains(strtolower($stdout . $stderr), 'merge conflict'),
+            'friendly_error' => $friendlyError,
+            'has_conflicts' => $hasConflicts,
         ];
     }
 
@@ -339,15 +418,50 @@ class GitSyncService
     public function push(string $branch, string $commitMessage, ?int $userId = null): array
     {
         $creds = $this->getCredentials();
-        $authUrl = $this->buildAuthenticatedUrl($creds['remote_url'], $creds['username'], $creds['access_token']);
 
+        if (empty($creds['remote_url']) || empty($creds['access_token'])) {
+            return [
+                'successful' => false,
+                'commit_before' => 'unknown',
+                'commit_after' => 'unknown',
+                'stdout' => '',
+                'stderr' => 'Git repository is not configured. Please enter your Remote URL and Personal Access Token in the Repository Connection tab before pushing.',
+                'friendly_error' => 'Git repository is not configured. Please enter your Remote URL and Personal Access Token in the Repository Connection tab before pushing.',
+            ];
+        }
+
+        $authorName = trim($creds['committer_name'] ?? '');
+        $authorEmail = trim($creds['committer_email'] ?? '');
+
+        if (empty($authorName) || empty($authorEmail)) {
+            return [
+                'successful' => false,
+                'commit_before' => 'unknown',
+                'commit_after' => 'unknown',
+                'stdout' => '',
+                'stderr' => 'Git Author Name or Email is not configured. Please set your Author Name and Email in the Repository Connection tab before committing changes.',
+                'friendly_error' => 'Git Author Name or Email is not configured. Please set your Author Name and Email in the Repository Connection tab before committing changes.',
+            ];
+        }
+
+        // Ensure Git committer identity is configured locally
+        $this->runCommand(['git', 'config', 'user.name', $authorName]);
+        $this->runCommand(['git', 'config', 'user.email', $authorEmail]);
+
+        $authUrl = $this->buildAuthenticatedUrl($creds['remote_url'], $creds['username'], $creds['access_token']);
         $commitBefore = trim($this->runCommand(['git', 'rev-parse', 'HEAD'])['stdout'] ?? 'unknown');
 
         // 1. Stage all modifications
         $this->runCommand(['git', 'add', '-A']);
 
-        // 2. Commit
-        $commitRes = $this->runCommand(['git', 'commit', '-m', $commitMessage]);
+        // 2. Commit with explicit author configuration flags
+        $commitRes = $this->runCommand([
+            'git',
+            '-c', 'user.name=' . $authorName,
+            '-c', 'user.email=' . $authorEmail,
+            'commit',
+            '-m', $commitMessage
+        ]);
 
         // 3. Push to remote branch
         $pushRes = $this->runCommand(['git', 'push', $authUrl, 'HEAD:' . $branch], timeout: 120);
@@ -357,6 +471,15 @@ class GitSyncService
         $token = $creds['access_token'];
         $stdout = $token ? str_replace($token, '[REDACTED_TOKEN]', $commitRes['stdout'] . "\n" . $pushRes['stdout']) : ($commitRes['stdout'] . "\n" . $pushRes['stdout']);
         $stderr = $token ? str_replace($token, '[REDACTED_TOKEN]', $commitRes['stderr'] . "\n" . $pushRes['stderr']) : ($commitRes['stderr'] . "\n" . $pushRes['stderr']);
+
+        $isSuccessful = $pushRes['successful'];
+        if (!$commitRes['successful'] && str_contains(strtolower($commitRes['stdout'] . $commitRes['stderr']), 'nothing to commit')) {
+            $isSuccessful = $pushRes['successful'];
+        } elseif (!$commitRes['successful']) {
+            $isSuccessful = false;
+        }
+
+        $friendlyError = !$isSuccessful ? $this->translateGitError($stderr ?: $stdout) : null;
 
         // Write to audit log
         $this->logAudit(
@@ -370,18 +493,19 @@ class GitSyncService
             toValue: [
                 'branch' => $branch,
                 'commit_after' => $commitAfter,
-                'successful' => $pushRes['successful'],
+                'successful' => $isSuccessful,
                 'stdout' => $stdout,
                 'stderr' => $stderr,
             ]
         );
 
         return [
-            'successful' => $pushRes['successful'],
+            'successful' => $isSuccessful,
             'commit_before' => $commitBefore,
             'commit_after' => $commitAfter,
             'stdout' => $stdout,
             'stderr' => $stderr,
+            'friendly_error' => $friendlyError,
         ];
     }
 
@@ -534,9 +658,18 @@ class GitSyncService
             ];
         }
 
+        $authorName = $creds['committer_name'] ?: 'Lead Panther Deployer';
+        $authorEmail = $creds['committer_email'] ?: 'deploy@leadpanther.com';
+
         $shortTarget = substr($targetCommitSha, 0, 7);
         $commitMsg = "Revert to {$shortTarget}: Safe revert via Git Sync";
-        $commitRes = $this->runCommand(['git', 'commit', '-m', $commitMsg]);
+        $commitRes = $this->runCommand([
+            'git',
+            '-c', 'user.name=' . $authorName,
+            '-c', 'user.email=' . $authorEmail,
+            'commit',
+            '-m', $commitMsg
+        ]);
 
         // Push new revert commit to remote
         $pushRes = $this->runCommand(['git', 'push', $authUrl, 'HEAD:' . $branch], timeout: 120);

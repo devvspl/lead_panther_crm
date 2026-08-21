@@ -38,7 +38,7 @@
                             <x-ui.badge :status="$event['status']" />
                         </div>
                     @endforeach
-                </div>
+                </div>  
             </x-ui.card>
         </div>
     </div>

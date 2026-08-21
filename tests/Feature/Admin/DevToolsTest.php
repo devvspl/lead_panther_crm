@@ -82,7 +82,7 @@ class DevToolsTest extends TestCase
         $this->assertTrue(Organization::count() > 0);
     }
 
-    public function test_dev_tools_returns_404_in_production_environment(): void
+    public function test_dev_tools_is_accessible_in_production_environment_for_super_admin(): void
     {
         $admin = User::factory()->create(['email' => 'admin@leadpanther.com']);
         $admin->assignRole('super-admin');
@@ -94,6 +94,15 @@ class DevToolsTest extends TestCase
         // Restore environment to testing
         config(['app.env' => 'testing']);
 
-        $response->assertNotFound();
+        $response->assertOk();
+    }
+
+    public function test_dev_tools_returns_403_for_non_super_admin(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('client');
+
+        $response = $this->actingAs($user)->get('/admin/dev-tools');
+        $response->assertForbidden();
     }
 }

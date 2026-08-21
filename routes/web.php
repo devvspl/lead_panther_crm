@@ -118,10 +118,7 @@ Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->na
     Route::get('/users/{user}/impersonate', [ImpersonationController::class, 'start'])->name('users.impersonate');
     Route::get('/notification-templates', \App\Livewire\Admin\NotificationTemplates::class)->name('notification-templates');
     Route::get('/git-sync', \App\Livewire\Admin\GitSync::class)->name('git-sync');
-
-    if (app()->environment(['local', 'staging', 'development'])) {
-        Route::get('/dev-tools', \App\Livewire\Admin\DevTools::class)->name('dev-tools');
-    }
+    Route::get('/dev-tools', \App\Livewire\Admin\DevTools::class)->name('dev-tools');
 });
 
 Route::middleware(['auth', 'role:Super Admin|super-admin|Builder|builder'])->prefix('builder')->name('builder.')->group(function () {

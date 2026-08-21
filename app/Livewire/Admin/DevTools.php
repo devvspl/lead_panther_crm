@@ -23,10 +23,6 @@ class DevTools extends Component
 
     public function mount(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
-            abort(404);
-        }
-
         $user = auth()->user();
         if (!$user || (!$user->hasRole('Super Admin') && !$user->hasRole('super-admin'))) {
             abort(403);
@@ -51,10 +47,6 @@ class DevTools extends Component
 
     public function reseedDatabase(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
-            abort(404);
-        }
-
         $this->isSeeding = true;
 
         try {
@@ -94,10 +86,6 @@ class DevTools extends Component
 
     public function clearAllData(): void
     {
-        if (!in_array(config('app.env'), ['local', 'staging', 'development'])) {
-            abort(404);
-        }
-
         if (trim($this->confirmPhrase) !== 'DELETE ALL DATA') {
             $this->dispatch('toast', type: 'error', message: 'Exact confirmation phrase "DELETE ALL DATA" required.');
             return;

@@ -1,8 +1,159 @@
 <!-- Lead Panther Global Confirmation Modal Component -->
+<script>
+    window.leadPantherConfirmModal = function () {
+        return {
+            open: false,
+            loading: false,
+            title: 'Are you sure?',
+            message: 'Please confirm that you want to perform this action.',
+            confirmText: 'Confirm',
+            cancelText: 'Cancel',
+            variant: 'primary',
+            icon: null,
+            onConfirm: null,
+            onCancel: null,
+            livewireTarget: null,
+            livewireMethod: null,
+            livewireParams: [],
+            eventOnConfirm: null,
+            eventParams: null,
+            previousActiveElement: null,
+
+            init: function () {
+                const self = this;
+                window.addEventListener('confirm-action', function (e) {
+                    self.showModal(e.detail || {});
+                });
+                window.addEventListener('open-confirmation-modal', function (e) {
+                    self.showModal(e.detail || {});
+                });
+            },
+
+            showModal: function (options) {
+                this.previousActiveElement = document.activeElement;
+                this.title = options.title || 'Are you sure?';
+                this.message = options.message || 'Please confirm that you want to perform this action.';
+                this.confirmText = options.confirmText || 'Confirm';
+                this.cancelText = options.cancelText || 'Cancel';
+                this.variant = options.variant || 'primary';
+                this.icon = options.icon || null;
+                this.onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+                this.onCancel = typeof options.onCancel === 'function' ? options.onCancel : null;
+                this.livewireTarget = options.livewireTarget || null;
+                this.livewireMethod = options.livewireMethod || null;
+                this.livewireParams = options.livewireParams || [];
+                this.eventOnConfirm = options.eventOnConfirm || null;
+                this.eventParams = options.eventParams || null;
+                this.loading = false;
+                this.open = true;
+
+                document.body.classList.add('overflow-hidden');
+
+                const self = this;
+                this.$nextTick(function () {
+                    if (self.$refs.confirmBtn) {
+                        self.$refs.confirmBtn.focus();
+                    }
+                });
+            },
+
+            closeModal: function () {
+                if (this.loading) return;
+                this.open = false;
+                this.loading = false;
+                document.body.classList.remove('overflow-hidden');
+                if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+                    this.previousActiveElement.focus();
+                }
+            },
+
+            handleCancel: function () {
+                if (this.loading) return;
+                if (this.onCancel) {
+                    try { this.onCancel(); } catch (err) { console.error(err); }
+                }
+                this.closeModal();
+            },
+
+            handleConfirm: async function () {
+                if (this.loading) return;
+                this.loading = true;
+
+                try {
+                    // 1. JavaScript Callback
+                    if (this.onConfirm) {
+                        const result = this.onConfirm();
+                        if (result instanceof Promise) {
+                            await result;
+                        }
+                    }
+
+                    // 2. Livewire Target Method
+                    if (this.livewireMethod) {
+                        let target = window.Livewire;
+                        if (this.livewireTarget && window.Livewire && typeof window.Livewire.find === 'function') {
+                            const specificComponent = window.Livewire.find(this.livewireTarget);
+                            if (specificComponent) {
+                                target = specificComponent;
+                            }
+                        }
+                        if (target && typeof target.call === 'function') {
+                            const params = Array.isArray(this.livewireParams) ? this.livewireParams : [this.livewireParams];
+                            await target.call(this.livewireMethod, ...params);
+                        }
+                    }
+
+                    // 3. Custom Event Dispatch
+                    if (this.eventOnConfirm) {
+                        window.dispatchEvent(new CustomEvent(this.eventOnConfirm, { detail: this.eventParams }));
+                    }
+
+                    this.loading = false;
+                    this.open = false;
+                    document.body.classList.remove('overflow-hidden');
+                    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+                        this.previousActiveElement.focus();
+                    }
+                } catch (error) {
+                    this.loading = false;
+                    console.error('Confirmation action error:', error);
+                    window.dispatchEvent(new CustomEvent('toast-alert', {
+                        detail: { type: 'error', message: (error && error.message) ? error.message : 'An error occurred during action execution.' }
+                    }));
+                }
+            }
+        };
+    };
+
+    if (window.Alpine) {
+        window.Alpine.data('leadPantherConfirmModal', window.leadPantherConfirmModal);
+    } else {
+        document.addEventListener('alpine:init', function () {
+            Alpine.data('leadPantherConfirmModal', window.leadPantherConfirmModal);
+        });
+    }
+
+    // Global promise-based helper
+    window.$confirm = function (options) {
+        if (typeof options === 'string') {
+            options = { message: options };
+        }
+        return new Promise(function (resolve) {
+            window.dispatchEvent(new CustomEvent('confirm-action', {
+                detail: Object.assign({}, options, {
+                    onConfirm: function () { resolve(true); },
+                    onCancel: function () { resolve(false); }
+                })
+            }));
+        });
+    };
+</script>
+
 <div x-data="leadPantherConfirmModal()" x-init="init()" x-cloak x-show="open"
     x-on:keydown.escape.window="handleCancel()" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title"
     aria-describedby="confirm-modal-desc"
-    class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+    style="display: none;">
     <!-- Smooth Backdrop with Blur -->
     <div x-show="open" x-transition:enter="transition-opacity ease-out duration-200"
         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
@@ -113,147 +264,3 @@
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener('alpine:init', function () {
-        Alpine.data('leadPantherConfirmModal', function () {
-            return {
-                open: false,
-                loading: false,
-                title: 'Are you sure?',
-                message: 'Please confirm that you want to perform this action.',
-                confirmText: 'Confirm',
-                cancelText: 'Cancel',
-                variant: 'primary',
-                icon: null,
-                onConfirm: null,
-                onCancel: null,
-                livewireTarget: null,
-                livewireMethod: null,
-                livewireParams: [],
-                eventOnConfirm: null,
-                eventParams: null,
-                previousActiveElement: null,
-
-                init: function () {
-                    const self = this;
-                    window.addEventListener('confirm-action', function (e) {
-                        self.showModal(e.detail || {});
-                    });
-                    window.addEventListener('open-confirmation-modal', function (e) {
-                        self.showModal(e.detail || {});
-                    });
-                },
-
-                showModal: function (options) {
-                    this.previousActiveElement = document.activeElement;
-                    this.title = options.title || 'Are you sure?';
-                    this.message = options.message || 'Please confirm that you want to perform this action.';
-                    this.confirmText = options.confirmText || 'Confirm';
-                    this.cancelText = options.cancelText || 'Cancel';
-                    this.variant = options.variant || 'primary';
-                    this.icon = options.icon || null;
-                    this.onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null;
-                    this.onCancel = typeof options.onCancel === 'function' ? options.onCancel : null;
-                    this.livewireTarget = options.livewireTarget || null;
-                    this.livewireMethod = options.livewireMethod || null;
-                    this.livewireParams = options.livewireParams || [];
-                    this.eventOnConfirm = options.eventOnConfirm || null;
-                    this.eventParams = options.eventParams || null;
-                    this.loading = false;
-                    this.open = true;
-
-                    document.body.classList.add('overflow-hidden');
-
-                    const self = this;
-                    this.$nextTick(function () {
-                        if (self.$refs.confirmBtn) {
-                            self.$refs.confirmBtn.focus();
-                        }
-                    });
-                },
-
-                closeModal: function () {
-                    if (this.loading) return;
-                    this.open = false;
-                    this.loading = false;
-                    document.body.classList.remove('overflow-hidden');
-                    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
-                        this.previousActiveElement.focus();
-                    }
-                },
-
-                handleCancel: function () {
-                    if (this.loading) return;
-                    if (this.onCancel) {
-                        try { this.onCancel(); } catch (err) { console.error(err); }
-                    }
-                    this.closeModal();
-                },
-
-                handleConfirm: async function () {
-                    if (this.loading) return;
-                    this.loading = true;
-
-                    try {
-                        // 1. JavaScript Callback
-                        if (this.onConfirm) {
-                            const result = this.onConfirm();
-                            if (result instanceof Promise) {
-                                await result;
-                            }
-                        }
-
-                        // 2. Livewire Target Method
-                        if (this.livewireMethod) {
-                            let target = window.Livewire;
-                            if (this.livewireTarget && window.Livewire && typeof window.Livewire.find === 'function') {
-                                const specificComponent = window.Livewire.find(this.livewireTarget);
-                                if (specificComponent) {
-                                    target = specificComponent;
-                                }
-                            }
-                            if (target && typeof target.call === 'function') {
-                                const params = Array.isArray(this.livewireParams) ? this.livewireParams : [this.livewireParams];
-                                await target.call(this.livewireMethod, ...params);
-                            }
-                        }
-
-                        // 3. Custom Event Dispatch
-                        if (this.eventOnConfirm) {
-                            window.dispatchEvent(new CustomEvent(this.eventOnConfirm, { detail: this.eventParams }));
-                        }
-
-                        this.loading = false;
-                        this.open = false;
-                        document.body.classList.remove('overflow-hidden');
-                        if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
-                            this.previousActiveElement.focus();
-                        }
-                    } catch (error) {
-                        this.loading = false;
-                        console.error('Confirmation action error:', error);
-                        window.dispatchEvent(new CustomEvent('toast-alert', {
-                            detail: { type: 'error', message: (error && error.message) ? error.message : 'An error occurred during action execution.' }
-                        }));
-                    }
-                }
-            };
-        });
-    });
-
-    // Global promise-based helper
-    window.$confirm = function (options) {
-        if (typeof options === 'string') {
-            options = { message: options };
-        }
-        return new Promise(function (resolve) {
-            window.dispatchEvent(new CustomEvent('confirm-action', {
-                detail: Object.assign({}, options, {
-                    onConfirm: function () { resolve(true); },
-                    onCancel: function () { resolve(false); }
-                })
-            }));
-        });
-    };
-</script>

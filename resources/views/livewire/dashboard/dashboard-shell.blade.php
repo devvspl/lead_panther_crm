@@ -18,7 +18,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Revenue & Lead Volume Line Chart (2 Cols) -->
         <div class="lg:col-span-2">
-            <x-ui.card title="Lead Volume &amp; Revenue Velocity (6 Months)">
+            <x-ui.card title="Lead Volume & Revenue Velocity (6 Months)">
                 <div class="relative h-72 w-full">
                     <canvas id="dashboardRevenueChart"></canvas>
                 </div>

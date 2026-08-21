@@ -103,17 +103,24 @@
 
     <!-- Active Job Notification Bar -->
     @if($isSyncRunning)
-        <div class="p-4 rounded-card border border-blue-200 bg-blue-50 text-blue-900 flex items-center justify-between shadow-xs">
+        <div class="p-4 rounded-card border border-blue-200 bg-blue-50 text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div class="flex items-center space-x-3 text-xs">
-                <svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-5 w-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 <div>
                     <div class="font-bold text-sm">Git Operation in Progress...</div>
-                    <p class="text-blue-700 text-xs">Executing background process on branch <span class="font-mono font-bold">{{ $selectedBranch }}</span>. Output will refresh automatically.</p>
+                    <p class="text-blue-700 text-xs">Executing process on branch <span class="font-mono font-bold">{{ $selectedBranch }}</span>. Output will refresh automatically.</p>
                 </div>
             </div>
+            <button 
+                type="button" 
+                wire:click="cancelSync" 
+                class="px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-blue-800 text-xs font-semibold hover:bg-blue-100 transition shrink-0 cursor-pointer shadow-2xs"
+            >
+                Dismiss / Reset Status
+            </button>
         </div>
     @endif
 

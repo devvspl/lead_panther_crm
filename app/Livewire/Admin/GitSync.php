@@ -89,7 +89,19 @@ class GitSync extends Component
             $runningKey = 'git_sync_running_' . $userId;
             $resultKey = 'git_sync_result_' . $userId;
 
-            $this->isSyncRunning = Cache::has($runningKey);
+            if (Cache::has($runningKey)) {
+                $runningData = Cache::get($runningKey);
+                $startedAt = is_array($runningData) ? ($runningData['started_at'] ?? 0) : 0;
+                if ($startedAt > 0 && (time() - $startedAt > 60)) {
+                    Cache::forget($runningKey);
+                    $this->isSyncRunning = false;
+                } else {
+                    $this->isSyncRunning = true;
+                }
+            } else {
+                $this->isSyncRunning = false;
+            }
+
             if (Cache::has($resultKey)) {
                 $this->lastJobResult = Cache::get($resultKey);
             }
@@ -104,35 +116,65 @@ class GitSync extends Component
                 'ahead_count' => 0,
                 'behind_count' => 0,
                 'recent_commits' => [],
+                'working_directory_clean' => true,
+                'upstream_configured' => false,
             ];
+            $this->isSyncRunning = false;
             $this->commitHistory = [];
             $this->backupBranches = [];
         }
     }
 
+    public function cancelSync(GitSyncService $gitService): void
+    {
+        $userId = auth()->id() ?? 0;
+        Cache::forget('git_sync_running_' . $userId);
+        $this->isSyncRunning = false;
+        $this->refreshStatus($gitService);
+        $this->dispatch('toast', type: 'info', message: 'Git operation lock dismissed.');
+    }
+
+    public function selectBranch(string $branch, GitSyncService $gitService): void
+    {
+        $this->selectedBranch = $branch;
+        $this->refreshStatus($gitService);
+    }
+
+    public function setActiveTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
+
     public function saveSettings(GitSyncService $gitService): void
     {
         $this->validate([
-            'remoteUrl' => 'required|url',
+            'remoteUrl' => 'required|string|url|max:255',
             'username' => 'nullable|string|max:100',
-            'accessToken' => $this->hasStoredToken && !$this->isReplacingToken ? 'nullable' : 'required|string',
-            'defaultBranch' => 'required|string|max:50',
+            'defaultBranch' => 'required|string|max:100',
         ]);
 
-        $gitService->saveCredentials(
-            remoteUrl: $this->remoteUrl,
-            username: $this->username,
-            token: $this->accessToken ?: null,
-            defaultBranch: $this->defaultBranch
-        );
+        if (empty($this->accessToken) && !$this->hasStoredToken) {
+            $this->addError('accessToken', 'Access Token is required to authenticate with remote Git repository.');
+            return;
+        }
 
-        $this->hasStoredToken = true;
-        $this->isReplacingToken = false;
-        $this->accessToken = '';
-        $this->selectedBranch = $this->defaultBranch;
+        try {
+            $gitService->saveCredentials(
+                remoteUrl: $this->remoteUrl,
+                username: $this->username,
+                token: !empty($this->accessToken) ? $this->accessToken : null,
+                defaultBranch: $this->defaultBranch
+            );
 
-        $this->dispatch('toast', type: 'success', message: 'Git repository settings saved encrypted.');
-        $this->refreshStatus($gitService);
+            $this->accessToken = '';
+            $this->isReplacingToken = false;
+            $this->hasStoredToken = true;
+
+            $this->dispatch('toast', type: 'success', message: 'Git deployment settings and credentials saved securely.');
+            $this->refreshStatus($gitService);
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Failed to save Git credentials: ' . $e->getMessage());
+        }
     }
 
     public function testConnection(GitSyncService $gitService): void
@@ -141,11 +183,11 @@ class GitSync extends Component
         $this->connectionTestResult = null;
 
         $creds = $gitService->getCredentials();
-        $token = $this->accessToken ?: $creds['access_token'];
-        $username = $this->username ?: $creds['username'];
         $url = $this->remoteUrl ?: $creds['remote_url'];
+        $username = $this->username ?: $creds['username'];
+        $token = !empty($this->accessToken) ? $this->accessToken : $creds['access_token'];
 
-        if (empty($token) || empty($url)) {
+        if (empty($url) || empty($token)) {
             $this->connectionTestResult = [
                 'successful' => false,
                 'message' => 'Please provide both Remote URL and Access Token.',
@@ -176,28 +218,29 @@ class GitSync extends Component
             'action' => 'pull',
             'branch' => $this->selectedBranch,
             'started_at' => time(),
-        ], now()->addMinutes(15));
+        ], now()->addMinutes(2));
 
-        // If queue driver is sync, execute directly
-        if (config('queue.default') === 'sync') {
+        @set_time_limit(180);
+
+        try {
             $result = $gitService->pull($this->selectedBranch, $userId);
             Cache::put('git_sync_result_' . $userId, array_merge($result, [
                 'action' => 'pull',
                 'completed_at' => time(),
             ]), now()->addHours(1));
-            Cache::forget('git_sync_running_' . $userId);
-            $this->isSyncRunning = false;
             $this->lastJobResult = $result;
 
             if ($result['successful']) {
                 $this->dispatch('toast', type: 'success', title: 'Pull Completed', message: "Pulled latest commits for '{$this->selectedBranch}'.");
             } else {
-                $this->dispatch('toast', type: 'error', title: 'Pull Failed', message: $result['has_conflicts'] ? 'Merge conflict detected!' : 'Git pull encountered errors.');
+                $this->dispatch('toast', type: 'error', title: 'Pull Failed', message: $result['has_conflicts'] ? 'Merge conflict detected!' : ($result['stderr'] ?: 'Git pull encountered errors.'));
             }
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', title: 'Pull Error', message: $e->getMessage());
+        } finally {
+            Cache::forget('git_sync_running_' . $userId);
+            $this->isSyncRunning = false;
             $this->refreshStatus($gitService);
-        } else {
-            RunGitSyncJob::dispatch('pull', $this->selectedBranch, null, null, $userId);
-            $this->dispatch('toast', type: 'info', message: "Pull job queued for branch '{$this->selectedBranch}'.");
         }
     }
 
@@ -230,16 +273,16 @@ class GitSync extends Component
             'action' => 'push',
             'branch' => $this->selectedBranch,
             'started_at' => time(),
-        ], now()->addMinutes(15));
+        ], now()->addMinutes(2));
 
-        if (config('queue.default') === 'sync') {
+        @set_time_limit(180);
+
+        try {
             $result = $gitService->push($this->selectedBranch, $this->commitMessage, $userId);
             Cache::put('git_sync_result_' . $userId, array_merge($result, [
                 'action' => 'push',
                 'completed_at' => time(),
             ]), now()->addHours(1));
-            Cache::forget('git_sync_running_' . $userId);
-            $this->isSyncRunning = false;
             $this->lastJobResult = $result;
 
             if ($result['successful']) {
@@ -249,12 +292,14 @@ class GitSync extends Component
                 $this->secretScanResult = null;
                 $this->dispatch('toast', type: 'success', title: 'Push Succeeded', message: "Pushed changes to origin/{$this->selectedBranch}.");
             } else {
-                $this->dispatch('toast', type: 'error', title: 'Push Failed', message: 'Error pushing to remote repository.');
+                $this->dispatch('toast', type: 'error', title: 'Push Failed', message: $result['stderr'] ?: 'Error pushing to remote repository.');
             }
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', title: 'Push Error', message: $e->getMessage());
+        } finally {
+            Cache::forget('git_sync_running_' . $userId);
+            $this->isSyncRunning = false;
             $this->refreshStatus($gitService);
-        } else {
-            RunGitSyncJob::dispatch('push', $this->selectedBranch, $this->commitMessage, null, $userId);
-            $this->dispatch('toast', type: 'info', message: "Push job queued for branch '{$this->selectedBranch}'.");
         }
     }
 
@@ -286,12 +331,9 @@ class GitSync extends Component
             return;
         }
 
-        if ($this->revertStrategy === 'hard') {
-            $this->validate([
-                'confirmRevertPhrase' => 'required|in:REVERT TO THIS COMMIT',
-            ], [
-                'confirmRevertPhrase.in' => 'You must type "REVERT TO THIS COMMIT" exactly to confirm hard reset.',
-            ]);
+        if ($this->revertStrategy === 'hard' && trim($this->confirmRevertPhrase) !== 'REVERT TO THIS COMMIT') {
+            $this->addError('confirmRevertPhrase', 'Type "REVERT TO THIS COMMIT" exactly to confirm.');
+            return;
         }
 
         $userId = auth()->id() ?? 0;
@@ -307,9 +349,11 @@ class GitSync extends Component
             'branch' => $this->selectedBranch,
             'target_commit' => $targetCommit,
             'started_at' => time(),
-        ], now()->addMinutes(15));
+        ], now()->addMinutes(2));
 
-        if (config('queue.default') === 'sync') {
+        @set_time_limit(180);
+
+        try {
             $result = $this->revertStrategy === 'hard'
                 ? $gitService->hardReset($this->selectedBranch, $targetCommit, $userId)
                 : $gitService->safeRevert($this->selectedBranch, $targetCommit, $userId);
@@ -318,8 +362,6 @@ class GitSync extends Component
                 'action' => $actionName,
                 'completed_at' => time(),
             ]), now()->addHours(1));
-            Cache::forget('git_sync_running_' . $userId);
-            $this->isSyncRunning = false;
             $this->lastJobResult = $result;
 
             if ($result['successful']) {
@@ -327,15 +369,12 @@ class GitSync extends Component
             } else {
                 $this->dispatch('toast', type: 'error', title: 'Revert Failed', message: $result['stderr'] ?: 'Revert operation encountered an error.');
             }
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', title: 'Revert Error', message: $e->getMessage());
+        } finally {
+            Cache::forget('git_sync_running_' . $userId);
+            $this->isSyncRunning = false;
             $this->refreshStatus($gitService);
-        } else {
-            RunGitSyncJob::dispatch(
-                action: $actionName,
-                branch: $this->selectedBranch,
-                userId: $userId,
-                targetCommitSha: $targetCommit
-            );
-            $this->dispatch('toast', type: 'info', message: "Revert job queued for commit {$this->selectedCommit['short_hash']}.");
         }
     }
 
@@ -350,32 +389,29 @@ class GitSync extends Component
             'branch' => $this->selectedBranch,
             'backup_branch' => $backupBranch,
             'started_at' => time(),
-        ], now()->addMinutes(15));
+        ], now()->addMinutes(2));
 
-        if (config('queue.default') === 'sync') {
+        @set_time_limit(180);
+
+        try {
             $result = $gitService->restoreFromBackup($this->selectedBranch, $backupBranch, $userId);
             Cache::put('git_sync_result_' . $userId, array_merge($result, [
                 'action' => 'restore_backup',
                 'completed_at' => time(),
             ]), now()->addHours(1));
-            Cache::forget('git_sync_running_' . $userId);
-            $this->isSyncRunning = false;
             $this->lastJobResult = $result;
 
             if ($result['successful']) {
                 $this->dispatch('toast', type: 'success', title: 'Backup Restored', message: "Codebase restored from backup branch '{$backupBranch}'.");
             } else {
-                $this->dispatch('toast', type: 'error', title: 'Restore Failed', message: 'Failed to restore codebase from backup branch.');
+                $this->dispatch('toast', type: 'error', title: 'Restore Failed', message: $result['stderr'] ?: 'Failed to restore codebase from backup branch.');
             }
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', title: 'Restore Error', message: $e->getMessage());
+        } finally {
+            Cache::forget('git_sync_running_' . $userId);
+            $this->isSyncRunning = false;
             $this->refreshStatus($gitService);
-        } else {
-            RunGitSyncJob::dispatch(
-                action: 'restore_backup',
-                branch: $this->selectedBranch,
-                userId: $userId,
-                backupBranchName: $backupBranch
-            );
-            $this->dispatch('toast', type: 'info', message: "Restore job queued for '{$backupBranch}'.");
         }
     }
 
@@ -412,10 +448,20 @@ class GitSync extends Component
         $runningKey = 'git_sync_running_' . $userId;
         $resultKey = 'git_sync_result_' . $userId;
 
-        if ($this->isSyncRunning && !Cache::has($runningKey)) {
-            $this->isSyncRunning = false;
-            $this->lastJobResult = Cache::get($resultKey);
-            $this->refreshStatus($gitService);
+        if ($this->isSyncRunning) {
+            if (!Cache::has($runningKey)) {
+                $this->isSyncRunning = false;
+                $this->lastJobResult = Cache::get($resultKey);
+                $this->refreshStatus($gitService);
+            } else {
+                $runningData = Cache::get($runningKey);
+                $startedAt = is_array($runningData) ? ($runningData['started_at'] ?? 0) : 0;
+                if ($startedAt > 0 && (time() - $startedAt > 60)) {
+                    Cache::forget($runningKey);
+                    $this->isSyncRunning = false;
+                    $this->refreshStatus($gitService);
+                }
+            }
         }
     }
 

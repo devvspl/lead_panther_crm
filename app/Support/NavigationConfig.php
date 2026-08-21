@@ -76,7 +76,7 @@ class NavigationConfig
             default => route('replacements.queue'),
         };
 
-        $devToolsUrl = app()->environment(['local', 'staging']) ? route('admin.dev-tools') : '#';
+        $devToolsUrl = app()->environment(['local', 'staging', 'development']) ? route('admin.dev-tools') : '#';
 
         $allMasterItems = [
             'dashboard' => [

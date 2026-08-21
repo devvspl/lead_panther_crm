@@ -119,7 +119,7 @@ Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->na
     Route::get('/notification-templates', \App\Livewire\Admin\NotificationTemplates::class)->name('notification-templates');
     Route::get('/git-sync', \App\Livewire\Admin\GitSync::class)->name('git-sync');
 
-    if (app()->environment(['local', 'staging', 'testing'])) {
+    if (app()->environment(['local', 'staging', 'development'])) {
         Route::get('/dev-tools', \App\Livewire\Admin\DevTools::class)->name('dev-tools');
     }
 });
@@ -149,4 +149,4 @@ Route::middleware(['auth'])->prefix('settings/theme')->name('settings.theme.')->
     Route::post('/reset', [\App\Http\Controllers\ThemeSettingsController::class, 'reset'])->name('reset');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

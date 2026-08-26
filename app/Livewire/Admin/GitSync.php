@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin;
 
 use Livewire\Component;
+use Livewire\Attributes\Url;
+use App\Livewire\Concerns\HasAdvancedTable;
 use App\Services\GitSyncService;
 use App\Jobs\RunGitSyncJob;
 use App\Models\AuditLog;
@@ -11,6 +13,8 @@ use Throwable;
 
 class GitSync extends Component
 {
+    use HasAdvancedTable;
+
     // Credentials & Repository Settings
     public string $remoteUrl = '';
     public string $username = '';
@@ -31,6 +35,7 @@ class GitSync extends Component
     public bool $isTestingConnection = false;
 
     // Operations State & Polling
+    #[Url(as: 'tab', history: true, keep: true)]
     public string $activeTab = 'pull'; // 'pull' | 'push' | 'history' | 'settings' | 'audit'
     public bool $isSyncRunning = false;
     public ?array $lastJobResult = null;
@@ -60,6 +65,12 @@ class GitSync extends Component
             abort(403, 'Unauthorized. Super Admin role required for Git Deployment.');
         }
 
+        $validTabs = ['pull', 'push', 'history', 'settings', 'audit'];
+        if (!in_array($this->activeTab, $validTabs)) {
+            $this->activeTab = 'pull';
+        }
+
+        $this->loadColumnPreferences();
         $this->loadSettingsAndStatus($gitService);
     }
 
@@ -146,7 +157,10 @@ class GitSync extends Component
 
     public function setActiveTab(string $tab): void
     {
-        $this->activeTab = $tab;
+        $validTabs = ['pull', 'push', 'history', 'settings', 'audit'];
+        $this->activeTab = in_array($tab, $validTabs) ? $tab : 'pull';
+        $this->search = '';
+        $this->statusFilter = 'all';
     }
 
     public function saveSettings(GitSyncService $gitService): void
@@ -475,16 +489,186 @@ class GitSync extends Component
         }
     }
 
+    public function getTableIdentifier(): string
+    {
+        return 'git_sync_audit_logs';
+    }
+
+    public function tableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'action', 'label' => 'Action', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeStyle' => function ($val) {
+                if (str_contains($val, 'push')) {
+                    return 'bg-rose-50 text-rose-700 border border-rose-200';
+                }
+                if (str_contains($val, 'pull')) {
+                    return 'bg-blue-50 text-blue-700 border border-blue-200';
+                }
+                if (str_contains($val, 'revert') || str_contains($val, 'hard')) {
+                    return 'bg-amber-50 text-amber-700 border border-amber-200';
+                }
+                if (str_contains($val, 'restore')) {
+                    return 'bg-purple-50 text-purple-700 border border-purple-200';
+                }
+                return 'bg-canvas text-ink border border-border';
+            }],
+            ['key' => 'user_name', 'label' => 'Performed By', 'type' => 'text', 'priority' => 1, 'class' => 'font-semibold text-ink'],
+            ['key' => 'details_summary', 'label' => 'Operation Details', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-xs text-ink max-w-md truncate'],
+            ['key' => 'status_badge', 'label' => 'Status', 'type' => 'badge', 'priority' => 1, 'badgeStyle' => fn($val) => $val === 'Success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'],
+            ['key' => 'formatted_ip', 'label' => 'IP Address', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-[11px] text-muted'],
+            ['key' => 'created_at', 'label' => 'Timestamp', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i:s'],
+        ];
+    }
+
+    public function quickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All Operations'],
+            ['key' => 'push', 'label' => 'Push Events'],
+            ['key' => 'pull', 'label' => 'Pull Events'],
+            ['key' => 'revert', 'label' => 'Reverts & Restores'],
+            ['key' => 'followup', 'label' => 'Maintenance Tasks'],
+        ];
+    }
+
+    public function getFilteredAuditLogsQuery()
+    {
+        $query = AuditLog::with('user')
+            ->where('action', 'like', 'git_%');
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->where('action', 'like', '%' . $this->search . '%')
+                  ->orWhere('to_value', 'like', '%' . $this->search . '%')
+                  ->orWhere('from_value', 'like', '%' . $this->search . '%')
+                  ->orWhere('ip_address', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', '%' . $this->search . '%'));
+            });
+        }
+
+        if ($this->statusFilter === 'push') {
+            $query->where('action', 'like', '%push%');
+        } elseif ($this->statusFilter === 'pull') {
+            $query->where('action', 'like', '%pull%');
+        } elseif ($this->statusFilter === 'revert') {
+            $query->where(function ($q) {
+                $q->where('action', 'like', '%revert%')
+                  ->orWhere('action', 'like', '%restore%');
+            });
+        } elseif ($this->statusFilter === 'followup') {
+            $query->where('action', 'like', '%followup%');
+        }
+
+        if (!empty($this->sortField)) {
+            $query->orderBy($this->sortField, $this->sortDirection);
+        } else {
+            $query->latest('id');
+        }
+
+        return $query;
+    }
+
+    public function commitTableColumns(): array
+    {
+        return [
+            [
+                'key' => 'short_hash',
+                'label' => 'Commit',
+                'render' => function ($row) {
+                    $short = is_array($row) ? ($row['short_hash'] ?? '') : ($row->short_hash ?? '');
+                    $isHead = ($this->repoStatus['short_commit'] ?? '') === $short;
+                    $dot = $isHead ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Current HEAD"></span>' : '';
+                    return '<div class="font-mono font-bold text-primary flex items-center gap-1.5">' . $dot . '<span>' . e($short) . '</span></div>';
+                },
+                'sortable' => false,
+                'priority' => 1,
+            ],
+            [
+                'key' => 'message',
+                'label' => 'Commit Message',
+                'render' => fn($row) => '<div class="font-semibold text-ink max-w-lg truncate" title="' . e(is_array($row) ? ($row['message'] ?? '') : ($row->message ?? '')) . '">' . e(is_array($row) ? ($row['message'] ?? '') : ($row->message ?? '')) . '</div>',
+                'sortable' => false,
+                'priority' => 1,
+            ],
+            [
+                'key' => 'author',
+                'label' => 'Author',
+                'render' => fn($row) => '<span class="text-xs text-ink font-medium">' . e(is_array($row) ? ($row['author'] ?? '') : ($row->author ?? '')) . '</span>',
+                'sortable' => false,
+                'priority' => 2,
+            ],
+            [
+                'key' => 'date',
+                'label' => 'Date',
+                'render' => function ($row) {
+                    $rawDate = is_array($row) ? ($row['date'] ?? '') : ($row->date ?? '');
+                    try {
+                        $formatted = \Carbon\Carbon::parse($rawDate)->diffForHumans();
+                    } catch (\Throwable $e) {
+                        $formatted = $rawDate;
+                    }
+                    return '<span class="text-muted font-mono text-[11px]">' . e($formatted) . '</span>';
+                },
+                'sortable' => false,
+                'priority' => 2,
+            ],
+            [
+                'key' => 'action',
+                'label' => 'Action',
+                'align' => 'right',
+                'render' => fn($row) => '<div class="flex items-center justify-end"><button type="button" wire:click="openRevertModal(\'' . (is_array($row) ? ($row['hash'] ?? '') : ($row->hash ?? '')) . '\')" class="px-2.5 py-1 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:border-danger hover:text-danger hover:bg-danger/5 transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"><svg class="w-3 h-3 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/></svg><span>Revert to here</span></button></div>',
+                'sortable' => false,
+                'priority' => 1,
+            ],
+        ];
+    }
+
+    public function historyQuickFilters(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All (Last 50)', 'count' => count($this->commitHistory)],
+            ['key' => 'recent_10', 'label' => 'Recent 10', 'count' => min(10, count($this->commitHistory))],
+            ['key' => 'my_commits', 'label' => 'My Commits'],
+        ];
+    }
+
+    public function getFilteredCommitHistoryProperty(): array
+    {
+        $commits = $this->commitHistory;
+
+        if (!empty($this->search) && $this->activeTab === 'history') {
+            $search = strtolower(trim($this->search));
+            $commits = array_filter($commits, function ($c) use ($search) {
+                return str_contains(strtolower($c['hash'] ?? ''), $search)
+                    || str_contains(strtolower($c['short_hash'] ?? ''), $search)
+                    || str_contains(strtolower($c['message'] ?? ''), $search)
+                    || str_contains(strtolower($c['author'] ?? ''), $search);
+            });
+        }
+
+        if ($this->activeTab === 'history') {
+            if ($this->statusFilter === 'recent_10') {
+                $commits = array_slice($commits, 0, 10);
+            } elseif ($this->statusFilter === 'my_commits') {
+                $user = auth()->user();
+                $author = strtolower(trim($this->committerName ?: ($user?->name ?: '')));
+                if (!empty($author)) {
+                    $commits = array_filter($commits, fn($c) => str_contains(strtolower($c['author'] ?? ''), $author));
+                }
+            }
+        }
+
+        return array_values($commits);
+    }
+
     public function render()
     {
-        $gitAuditLogs = AuditLog::with('user')
-            ->where('action', 'like', 'git_%')
-            ->latest('id')
-            ->take(15)
-            ->get();
+        $gitAuditLogs = $this->getFilteredAuditLogsQuery()->paginate($this->perPage);
 
         return view('livewire.admin.git-sync', [
             'gitAuditLogs' => $gitAuditLogs,
+            'filteredCommitHistory' => $this->filteredCommitHistory,
         ])->layout('layouts.app');
     }
 }

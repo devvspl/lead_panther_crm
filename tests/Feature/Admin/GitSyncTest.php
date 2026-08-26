@@ -505,4 +505,22 @@ class GitSyncTest extends TestCase
             ->call('restoreBackup', 'backup/pre-revert-20260818-100000')
             ->assertDispatched('toast');
     }
+
+    public function test_tab_query_parameter_sets_active_tab(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::withQueryParams(['tab' => 'push'])
+            ->actingAs($admin)
+            ->test(GitSync::class)
+            ->assertSet('activeTab', 'push')
+            ->assertSee('Push Local Commits to Remote Repository');
+
+        Livewire::withQueryParams(['tab' => 'settings'])
+            ->actingAs($admin)
+            ->test(GitSync::class)
+            ->assertSet('activeTab', 'settings')
+            ->assertSee('Git Repository Connection & Authentication');
+    }
 }

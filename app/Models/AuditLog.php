@@ -44,4 +44,49 @@ class AuditLog extends Model
     {
         return $this->ip_address ?: '127.0.0.1';
     }
+
+    public function getDetailsSummaryAttribute(): string
+    {
+        if (!empty($this->to_value)) {
+            $data = is_array($this->to_value) ? $this->to_value : json_decode($this->to_value, true);
+            if (is_array($data)) {
+                $parts = [];
+                if (!empty($data['branch'])) {
+                    $parts[] = 'Branch: ' . $data['branch'];
+                }
+                if (!empty($data['commit_message'])) {
+                    $parts[] = '"' . \Illuminate\Support\Str::limit($data['commit_message'], 40) . '"';
+                }
+                if (!empty($data['commit_after']) && $data['commit_after'] !== 'unknown') {
+                    $parts[] = 'SHA: ' . substr($data['commit_after'], 0, 7);
+                }
+                if (!empty($data['target_commit'])) {
+                    $parts[] = 'Target: ' . substr($data['target_commit'], 0, 7);
+                }
+                if (!empty($data['backup_branch'])) {
+                    $parts[] = 'Backup: ' . $data['backup_branch'];
+                }
+                if (!empty($data['action'])) {
+                    $parts[] = 'Task: ' . $data['action'];
+                }
+                if (!empty($parts)) {
+                    return implode(' | ', $parts);
+                }
+            }
+            return \Illuminate\Support\Str::limit((string) $this->to_value, 70);
+        }
+
+        return '—';
+    }
+
+    public function getStatusBadgeAttribute(): string
+    {
+        if (!empty($this->to_value)) {
+            $data = is_array($this->to_value) ? $this->to_value : json_decode($this->to_value, true);
+            if (is_array($data) && isset($data['successful'])) {
+                return $data['successful'] ? 'Success' : 'Failed';
+            }
+        }
+        return 'Success';
+    }
 }

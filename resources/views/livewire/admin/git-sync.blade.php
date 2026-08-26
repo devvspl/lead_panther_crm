@@ -635,40 +635,18 @@
             @endif
 
             <!-- Main Commit History Table -->
-            <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-                    <div>
-                        <h2 class="text-base font-bold text-ink">Recent Commit History (Last 50 Commits)</h2>
-                        <p class="text-xs text-muted mt-0.5">View log history on <span
-                                class="font-mono font-bold text-ink">{{ $selectedBranch }}</span> and revert codebase
-                            safely.</p>
-                    </div>
-                </div>
-
-                @php
-                    $commitColumns = [
-                        [
-                            'key' => 'short_hash',
-                            'label' => 'Commit',
-                            'render' => function ($row) use ($repoStatus) {
-                                $short = is_array($row) ? $row['short_hash'] : $row->short_hash;
-                                $isHead = ($repoStatus['short_commit'] ?? '') === $short;
-                                $dot = $isHead ? '<span class="w-2 h-2 rounded-full bg-emerald-500" title="Current HEAD"></span>' : '';
-                                return '<div class="font-mono font-bold text-primary flex items-center gap-1.5">' . $dot . '<span>' . e($short) . '</span></div>';
-                            },
-                            'sortable' => false,
-                            'priority' => 1
-                        ],
-                        ['key' => 'message', 'label' => 'Message', 'render' => fn($row) => '<div class="font-medium text-ink max-w-md truncate" title="' . e(is_array($row) ? $row['message'] : $row->message) . '">' . e(is_array($row) ? $row['message'] : $row->message) . '</div>', 'sortable' => false, 'priority' => 1],
-                        ['key' => 'author', 'label' => 'Author', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
-                        ['key' => 'date', 'label' => 'Date', 'render' => fn($row) => '<span class="text-muted font-mono text-[11px]">' . \Carbon\Carbon::parse(is_array($row) ? $row['date'] : $row->date)->diffForHumans() . '</span>', 'sortable' => false, 'priority' => 2],
-                        ['key' => 'action', 'label' => 'Action', 'align' => 'right', 'render' => fn($row) => '<div class="flex items-center justify-end"><button type="button" wire:click="openRevertModal(\'' . (is_array($row) ? $row['hash'] : $row->hash) . '\')" class="px-2.5 py-1 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:border-danger hover:text-danger transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/></svg><span>Revert to here</span></button></div>', 'sortable' => false, 'priority' => 1],
-                    ];
-                @endphp
-
-                <x-ui.advanced-table :columns="$commitColumns" :rows="$commitHistory" :showSearch="false"
-                    :showFilterDropdown="false" :showConfigurations="false" emptyTitle="No Commit History"
-                    emptyMessage="No commit history found on branch {{ $selectedBranch }}." />
+            <div class="space-y-4">
+                <x-ui.advanced-table 
+                    :columns="$this->commitTableColumns()"
+                    :rows="$filteredCommitHistory"
+                    :quickFilters="$this->historyQuickFilters()"
+                    :activeStatus="$statusFilter"
+                    :showFilterDropdown="false"
+                    :showConfigurations="false"
+                    searchPlaceholder="Search commits by message, SHA hash, author..."
+                    emptyTitle="No Commits Found"
+                    emptyMessage="No commit history records match your search or filter on branch {{ $selectedBranch }}."
+                />
 
                 <!-- Last Revert Output Console & Follow-ups -->
                 @if($lastJobResult && in_array($lastJobResult['action'] ?? '', ['revert_safe', 'revert_hard', 'restore_backup']))
@@ -846,38 +824,20 @@
 
     <!-- TAB 5: AUDIT TRAIL -->
     @if($activeTab === 'audit')
-        <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-border">
-                <div>
-                    <h2 class="text-base font-bold text-ink">Git Deployment Audit Logs</h2>
-                    <p class="text-xs text-muted">Immutable trail of every pull, push, and maintenance command executed by
-                        administrators.</p>
-                </div>
-            </div>
-
-            @php
-                $auditColumns = [
-                    [
-                        'key' => 'action',
-                        'label' => 'Action',
-                        'render' => function ($row) {
-                            $isHigh = str_contains($row->action, 'push') || str_contains($row->action, 'hard');
-                            $isMed = str_contains($row->action, 'pull') || str_contains($row->action, 'safe');
-                            $badgeClass = $isHigh ? 'bg-red-100 text-red-800' : ($isMed ? 'bg-blue-100 text-blue-800' : 'bg-canvas text-ink');
-                            return '<span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ' . $badgeClass . '">' . e($row->action) . '</span>';
-                        },
-                        'sortable' => false,
-                        'priority' => 1
-                    ],
-                    ['key' => 'user', 'label' => 'User', 'render' => fn($row) => '<span class="font-medium text-ink">' . e($row->user?->name ?: 'System') . '</span>', 'sortable' => false, 'priority' => 1],
-                    ['key' => 'to_value', 'label' => 'Details', 'render' => fn($row) => '<span class="font-mono text-[11px] text-muted truncate max-w-md block" title="' . e($row->to_value) . '">' . e($row->to_value) . '</span>', 'sortable' => false, 'priority' => 2],
-                    ['key' => 'created_at', 'label' => 'Timestamp', 'render' => fn($row) => '<span class="text-muted text-[11px] font-mono">' . ($row->created_at ? $row->created_at->format('M d, Y H:i:s') : 'N/A') . '</span>', 'sortable' => false, 'priority' => 2],
-                ];
-            @endphp
-
-            <x-ui.advanced-table :columns="$auditColumns" :rows="$gitAuditLogs" :showSearch="false"
-                :showFilterDropdown="false" :showConfigurations="false" emptyTitle="No Audit Logs"
-                emptyMessage="No Git deployment audit logs recorded yet." />
+        <div class="space-y-4">
+            <x-ui.advanced-table 
+                :columns="$this->tableColumns()"
+                :rows="$gitAuditLogs"
+                :quickFilters="$this->quickFilters()"
+                :activeStatus="$statusFilter"
+                :visibleColumns="$visibleColumns"
+                :sortField="$sortField"
+                :sortDirection="$sortDirection"
+                :filterCount="$this->activeFilterCount"
+                searchPlaceholder="Search Git deployment audit logs, actions, commits, users..."
+                emptyTitle="No Git Audit Logs Found"
+                emptyMessage="No Git deployment audit logs match your search or selected filter."
+            />
         </div>
     @endif
 

@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^$ public/ [L]
+
+    # Remove /public from URL
+    RewriteCond %{THE_REQUEST} \s/+public/([^\s]*) [NC]
+    RewriteRule ^public/(.*)$ /$1 [R=301,L]
+
+    # Send all requests to public folder
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

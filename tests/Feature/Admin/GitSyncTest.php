@@ -233,19 +233,54 @@ class GitSyncTest extends TestCase
             'recent_commits' => [],
         ]);
         $mockGitService->method('getRemoteBranches')->willReturn(['main']);
-        $mockGitService->method('runFollowupAction')->willReturn([
-            'action' => 'clear_cache',
-            'successful' => true,
-            'stdout' => 'Configuration cache cleared successfully.',
-            'stderr' => '',
-        ]);
+        $mockGitService->method('runFollowupAction')->willReturnCallback(function ($action, $userId = null, $class = null) {
+            return [
+                'action' => $action,
+                'successful' => true,
+                'stdout' => "Action {$action} (" . ($class ?: 'all') . ") completed.",
+                'stderr' => '',
+            ];
+        });
 
         $this->app->instance(GitSyncService::class, $mockGitService);
 
         Livewire::actingAs($admin)
             ->test(GitSync::class)
             ->call('runFollowup', 'clear_cache')
-            ->assertDispatched('toast');
+            ->assertDispatched('toast')
+            ->call('runFollowup', 'seed')
+            ->assertDispatched('toast')
+            ->set('selectedSeederClass', 'RoleAndPermissionSeeder')
+            ->call('runFollowup', 'seed')
+            ->assertDispatched('toast')
+            ->assertSee('Run Seeders')
+            ->assertSee('RoleAndPermissionSeeder');
+    }
+
+    public function test_git_sync_service_seed_followup_action_command(): void
+    {
+        $service = $this->getMockBuilder(GitSyncService::class)
+            ->onlyMethods(['runCommand'])
+            ->getMock();
+
+        $executedCommands = [];
+        $service->method('runCommand')->willReturnCallback(function ($cmd) use (&$executedCommands) {
+            $executedCommands[] = $cmd;
+            return [
+                'successful' => true,
+                'exit_code' => 0,
+                'stdout' => 'Database seeding completed successfully.',
+                'stderr' => '',
+            ];
+        });
+
+        $result1 = $service->runFollowupAction('seed');
+        $this->assertTrue($result1['successful']);
+        $this->assertEquals(['php', 'artisan', 'db:seed', '--force'], $executedCommands[0]);
+
+        $result2 = $service->runFollowupAction('seed', null, 'RoleAndPermissionSeeder');
+        $this->assertTrue($result2['successful']);
+        $this->assertEquals(['php', 'artisan', 'db:seed', '--force', '--class=RoleAndPermissionSeeder'], $executedCommands[1]);
     }
 
     public function test_commit_history_renders_commits_and_revert_options(): void

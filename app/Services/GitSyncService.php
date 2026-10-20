@@ -828,12 +828,21 @@ class GitSyncService
     }
 
     /**
-     * Run Follow-up Commands (Migrate, Composer, Npm build, Cache clear).
+     * Run Follow-up Commands (Migrate, Seed, Composer, Npm build, Cache clear).
      */
-    public function runFollowupAction(string $actionType, ?int $userId = null): array
+    public function runFollowupAction(string $actionType, ?int $userId = null, ?string $class = null): array
     {
+        $safeClass = !empty($class) ? preg_replace('/[^a-zA-Z0-9_\\\\]/', '', (string) $class) : null;
+
         $command = match ($actionType) {
             'migrate' => ['php', 'artisan', 'migrate', '--force'],
+            'seed', 'db_seed', 'seeder' => array_values(array_filter([
+                'php',
+                'artisan',
+                'db:seed',
+                '--force',
+                $safeClass ? "--class={$safeClass}" : null,
+            ])),
             'composer' => ['composer', 'install', '--no-dev', '--optimize-autoloader'],
             'npm' => ['npm', 'run', 'build'],
             'clear_cache' => ['php', 'artisan', 'optimize:clear'],
@@ -846,7 +855,7 @@ class GitSyncService
         $this->logAudit(
             userId: $userId,
             action: 'git_followup_' . $actionType,
-            fromValue: ['action' => $actionType],
+            fromValue: ['action' => $actionType, 'class' => $safeClass],
             toValue: [
                 'successful' => $res['successful'],
                 'stdout' => $res['stdout'],

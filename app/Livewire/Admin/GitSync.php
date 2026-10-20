@@ -57,6 +57,7 @@ class GitSync extends Component
     // Follow-up Actions
     public bool $isFollowupRunning = false;
     public ?array $lastFollowupResult = null;
+    public string $selectedSeederClass = '';
 
     public function mount(GitSyncService $gitService): void
     {
@@ -439,17 +440,21 @@ class GitSync extends Component
         }
     }
 
-    public function runFollowup(string $actionType, GitSyncService $gitService): void
+    public function runFollowup(string $actionType, ?GitSyncService $gitService = null, ?string $class = null): void
     {
+        $gitService = $gitService ?? app(GitSyncService::class);
         $userId = auth()->id() ?? 0;
         $this->isFollowupRunning = true;
         $this->lastFollowupResult = null;
 
+        $targetClass = $class ?: ($this->selectedSeederClass ?: null);
+
         try {
-            $this->lastFollowupResult = $gitService->runFollowupAction($actionType, $userId);
+            $this->lastFollowupResult = $gitService->runFollowupAction($actionType, $userId, $targetClass);
 
             if ($this->lastFollowupResult['successful']) {
-                $this->dispatch('toast', type: 'success', message: "Action '{$actionType}' executed successfully.");
+                $label = $actionType === 'seed' && $targetClass ? "Seed ({$targetClass})" : $actionType;
+                $this->dispatch('toast', type: 'success', message: "Action '{$label}' executed successfully.");
             } else {
                 $this->dispatch('toast', type: 'error', message: "Action '{$actionType}' encountered errors.");
             }
@@ -662,6 +667,27 @@ class GitSync extends Component
         return array_values($commits);
     }
 
+    public function getAvailableSeedersProperty(): array
+    {
+        $seederPath = database_path('seeders');
+        if (!is_dir($seederPath)) {
+            return [];
+        }
+
+        $files = glob($seederPath . '/*Seeder.php') ?: [];
+        $seeders = [];
+
+        foreach ($files as $file) {
+            $className = basename($file, '.php');
+            if ($className !== 'DatabaseSeeder') {
+                $seeders[] = $className;
+            }
+        }
+
+        sort($seeders);
+        return $seeders;
+    }
+
     public function render()
     {
         $gitAuditLogs = $this->getFilteredAuditLogsQuery()->paginate($this->perPage);
@@ -669,6 +695,7 @@ class GitSync extends Component
         return view('livewire.admin.git-sync', [
             'gitAuditLogs' => $gitAuditLogs,
             'filteredCommitHistory' => $this->filteredCommitHistory,
+            'availableSeeders' => $this->availableSeeders,
         ])->layout('layouts.app');
     }
 }

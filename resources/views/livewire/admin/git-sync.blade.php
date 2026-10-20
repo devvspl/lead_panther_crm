@@ -344,7 +344,7 @@
                         explicitly after reviewing pulled changes.</p>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                     <button type="button" wire:click="runFollowup('migrate')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
                         <div class="flex items-center justify-between">
@@ -355,6 +355,20 @@
                             </svg>
                         </div>
                         <p class="text-[11px] text-muted font-mono">php artisan migrate --force</p>
+                    </button>
+
+                    <button type="button" wire:click="runFollowup('seed')" wire:loading.attr="disabled"
+                        class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs text-ink">Run Seeders</span>
+                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 21v-7m0 0c0-3.866 3.134-7 7-7 0 3.866-3.134 7-7 7zm0 0c0-3.866-3.134-7-7-7 0 3.866 3.134 7 7 7z" />
+                            </svg>
+                        </div>
+                        <p class="text-[11px] text-muted font-mono truncate" title="php artisan db:seed {{ $selectedSeederClass ? '--class=' . $selectedSeederClass . ' ' : '' }}--force">
+                            {{ $selectedSeederClass ? "db:seed --class={$selectedSeederClass}" : 'php artisan db:seed --force' }}
+                        </p>
                     </button>
 
                     <button type="button" wire:click="runFollowup('composer')" wire:loading.attr="disabled"
@@ -392,6 +406,26 @@
                         </div>
                         <p class="text-[11px] text-muted font-mono">php artisan optimize</p>
                     </button>
+                </div>
+
+                <!-- Optional Target Seeder Class Selector -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/70 text-xs">
+                    <div class="flex items-center gap-2">
+                        <label for="seederSelector" class="font-bold text-ink whitespace-nowrap">Target Seeder:</label>
+                        <select id="seederSelector" wire:model.live="selectedSeederClass"
+                            class="bg-canvas border border-border rounded-lg px-2.5 py-1 text-xs text-ink font-mono focus:border-ink focus:outline-none">
+                            <option value="">All Seeders (DatabaseSeeder)</option>
+                            @foreach($availableSeeders as $seeder)
+                                <option value="{{ $seeder }}">{{ $seeder }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="text-[11px] text-muted flex items-center gap-1.5 font-mono">
+                        <span>Command:</span>
+                        <span class="bg-canvas px-2 py-0.5 rounded border border-border text-ink font-bold">
+                            php artisan db:seed{{ $selectedSeederClass ? ' --class=' . $selectedSeederClass : '' }} --force
+                        </span>
+                    </div>
                 </div>
 
                 @if($lastFollowupResult)
@@ -666,22 +700,26 @@
                         <!-- Post-Revert Follow-up Actions -->
                         <div class="p-4 bg-canvas rounded-xl border border-border space-y-3">
                             <div class="font-bold text-xs text-ink">Post-Revert Follow-Up Actions:</div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
                                 <button type="button" wire:click="runFollowup('migrate')"
                                     class="px-3 py-2 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition text-left cursor-pointer">
                                     1. Run Migrations
                                 </button>
+                                <button type="button" wire:click="runFollowup('seed')"
+                                    class="px-3 py-2 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition text-left cursor-pointer">
+                                    2. Run Seeders
+                                </button>
                                 <button type="button" wire:click="runFollowup('composer')"
                                     class="px-3 py-2 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition text-left cursor-pointer">
-                                    2. Composer Install
+                                    3. Composer Install
                                 </button>
                                 <button type="button" wire:click="runFollowup('npm')"
                                     class="px-3 py-2 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition text-left cursor-pointer">
-                                    3. Rebuild Assets (npm)
+                                    4. Rebuild Assets (npm)
                                 </button>
                                 <button type="button" wire:click="runFollowup('cache_all')"
                                     class="px-3 py-2 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition text-left cursor-pointer">
-                                    4. Optimize Cache
+                                    5. Optimize Cache
                                 </button>
                             </div>
                         </div>

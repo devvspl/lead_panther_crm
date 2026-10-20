@@ -489,7 +489,7 @@
 
             @if($editingOrg)
                 @if($orgDetailsMode === 'view')
-                    <!-- VIEW MODE -->
+                    <!-- View -->
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">

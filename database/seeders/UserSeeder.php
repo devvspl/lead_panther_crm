@@ -10,9 +10,15 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $platformOrg = Organization::where('type', 'platform')->first();
-        $builderOrgs = Organization::where('type', 'builder')->get();
-        $partnerOrgs = Organization::where('type', 'channel_partner')->get();
+        $platformOrg = Organization::where('name', 'Lead Panther Platform HQ')->first() ?: Organization::first();
+        $builderOrgs = Organization::whereIn('name', ['Venture Realty Developers', 'Skyline Heights Infra'])->get();
+        if ($builderOrgs->isEmpty()) {
+            $builderOrgs = Organization::take(2)->get();
+        }
+        $partnerOrgs = Organization::whereIn('name', ['Royal Realty Associates', 'Prime Square Partners', 'Urban Living Advisory'])->get();
+        if ($partnerOrgs->isEmpty()) {
+            $partnerOrgs = Organization::skip(1)->take(3)->get();
+        }
 
         // 1 Super Admin
         $superAdmin = User::firstOrCreate(
@@ -26,7 +32,7 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-        $superAdmin->assignRole('super-admin');
+        $superAdmin->assignRole('Super Admin');
 
         // 2 Builder Users
         foreach ($builderOrgs as $index => $org) {
@@ -41,7 +47,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $user->assignRole('builder');
+            $user->assignRole('Builder');
         }
 
         // 6 Channel Partner Users
@@ -58,7 +64,7 @@ class UserSeeder extends Seeder
                         'email_verified_at' => now(),
                     ]
                 );
-                $pUser->assignRole('channel-partner');
+                $pUser->assignRole('Channel Partner');
             }
         }
 
@@ -75,7 +81,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $salesUser->assignRole('sales-executive');
+            $salesUser->assignRole('Sales Executive');
         }
 
         // 3 Account Managers
@@ -91,7 +97,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $amUser->assignRole('account-manager');
+            $amUser->assignRole('Account Manager');
         }
 
         // 4 Client Users
@@ -107,7 +113,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $clientUser->assignRole('client');
+            $clientUser->assignRole('Client');
         }
     }
 }

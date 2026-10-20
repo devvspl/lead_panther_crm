@@ -5,7 +5,6 @@
     $initials = count($words) >= 2 
         ? strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1))
         : strtoupper(substr($orgName, 0, 2));
-    $orgType = ucfirst(str_replace('_', ' ', $org?->type ?? 'Builder'));
     $orgIdStr = '#ORG-' . str_pad($org?->id ?? 1, 4, '0', STR_PAD_LEFT);
 @endphp
 
@@ -33,8 +32,8 @@
             <div class="space-y-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                     <h2 class="text-base font-bold text-ink truncate">{{ $orgName }}</h2>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-canvas border border-border text-ink">
-                        {{ $orgType }} Organization
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-canvas border border-border text-ink font-mono">
+                        {{ $orgIdStr }}
                     </span>
                 </div>
                 <p class="text-xs text-muted truncate">{{ $billingEmail }}</p>
@@ -58,8 +57,8 @@
                 <span class="text-xs font-semibold font-mono text-ink">{{ $orgIdStr }}</span>
             </div>
             <div class="px-3.5 py-1.5 rounded-lg bg-canvas border border-border flex flex-col">
-                <span class="text-[10px] font-bold uppercase text-muted tracking-wider">Access Scope</span>
-                <span class="text-xs font-semibold text-ink">{{ $orgType }}</span>
+                <span class="text-[10px] font-bold uppercase text-muted tracking-wider">Status</span>
+                <span class="text-xs font-semibold text-ink capitalize">{{ $org?->status ?? 'Active' }}</span>
             </div>
         </div>
     </div>
@@ -128,13 +127,13 @@
                 </div>
 
                 <div>
-                    <label class="font-bold text-ink block mb-1">Entity / Organization Type</label>
+                    <label class="font-bold text-ink block mb-1">Organization Identifier</label>
                     <input 
                         type="text" 
                         readonly 
                         disabled
-                        value="{{ $orgType }} Organization"
-                        class="w-full h-9 px-3.5 rounded-lg border border-border bg-canvas/60 text-muted text-xs font-medium cursor-not-allowed select-none"
+                        value="{{ $orgIdStr }}"
+                        class="w-full h-9 px-3.5 rounded-lg border border-border bg-canvas/60 text-muted text-xs font-mono font-medium cursor-not-allowed select-none"
                     >
                 </div>
             </div>

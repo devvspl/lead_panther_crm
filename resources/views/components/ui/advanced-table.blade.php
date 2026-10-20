@@ -363,31 +363,91 @@
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                                 </button>
                                             </div>
+                                        @elseif($type === 'user_name')
+                                            @php
+                                                $userRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <button 
+                                                type="button" 
+                                                wire:click="openUserDetailsModal({{ $userRowId }})" 
+                                                class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1.5 group"
+                                                title="View &amp; Edit User Details"
+                                            >
+                                                <span>{{ $val }}</span>
+                                                <svg class="w-3.5 h-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                            </button>
                                         @elseif($type === 'user_actions')
-                                            <div class="flex items-center justify-end gap-2">
-                                                @if(auth()->id() !== (is_object($row) ? $row->id : $row['id']))
-                                                    <a href="{{ route('admin.users.impersonate', is_object($row) ? $row->id : $row['id']) }}" class="text-xs font-bold text-purple-700 hover:underline">
-                                                        Impersonate
+                                            @php
+                                                $userRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <button 
+                                                    type="button" 
+                                                    wire:click="openUserDetailsModal({{ $userRowId }})" 
+                                                    class="p-1.5 rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                    title="View &amp; Edit User Details"
+                                                    aria-label="View &amp; Edit User Details"
+                                                >
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
+                                                </button>
+
+                                                @if(auth()->id() !== $userRowId)
+                                                    <a 
+                                                        href="{{ route('admin.users.impersonate', $userRowId) }}" 
+                                                        class="p-1.5 rounded-lg border border-border bg-surface hover:bg-purple-50 text-purple-700 hover:border-purple-300 transition shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                                        title="Impersonate User"
+                                                        aria-label="Impersonate User"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                        </svg>
                                                     </a>
                                                 @else
                                                     <span class="text-[10px] text-muted font-bold">(You)</span>
                                                 @endif
                                             </div>
+                                        @elseif($type === 'org_name')
+                                            @php
+                                                $orgRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <button 
+                                                type="button" 
+                                                wire:click="openOrgDetailsModal({{ $orgRowId }})" 
+                                                class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1.5 group"
+                                                title="View &amp; Edit Organization Details"
+                                            >
+                                                <span>{{ $val }}</span>
+                                                <svg class="w-3.5 h-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                            </button>
                                         @elseif($type === 'org_actions')
-                                            <div class="flex items-center justify-end gap-2">
+                                            @php
+                                                $orgRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <div class="flex items-center justify-end gap-1.5">
                                                 <button 
-                                                    type="button"
-                                                    wire:click="openUserOffcanvas({{ is_object($row) ? $row->id : $row['id'] }})"
-                                                    class="px-2 py-1 rounded text-xs font-bold text-primary hover:bg-primary/10 transition cursor-pointer"
+                                                    type="button" 
+                                                    wire:click="openOrgDetailsModal({{ $orgRowId }})" 
+                                                    class="p-1.5 rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                    title="View &amp; Edit Organization"
+                                                    aria-label="View &amp; Edit Organization"
                                                 >
-                                                    Manage Users
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
                                                 </button>
+
                                                 <button 
                                                     type="button"
-                                                    wire:click="toggleStatus({{ is_object($row) ? $row->id : $row['id'] }})"
-                                                    class="px-2 py-1 rounded text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
+                                                    wire:click="openUserModal({{ $orgRowId }})"
+                                                    class="p-1.5 rounded-lg border border-border bg-surface hover:bg-primary/10 text-primary hover:border-primary/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                    title="Manage Users"
+                                                    aria-label="Manage Users"
                                                 >
-                                                    {{ (is_object($row) ? $row->status : $row['status']) === 'active' ? 'Suspend' : 'Activate' }}
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                                    </svg>
                                                 </button>
                                             </div>
                                         @elseif($type === 'replacement_actions')
@@ -582,31 +642,89 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             </button>
                                         </div>
+                                    @elseif($type === 'user_name')
+                                        @php
+                                            $userRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <button 
+                                            type="button" 
+                                            wire:click="openUserDetailsModal({{ $userRowIdMobile }})" 
+                                            class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1"
+                                        >
+                                            <span>{{ $val }}</span>
+                                            <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                        </button>
                                     @elseif($type === 'user_actions')
-                                        <div class="flex items-center justify-end gap-2">
-                                            @if(auth()->id() !== (is_object($row) ? $row->id : $row['id']))
-                                                <a href="{{ route('admin.users.impersonate', is_object($row) ? $row->id : $row['id']) }}" class="text-xs font-bold text-purple-700 hover:underline">
-                                                    Impersonate
+                                        @php
+                                            $userRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <button 
+                                                type="button" 
+                                                wire:click="openUserDetailsModal({{ $userRowIdMobile }})" 
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                title="View &amp; Edit User Details"
+                                                aria-label="View &amp; Edit User Details"
+                                            >
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                </svg>
+                                            </button>
+
+                                            @if(auth()->id() !== $userRowIdMobile)
+                                                <a 
+                                                    href="{{ route('admin.users.impersonate', $userRowIdMobile) }}" 
+                                                    class="p-1.5 rounded-lg border border-border bg-surface hover:bg-purple-50 text-purple-700 hover:border-purple-300 transition shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                                    title="Impersonate User"
+                                                    aria-label="Impersonate User"
+                                                >
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                    </svg>
                                                 </a>
                                             @else
                                                 <span class="text-[10px] text-muted font-bold">(You)</span>
                                             @endif
                                         </div>
+                                    @elseif($type === 'org_name')
+                                        @php
+                                            $orgRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <button 
+                                            type="button" 
+                                            wire:click="openOrgDetailsModal({{ $orgRowIdMobile }})" 
+                                            class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1"
+                                        >
+                                            <span>{{ $val }}</span>
+                                            <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                        </button>
                                     @elseif($type === 'org_actions')
-                                        <div class="flex items-center justify-end gap-2">
+                                        @php
+                                            $orgRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <div class="flex items-center justify-end gap-1.5">
                                             <button 
-                                                type="button"
-                                                wire:click="openUserOffcanvas({{ is_object($row) ? $row->id : $row['id'] }})"
-                                                class="px-2 py-1 rounded text-xs font-bold text-primary hover:bg-primary/10 transition cursor-pointer"
+                                                type="button" 
+                                                wire:click="openOrgDetailsModal({{ $orgRowIdMobile }})" 
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                title="View &amp; Edit Organization"
+                                                aria-label="View &amp; Edit Organization"
                                             >
-                                                Manage Users
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                </svg>
                                             </button>
+
                                             <button 
                                                 type="button"
-                                                wire:click="toggleStatus({{ is_object($row) ? $row->id : $row['id'] }})"
-                                                class="px-2 py-1 rounded text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
+                                                wire:click="openUserModal({{ $orgRowIdMobile }})"
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-primary/10 text-primary hover:border-primary/30 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                title="Manage Users"
+                                                aria-label="Manage Users"
                                             >
-                                                {{ (is_object($row) ? $row->status : $row['status']) === 'active' ? 'Suspend' : 'Activate' }}
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                                </svg>
                                             </button>
                                         </div>
                                     @elseif($type === 'replacement_actions')

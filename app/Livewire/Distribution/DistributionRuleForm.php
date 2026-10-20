@@ -79,7 +79,7 @@ class DistributionRuleForm extends Component
 
     public function render()
     {
-        $channelPartners = Organization::where('type', 'channel_partner')->get();
+        $channelPartners = Organization::all();
         $executives = User::all();
 
         return view('livewire.distribution.distribution-rule-form', [

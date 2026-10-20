@@ -22,7 +22,6 @@ class LeadPantherDemoSeeder extends Seeder
         // 1. Create Organization
         $org = Organization::create([
             'name' => 'Venture Realty Developers',
-            'type' => 'builder',
             'status' => 'active',
         ]);
 

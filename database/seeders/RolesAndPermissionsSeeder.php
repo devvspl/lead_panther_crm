@@ -48,5 +48,8 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $roleAccountMgr = Role::firstOrCreate(['name' => 'Account Manager', 'guard_name' => 'web']);
         $roleAccountMgr->givePermissionTo(['view-leads', 'create-leads', 'manage-credits', 'view-reports']);
+
+        $roleClient = Role::firstOrCreate(['name' => 'Client', 'guard_name' => 'web']);
+        $roleClient->givePermissionTo(['view-leads', 'view-reports']);
     }
 }

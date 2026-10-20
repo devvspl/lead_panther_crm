@@ -14,9 +14,12 @@ class ChannelPartnerHierarchySeeder extends Seeder
 {
     public function run(): void
     {
-        $partnerOrgs = Organization::where('type', 'channel_partner')->get();
+        $partnerOrgs = Organization::whereIn('name', ['Royal Realty Associates', 'Prime Square Partners', 'Urban Living Advisory'])->get();
+        if ($partnerOrgs->isEmpty()) {
+            $partnerOrgs = Organization::skip(1)->take(3)->get();
+        }
         $firstProject = Project::first();
-        $salesExecs = User::role('sales-executive')->get();
+        $salesExecs = User::role(['Sales Executive', 'sales-executive'])->get();
 
         if ($firstProject && $partnerOrgs->count() >= 3) {
             foreach ($partnerOrgs as $index => $pOrg) {

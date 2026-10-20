@@ -18,18 +18,17 @@ class AccountAccessFixSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Ensure all Spatie roles exist (both kebab-case and Title Case variants)
-        $rolePairs = [
-            'super-admin' => 'Super Admin',
-            'builder' => 'Builder',
-            'channel-partner' => 'Channel Partner',
-            'sales-executive' => 'Sales Executive',
-            'account-manager' => 'Account Manager',
-            'client' => 'Client',
+        // 1. Ensure all Spatie roles exist in standard Title Case
+        $canonicalRoles = [
+            'Super Admin',
+            'Builder',
+            'Channel Partner',
+            'Sales Executive',
+            'Account Manager',
+            'Client',
         ];
 
-        foreach ($rolePairs as $kebab => $title) {
-            Role::firstOrCreate(['name' => $kebab, 'guard_name' => 'web']);
+        foreach ($canonicalRoles as $title) {
             Role::firstOrCreate(['name' => $title, 'guard_name' => 'web']);
         }
 
@@ -46,39 +45,31 @@ class AccountAccessFixSeeder extends Seeder
                 $user->save();
             }
 
-            $kebabRole = null;
             $titleRole = null;
 
             $name = $user->name;
             $email = strtolower($user->email);
 
             if ($email === 'admin@leadpanther.com' || str_contains($name, 'Super Admin')) {
-                $kebabRole = 'super-admin';
                 $titleRole = 'Super Admin';
             } elseif (str_contains($name, 'Builder Manager') || str_starts_with($email, 'builder')) {
-                $kebabRole = 'builder';
                 $titleRole = 'Builder';
             } elseif (str_contains($name, 'Partner') || str_contains($email, 'cp.com')) {
-                $kebabRole = 'channel-partner';
                 $titleRole = 'Channel Partner';
             } elseif (str_contains($name, 'Sales Exec') || str_starts_with($email, 'sales')) {
-                $kebabRole = 'sales-executive';
                 $titleRole = 'Sales Executive';
             } elseif (str_contains($name, 'Account Manager') || str_starts_with($email, 'accountmgr')) {
-                $kebabRole = 'account-manager';
                 $titleRole = 'Account Manager';
             } elseif (str_contains($name, 'Client User') || str_starts_with($email, 'client')) {
-                $kebabRole = 'client';
                 $titleRole = 'Client';
             }
 
-            if ($kebabRole && $titleRole) {
-                // Assign both variants so any role check (kebab or Title Case) passes
-                $user->assignRole([$kebabRole, $titleRole]);
+            if ($titleRole) {
+                $user->syncRoles([$titleRole]);
             }
 
             // c. CLIENT_USERS PIVOT
-            if ($kebabRole === 'client' || $user->hasRole('client') || $user->hasRole('Client')) {
+            if ($titleRole === 'Client' || $user->hasRole('Client')) {
                 $orgId = $user->organization_id ?? Organization::first()?->id;
 
                 if ($orgId) {
@@ -106,8 +97,8 @@ class AccountAccessFixSeeder extends Seeder
             }
 
             // d. SALES TEAM MEMBERSHIP
-            if ($kebabRole === 'sales-executive' || $user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
-                $orgId = $user->organization_id ?? Organization::where('type', 'builder')->first()?->id;
+            if ($titleRole === 'Sales Executive' || $user->hasRole('Sales Executive')) {
+                $orgId = $user->organization_id ?? Organization::first()?->id;
 
                 if ($orgId) {
                     $salesTeam = SalesTeam::firstOrCreate(

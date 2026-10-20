@@ -139,13 +139,11 @@ class AdvancedTableTest extends TestCase
 
         Organization::create([
             'name' => 'Lodha Developers',
-            'type' => 'builder',
             'status' => 'active',
         ]);
 
         Organization::create([
             'name' => 'Apex Channel Partner',
-            'type' => 'channel_partner',
             'status' => 'suspended',
         ]);
 

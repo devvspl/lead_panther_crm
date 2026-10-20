@@ -88,13 +88,11 @@ class SuperAdminSuiteTest extends TestCase
         Livewire::actingAs($admin)
             ->test(OrganizationManager::class)
             ->set('name', 'Apex Infra Developers')
-            ->set('type', 'builder')
             ->set('status', 'active')
             ->call('createOrganization');
 
         $this->assertDatabaseHas('organizations', [
             'name' => 'Apex Infra Developers',
-            'type' => 'builder',
             'status' => 'active',
         ]);
 
@@ -173,7 +171,7 @@ class SuperAdminSuiteTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('Super Admin');
 
-        $org = Organization::create(['name' => 'Brigade Group', 'type' => 'builder', 'status' => 'active']);
+        $org = Organization::create(['name' => 'Brigade Group', 'status' => 'active']);
 
         Livewire::actingAs($admin)
             ->test(OrganizationManager::class)

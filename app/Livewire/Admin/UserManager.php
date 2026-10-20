@@ -17,10 +17,27 @@ class UserManager extends Component
     public string $roleFilter = '';
     public ?int $filterOrganizationId = null;
 
-    // Create User Offcanvas State
-    public bool $showCreateUserOffcanvas = false;
+    // User Details Modal State (View & Edit Modes)
+    public bool $showUserDetailsModal = false;
+    public ?int $selectedUserId = null;
+    public ?User $selectedUser = null;
+    public string $userDetailsMode = 'view'; // 'view' or 'edit'
+
+    // User Edit Form Fields
+    public string $editName = '';
+    public string $editEmail = '';
+    public ?string $editPhone = '';
+    public ?int $editOrganizationId = null;
+    public string $editRole = 'Sales Executive';
+    public string $editStatus = 'active';
+    public string $editPassword = '';
+
+    // Create User Modal State
+    public bool $showCreateModal = false;
+    public bool $showCreateUserOffcanvas = false; // Backward-compatibility
     public string $newUserName = '';
     public string $newUserEmail = '';
+    public ?string $newUserPhone = '';
     public ?int $newUserOrganizationId = null;
     public string $newUserRole = 'Sales Executive';
     public string $newUserPassword = '';
@@ -35,7 +52,7 @@ class UserManager extends Component
     {
         return [
             ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
-            ['key' => 'name', 'label' => 'Full Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'name', 'label' => 'Full Name', 'type' => 'user_name', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'email', 'label' => 'Email Address', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted'],
             ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2],
             ['key' => 'primary_role_name', 'label' => 'Role', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
@@ -47,6 +64,8 @@ class UserManager extends Component
                 'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'Builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                'builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                 'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
                 'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
             ]],
@@ -66,19 +85,32 @@ class UserManager extends Component
         ];
     }
 
+    public function openCreateUserModal(): void
+    {
+        $this->reset(['newUserName', 'newUserEmail', 'newUserPhone', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
+        $this->newUserRole = 'Sales Executive';
+        $this->showCreateModal = true;
+        $this->showCreateUserOffcanvas = true;
+        $this->dispatch('open-modal', 'create-user-modal');
+    }
+
+    public function closeCreateUserModal(): void
+    {
+        $this->showCreateModal = false;
+        $this->showCreateUserOffcanvas = false;
+        $this->reset(['newUserName', 'newUserEmail', 'newUserPhone', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
+        $this->resetValidation();
+        $this->dispatch('close-modal', 'create-user-modal');
+    }
+
     public function openCreateUserOffcanvas(): void
     {
-        $this->reset(['newUserName', 'newUserEmail', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
-        $this->newUserRole = 'Sales Executive';
-        $this->showCreateUserOffcanvas = true;
-        $this->dispatch('open-offcanvas', 'create-user-drawer');
+        $this->openCreateUserModal();
     }
 
     public function closeCreateUserOffcanvas(): void
     {
-        $this->showCreateUserOffcanvas = false;
-        $this->reset(['newUserName', 'newUserEmail', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
-        $this->dispatch('close-offcanvas', 'create-user-drawer');
+        $this->closeCreateUserModal();
     }
 
     public function createUser(): void
@@ -86,6 +118,7 @@ class UserManager extends Component
         $this->validate([
             'newUserName' => 'required|string|max:255',
             'newUserEmail' => 'required|email|unique:users,email',
+            'newUserPhone' => 'nullable|string|max:50',
             'newUserRole' => 'required|string',
             'newUserOrganizationId' => 'nullable|exists:organizations,id',
         ]);
@@ -93,23 +126,125 @@ class UserManager extends Component
         $user = User::create([
             'name' => $this->newUserName,
             'email' => $this->newUserEmail,
+            'phone' => $this->newUserPhone ?: null,
             'password' => bcrypt($this->newUserPassword ?: Str::random(16)),
             'organization_id' => $this->newUserOrganizationId,
+            'status' => 'active',
         ]);
 
-        // Find or create role to prevent Spatie RoleDoesNotExist errors
         $role = Role::firstOrCreate(['name' => $this->newUserRole, 'guard_name' => 'web']);
         $user->assignRole($role->name);
 
-        // Generate temporary password reset / invite activation link
         $token = Password::createToken($user);
         $this->generatedInviteLink = url(route('password.reset', [
             'token' => $token,
             'email' => $user->email,
         ], false));
 
-        $this->reset(['newUserName', 'newUserEmail', 'newUserPassword', 'newUserOrganizationId']);
+        $this->reset(['newUserName', 'newUserEmail', 'newUserPhone', 'newUserPassword', 'newUserOrganizationId']);
         $this->dispatch('toast', type: 'success', message: "User '{$user->name}' created successfully.");
+    }
+
+    public function openUserDetailsModal(int $userId): void
+    {
+        $this->selectedUserId = $userId;
+        $this->selectedUser = User::with(['roles', 'organization'])->find($userId);
+
+        if (!$this->selectedUser) {
+            $this->dispatch('toast', type: 'error', message: 'User not found.');
+            return;
+        }
+
+        $this->editName = $this->selectedUser->name;
+        $this->editEmail = $this->selectedUser->email;
+        $this->editPhone = $this->selectedUser->phone ?? '';
+        $this->editOrganizationId = $this->selectedUser->organization_id;
+        $primaryRole = $this->selectedUser->roles->first()?->name;
+        $this->editRole = $primaryRole ? User::normalizeRoleName($primaryRole) : 'Sales Executive';
+        $this->editStatus = $this->selectedUser->status ?? 'active';
+        $this->editPassword = '';
+
+        $this->userDetailsMode = 'view';
+        $this->showUserDetailsModal = true;
+        $this->dispatch('open-modal', 'user-details-modal');
+    }
+
+    public function switchUserDetailsMode(string $mode): void
+    {
+        if (!in_array($mode, ['view', 'edit'])) {
+            return;
+        }
+
+        if ($mode === 'edit' && $this->selectedUser) {
+            $this->editName = $this->selectedUser->name;
+            $this->editEmail = $this->selectedUser->email;
+            $this->editPhone = $this->selectedUser->phone ?? '';
+            $this->editOrganizationId = $this->selectedUser->organization_id;
+            $primaryRole = $this->selectedUser->roles->first()?->name;
+            $this->editRole = $primaryRole ? User::normalizeRoleName($primaryRole) : 'Sales Executive';
+            $this->editStatus = $this->selectedUser->status ?? 'active';
+            $this->editPassword = '';
+            $this->resetValidation();
+        }
+
+        $this->userDetailsMode = $mode;
+    }
+
+    public function updateUser(): void
+    {
+        if (!$this->selectedUserId) {
+            return;
+        }
+
+        $this->validate([
+            'editName' => 'required|string|max:255',
+            'editEmail' => 'required|email|unique:users,email,' . $this->selectedUserId,
+            'editPhone' => 'nullable|string|max:50',
+            'editOrganizationId' => 'nullable|exists:organizations,id',
+            'editRole' => 'required|string',
+            'editStatus' => 'required|in:active,suspended',
+            'editPassword' => 'nullable|string|min:6',
+        ]);
+
+        $user = User::find($this->selectedUserId);
+        if (!$user) {
+            $this->dispatch('toast', type: 'error', message: 'User not found.');
+            return;
+        }
+
+        $updateData = [
+            'name' => $this->editName,
+            'email' => $this->editEmail,
+            'phone' => $this->editPhone ?: null,
+            'organization_id' => $this->editOrganizationId,
+            'status' => $this->editStatus,
+        ];
+
+        if (!empty($this->editPassword)) {
+            $updateData['password'] = bcrypt($this->editPassword);
+        }
+
+        $user->update($updateData);
+
+        $role = Role::firstOrCreate(['name' => $this->editRole, 'guard_name' => 'web']);
+        $user->syncRoles([$role->name]);
+
+        $this->selectedUser = User::with(['roles', 'organization'])->find($this->selectedUserId);
+        $this->userDetailsMode = 'view';
+        $this->editPassword = '';
+
+        $this->dispatch('toast', type: 'success', message: "User '{$user->name}' updated successfully.");
+    }
+
+    public function closeUserDetailsModal(): void
+    {
+        $this->showUserDetailsModal = false;
+        $this->selectedUserId = null;
+        $this->selectedUser = null;
+        $this->userDetailsMode = 'view';
+        $this->reset(['editName', 'editEmail', 'editPhone', 'editOrganizationId', 'editRole', 'editStatus', 'editPassword']);
+        $this->resetValidation();
+        $this->dispatch('close-modal', 'user-details-modal');
     }
 
     public function updateUserRole(int $userId, string $roleName): void
@@ -120,6 +255,42 @@ class UserManager extends Component
             $user->syncRoles([$role->name]);
             $this->dispatch('toast', type: 'success', message: "Role for {$user->name} updated to '{$role->name}'.");
         }
+    }
+
+    public function getAvailableRolesProperty(): array
+    {
+        $dbRoles = Role::orderBy('name')->pluck('name');
+        $roles = [];
+
+        foreach ($dbRoles as $roleName) {
+            $label = ucwords(str_replace(['-', '_'], ' ', $roleName));
+            if (!isset($roles[$label])) {
+                $roles[$label] = $label;
+            }
+        }
+
+        if (empty($roles)) {
+            $roles = [
+                'Builder' => 'Builder',
+                'Channel Partner' => 'Channel Partner',
+                'Sales Executive' => 'Sales Executive',
+                'Account Manager' => 'Account Manager',
+                'Client' => 'Client',
+                'Super Admin' => 'Super Admin',
+            ];
+        }
+
+        return $roles;
+    }
+
+    public function getOrganizationOptionsProperty(): array
+    {
+        $orgs = Organization::where('status', 'active')->orderBy('name')->get();
+        $options = ['' => 'Platform HQ (No Organization)'];
+        foreach ($orgs as $org) {
+            $options[(string)$org->id] = $org->name;
+        }
+        return $options;
     }
 
     protected function getFilteredQuery()
@@ -191,7 +362,7 @@ class UserManager extends Component
                 $u->id,
                 $u->name,
                 $u->email,
-                $u->organization ? $u->organization->name . ' (' . strtoupper($u->organization->type) . ')' : 'Platform HQ',
+                $u->organization ? $u->organization->name : 'Platform HQ',
                 $u->getRoleNames()->first() ?? 'No Role Assigned',
                 $u->created_at->format('Y-m-d H:i:s'),
             ];

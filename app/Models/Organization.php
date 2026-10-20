@@ -23,4 +23,20 @@ class Organization extends Model
     {
         return ($this->attributes['status'] ?? 'active') === 'active';
     }
+
+    /**
+     * Mutator to safely ignore legacy 'type' assignment since column was dropped.
+     */
+    public function setTypeAttribute($value): void
+    {
+        // Ignored: Organization Type has been removed from organizations table.
+    }
+
+    /**
+     * Accessor for legacy code expecting 'type'.
+     */
+    public function getTypeAttribute(): ?string
+    {
+        return $this->attributes['type'] ?? null;
+    }
 }

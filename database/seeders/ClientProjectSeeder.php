@@ -12,7 +12,7 @@ class ClientProjectSeeder extends Seeder
 {
     public function run(): void
     {
-        $org = Organization::where('type', 'builder')->first();
+        $org = Organization::first();
 
         $clientNames = ['Apex Real Estate Ventures', 'Prestige Landmark Group', 'Sobha Urban Living'];
 

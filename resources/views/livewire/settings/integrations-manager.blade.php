@@ -9,6 +9,10 @@
 
     <!-- Add / Edit Credential Card -->
     <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-5">
+        <!-- Hidden inputs to trap browser password manager autofill -->
+        <input type="text" class="hidden" name="prevent_autofill_user" style="display:none !important;" aria-hidden="true" tabindex="-1" autocomplete="off" />
+        <input type="password" class="hidden" name="prevent_autofill_pass" style="display:none !important;" aria-hidden="true" tabindex="-1" autocomplete="new-password" />
+
         <div class="flex items-center justify-between">
             <h2 class="text-xs font-bold text-ink uppercase tracking-wider">
                 {{ $selectedAccountId ? 'Edit Connection Credential (Account #' . $selectedAccountId . ')' : 'Add Connection Credential' }}
@@ -40,6 +44,8 @@
                 <input 
                     type="text" 
                     wire:model="accountName" 
+                    name="account_display_name"
+                    autocomplete="off"
                     placeholder="e.g. Bandra Campaign Account"
                     class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                 />
@@ -55,6 +61,8 @@
                     <input 
                         type="text" 
                         wire:model="metaPageId" 
+                        name="meta_page_id"
+                        autocomplete="off"
                         placeholder="e.g. 109283746501928"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
@@ -67,6 +75,8 @@
                     <input 
                         type="text" 
                         wire:model="metaAppId" 
+                        name="meta_app_id"
+                        autocomplete="off"
                         placeholder="e.g. 987654321098765"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
@@ -79,6 +89,8 @@
                     <input 
                         type="password" 
                         wire:model="metaAppSecret" 
+                        name="meta_app_secret"
+                        autocomplete="new-password"
                         placeholder="••••••••••••••••••••••••"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
@@ -97,6 +109,8 @@
                     <input 
                         type="password" 
                         wire:model="metaAccessToken" 
+                        name="meta_access_token"
+                        autocomplete="new-password"
                         placeholder="EAABw... (Never-expiring System User Token or Graph Token)"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
@@ -117,6 +131,8 @@
                     <input 
                         type="text" 
                         wire:model="metaVerifyToken" 
+                        name="meta_verify_token"
+                        autocomplete="off"
                         placeholder="Random verification token"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition mt-1"
                     />
@@ -163,11 +179,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div>
                     <label class="font-bold text-ink">Google Ads Customer ID</label>
-                    <input type="text" wire:model="googleCustomerId" placeholder="123-456-7890" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
+                    <input type="text" wire:model="googleCustomerId" name="google_customer_id" autocomplete="off" placeholder="123-456-7890" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
                 </div>
                 <div>
                     <label class="font-bold text-ink">Developer Token (Encrypted)</label>
-                    <input type="password" wire:model="googleDeveloperToken" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
+                    <input type="password" wire:model="googleDeveloperToken" name="google_developer_token" autocomplete="new-password" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
                 </div>
             </div>
         </div>
@@ -177,11 +193,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div>
                     <label class="font-bold text-ink">Portal API Key (99acres / MagicBricks)</label>
-                    <input type="password" wire:model="portalApiKey" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
+                    <input type="password" wire:model="portalApiKey" name="portal_api_key" autocomplete="new-password" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
                 </div>
                 <div>
                     <label class="font-bold text-ink">Vendor / Agency ID</label>
-                    <input type="text" wire:model="portalVendorId" placeholder="e.g. VEND-99201" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
+                    <input type="text" wire:model="portalVendorId" name="portal_vendor_id" autocomplete="off" placeholder="e.g. VEND-99201" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
                 </div>
             </div>
         </div>
@@ -190,7 +206,7 @@
         <div x-show="source === 'owned'" class="space-y-4 pt-2 border-t border-border" style="display: none;">
             <div class="text-xs">
                 <label class="font-bold text-ink">Web API Key / Bearer Secret</label>
-                <input type="password" wire:model="apiSecret" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
+                <input type="password" wire:model="apiSecret" name="api_secret" autocomplete="new-password" placeholder="••••••••••••••••" class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1" />
             </div>
         </div>
 

@@ -208,7 +208,7 @@ class AuditLogBrowser extends Component
             'id',
             fn($l) => $l->created_at ? $l->created_at->format('M d, Y H:i:s') : '',
             fn($l) => $l->user?->name ?: 'System',
-            'action',
+            fn($l) => $l->action,
             fn($l) => class_basename($l->subject_type),
             'subject_id',
             'from_value',
@@ -227,7 +227,7 @@ class AuditLogBrowser extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                statusColumns: ['action']
+                statusColumns: []
             ),
             $filename
         );

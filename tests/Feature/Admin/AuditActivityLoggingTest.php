@@ -229,4 +229,27 @@ class AuditActivityLoggingTest extends TestCase
             ->assertSet('showDetailsModal', false)
             ->assertSet('selectedLog', null);
     }
+
+    public function test_audit_log_browser_export_excel_succeeds_without_error(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        AuditLog::create([
+            'user_id' => $this->superAdmin->id,
+            'action' => 'lead.created',
+            'subject_type' => 'App\Models\Lead',
+            'subject_id' => 10,
+            'from_value' => null,
+            'to_value' => json_encode(['title' => 'VIP Lead']),
+            'ip_address' => '127.0.0.1',
+            'created_at' => now(),
+        ]);
+
+        $component = Livewire::test(AuditLogBrowser::class);
+        $component->call('exportExcel');
+        $component->assertDispatched('toast', type: 'success');
+
+        $downloadResponse = $component->instance()->exportExcel();
+        $this->assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $downloadResponse);
+    }
 }

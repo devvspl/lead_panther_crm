@@ -109,7 +109,11 @@ class AuditActivityMiddleware
                 continue;
             }
 
-            $memo = $component['snapshot']['memo'] ?? ($component['memo'] ?? []);
+            $snapshot = $component['snapshot'] ?? [];
+            if (is_string($snapshot)) {
+                $snapshot = json_decode($snapshot, true) ?? [];
+            }
+            $memo = $snapshot['memo'] ?? ($component['memo'] ?? []);
             $componentName = $memo['name'] ?? 'unknown-component';
 
             // Skip internal audit logs browser updates from polling

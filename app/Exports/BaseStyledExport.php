@@ -80,15 +80,20 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
     {
         $mapped = [];
         foreach ($this->columns as $col) {
-            if (is_callable($col)) {
-                $mapped[] = $col($row);
+            $val = '';
+            if ($col instanceof \Closure || (!is_string($col) && is_callable($col))) {
+                $val = $col($row);
             } elseif (is_object($row)) {
-                $mapped[] = data_get($row, $col, '');
+                $val = data_get($row, $col, '');
             } elseif (is_array($row)) {
-                $mapped[] = $row[$col] ?? '';
-            } else {
-                $mapped[] = '';
+                $val = $row[$col] ?? '';
             }
+
+            if (is_array($val) || (is_object($val) && !method_exists($val, '__toString'))) {
+                $val = json_encode($val);
+            }
+
+            $mapped[] = $val;
         }
         return $mapped;
     }
@@ -159,10 +164,14 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
                 $rowItem = $this->data->values()->get($dataIdx);
 
                 foreach ($this->statusColumns as $sColKey) {
-                    $colIndex = array_search($sColKey, array_values($this->columns));
+                    $colIndex = array_search($sColKey, array_values($this->columns), true);
                     if ($colIndex !== false) {
                         $cellLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
-                        $val = strtolower(trim((string)(is_object($rowItem) ? data_get($rowItem, $sColKey) : ($rowItem[$sColKey] ?? ''))));
+                        $rowVal = is_object($rowItem) ? data_get($rowItem, $sColKey) : ($rowItem[$sColKey] ?? '');
+                        if (is_array($rowVal) || is_object($rowVal)) {
+                            $rowVal = json_encode($rowVal);
+                        }
+                        $val = strtolower(trim((string)$rowVal));
 
                         $badgeBg = 'F1F5F9';
                         $badgeText = '475569';
@@ -188,7 +197,7 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
 
                 // Currency / Number Formatting
                 foreach ($this->currencyColumns as $cColKey) {
-                    $colIndex = array_search($cColKey, array_values($this->columns));
+                    $colIndex = array_search($cColKey, array_values($this->columns), true);
                     if ($colIndex !== false) {
                         $cellLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
                         $sheet->getStyle("{$cellLetter}{$r}")->getNumberFormat()->setFormatCode('"₹"#,##0.00');
@@ -203,7 +212,7 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
             $sheet->setCellValue("A{$totalRow}", 'TOTAL SUMMARY');
 
             foreach ($this->currencyColumns as $cColKey) {
-                $colIndex = array_search($cColKey, array_values($this->columns));
+                $colIndex = array_search($cColKey, array_values($this->columns), true);
                 if ($colIndex !== false) {
                     $cellLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
                     $sheet->setCellValue("{$cellLetter}{$totalRow}", "=SUM({$cellLetter}{$firstDataRow}:{$cellLetter}{$lastDataRow})");

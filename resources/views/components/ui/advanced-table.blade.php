@@ -40,7 +40,16 @@
                     </svg>
                 </div>
                 <input 
-                    type="text" 
+                    type="search" 
+                    name="table_search_query"
+                    id="table_search_{{ $tableName }}"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
                     wire:model.live.debounce.300ms="search" 
                     placeholder="{{ $searchPlaceholder }}"
                     class="w-full pl-9 pr-8 py-2 rounded-lg border border-border bg-canvas text-ink text-xs placeholder:text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary transition"

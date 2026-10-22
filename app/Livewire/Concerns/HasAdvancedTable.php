@@ -38,6 +38,14 @@ trait HasAdvancedTable
     public function initializeHasAdvancedTable(): void
     {
         $this->loadColumnPreferences();
+
+        // Prevent browser autofill or stale query params from filling logged-in user's email into search
+        if (auth()->check() && !empty($this->search)) {
+            $userEmail = strtolower(trim(auth()->user()->email ?? ''));
+            if ($userEmail !== '' && strtolower(trim($this->search)) === $userEmail) {
+                $this->search = '';
+            }
+        }
     }
 
     /**
@@ -149,6 +157,15 @@ trait HasAdvancedTable
      */
     public function updatedSearch(): void
     {
+        // Ignore browser autofill of the logged-in user's email into search inputs
+        if (auth()->check() && !empty($this->search)) {
+            $userEmail = strtolower(trim(auth()->user()->email ?? ''));
+            if ($userEmail !== '' && strtolower(trim($this->search)) === $userEmail) {
+                $this->search = '';
+                return;
+            }
+        }
+
         $this->resetPage();
         $this->selectedRows = [];
         $this->selectAll = false;

@@ -7,7 +7,19 @@
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
         </div>
-        <input type="text" wire:model.live.debounce.300ms="search" @focus="open = true"
+        <input 
+            type="search" 
+            name="global_search_query"
+            id="global_search_query"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
+            wire:model.live.debounce.300ms="search" 
+            @focus="open = true"
             placeholder="Search leads, projects, clients..."
             class="w-full h-8 pl-9 pr-12 bg-canvas text-ink text-xs rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent focus:bg-surface placeholder:text-muted transition">
         <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none hidden sm:flex">

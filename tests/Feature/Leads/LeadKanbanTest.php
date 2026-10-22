@@ -83,4 +83,24 @@ class LeadKanbanTest extends TestCase
             ->assertSee('All Agents')
             ->assertSee('All Sources');
     }
+
+    public function test_autofilled_user_email_in_search_is_cleared(): void
+    {
+        $user = User::factory()->create(['email' => 'admin@leadpanther.com']);
+        $user->assignRole('super-admin');
+
+        // Test with query param search = user email (e.g. browser autofill or stale URL)
+        Livewire::withQueryParams(['search' => 'admin@leadpanther.com'])
+            ->actingAs($user)
+            ->test(LeadKanban::class)
+            ->assertSet('search', '');
+
+        // Test with live input updated to user email
+        Livewire::actingAs($user)
+            ->test(LeadKanban::class)
+            ->set('search', 'admin@leadpanther.com')
+            ->assertSet('search', '')
+            ->set('search', 'Genuine Lead Name')
+            ->assertSet('search', 'Genuine Lead Name');
+    }
 }

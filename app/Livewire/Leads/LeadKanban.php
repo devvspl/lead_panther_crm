@@ -120,6 +120,14 @@ class LeadKanban extends Component
             } else {
                 $this->analyticsRange = $savedRange;
             }
+
+            // Prevent browser autofill or stale query params from filling logged-in user's email into search
+            if (!empty($this->search)) {
+                $userEmail = strtolower(trim(auth()->user()->email ?? ''));
+                if ($userEmail !== '' && strtolower(trim($this->search)) === $userEmail) {
+                    $this->search = '';
+                }
+            }
         }
     }
 
@@ -181,7 +189,19 @@ class LeadKanban extends Component
         }
     }
 
-    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedSearch(): void
+    {
+        // Ignore browser autofill of the logged-in user's email into search inputs
+        if (auth()->check() && !empty($this->search)) {
+            $userEmail = strtolower(trim(auth()->user()->email ?? ''));
+            if ($userEmail !== '' && strtolower(trim($this->search)) === $userEmail) {
+                $this->search = '';
+                return;
+            }
+        }
+
+        $this->resetPage();
+    }
     public function updatedProject(): void { $this->resetPage(); }
     public function updatedExecutive(): void { $this->resetPage(); }
     public function updatedTeam(): void { $this->resetPage(); }

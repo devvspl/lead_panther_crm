@@ -28,7 +28,19 @@
         @if($searchable ?? true)
             <!-- Search Input Header -->
             <div class="relative">
-                <input x-ref="searchInput" type="text" wire:model.live.debounce.300ms="search" placeholder="Search..."
+                <input 
+                    x-ref="searchInput" 
+                    type="search" 
+                    name="select_search_query"
+                    autocomplete="off" 
+                    autocorrect="off" 
+                    autocapitalize="off" 
+                    spellcheck="false" 
+                    data-lpignore="true" 
+                    data-1p-ignore="true" 
+                    data-form-type="other" 
+                    wire:model.live.debounce.300ms="search" 
+                    placeholder="Search..."
                     class="w-full h-8 pl-8 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:outline-none placeholder:text-muted transition" />
                 <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5 pointer-events-none" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">

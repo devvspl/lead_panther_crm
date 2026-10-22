@@ -251,11 +251,25 @@
         class="bg-surface rounded-card border border-border p-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <!-- Filter Controls -->
         <div class="flex flex-wrap items-center gap-3">
-            <!-- Search -->
-            <div class="relative w-40 sm:w-48">
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search leads..."
-                    class="w-full h-8 pl-3 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:bg-surface">
-            </div>
+            <!-- Search (Rendered in top bar for Kanban view; Table view uses integrated table search) -->
+            @if($viewMode === 'kanban')
+                <div class="relative w-40 sm:w-48">
+                    <input 
+                        type="search" 
+                        name="kanban_search_query"
+                        id="kanban_search_query"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                        wire:model.live.debounce.300ms="search" 
+                        placeholder="Search leads..."
+                        class="w-full h-8 pl-3 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:bg-surface">
+                </div>
+            @endif
 
             <!-- Sort By Filter -->
             <x-ui.themed-select wire:model.live="sort_by" searchable="true" :options="[

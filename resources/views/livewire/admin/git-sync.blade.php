@@ -408,7 +408,7 @@
                     </button>
                 </div>
 
-                <!-- Optional Target Seeder Class Selector -->
+                <!-- Optional Target Seeder Class Selector Quick Hint -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/70 text-xs">
                     <div class="flex items-center gap-2">
                         <label for="seederSelector" class="font-bold text-ink whitespace-nowrap">Target Seeder:</label>
@@ -427,13 +427,290 @@
                         </span>
                     </div>
                 </div>
+            </div>
 
-                @if($lastFollowupResult)
-                    <div
-                        class="p-3 bg-black text-emerald-400 rounded-xl font-mono text-[11px] overflow-x-auto select-text whitespace-pre-wrap mt-3">
-                        <div class="text-white font-bold mb-1">[Action: {{ $lastFollowupResult['action'] }}] Status:
-                            {{ $lastFollowupResult['successful'] ? 'SUCCESS' : 'FAILED' }}</div>
-                        {{ $lastFollowupResult['stdout'] ?: ($lastFollowupResult['stderr'] ?: 'Executed with no output') }}
+            <!-- Execution Terminal Output Console -->
+            @if($lastFollowupResult)
+                <div class="p-4 bg-black text-emerald-400 rounded-xl font-mono text-[11px] overflow-x-auto select-text whitespace-pre-wrap border border-neutral-800 shadow-md">
+                    <div class="flex items-center justify-between text-white font-bold mb-2 pb-2 border-b border-neutral-800">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] {{ $lastFollowupResult['successful'] ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-red-900/60 text-red-300 border border-red-700' }}">
+                                {{ $lastFollowupResult['successful'] ? 'SUCCESS' : 'FAILED' }}
+                            </span>
+                            <span>Action: {{ $lastFollowupResult['action'] }}</span>
+                        </div>
+                        <button type="button" wire:click="clearFollowupConsole" class="text-neutral-400 hover:text-white text-xs cursor-pointer">
+                            ✕ Clear Output
+                        </button>
+                    </div>
+                    <div class="leading-relaxed">{{ $lastFollowupResult['stdout'] ?: ($lastFollowupResult['stderr'] ?: 'Command finished with no output recorded.') }}</div>
+                </div>
+            @endif
+
+            <!-- Interactive Database Migrations & Seeders Directory (2 Tabs: Migrations & Seeders) -->
+            <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink flex items-center gap-2">
+                            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                            </svg>
+                            <span>Database Migrations &amp; Seeders Management</span>
+                        </h3>
+                        <p class="text-xs text-muted">Inspect migration states, track execution batches, or execute individual migrations and seeders independently single by single.</p>
+                    </div>
+
+                    <!-- 2-Tab Navigation Switcher -->
+                    <div class="inline-flex items-center p-1 bg-canvas rounded-lg border border-border">
+                        <button type="button" wire:click="$set('dbManagerTab', 'migrations')"
+                            class="px-3.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer {{ $dbManagerTab === 'migrations' ? 'bg-surface text-ink font-bold shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
+                            <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                            </svg>
+                            <span>1. Migrations</span>
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] {{ $dbManagerTab === 'migrations' ? 'bg-primary/10 text-primary font-bold' : 'bg-surface text-muted' }}">
+                                {{ $migrationStats['total'] ?? 0 }}
+                            </span>
+                            @if(($migrationStats['pending'] ?? 0) > 0)
+                                <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500 text-white font-bold animate-pulse">
+                                    {{ $migrationStats['pending'] }} Pending
+                                </span>
+                            @endif
+                        </button>
+
+                        <button type="button" wire:click="$set('dbManagerTab', 'seeders')"
+                            class="px-3.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer {{ $dbManagerTab === 'seeders' ? 'bg-surface text-ink font-bold shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
+                            <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21v-7m0 0c0-3.866 3.134-7 7-7 0 3.866-3.134 7-7 7zm0 0c0-3.866-3.134-7-7-7 0 3.866 3.134 7 7 7z" />
+                            </svg>
+                            <span>2. Seeders</span>
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] {{ $dbManagerTab === 'seeders' ? 'bg-purple-50 text-purple-700 font-bold' : 'bg-surface text-muted' }}">
+                                {{ count($seeders) }}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search and Filters Bar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-canvas p-3 rounded-xl border border-border">
+                    <div class="relative flex-1 max-w-sm">
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.250ms="dbSearch"
+                            placeholder="{{ $dbManagerTab === 'migrations' ? 'Search migration file, table name...' : 'Search seeder class, category...' }}"
+                            class="w-full pl-8 pr-7 py-1.5 rounded-lg border border-border bg-surface text-ink text-xs placeholder:text-muted focus:ring-1 focus:ring-primary focus:border-primary transition"
+                        />
+                        <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        @if(!empty($dbSearch))
+                            <button type="button" wire:click="$set('dbSearch', '')" class="absolute right-2 top-2 text-muted hover:text-ink cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        @endif
+                    </div>
+
+                    @if($dbManagerTab === 'migrations')
+                        <!-- Migration Status Filter Pills -->
+                        <div class="flex items-center gap-1.5 text-xs">
+                            <span class="text-muted text-[11px] font-semibold">Filter:</span>
+                            <button type="button" wire:click="$set('migrationFilter', 'all')"
+                                class="px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer {{ $migrationFilter === 'all' ? 'bg-surface text-ink font-bold border border-border shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                All ({{ $migrationStats['total'] ?? 0 }})
+                            </button>
+                            <button type="button" wire:click="$set('migrationFilter', 'pending')"
+                                class="px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer {{ $migrationFilter === 'pending' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-300 shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                Pending ({{ $migrationStats['pending'] ?? 0 }})
+                            </button>
+                            <button type="button" wire:click="$set('migrationFilter', 'ran')"
+                                class="px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer {{ $migrationFilter === 'ran' ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-300 shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                Ran ({{ $migrationStats['ran'] ?? 0 }})
+                            </button>
+                        </div>
+                    @else
+                        <!-- Seeders Count & Quick Hint -->
+                        <div class="text-[11px] text-muted flex items-center gap-1.5 font-mono">
+                            <span>Available:</span>
+                            <span class="font-bold text-ink">{{ count($seeders) }} classes discovered</span>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- TAB 1 CONTENT: MIGRATIONS TABLE -->
+                @if($dbManagerTab === 'migrations')
+                    <div class="rounded-xl border border-border overflow-hidden bg-surface">
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="sticky top-0 bg-surface z-10 border-b border-border shadow-2xs">
+                                    <tr class="text-[11px] font-bold text-muted uppercase tracking-wider">
+                                        <th class="py-2.5 px-3.5">Migration File &amp; Name</th>
+                                        <th class="py-2.5 px-3.5">Batch</th>
+                                        <th class="py-2.5 px-3.5">Status</th>
+                                        <th class="py-2.5 px-3.5 hidden md:table-cell">Created Date</th>
+                                        <th class="py-2.5 px-3.5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    @forelse($migrations as $m)
+                                        <tr class="hover:bg-canvas/50 transition">
+                                            <td class="py-2.5 px-3.5">
+                                                <div class="font-bold text-ink">{{ $m['title'] }}</div>
+                                                <div class="font-mono text-[11px] text-muted truncate max-w-md" title="{{ $m['filename'] }}">
+                                                    {{ $m['filename'] }}
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-3.5 font-mono">
+                                                @if($m['batch'])
+                                                    <span class="px-2 py-0.5 rounded-pill bg-canvas text-ink border border-border text-[10px] font-bold">
+                                                        Batch #{{ $m['batch'] }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted text-[11px]">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3.5">
+                                                @if($m['is_ran'])
+                                                    <span class="px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        <span>Ran</span>
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-pill bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                        <span>Pending</span>
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3.5 font-mono text-[11px] text-muted hidden md:table-cell">
+                                                {{ $m['date'] }}
+                                            </td>
+                                            <td class="py-2.5 px-3.5 text-right">
+                                                <button 
+                                                    type="button" 
+                                                    wire:click="runSingleMigration('{{ $m['filename'] }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="runSingleMigration('{{ $m['filename'] }}')"
+                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5 {{ !$m['is_ran'] ? 'bg-primary hover:bg-primary-dark text-white' : 'bg-surface hover:bg-canvas text-ink border border-border' }}"
+                                                    title="{{ !$m['is_ran'] ? 'Run this pending migration now' : 'Re-run single migration' }}"
+                                                >
+                                                    <svg wire:loading.remove wire:target="runSingleMigration('{{ $m['filename'] }}')" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <svg wire:loading wire:target="runSingleMigration('{{ $m['filename'] }}')" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span wire:loading.remove wire:target="runSingleMigration('{{ $m['filename'] }}')">
+                                                        {{ !$m['is_ran'] ? 'Run Migration' : 'Run Single' }}
+                                                    </span>
+                                                    <span wire:loading wire:target="runSingleMigration('{{ $m['filename'] }}')">
+                                                        Running...
+                                                    </span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="py-8 text-center text-muted">
+                                                No migrations match your search or status filter.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- TAB 2 CONTENT: SEEDERS TABLE -->
+                @if($dbManagerTab === 'seeders')
+                    <div class="rounded-xl border border-border overflow-hidden bg-surface">
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="sticky top-0 bg-surface z-10 border-b border-border shadow-2xs">
+                                    <tr class="text-[11px] font-bold text-muted uppercase tracking-wider">
+                                        <th class="py-2.5 px-3.5">Seeder Class</th>
+                                        <th class="py-2.5 px-3.5">Category</th>
+                                        <th class="py-2.5 px-3.5 hidden md:table-cell">Last Run</th>
+                                        <th class="py-2.5 px-3.5">Status</th>
+                                        <th class="py-2.5 px-3.5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    @forelse($seeders as $s)
+                                        <tr class="hover:bg-canvas/50 transition">
+                                            <td class="py-2.5 px-3.5">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-mono font-bold text-ink">{{ $s['class'] }}</span>
+                                                    @if($s['is_master'])
+                                                        <span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                                            Master
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <div class="text-[11px] text-muted">{{ $s['title'] }}</div>
+                                            </td>
+                                            <td class="py-2.5 px-3.5">
+                                                <span class="px-2 py-0.5 rounded-pill bg-canvas text-ink border border-border text-[10px] font-semibold">
+                                                    {{ $s['category'] }}
+                                                </span>
+                                            </td>
+                                            <td class="py-2.5 px-3.5 hidden md:table-cell">
+                                                @if($s['last_run'])
+                                                    <div class="font-mono text-[11px] text-ink font-semibold">{{ $s['last_run'] }}</div>
+                                                    <div class="text-[10px] text-muted">by {{ $s['last_user'] }}</div>
+                                                @else
+                                                    <span class="text-muted text-[11px]">Ready / Available</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3.5">
+                                                @if($s['last_run'])
+                                                    <span class="px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                                        ✓ Executed
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-pill bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+                                                        Available
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3.5 text-right">
+                                                <button 
+                                                    type="button" 
+                                                    wire:click="runSingleSeeder('{{ $s['class'] }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="runSingleSeeder('{{ $s['class'] }}')"
+                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-300 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                                                    title="Execute php artisan db:seed --class={{ $s['class'] }} --force"
+                                                >
+                                                    <svg wire:loading.remove wire:target="runSingleSeeder('{{ $s['class'] }}')" class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <svg wire:loading wire:target="runSingleSeeder('{{ $s['class'] }}')" class="w-3.5 h-3.5 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span wire:loading.remove wire:target="runSingleSeeder('{{ $s['class'] }}')">
+                                                        Run Seeder
+                                                    </span>
+                                                    <span wire:loading wire:target="runSingleSeeder('{{ $s['class'] }}')">
+                                                        Seeding...
+                                                    </span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="py-8 text-center text-muted">
+                                                No seeders match your search.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 @endif
             </div>

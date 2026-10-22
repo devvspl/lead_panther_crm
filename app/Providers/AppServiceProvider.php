@@ -40,10 +40,48 @@ class AppServiceProvider extends ServiceProvider
             return ($user->hasRole('Super Admin') || $user->hasRole('super-admin')) ? true : null;
         });
 
-        Lead::observe(AuditLogObserver::class);
-        CreditTransaction::observe(AuditLogObserver::class);
-        LeadReplacement::observe(AuditLogObserver::class);
-        User::observe(AuditLogObserver::class);
+        // Audit Trail Model Observers
+        $auditableModels = [
+            \App\Models\Lead::class,
+            \App\Models\CreditTransaction::class,
+            \App\Models\LeadReplacement::class,
+            \App\Models\User::class,
+            \App\Models\Organization::class,
+            \App\Models\Project::class,
+            \App\Models\Client::class,
+            \App\Models\DistributionRule::class,
+            \App\Models\SalesTeam::class,
+            \App\Models\SalesTeamMember::class,
+            \App\Models\CreditPackage::class,
+            \App\Models\CreditWallet::class,
+            \App\Models\Followup::class,
+            \App\Models\GeneralSetting::class,
+            \App\Models\IntegrationCredential::class,
+            \App\Models\LeadSource::class,
+            \App\Models\Campaign::class,
+            \App\Models\Meeting::class,
+            \App\Models\Negotiation::class,
+            \App\Models\NotificationTemplate::class,
+            \App\Models\Payment::class,
+            \App\Models\PaymentReceived::class,
+            \App\Models\PortalAccount::class,
+            \App\Models\Proposal::class,
+            \App\Models\RechargeRequest::class,
+            \App\Models\SiteVisit::class,
+            \App\Models\UploadBatch::class,
+            \App\Models\LeadActivity::class,
+            \App\Models\LeadAssignment::class,
+            \App\Models\LeadCall::class,
+            \App\Models\LeadCommunication::class,
+            \App\Models\LeadMessage::class,
+            \App\Models\LeadStatusHistory::class,
+        ];
+
+        foreach ($auditableModels as $modelClass) {
+            if (class_exists($modelClass)) {
+                $modelClass::observe(AuditLogObserver::class);
+            }
+        }
 
         // First Response SLA Observers
         LeadCall::observe(FirstResponseObserver::class);
@@ -59,5 +97,8 @@ class AppServiceProvider extends ServiceProvider
         // Default Pagination Views
         \Illuminate\Pagination\Paginator::defaultView('vendor.pagination.tailwind');
         \Illuminate\Pagination\Paginator::defaultSimpleView('vendor.pagination.tailwind');
+
+        // Security & Auth Events Audit Subscriber
+        \Illuminate\Support\Facades\Event::subscribe(\App\Listeners\AuditAuthSubscriber::class);
     }
 }

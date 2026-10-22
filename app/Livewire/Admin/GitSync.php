@@ -9,6 +9,8 @@ use App\Services\GitSyncService;
 use App\Jobs\RunGitSyncJob;
 use App\Models\AuditLog;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Throwable;
 
 class GitSync extends Component
@@ -58,6 +60,12 @@ class GitSync extends Component
     public bool $isFollowupRunning = false;
     public ?array $lastFollowupResult = null;
     public string $selectedSeederClass = '';
+
+    // Database Migrations & Seeders Manager
+    public string $dbManagerTab = 'migrations'; // 'migrations' | 'seeders'
+    public string $dbSearch = '';
+    public string $migrationFilter = 'all'; // 'all' | 'pending' | 'ran'
+    public ?string $executingSingleItem = null; // e.g. 'migration:2026_...' or 'seeder:UserSeeder'
 
     public function mount(GitSyncService $gitService): void
     {
@@ -471,6 +479,251 @@ class GitSync extends Component
         }
     }
 
+    public function getMigrationsProperty(): array
+    {
+        $ranMigrations = [];
+        try {
+            $ranMigrations = DB::table('migrations')->pluck('batch', 'migration')->toArray();
+        } catch (Throwable $e) {}
+
+        $files = File::files(database_path('migrations'));
+        $migrations = [];
+
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $migrationName = str_replace('.php', '', $filename);
+            $isRan = array_key_exists($migrationName, $ranMigrations);
+            $batch = $isRan ? $ranMigrations[$migrationName] : null;
+
+            // Formatted date
+            $readableDate = '—';
+            $parts = explode('_', $migrationName);
+            if (count($parts) >= 4 && is_numeric($parts[0]) && is_numeric($parts[1]) && is_numeric($parts[2])) {
+                $readableDate = "{$parts[0]}-{$parts[1]}-{$parts[2]}";
+            }
+
+            // Human readable title
+            $cleanTitle = ucwords(str_replace('_', ' ', preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', $migrationName)));
+
+            // Filter by migration status
+            if ($this->migrationFilter === 'pending' && $isRan) {
+                continue;
+            }
+            if ($this->migrationFilter === 'ran' && !$isRan) {
+                continue;
+            }
+
+            // Filter by search
+            if (!empty($this->dbSearch)) {
+                $search = strtolower(trim($this->dbSearch));
+                $match = str_contains(strtolower($migrationName), $search)
+                    || str_contains(strtolower($cleanTitle), $search)
+                    || str_contains(strtolower($filename), $search)
+                    || ($batch && str_contains((string)$batch, $search));
+                if (!$match) {
+                    continue;
+                }
+            }
+
+            $migrations[] = [
+                'filename' => $filename,
+                'migration' => $migrationName,
+                'title' => $cleanTitle,
+                'date' => $readableDate,
+                'is_ran' => $isRan,
+                'batch' => $batch,
+                'path' => 'database/migrations/' . $filename,
+            ];
+        }
+
+        // Sort latest migration first
+        usort($migrations, fn($a, $b) => strcmp($b['migration'], $a['migration']));
+
+        return $migrations;
+    }
+
+    public function getMigrationStatsProperty(): array
+    {
+        $ranMigrations = [];
+        try {
+            $ranMigrations = DB::table('migrations')->pluck('batch', 'migration')->toArray();
+        } catch (Throwable $e) {}
+
+        $files = File::files(database_path('migrations'));
+        $total = count($files);
+        $ran = 0;
+
+        foreach ($files as $file) {
+            $name = str_replace('.php', '', $file->getFilename());
+            if (array_key_exists($name, $ranMigrations)) {
+                $ran++;
+            }
+        }
+
+        return [
+            'total' => $total,
+            'ran' => $ran,
+            'pending' => max(0, $total - $ran),
+        ];
+    }
+
+    public function getSeedersProperty(): array
+    {
+        $files = File::files(database_path('seeders'));
+        $seeders = [];
+
+        // Check recent seed audit logs for execution history
+        $lastRuns = [];
+        try {
+            $logs = AuditLog::where('action', 'like', '%seed%')
+                ->latest('id')
+                ->take(150)
+                ->get();
+
+            foreach ($logs as $log) {
+                $from = is_array($log->from_value) ? $log->from_value : json_decode($log->from_value, true);
+                $targetClass = $from['class'] ?? ($from['target_class'] ?? null);
+                if ($targetClass && !isset($lastRuns[$targetClass])) {
+                    $lastRuns[$targetClass] = [
+                        'timestamp' => $log->created_at,
+                        'user' => $log->user?->name ?: 'Super Admin',
+                    ];
+                }
+            }
+        } catch (Throwable $e) {}
+
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $className = str_replace('.php', '', $filename);
+
+            if (!str_ends_with($filename, 'Seeder.php')) {
+                continue;
+            }
+
+            $category = match (true) {
+                $className === 'DatabaseSeeder' => 'Master Orchestrator',
+                str_contains($className, 'Role') || str_contains($className, 'Permission') => 'Roles & Security',
+                str_contains($className, 'User') || str_contains($className, 'Account') => 'Users & Auth',
+                str_contains($className, 'Organization') || str_contains($className, 'Client') || str_contains($className, 'Project') => 'Core Business',
+                str_contains($className, 'Lead') || str_contains($className, 'Campaign') || str_contains($className, 'Distribution') => 'CRM Pipeline',
+                str_contains($className, 'Credit') || str_contains($className, 'Replacement') => 'Billing & Operations',
+                str_contains($className, 'Communication') || str_contains($className, 'Activity') => 'Activity & Comms',
+                str_contains($className, 'Demo') => 'Demo Dataset',
+                default => 'General',
+            };
+
+            $lastRun = $lastRuns[$className] ?? null;
+
+            if (!empty($this->dbSearch)) {
+                $search = strtolower(trim($this->dbSearch));
+                $match = str_contains(strtolower($className), $search)
+                    || str_contains(strtolower($category), $search)
+                    || str_contains(strtolower($filename), $search);
+                if (!$match) {
+                    continue;
+                }
+            }
+
+            $seeders[] = [
+                'filename' => $filename,
+                'class' => $className,
+                'title' => ucwords(str_replace('Seeder', ' Seeder', $className)),
+                'category' => $category,
+                'is_master' => $className === 'DatabaseSeeder',
+                'last_run' => $lastRun ? $lastRun['timestamp']->format('M d, Y H:i') : null,
+                'last_user' => $lastRun['user'] ?? null,
+                'status' => $lastRun ? 'Executed' : 'Available',
+            ];
+        }
+
+        // Put DatabaseSeeder first, then sort alphabetically
+        usort($seeders, function ($a, $b) {
+            if ($a['is_master']) return -1;
+            if ($b['is_master']) return 1;
+            return strcmp($a['class'], $b['class']);
+        });
+
+        return $seeders;
+    }
+
+    public function runSingleMigration(string $filename, GitSyncService $gitService): void
+    {
+        $safeFile = basename($filename);
+        $relativePath = 'database/migrations/' . $safeFile;
+
+        if (!File::exists(base_path($relativePath))) {
+            $this->dispatch('toast', type: 'error', message: "Migration file '{$safeFile}' not found.");
+            return;
+        }
+
+        $userId = auth()->id() ?? 0;
+        $this->isFollowupRunning = true;
+        $this->executingSingleItem = 'migration:' . $safeFile;
+        $this->lastFollowupResult = null;
+
+        try {
+            $this->lastFollowupResult = $gitService->runFollowupAction('migrate', $userId, $relativePath);
+
+            if ($this->lastFollowupResult['successful']) {
+                $this->dispatch('toast', type: 'success', message: "Migration '{$safeFile}' processed.");
+            } else {
+                $this->dispatch('toast', type: 'error', message: "Migration '{$safeFile}' encountered an error.");
+            }
+        } catch (Throwable $e) {
+            $this->lastFollowupResult = [
+                'action' => 'migrate: ' . $safeFile,
+                'successful' => false,
+                'stdout' => '',
+                'stderr' => $e->getMessage(),
+            ];
+            $this->dispatch('toast', type: 'error', message: "Error: {$e->getMessage()}");
+        } finally {
+            $this->isFollowupRunning = false;
+            $this->executingSingleItem = null;
+        }
+    }
+
+    public function runSingleSeeder(string $className, GitSyncService $gitService): void
+    {
+        $safeClass = preg_replace('/[^a-zA-Z0-9_\\\\]/', '', (string) $className);
+
+        if (empty($safeClass)) {
+            $this->dispatch('toast', type: 'error', message: 'Invalid seeder class name.');
+            return;
+        }
+
+        $userId = auth()->id() ?? 0;
+        $this->isFollowupRunning = true;
+        $this->executingSingleItem = 'seeder:' . $safeClass;
+        $this->lastFollowupResult = null;
+
+        try {
+            $this->lastFollowupResult = $gitService->runFollowupAction('seed', $userId, $safeClass);
+
+            if ($this->lastFollowupResult['successful']) {
+                $this->dispatch('toast', type: 'success', message: "Seeder '{$safeClass}' executed successfully.");
+            } else {
+                $this->dispatch('toast', type: 'error', message: "Seeder '{$safeClass}' failed.");
+            }
+        } catch (Throwable $e) {
+            $this->lastFollowupResult = [
+                'action' => 'seed: ' . $safeClass,
+                'successful' => false,
+                'stdout' => '',
+                'stderr' => $e->getMessage(),
+            ];
+            $this->dispatch('toast', type: 'error', message: "Error: {$e->getMessage()}");
+        } finally {
+            $this->isFollowupRunning = false;
+            $this->executingSingleItem = null;
+        }
+    }
+
+    public function clearFollowupConsole(): void
+    {
+        $this->lastFollowupResult = null;
+    }
+
     public function checkSyncProgress(GitSyncService $gitService): void
     {
         $userId = auth()->id() ?? 0;
@@ -696,6 +949,9 @@ class GitSync extends Component
             'gitAuditLogs' => $gitAuditLogs,
             'filteredCommitHistory' => $this->filteredCommitHistory,
             'availableSeeders' => $this->availableSeeders,
+            'migrations' => $this->migrations,
+            'migrationStats' => $this->migrationStats,
+            'seeders' => $this->seeders,
         ])->layout('layouts.app');
     }
 }

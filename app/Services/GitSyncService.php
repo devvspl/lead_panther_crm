@@ -833,9 +833,16 @@ class GitSyncService
     public function runFollowupAction(string $actionType, ?int $userId = null, ?string $class = null): array
     {
         $safeClass = !empty($class) ? preg_replace('/[^a-zA-Z0-9_\\\\]/', '', (string) $class) : null;
+        $safePath = !empty($class) ? preg_replace('/[^a-zA-Z0-9_\\/\\\\.-]/', '', (string) $class) : null;
 
         $command = match ($actionType) {
-            'migrate' => ['php', 'artisan', 'migrate', '--force'],
+            'migrate' => array_values(array_filter([
+                'php',
+                'artisan',
+                'migrate',
+                $safePath ? "--path={$safePath}" : null,
+                '--force',
+            ])),
             'seed', 'db_seed', 'seeder' => array_values(array_filter([
                 'php',
                 'artisan',

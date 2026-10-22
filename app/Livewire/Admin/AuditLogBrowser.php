@@ -18,32 +18,73 @@ class AuditLogBrowser extends Component
     public ?string $customFrom = null;
     public ?string $customTo = null;
 
+    public bool $showDetailsModal = false;
+    public ?AuditLog $selectedLog = null;
+
     public function mount(): void
     {
         $this->loadColumnPreferences();
     }
 
+    public function viewDetails(int $logId): void
+    {
+        $this->selectedLog = AuditLog::with('user')->find($logId);
+        if ($this->selectedLog) {
+            $this->showDetailsModal = true;
+            $this->dispatch('open-modal', 'audit-log-details-modal');
+        }
+    }
+
+    public function closeDetails(): void
+    {
+        $this->showDetailsModal = false;
+        $this->selectedLog = null;
+        $this->dispatch('close-modal', 'audit-log-details-modal');
+    }
+
+    public function formatPayload(mixed $payload): string
+    {
+        if (empty($payload)) {
+            return '';
+        }
+        if (is_array($payload)) {
+            return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+        $decoded = json_decode($payload, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }
+        return (string) $payload;
+    }
+
     public function tableColumns(): array
     {
         return [
-            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'id', 'label' => 'ID', 'type' => 'audit_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-xs'],
             ['key' => 'created_at', 'label' => 'Timestamp', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'format' => 'M d, Y H:i:s'],
             ['key' => 'user_name', 'label' => 'User', 'type' => 'text', 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'action', 'label' => 'Action', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeStyle' => function ($val) {
-                if (str_contains($val, 'delete') || str_contains($val, 'revert') || str_contains($val, 'hard') || str_contains($val, 'reject')) {
+                if (str_contains($val, 'delete') || str_contains($val, 'revert') || str_contains($val, 'hard') || str_contains($val, 'reject') || str_contains($val, 'failed')) {
                     return 'bg-red-50 text-red-700 border border-red-200';
                 }
-                if (str_contains($val, 'create') || str_contains($val, 'approve') || str_contains($val, 'success')) {
+                if (str_contains($val, 'create') || str_contains($val, 'approve') || str_contains($val, 'success') || str_contains($val, 'login')) {
                     return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
                 }
                 if (str_contains($val, 'update') || str_contains($val, 'edit') || str_contains($val, 'pull')) {
                     return 'bg-blue-50 text-blue-700 border border-blue-200';
+                }
+                if (str_contains($val, 'route.') || str_contains($val, 'controller.')) {
+                    return 'bg-amber-50 text-amber-700 border border-amber-200';
+                }
+                if (str_contains($val, 'livewire.')) {
+                    return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
                 }
                 return 'bg-purple-50 text-purple-700 border border-purple-200';
             }],
             ['key' => 'subject_summary', 'label' => 'Subject', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted'],
             ['key' => 'changes_summary', 'label' => 'Changes', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-xs max-w-xs truncate text-muted'],
             ['key' => 'formatted_ip', 'label' => 'IP Address', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-[11px] text-muted'],
+            ['key' => 'actions', 'label' => 'Action', 'type' => 'audit_actions', 'priority' => 1],
         ];
     }
 
@@ -53,6 +94,8 @@ class AuditLogBrowser extends Component
             ['key' => 'all', 'label' => 'All Logs'],
             ['key' => 'today', 'label' => 'Today'],
             ['key' => 'week', 'label' => 'This Week'],
+            ['key' => 'activity', 'label' => 'User & Controller Actions'],
+            ['key' => 'models', 'label' => 'Data Mutations'],
             ['key' => 'auth', 'label' => 'Auth & Sessions'],
             ['key' => 'git_sync', 'label' => 'Git Deployments'],
         ];
@@ -65,6 +108,7 @@ class AuditLogBrowser extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('action', 'like', '%' . $this->search . '%')
+                  ->orWhere('subject_type', 'like', '%' . $this->search . '%')
                   ->orWhere('to_value', 'like', '%' . $this->search . '%')
                   ->orWhere('from_value', 'like', '%' . $this->search . '%')
                   ->orWhere('ip_address', 'like', '%' . $this->search . '%')
@@ -77,7 +121,11 @@ class AuditLogBrowser extends Component
         }
 
         if ($this->actionType) {
-            $query->where('action', 'like', $this->actionType . '%');
+            if (in_array($this->actionType, ['created', 'updated', 'deleted'])) {
+                $query->where('action', 'like', '%.' . $this->actionType);
+            } else {
+                $query->where('action', 'like', $this->actionType . '%');
+            }
         }
 
         if ($this->subjectType) {
@@ -89,12 +137,27 @@ class AuditLogBrowser extends Component
             $query->whereDate('created_at', now());
         } elseif ($this->statusFilter === 'week') {
             $query->where('created_at', '>=', now()->subDays(7));
+        } elseif ($this->statusFilter === 'activity') {
+            $query->where(function ($q) {
+                $q->where('action', 'like', 'route.%')
+                  ->orWhere('action', 'like', 'controller.%')
+                  ->orWhere('action', 'like', 'livewire.%')
+                  ->orWhere('action', 'like', 'request.%');
+            });
+        } elseif ($this->statusFilter === 'models') {
+            $query->where(function ($q) {
+                $q->where('action', 'like', '%.created')
+                  ->orWhere('action', 'like', '%.updated')
+                  ->orWhere('action', 'like', '%.deleted');
+            });
         } elseif ($this->statusFilter === 'auth') {
             $query->where(function ($q) {
                 $q->where('action', 'like', '%auth%')
                   ->orWhere('action', 'like', '%login%')
                   ->orWhere('action', 'like', '%impersonat%')
-                  ->orWhere('action', 'like', '%password%');
+                  ->orWhere('action', 'like', '%password%')
+                  ->orWhere('action', 'like', '%logout%')
+                  ->orWhere('action', 'like', '%lockout%');
             });
         } elseif ($this->statusFilter === 'git_sync') {
             $query->where(function ($q) {

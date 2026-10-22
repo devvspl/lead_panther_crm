@@ -529,6 +529,37 @@
                                                     <span class="text-[11px] text-muted font-semibold">Clean Import</span>
                                                 @endif
                                             </div>
+                                        @elseif($type === 'audit_id')
+                                            @php
+                                                $auditRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <button 
+                                                type="button" 
+                                                wire:click="viewDetails({{ $auditRowId }})" 
+                                                class="font-mono text-xs font-bold text-primary hover:underline hover:text-primary-dark cursor-pointer inline-flex items-center gap-1 group"
+                                                title="View Audit Log Details"
+                                            >
+                                                <span>#{{ $val }}</span>
+                                                <svg class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            </button>
+                                        @elseif($type === 'audit_actions')
+                                            @php
+                                                $auditRowId = is_object($row) ? $row->id : $row['id'];
+                                            @endphp
+                                            <div class="flex items-center justify-end">
+                                                <button 
+                                                    type="button" 
+                                                    wire:click="viewDetails({{ $auditRowId }})" 
+                                                    class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                                                    title="Inspect Details"
+                                                >
+                                                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    <span>Inspect</span>
+                                                </button>
+                                            </div>
                                         @elseif($type === 'html' || isset($col['render']))
                                             {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}
                                         @else
@@ -805,6 +836,36 @@
                                             @else
                                                 <span class="text-[11px] text-muted font-semibold">Clean Import</span>
                                             @endif
+                                        </div>
+                                    @elseif($type === 'audit_id')
+                                        @php
+                                            $auditRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <button 
+                                            type="button" 
+                                            wire:click="viewDetails({{ $auditRowIdMobile }})" 
+                                            class="font-mono text-xs font-bold text-primary hover:underline hover:text-primary-dark cursor-pointer inline-flex items-center gap-1"
+                                        >
+                                            <span>#{{ $val }}</span>
+                                            <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        </button>
+                                    @elseif($type === 'audit_actions')
+                                        @php
+                                            $auditRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                        @endphp
+                                        <div class="flex items-center justify-end">
+                                            <button 
+                                                type="button" 
+                                                wire:click="viewDetails({{ $auditRowIdMobile }})" 
+                                                class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-ink/30 transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                                                title="Inspect Details"
+                                            >
+                                                <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                                <span>Inspect</span>
+                                            </button>
                                         </div>
                                     @elseif($type === 'html' || isset($col['render']))
                                         {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}

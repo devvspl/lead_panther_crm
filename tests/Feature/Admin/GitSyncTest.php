@@ -558,4 +558,178 @@ class GitSyncTest extends TestCase
             ->assertSet('activeTab', 'settings')
             ->assertSee('Git Repository Connection & Authentication');
     }
+
+    public function test_database_manager_renders_migrations_and_seeders_tabs(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $test = Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->assertSet('dbManagerTab', 'migrations')
+            ->assertSee('Database Migrations &amp; Seeders Management', false)
+            ->assertSee('1. Migrations')
+            ->assertSee('2. Seeders');
+
+        // Check migration stats
+        $stats = $test->get('migrationStats');
+        $this->assertIsArray($stats);
+        $this->assertArrayHasKey('total', $stats);
+        $this->assertGreaterThan(0, $stats['total']);
+
+        // Switch to seeders tab
+        $test->set('dbManagerTab', 'seeders')
+            ->assertSet('dbManagerTab', 'seeders')
+            ->assertSee('DatabaseSeeder')
+            ->assertSee('Master Orchestrator');
+
+        $seeders = $test->get('seeders');
+        $this->assertIsArray($seeders);
+        $this->assertNotEmpty($seeders);
+    }
+
+    public function test_can_filter_migrations_and_search(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $test = Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('dbManagerTab', 'migrations');
+
+        $allMigrations = $test->get('migrations');
+        $this->assertNotEmpty($allMigrations);
+
+        // Filter by search keyword
+        $test->set('dbSearch', 'organizations');
+        $filtered = $test->get('migrations');
+        $this->assertNotEmpty($filtered);
+        foreach ($filtered as $item) {
+            $this->assertTrue(
+                str_contains(strtolower($item['migration']), 'organizations') ||
+                str_contains(strtolower($item['title']), 'organizations')
+            );
+        }
+
+        // Filter by status 'ran'
+        $test->set('dbSearch', '')
+            ->set('migrationFilter', 'ran');
+        $ranList = $test->get('migrations');
+        foreach ($ranList as $item) {
+            $this->assertTrue($item['is_ran']);
+        }
+    }
+
+    public function test_can_execute_single_migration_via_action_column(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $mockGitService = $this->createMock(GitSyncService::class);
+        $mockGitService->method('getCredentials')->willReturn([
+            'remote_url' => 'https://github.com/mock/repo.git',
+            'username' => 'user',
+            'access_token' => 'mock_token',
+            'default_branch' => 'main',
+        ]);
+        $mockGitService->method('getRepoStatus')->willReturn([
+            'current_branch' => 'main',
+            'current_commit' => 'abc1234',
+            'short_commit' => 'abc1234',
+            'last_commit_info' => 'Initial commit',
+            'modified_files' => [],
+            'modified_count' => 0,
+            'ahead_count' => 0,
+            'behind_count' => 0,
+            'recent_commits' => [],
+        ]);
+
+        $mockGitService->expects($this->once())
+            ->method('runFollowupAction')
+            ->with(
+                $this->equalTo('migrate'),
+                $this->equalTo($admin->id),
+                $this->stringContains('2026_08_14_000001_create_organizations_table.php')
+            )
+            ->willReturn([
+                'action' => 'migrate',
+                'successful' => true,
+                'stdout' => 'Migrating: 2026_08_14_000001_create_organizations_table',
+                'stderr' => '',
+            ]);
+
+        $this->app->instance(GitSyncService::class, $mockGitService);
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->call('runSingleMigration', '2026_08_14_000001_create_organizations_table.php')
+            ->assertDispatched('toast', fn($event, $params) => $params['type'] === 'success')
+            ->assertSet('lastFollowupResult.successful', true)
+            ->assertSee('Migrating: 2026_08_14_000001_create_organizations_table');
+    }
+
+    public function test_can_execute_single_seeder_via_action_column(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $mockGitService = $this->createMock(GitSyncService::class);
+        $mockGitService->method('getCredentials')->willReturn([
+            'remote_url' => 'https://github.com/mock/repo.git',
+            'username' => 'user',
+            'access_token' => 'mock_token',
+            'default_branch' => 'main',
+        ]);
+        $mockGitService->method('getRepoStatus')->willReturn([
+            'current_branch' => 'main',
+            'current_commit' => 'abc1234',
+            'short_commit' => 'abc1234',
+            'last_commit_info' => 'Initial commit',
+            'modified_files' => [],
+            'modified_count' => 0,
+            'ahead_count' => 0,
+            'behind_count' => 0,
+            'recent_commits' => [],
+        ]);
+
+        $mockGitService->expects($this->once())
+            ->method('runFollowupAction')
+            ->with(
+                $this->equalTo('seed'),
+                $this->equalTo($admin->id),
+                $this->equalTo('RoleAndPermissionSeeder')
+            )
+            ->willReturn([
+                'action' => 'seed',
+                'successful' => true,
+                'stdout' => 'Seeding: Database\Seeders\RoleAndPermissionSeeder',
+                'stderr' => '',
+            ]);
+
+        $this->app->instance(GitSyncService::class, $mockGitService);
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->call('runSingleSeeder', 'RoleAndPermissionSeeder')
+            ->assertDispatched('toast', fn($event, $params) => $params['type'] === 'success')
+            ->assertSet('lastFollowupResult.successful', true)
+            ->assertSee('Seeding: Database\Seeders\RoleAndPermissionSeeder');
+    }
+
+    public function test_can_clear_followup_console(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('lastFollowupResult', [
+                'action' => 'migrate',
+                'successful' => true,
+                'stdout' => 'Done',
+                'stderr' => '',
+            ])
+            ->call('clearFollowupConsole')
+            ->assertSet('lastFollowupResult', null);
+    }
 }

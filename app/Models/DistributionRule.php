@@ -31,7 +31,7 @@ class DistributionRule extends Model
 
         if (!$rule) {
             // Fallback: pick any active sales executive
-            return User::role('sales-executive')->first() ?? User::first();
+            return User::whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))->first() ?? User::first();
         }
 
         return match ($rule->rule_type) {
@@ -45,7 +45,7 @@ class DistributionRule extends Model
 
     private static function pickRoundRobin(DistributionRule $rule, Lead $lead): ?User
     {
-        $execs = User::role('sales-executive')->pluck('id')->toArray();
+        $execs = User::whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))->pluck('id')->toArray();
         if (empty($execs)) {
             $execs = User::pluck('id')->toArray();
         }
@@ -97,7 +97,7 @@ class DistributionRule extends Model
 
     private static function pickAvailability(DistributionRule $rule, Lead $lead): ?User
     {
-        $onlineExec = User::role('sales-executive')
+        $onlineExec = User::whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))
             ->where('status', 'active')
             ->first();
 

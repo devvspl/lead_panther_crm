@@ -10,7 +10,7 @@ class SendCampaignPausedNotificationListener
 {
     public function handle(CampaignPaused $event): void
     {
-        $client = $event->client;
+        $client = $event->client ?? $event->lead?->client;
         if (!$client) return;
 
         $clientUser = User::where('organization_id', $client->organization_id)->first() ?? User::first();

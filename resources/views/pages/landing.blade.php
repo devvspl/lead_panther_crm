@@ -30,6 +30,7 @@
                 <a href="#how-it-works" class="hover:text-ink transition-colors">How it Works</a>
                 <a href="#showcase" class="hover:text-ink transition-colors">Showcase</a>
                 <a href="#pricing" class="hover:text-ink transition-colors">Pricing</a>
+                <a href="{{ route('docs') }}" class="hover:text-ink transition-colors text-primary font-semibold">Documentation</a>
                 <a href="#contact" class="hover:text-ink transition-colors">Contact</a>
             </nav>
 
@@ -482,6 +483,7 @@
             <div class="space-y-3">
                 <div class="font-bold text-ink uppercase tracking-wider text-[11px]">Resources &amp; Legal</div>
                 <ul class="space-y-2">
+                    <li><a href="{{ route('docs') }}" class="hover:text-ink transition font-semibold text-primary">Developer &amp; User Docs</a></li>
                     <li><a href="{{ route('privacy-policy') }}" class="hover:text-ink transition">Privacy Policy</a></li>
                     <li><a href="{{ route('privacy-policy') }}#meta-lead-ads" class="hover:text-ink transition">Meta Lead Ads Terms</a></li>
                     <li><a href="{{ route('privacy-policy') }}#data-deletion" class="hover:text-ink transition">Data Deletion Instructions</a></li>

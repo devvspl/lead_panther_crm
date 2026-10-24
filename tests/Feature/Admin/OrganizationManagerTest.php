@@ -5,7 +5,9 @@ namespace Tests\Feature\Admin;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Organization;
+use App\Models\Client;
 use App\Livewire\Admin\OrganizationManager;
+use App\Livewire\Admin\OrganizationDetail;
 use Livewire\Livewire;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -329,6 +331,124 @@ class OrganizationManagerTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $createdUser->id,
             'organization_id' => null,
+        ]);
+    }
+
+    public function test_organization_name_in_table_links_to_separate_detail_page(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Brigade Group Enterprise',
+            'status' => 'active',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationManager::class)
+            ->assertSee('Brigade Group Enterprise')
+            ->assertSee(route('admin.organizations.show', $org->id), false);
+    }
+
+    public function test_super_admin_can_access_organization_detail_page_and_view_kpis_and_tabs(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Godrej Properties HQ',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('admin.organizations.show', $org->id));
+        $response->assertStatus(200);
+        $response->assertSee('Godrej Properties HQ');
+        $response->assertSee('Overview & Profile', false);
+        $response->assertSee('Team Members');
+        $response->assertSee('Clients & Projects', false);
+        $response->assertSee('Activity & Audit', false);
+    }
+
+    public function test_organization_detail_component_updates_profile_and_toggles_status(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Shapoorji Pallonji Real Estate',
+            'status' => 'active',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org])
+            ->assertSee('Shapoorji Pallonji Real Estate')
+            ->call('toggleOrganizationStatus')
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('organizations', [
+            'id' => $org->id,
+            'status' => 'suspended',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org])
+            ->call('startEditing')
+            ->assertSet('isEditing', true)
+            ->set('editName', 'Shapoorji Pallonji Joyville')
+            ->set('editStatus', 'active')
+            ->call('updateOrganization')
+            ->assertSet('isEditing', false)
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('organizations', [
+            'id' => $org->id,
+            'name' => 'Shapoorji Pallonji Joyville',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_organization_detail_component_creates_member_and_client(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Hiranandani Communities',
+            'status' => 'active',
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org]);
+
+        // Add Team Member
+        $component->call('openAddMemberModal')
+            ->assertSet('showAddMemberModal', true)
+            ->set('newUserName', 'Vikram Hiranandani')
+            ->set('newUserEmail', 'vikram@hiranandani.com')
+            ->set('newUserRole', 'Builder')
+            ->call('createUserForOrganization')
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'Vikram Hiranandani',
+            'email' => 'vikram@hiranandani.com',
+            'organization_id' => $org->id,
+        ]);
+
+        // Add Client
+        $component->call('openCreateClientModal')
+            ->assertSet('showCreateClientModal', true)
+            ->set('newClientName', 'Hiranandani Estate Thane')
+            ->set('newClientBillingEmail', 'billing@hiranandani.com')
+            ->set('newClientStatus', 'active')
+            ->call('createClientForOrganization')
+            ->assertDispatched('toast')
+            ->assertSet('showCreateClientModal', false);
+
+        $this->assertDatabaseHas('clients', [
+            'name' => 'Hiranandani Estate Thane',
+            'organization_id' => $org->id,
+            'status' => 'active',
         ]);
     }
 }

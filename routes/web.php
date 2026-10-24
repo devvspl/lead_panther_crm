@@ -16,6 +16,7 @@ use App\Livewire\Admin\AdminCredits;
 use App\Livewire\Admin\WebhookLogs;
 use App\Livewire\Admin\AuditLogBrowser;
 use App\Livewire\Admin\OrganizationManager;
+use App\Livewire\Admin\OrganizationDetail;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Replacement\ReplacementQueue;
 use App\Livewire\Replacement\ClientReplacementHistory;
@@ -128,6 +129,7 @@ Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->na
     Route::get('/recharge-requests', RechargeApprovalQueue::class)->name('recharge-requests');
     Route::get('/backups', BackupStatus::class)->name('backups');
     Route::get('/organizations', OrganizationManager::class)->name('organizations');
+    Route::get('/organizations/{organization}', OrganizationDetail::class)->name('organizations.show');
     Route::get('/users', UserManager::class)->name('users');
     Route::get('/users/{user}/impersonate', [ImpersonationController::class, 'start'])->name('users.impersonate');
     Route::get('/notification-templates', NotificationTemplates::class)->name('notification-templates');

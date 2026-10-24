@@ -24,23 +24,9 @@ class DistributionRule extends Model
      */
     public static function pickAssignee(Lead $lead): ?User
     {
-        $rule = static::where('project_id', $lead->project_id)
-            ->where('is_active', true)
-            ->latest('id')
-            ->first();
-
-        if (!$rule) {
-            // Fallback: pick any active sales executive
-            return User::whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))->first() ?? User::first();
-        }
-
-        return match ($rule->rule_type) {
-            'manual' => null, // Manual queue
-            'location' => static::pickLocationWise($rule, $lead),
-            'priority' => static::pickPriority($rule, $lead),
-            'availability' => static::pickAvailability($rule, $lead),
-            default => static::pickRoundRobin($rule, $lead),
-        };
+        $distributionService = app(\App\Services\LeadDistributionService::class);
+        $result = $distributionService->distribute($lead);
+        return $result['assigned_user'] ?? null;
     }
 
     private static function pickRoundRobin(DistributionRule $rule, Lead $lead): ?User

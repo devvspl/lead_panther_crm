@@ -476,19 +476,30 @@
                                             </span>
                                         </div>
 
-                                        <!-- SLA Pill -->
-                                        @if($lead->first_response_at)
-                                            <span
-                                                class="px-1.5 py-0.5 rounded-pill bg-green-50 text-green-700 font-semibold text-[9px]">SLA
-                                                Met</span>
-                                        @elseif(\Carbon\Carbon::parse($lead->created_at)->diffInMinutes(now()) > 15)
-                                            <span class="px-1.5 py-0.5 rounded-pill bg-red-50 text-red-700 font-bold text-[9px]">SLA
-                                                Breached</span>
-                                        @else
-                                            <span
-                                                class="px-1.5 py-0.5 rounded-pill bg-amber-50 text-amber-700 font-semibold text-[9px]">SLA
-                                                Pending</span>
-                                        @endif
+                                        <!-- SLA Pill & Journey Button -->
+                                        <div class="flex items-center gap-1.5">
+                                            @if($lead->first_response_at)
+                                                <span
+                                                    class="px-1.5 py-0.5 rounded-pill bg-green-50 text-green-700 font-semibold text-[9px]">SLA
+                                                    Met</span>
+                                            @elseif(\Carbon\Carbon::parse($lead->created_at)->diffInMinutes(now()) > 15)
+                                                <span class="px-1.5 py-0.5 rounded-pill bg-red-50 text-red-700 font-bold text-[9px]">SLA
+                                                    Breached</span>
+                                            @else
+                                                <span
+                                                    class="px-1.5 py-0.5 rounded-pill bg-amber-50 text-amber-700 font-semibold text-[9px]">SLA
+                                                    Pending</span>
+                                            @endif
+
+                                            <button 
+                                                type="button" 
+                                                @click.stop="$dispatch('open-lead-journey', { id: {{ $lead->id }} })"
+                                                class="p-0.5 rounded hover:bg-canvas text-muted hover:text-primary transition cursor-pointer"
+                                                title="Show Full Lead Journey Timeline"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <!-- Lead Name & City -->
@@ -608,6 +619,9 @@
 
     <!-- Include Slide-over Detail Component -->
     <livewire:leads.lead-detail />
+
+    <!-- Include Full Lead Journey Timeline Drawer Component -->
+    <livewire:leads.lead-timeline />
 
     <!-- Manual Lead Ingestion & Meta Sync Offcanvas Drawer -->
     <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Pull & Ingest Leads"

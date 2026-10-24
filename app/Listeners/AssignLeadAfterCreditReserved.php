@@ -23,10 +23,12 @@ class AssignLeadAfterCreditReserved
                 'status' => 'assigned',
             ]);
 
+            $assignerId = auth()->id() ?? \App\Models\User::where('id', 1)->value('id') ?? \App\Models\User::value('id') ?? $assignee->id;
+
             $assignment = LeadAssignment::create([
                 'lead_id' => $lead->id,
                 'assigned_to' => $assignee->id,
-                'assigned_by' => auth()->id() ?? 1,
+                'assigned_by' => $assignerId,
                 'assigned_at' => now(),
             ]);
 

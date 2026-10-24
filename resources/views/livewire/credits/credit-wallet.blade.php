@@ -9,20 +9,26 @@
 
 
 
-    <!-- Big Balance Card -->
+    <!-- Credit Balances Strip (Opening & Available Balances Clearly Visible) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 bg-accent text-white rounded-card p-6 shadow-md flex flex-col justify-between space-y-4">
+        <!-- Live Available Balance Card -->
+        <div class="bg-accent text-white rounded-card p-6 shadow-md flex flex-col justify-between space-y-4">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Current Credit Balance</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Available Spendable Credits</span>
                 <span class="px-2.5 py-1 text-[10px] font-bold rounded-pill bg-white/10 text-white">Live Wallet</span>
             </div>
             <div>
                 <div class="text-4xl font-black tracking-tight">
                     {{ number_format($wallet->balance ?? 0) }} <span class="text-lg font-normal text-gray-300">Credits</span>
                 </div>
-                <p class="text-xs text-gray-400 mt-1">
-                    Last recharged: {{ $lastRecharge ? \Carbon\Carbon::parse($lastRecharge->created_at)->format('M d, Y') : 'No recent recharge' }}
-                </p>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {{ ($wallet->balance ?? 0) > 50 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-red-500/20 text-red-300 border border-red-400/30' }}">
+                        {{ ($wallet->balance ?? 0) > 50 ? '● Active Balance' : '● Low Balance' }}
+                    </span>
+                    <span class="text-xs text-gray-400">
+                        Last recharged: {{ $lastRecharge ? \Carbon\Carbon::parse($lastRecharge->created_at)->format('M d, Y') : 'No recent recharge' }}
+                    </span>
+                </div>
             </div>
             <div class="pt-2">
                 <x-ui.button wire:click="openRechargeModal" variant="secondary" class="bg-white text-ink hover:bg-gray-100 text-xs font-bold">
@@ -31,16 +37,44 @@
             </div>
         </div>
 
-        <!-- Wallet Info Card -->
+        <!-- Opening Credit Balance Baseline Card -->
+        <div class="bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col justify-between space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase text-muted tracking-wider">Opening Balance</span>
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill bg-sky-100 text-sky-800 border border-sky-300">Baseline</span>
+            </div>
+            <div>
+                <div class="text-3xl font-extrabold font-mono text-ink tracking-tight">
+                    {{ number_format($wallet->opening_balance ?? 0, 2) }} <span class="text-sm font-normal text-muted">Credits</span>
+                </div>
+                <p class="text-xs text-muted mt-1.5">
+                    Original baseline credits allocated at client account onboarding.
+                </p>
+            </div>
+            <div class="text-[11px] text-muted border-t border-border pt-3 flex items-center justify-between">
+                <span>Account Client ID:</span>
+                <strong class="text-ink font-mono">#CLI-{{ str_pad($client->id ?? 0, 4, '0', STR_PAD_LEFT) }}</strong>
+            </div>
+        </div>
+
+        <!-- Wallet Info & Per-Lead Pricing Card -->
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col justify-between space-y-3">
-            <h3 class="text-xs font-bold uppercase text-muted tracking-wider">Client Billing Details</h3>
+            <h3 class="text-xs font-bold uppercase text-muted tracking-wider">Client Billing & Rate</h3>
             <div class="space-y-2">
                 <div class="text-sm font-bold text-ink">{{ $client->name ?? 'Organization Client' }}</div>
                 <div class="text-xs text-muted">{{ $client->billing_email ?? 'billing@client.com' }}</div>
-                <div class="text-xs text-muted">Cost per lead: <span class="font-bold text-ink">10 Credits</span></div>
+                <div class="p-2.5 rounded-lg bg-canvas border border-border text-xs space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted">Cost Per Lead:</span>
+                        <strong class="text-ink font-mono font-bold">{{ $pricingResolution['formatted'] ?? '10.00 Credits' }}</strong>
+                    </div>
+                    <div class="text-[10px] text-muted">
+                        Source: <span class="text-primary font-semibold">{{ $pricingResolution['source'] ?? 'Global Default' }}</span>
+                    </div>
+                </div>
             </div>
             <div class="text-[11px] text-muted border-t border-border pt-3">
-                Need custom enterprise invoicing? Contact your Account Manager.
+                Need custom rate or enterprise invoicing? Contact your Account Manager.
             </div>
         </div>
     </div>

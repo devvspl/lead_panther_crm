@@ -20,10 +20,11 @@ class UserSeeder extends Seeder
             $partnerOrgs = Organization::skip(1)->take(3)->get();
         }
 
-        // 1 Super Admin
+        // 1 Super Admin (Protected ID = 1)
         $superAdmin = User::firstOrCreate(
             ['email' => 'admin@leadpanther.com'],
             [
+                'id' => 1,
                 'organization_id' => $platformOrg->id ?? null,
                 'name' => 'Super Admin',
                 'password' => bcrypt('password'),

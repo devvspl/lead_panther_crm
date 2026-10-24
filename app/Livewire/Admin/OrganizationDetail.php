@@ -32,14 +32,15 @@ class OrganizationDetail extends Component
 
     public Organization $organization;
 
-    // Active Navigation Tab: 'overview' | 'team' | 'clients' | 'leads' | 'credits' | 'activity'
+    // Active Navigation Tab: 'overview' | 'team' | 'clients' | 'credits' | 'activity'
     #[Url(as: 'tab', history: true, keep: true)]
     public string $activeTab = 'overview';
 
-    // Organization Edit State
+    // Organization Edit State & Pricing
     public bool $isEditing = false;
     public string $editName = '';
     public string $editStatus = 'active';
+    public ?float $orgLeadCost = null;
 
     // Team Management & Filters
     public string $userSearch = '';
@@ -57,7 +58,7 @@ class OrganizationDetail extends Component
     public string $newClientBillingEmail = '';
     public string $newClientStatus = 'active';
 
-    // Directly Assigned Leads Management
+    // Directly Assigned Leads Management (Retained for background compatibility)
     public string $leadSearch = '';
     public string $leadAssignmentFilter = 'all'; // 'all' | 'assigned' | 'unassigned'
     public string $leadStatusFilter = 'all';
@@ -85,9 +86,10 @@ class OrganizationDetail extends Component
         $this->organization = $organization;
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
+        $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
 
         $requestedTab = request()->query('tab');
-        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
+        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'credits', 'activity'])) {
             $this->activeTab = $requestedTab;
         }
 
@@ -97,10 +99,25 @@ class OrganizationDetail extends Component
 
     public function setTab(string $tab): void
     {
-        if (in_array($tab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
+        if (in_array($tab, ['overview', 'team', 'clients', 'credits', 'activity'])) {
             $this->activeTab = $tab;
             $this->resetPage();
         }
+    }
+
+    public function updateOrgLeadCost(): void
+    {
+        $this->validate([
+            'orgLeadCost' => 'nullable|numeric|min:0.01|max:100000',
+        ]);
+
+        $this->organization->update([
+            'lead_cost' => $this->orgLeadCost !== null && $this->orgLeadCost > 0 ? (float) $this->orgLeadCost : null,
+        ]);
+        $this->organization->refresh();
+        $this->orgLeadCost = $this->organization->lead_cost !== null ? (float) $this->organization->lead_cost : null;
+
+        $this->dispatch('toast', type: 'success', message: "Per-lead pricing override for '{$this->organization->name}' updated successfully.");
     }
 
     public function updatedLeadSearch(): void
@@ -817,6 +834,12 @@ class OrganizationDetail extends Component
             ->whereIn('client_id', $clientIds)
             ->sum('balance') ?? 0;
 
+        $totalOpeningBalance = DB::table('client_wallets')
+            ->whereIn('client_id', $clientIds)
+            ->sum('opening_balance') ?? 0;
+
+        $globalDefaultLeadCost = app(\App\Services\LeadPricingService::class)->getGlobalDefaultCost();
+
         $totalCreditsRecharged = DB::table('credit_transactions')
             ->whereIn('client_id', $clientIds)
             ->whereIn('transaction_type', ['recharge', 'refund'])
@@ -862,7 +885,9 @@ class OrganizationDetail extends Component
             'totalProjectsCount' => $totalProjectsCount,
             'totalLeadsCount' => $totalLeadsCount,
             'directlyAssignedLeadsCount' => $directlyAssignedLeadsCount,
+            'totalOpeningBalance' => (float)$totalOpeningBalance,
             'totalWalletBalance' => (float)$totalWalletBalance,
+            'globalDefaultLeadCost' => (float)$globalDefaultLeadCost,
             'totalCreditsRecharged' => (float)$totalCreditsRecharged,
             'totalCreditsDeducted' => (float)$totalCreditsDeducted,
             'auditLogs' => $auditLogs,

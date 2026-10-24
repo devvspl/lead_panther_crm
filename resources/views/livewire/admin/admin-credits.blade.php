@@ -17,6 +17,93 @@
         </div>
     </div>
 
+    <!-- Global Per-Lead Pricing & System Credit Balance Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <!-- Card 1: Global Default Lead Cost Setting Control -->
+        <div class="lg:col-span-2 p-5 rounded-2xl bg-surface border border-purple-200 dark:border-purple-900/40 shadow-2xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+                <div class="flex items-center gap-2">
+                    <span class="p-1.5 rounded-lg bg-purple-100 text-purple-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <h2 class="text-sm font-bold text-ink">Global Default Per-Lead Cost Setting</h2>
+                        <p class="text-[11px] text-muted">Baseline cost deducted per ingested lead when no project, team, or organization override exists.</p>
+                    </div>
+                </div>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-950 border border-purple-300 w-fit">
+                    Active: {{ number_format($globalDefaultLeadCost, 2) }} Credits
+                </span>
+            </div>
+
+            <!-- Hierarchy Cascade Visual -->
+            <div class="p-3 bg-canvas/60 rounded-xl border border-border text-xs space-y-1.5">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-muted">4-Tier Pricing Resolution Priority:</div>
+                <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold border border-amber-300">1. Project Override</span>
+                    <span class="text-muted">→</span>
+                    <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-950 font-bold border border-blue-300">2. Team Override</span>
+                    <span class="text-muted">→</span>
+                    <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 font-bold border border-emerald-300">3. Organization Override</span>
+                    <span class="text-muted">→</span>
+                    <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-950 font-bold border border-purple-300">4. Global Default Setting</span>
+                </div>
+            </div>
+
+            <form wire:submit.prevent="updateGlobalDefaultCost" class="flex flex-col sm:flex-row items-end gap-3 text-xs pt-1">
+                <div class="flex-1 w-full">
+                    <label class="font-bold text-ink block mb-1">Global Default Per-Lead Cost (Credits) <span class="text-red-500">*</span></label>
+                    <input 
+                        type="number" 
+                        step="0.01" 
+                        min="0.01" 
+                        wire:model="globalDefaultLeadCost" 
+                        class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                        placeholder="10.00"
+                    >
+                    @error('globalDefaultLeadCost') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+                <button 
+                    type="submit" 
+                    class="h-9 px-4 bg-ink hover:bg-neutral-800 text-white font-bold rounded-lg transition shadow-xs cursor-pointer shrink-0"
+                >
+                    Update Global Default
+                </button>
+            </form>
+        </div>
+
+        <!-- Card 2: System-wide Balances Strip -->
+        <div class="p-5 rounded-2xl bg-surface border border-border shadow-2xs space-y-3.5 flex flex-col justify-between">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-muted">Platform Credit Summary</h3>
+                <div class="mt-3 space-y-3">
+                    <div class="p-3 rounded-xl bg-canvas/50 border border-border flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-muted">System Opening Balance</span>
+                            <div class="text-lg font-bold font-mono text-ink">{{ number_format($totalSystemOpeningBalance, 2) }} Cr</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-950 border border-sky-300">Opening</span>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-canvas/50 border border-border flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-muted">System Available Balance</span>
+                            <div class="text-lg font-bold font-mono text-emerald-600">{{ number_format($totalSystemAvailableBalance, 2) }} Cr</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">Available</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-[10px] text-muted flex items-center justify-between border-t border-border pt-2.5">
+                <span>Total Active Wallets: <strong class="text-ink font-mono">{{ $clients->count() }}</strong></span>
+                <span class="text-primary font-semibold">Real-Time Ledger</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Advanced Table Component -->
     <x-ui.advanced-table 
         :columns="$this->tableColumns()"

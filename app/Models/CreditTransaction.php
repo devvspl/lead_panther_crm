@@ -49,13 +49,16 @@ class CreditTransaction extends Model
                 ]);
             }
 
-            $cost = 10.00;
+            $pricingService = app(\App\Services\LeadPricingService::class);
+            $resolution = $pricingService->resolveForLead($lead);
+            $cost = (float) $resolution['cost'];
 
             if ($wallet->balance > 0) {
                 $before = (float) $wallet->balance;
                 $after = max(0.00, $before - $cost);
 
                 $wallet->update(['balance' => $after]);
+                $lead->update(['lead_cost' => $cost]);
 
                 $tx = static::create([
                     'client_id' => $lead->client_id,

@@ -21,10 +21,26 @@ class AdminCredits extends Component
     public string $reason = '';
 
     public string $filterClient = '';
+    public float $globalDefaultLeadCost = 10.00;
 
     public function mount(): void
     {
         $this->loadColumnPreferences();
+        $this->globalDefaultLeadCost = app(\App\Services\LeadPricingService::class)->getGlobalDefaultCost();
+    }
+
+    public function updateGlobalDefaultCost(): void
+    {
+        $this->validate([
+            'globalDefaultLeadCost' => 'required|numeric|min:0.01|max:100000',
+        ]);
+
+        app(\App\Services\LeadPricingService::class)->setGlobalDefaultCost(
+            (float) $this->globalDefaultLeadCost,
+            auth()->id() ?? 1
+        );
+
+        $this->dispatch('toast', type: 'success', message: 'Global default per-lead cost updated successfully to ' . number_format($this->globalDefaultLeadCost, 2) . ' Credits.');
     }
 
     public function tableColumns(): array
@@ -166,10 +182,14 @@ class AdminCredits extends Component
     {
         $transactions = $this->getFilteredQuery()->paginate($this->perPage);
         $clients = Client::all();
+        $totalSystemOpeningBalance = (float) CreditWallet::sum('opening_balance');
+        $totalSystemAvailableBalance = (float) CreditWallet::sum('balance');
 
         return view('livewire.admin.admin-credits', [
             'transactions' => $transactions,
             'clients' => $clients,
+            'totalSystemOpeningBalance' => $totalSystemOpeningBalance,
+            'totalSystemAvailableBalance' => $totalSystemAvailableBalance,
         ])->layout('layouts.app');
     }
 

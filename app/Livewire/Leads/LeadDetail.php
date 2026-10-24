@@ -125,18 +125,27 @@ class LeadDetail extends Component
         }
     }
 
-    public function render()
+    public function showFullJourney(): void
+    {
+        if ($this->leadId) {
+            $this->dispatch('show-lead-journey', id: $this->leadId);
+        }
+    }
+
+    public function render(\App\Services\LeadJourneyService $journeyService)
     {
         $lead = $this->leadId ? Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo'])->find($this->leadId) : null;
         $communications = $this->leadId ? LeadCommunication::where('lead_id', $this->leadId)->latest()->get() : [];
         $statusHistory = $this->leadId ? LeadStatusHistory::where('lead_id', $this->leadId)->latest('changed_at')->get() : [];
         $replacementReasons = ReplacementReason::all();
+        $journey = $lead ? $journeyService->getJourney($lead) : null;
 
         return view('livewire.leads.lead-detail', [
             'lead' => $lead,
             'communications' => $communications,
             'statusHistory' => $statusHistory,
             'replacementReasons' => $replacementReasons,
+            'journey' => $journey,
         ]);
     }
 }

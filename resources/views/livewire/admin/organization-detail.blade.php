@@ -196,40 +196,50 @@
             <div class="text-[10px] text-muted">Direct registered clients</div>
         </div>
 
-        <!-- Card 3: Directly Assigned Leads -->
+        <!-- Card 3: Opening Credit Balance -->
         <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
             <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Direct Leads</span>
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                <span>Opening Balance</span>
+                <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
             </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ $directlyAssignedLeadsCount }}</div>
-            <div class="text-[10px] text-muted">Of {{ number_format($totalLeadsCount) }} total org leads</div>
+            <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 2) }}</div>
+            <div class="text-[10px] text-muted flex items-center justify-between">
+                <span>Baseline allocation</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">Opening</span>
+            </div>
         </div>
 
-        <!-- Card 4: Projects -->
+        <!-- Card 4: Available Credit Balance -->
         <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
             <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Projects</span>
+                <span>Available Balance</span>
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-2xl font-bold font-mono text-emerald-600">{{ number_format($totalWalletBalance, 2) }}</div>
+            <div class="text-[10px] text-muted flex items-center justify-between">
+                <span>Spendable credits</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance > 50 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
+                    {{ $totalWalletBalance > 50 ? 'Sufficient' : 'Low Balance' }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 5: Projects & Rate -->
+        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 lg:col-span-1">
+            <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                <span>Projects & Rate</span>
                 <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                 </svg>
             </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ $totalProjectsCount }}</div>
-            <div class="text-[10px] text-muted">Active real estate projects</div>
-        </div>
-
-        <!-- Card 5: Wallet Balance -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 lg:col-span-1">
-            <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Credit Balance</span>
-                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                </svg>
+            <div class="text-2xl font-bold font-mono text-ink">{{ $totalProjectsCount }} <span class="text-xs font-normal text-muted">Projects</span></div>
+            <div class="text-[10px] text-muted">
+                Cost: <strong class="text-ink font-mono">{{ $organization->lead_cost !== null ? number_format($organization->lead_cost, 2) . ' Cr (Custom)' : number_format($globalDefaultLeadCost, 2) . ' Cr (Default)' }}</strong>
             </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalWalletBalance) }}</div>
-            <div class="text-[10px] text-muted">Total available credits</div>
         </div>
     </div>
 
@@ -278,22 +288,7 @@
                 </span>
             </a>
 
-            <!-- Tab 4: Directly Assigned Leads (NEW) -->
-            <a 
-                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'leads']) }}" 
-                wire:click.prevent="setTab('leads')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-                <span>Direct Leads</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'leads' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
-                    {{ $directlyAssignedLeadsCount }}
-                </span>
-            </a>
-
-            <!-- Tab 5: Credits & Wallet (NEW) -->
+            <!-- Tab 4: Credits & Wallet -->
             <a 
                 href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'credits']) }}" 
                 wire:click.prevent="setTab('credits')"
@@ -404,6 +399,80 @@
                             </svg>
                             <span>Edit Organization</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Organization Per-Lead Pricing Tier Card -->
+                <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+                        <div class="flex items-center gap-2">
+                            <span class="p-1.5 rounded-lg bg-purple-100 text-purple-700">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="text-sm font-bold text-ink">Organization Per-Lead Pricing</h3>
+                                <p class="text-[11px] text-muted">Tier 3 in 4-tier pricing hierarchy (Project → Team → Org → Global).</p>
+                            </div>
+                        </div>
+                        @if($organization->lead_cost !== null)
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-950 border border-purple-300 w-fit">
+                                Custom Override Active
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300 w-fit">
+                                Inheriting Global Default
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                        <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Effective Lead Cost</span>
+                            <div class="text-2xl font-bold font-mono text-purple-700">
+                                {{ $organization->lead_cost !== null ? number_format($organization->lead_cost, 2) : number_format($globalDefaultLeadCost, 2) }}
+                                <span class="text-xs font-normal text-muted">Credits</span>
+                            </div>
+                            <div class="text-[10px] text-muted">
+                                {{ $organization->lead_cost !== null ? 'Organization override active' : 'Global default: ' . number_format($globalDefaultLeadCost, 2) . ' Cr' }}
+                            </div>
+                        </div>
+
+                        <div class="sm:col-span-2 space-y-2">
+                            <label class="block text-xs font-bold text-ink">Set Organization Rate Override (Credits / Lead)</label>
+                            <div class="flex items-center gap-2">
+                                <div class="relative flex-1">
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        min="0.01" 
+                                        wire:model="orgLeadCost" 
+                                        placeholder="Inherit global default ({{ number_format($globalDefaultLeadCost, 2) }})"
+                                        class="w-full h-9 px-3 text-xs bg-canvas border border-border rounded-lg text-ink font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                                    >
+                                </div>
+                                <button 
+                                    type="button" 
+                                    wire:click="updateOrgLeadCost" 
+                                    class="h-9 px-4 bg-ink hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer shrink-0"
+                                >
+                                    Save Override
+                                </button>
+                                @if($orgLeadCost !== null)
+                                    <button 
+                                        type="button" 
+                                        wire:click="$set('orgLeadCost', null); updateOrgLeadCost()" 
+                                        class="h-9 px-3 border border-border bg-surface hover:bg-canvas text-xs font-semibold text-muted hover:text-ink rounded-lg transition cursor-pointer shrink-0"
+                                        title="Clear override and inherit global default"
+                                    >
+                                        Reset
+                                    </button>
+                                @endif
+                            </div>
+                            @error('orgLeadCost') <span class="text-red-500 text-[10px] block">{{ $message }}</span> @enderror
+                            <p class="text-[10px] text-muted">Applies to all clients &amp; projects under this org unless overridden at project or team level.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -849,206 +918,27 @@
         </div>
     @endif
 
-    <!-- TAB 4: DIRECTLY ASSIGNED LEADS (NEW) -->
-    @if($activeTab === 'leads')
-        <div class="space-y-4">
-            <!-- Filter & Action Bar for Leads -->
-            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div class="flex flex-wrap items-center gap-2.5 flex-1">
-                    <!-- Search Input -->
-                    <div class="relative flex-1 min-w-[220px] max-w-sm">
-                        <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        <input 
-                            type="text" 
-                            wire:model.live.debounce.300ms="leadSearch" 
-                            placeholder="Search leads by code, name, phone..."
-                            class="w-full h-8 pl-9 pr-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                        >
-                    </div>
-
-                    <!-- Assignment Filter -->
-                    <select 
-                        wire:model.live="leadAssignmentFilter" 
-                        class="h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer"
-                    >
-                        <option value="all">All Assignments</option>
-                        <option value="assigned">Directly Assigned Only</option>
-                        <option value="unassigned">Unassigned Only</option>
-                    </select>
-
-                    <!-- Status Filter -->
-                    <select 
-                        wire:model.live="leadStatusFilter" 
-                        class="h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer"
-                    >
-                        <option value="all">All Stages & Statuses</option>
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="site_visit">Site Visit</option>
-                        <option value="converted">Converted</option>
-                        <option value="lost">Lost</option>
-                    </select>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                    <button 
-                        type="button" 
-                        wire:click="exportTabExcel('leads')" 
-                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
-                        title="Export Leads to Excel"
-                    >
-                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Export Tab</span>
-                    </button>
-
-                    <button 
-                        type="button" 
-                        wire:click="openCreateLeadModal" 
-                        class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
-                        <span>Add & Direct Assign Lead</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Leads Table -->
-            <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-canvas/60 text-muted uppercase tracking-wider text-[10px] font-bold border-b border-border">
-                            <tr>
-                                <th class="py-3 px-4">Lead Code & Name</th>
-                                <th class="py-3 px-4">Contact Phone</th>
-                                <th class="py-3 px-4">Client / Project</th>
-                                <th class="py-3 px-4">Directly Assigned To</th>
-                                <th class="py-3 px-4">Status Stage</th>
-                                <th class="py-3 px-4">Created Date</th>
-                                <th class="py-3 px-4 text-right">Reassign</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
-                            @forelse($leads as $lead)
-                                <tr class="hover:bg-canvas/30 transition">
-                                    <!-- Lead Code & Name -->
-                                    <td class="py-3 px-4">
-                                        <div>
-                                            <div class="font-bold text-ink text-xs">{{ $lead->name }}</div>
-                                            <div class="text-[11px] font-mono font-bold text-primary tracking-tight">{{ $lead->lead_code }}</div>
-                                        </div>
-                                    </td>
-
-                                    <!-- Phone & Email -->
-                                    <td class="py-3 px-4 font-mono text-[11px]">
-                                        <div class="text-ink font-semibold">{{ $lead->mobile }}</div>
-                                        @if($lead->email)
-                                            <div class="text-[11px] text-muted truncate max-w-[170px]">{{ $lead->email }}</div>
-                                        @endif
-                                    </td>
-
-                                    <!-- Client & Project -->
-                                    <td class="py-3 px-4">
-                                        <div class="font-bold text-ink">{{ $lead->client?->name ?: '—' }}</div>
-                                        <div class="text-[10px] text-muted">{{ $lead->project?->name ?: 'No Project' }}</div>
-                                    </td>
-
-                                    <!-- Directly Assigned Agent -->
-                                    <td class="py-3 px-4">
-                                        @if($lead->assignedTo)
-                                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 border border-blue-300 text-[11px] font-bold shadow-2xs">
-                                                <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
-                                                <span class="text-blue-950 font-bold">{{ $lead->assignedTo->name }}</span>
-                                            </div>
-                                        @else
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-950 text-[10px] font-bold">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0"></span>
-                                                <span>Unassigned</span>
-                                            </span>
-                                        @endif
-                                    </td>
-
-                                    <!-- Status -->
-                                    <td class="py-3 px-4">
-                                        @php
-                                            $statusKey = strtolower(trim($lead->status ?? 'new'));
-                                            $stageBadge = match($statusKey) {
-                                                'new' => 'bg-sky-100 text-sky-950 border-sky-300',
-                                                'contacted' => 'bg-amber-100 text-amber-950 border-amber-300',
-                                                'qualified' => 'bg-emerald-100 text-emerald-950 border-emerald-300',
-                                                'proposal_sent', 'proposal' => 'bg-purple-100 text-purple-950 border-purple-300',
-                                                'negotiation' => 'bg-indigo-100 text-indigo-950 border-indigo-300',
-                                                'won', 'closed_won' => 'bg-green-100 text-green-950 border-green-300',
-                                                'lost', 'closed_lost', 'dropped' => 'bg-red-100 text-red-950 border-red-300',
-                                                'disqualified', 'junk' => 'bg-slate-100 text-slate-800 border-slate-300',
-                                                default => 'bg-neutral-100 text-neutral-900 border-neutral-300',
-                                            };
-                                        @endphp
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border {{ $stageBadge }}">
-                                            {{ ucfirst(str_replace(['_', '-'], ' ', $lead->status)) }}
-                                        </span>
-                                    </td>
-
-                                    <!-- Created Date -->
-                                    <td class="py-3 px-4 font-mono text-muted text-[11px]">
-                                        {{ $lead->created_at ? $lead->created_at->format('M d, Y') : '—' }}
-                                    </td>
-
-                                    <!-- Inline Reassign Dropdown -->
-                                    <td class="py-3 px-4 text-right">
-                                        <select 
-                                            wire:change="reassignLead({{ $lead->id }}, $event.target.value || null)"
-                                            class="h-7 px-2 text-[10px] bg-canvas border border-border rounded-lg text-ink font-semibold focus:ring-1 focus:ring-primary cursor-pointer"
-                                        >
-                                            <option value="">Unassign</option>
-                                            @foreach($teamMembers as $tm)
-                                                <option value="{{ $tm->id }}" @selected($lead->assigned_to == $tm->id)>
-                                                    {{ $tm->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="p-8 text-center text-xs text-muted">
-                                        No leads found matching your criteria for this organization.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                @if($leads->hasPages())
-                    <div class="p-3 border-t border-border bg-canvas/30">
-                        {{ $leads->links() }}
-                    </div>
-                @endif
-            </div>
-        </div>
-    @endif
-
-    <!-- TAB 5: CREDITS & WALLET (NEW) -->
+    <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
         <div class="space-y-6">
-            <!-- Credits Header & KPI Strip -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Credits Header & KPI Strip (4-Card Strip with Opening and Available Balances) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. Opening Balance -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
                     <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                        <span>Total Available Credits</span>
-                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <span>Opening Balance</span>
+                        <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance) }}</div>
-                    <div class="text-[10px] text-muted">Across all clients under {{ $organization->name }}</div>
+                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 2) }}</div>
+                    <div class="text-[10px] text-muted flex items-center justify-between">
+                        <span>Baseline starting credits</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
+                    </div>
                 </div>
 
+                <!-- 2. Total Recharged -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
                     <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Recharged</span>
@@ -1056,19 +946,157 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-emerald-600">{{ number_format($totalCreditsRecharged) }}</div>
-                    <div class="text-[10px] text-muted">Total credits allocated/recharged</div>
+                    <div class="text-2xl font-bold font-mono text-emerald-600">{{ number_format($totalCreditsRecharged, 2) }}</div>
+                    <div class="text-[10px] text-muted">Total credited / refunded</div>
                 </div>
 
+                <!-- 3. Total Deducted -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
                     <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                        <span>Total Deducted / Spent</span>
+                        <span>Total Consumed</span>
                         <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted) }}</div>
-                    <div class="text-[10px] text-muted">Consumed on lead deliveries</div>
+                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted, 2) }}</div>
+                    <div class="text-[10px] text-muted">Deducted for lead delivery</div>
+                </div>
+
+                <!-- 4. Available Balance -->
+                <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                        <span>Available Balance</span>
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance, 2) }}</div>
+                    <div class="text-[10px] text-muted flex items-center justify-between">
+                        <span>Live spendable credits</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance > 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
+                            {{ $totalWalletBalance > 50 ? 'Active' : 'Low Balance' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Organization Per-Lead Pricing Setting Card (Within Credits Tab) -->
+            <div class="p-5 rounded-2xl bg-surface border border-purple-200 dark:border-purple-900/40 shadow-2xs space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-ink flex items-center gap-1.5">
+                                <span class="p-1 rounded-md bg-purple-100 text-purple-700">⚡</span>
+                                <span>Organization Lead Cost Configuration</span>
+                            </h3>
+                            @if($organization->lead_cost !== null)
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-950 border border-purple-300">
+                                    Override Active: {{ number_format($organization->lead_cost, 2) }} Cr
+                                </span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+                                    Inheriting Global Default: {{ number_format($globalDefaultLeadCost, 2) }} Cr
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] text-muted mt-1">
+                            Pricing hierarchy: <strong class="text-ink">1. Project Override</strong> → <strong class="text-ink">2. Team Override</strong> → <strong class="text-ink">3. Organization Override</strong> → <strong class="text-ink">4. Global Default ({{ number_format($globalDefaultLeadCost, 2) }} Credits)</strong>
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="relative w-40">
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0.01" 
+                                wire:model="orgLeadCost" 
+                                placeholder="e.g. 15.00" 
+                                class="w-full h-8 px-2.5 text-xs bg-canvas border border-border rounded-lg text-ink font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                            >
+                        </div>
+                        <button 
+                            type="button" 
+                            wire:click="updateOrgLeadCost" 
+                            class="h-8 px-3.5 bg-ink hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer shrink-0"
+                        >
+                            Save Rate
+                        </button>
+                        @if($orgLeadCost !== null)
+                            <button 
+                                type="button" 
+                                wire:click="$set('orgLeadCost', null); updateOrgLeadCost()" 
+                                class="h-8 px-2.5 border border-border bg-surface hover:bg-canvas text-xs font-semibold text-muted hover:text-ink rounded-lg transition cursor-pointer shrink-0"
+                                title="Reset to global default"
+                            >
+                                Reset
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Wallets Breakdown Table (Opening vs Available Balances) -->
+            <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
+                <div class="p-4 border-b border-border flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink">Client Credit Wallets</h3>
+                        <p class="text-[11px] text-muted">Opening balance baseline vs current available spendable credits per client.</p>
+                    </div>
+                    <span class="text-xs text-muted font-mono">{{ $clients->count() }} Registered Clients</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-canvas/60 text-muted uppercase tracking-wider text-[10px] font-bold border-b border-border">
+                            <tr>
+                                <th class="py-3 px-4">Client Name</th>
+                                <th class="py-3 px-4">Billing Email</th>
+                                <th class="py-3 px-4">Opening Balance</th>
+                                <th class="py-3 px-4">Available Balance</th>
+                                <th class="py-3 px-4">Status</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            @forelse($clients as $c)
+                                <tr class="hover:bg-canvas/30 transition">
+                                    <td class="py-3 px-4 font-bold text-ink">
+                                        {{ $c->name }}
+                                        <div class="text-[10px] text-muted font-normal">{{ $c->projects_count }} active projects</div>
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-muted text-[11px]">
+                                        {{ $c->billing_email ?: '—' }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-ink text-xs font-semibold">
+                                        {{ number_format((float)($c->wallet?->opening_balance ?? 0), 2) }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
+                                        {{ number_format((float)($c->wallet?->balance ?? 0), 2) }}
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $c->status === 'active' ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-red-100 text-red-950 border border-red-300' }}">
+                                            {{ $c->status }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 text-right">
+                                        <button 
+                                            type="button" 
+                                            wire:click="openCreditModal({{ $c->id }})" 
+                                            class="px-2.5 py-1 rounded-lg bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                        >
+                                            Adjust / Recharge
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="p-6 text-center text-xs text-muted">
+                                        No client wallets registered.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

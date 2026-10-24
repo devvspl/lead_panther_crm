@@ -101,6 +101,26 @@ class ProcessInboundLeadJob implements ShouldQueue
                 return;
             }
 
+            // Parse budget to valid decimal format
+            $rawBudget = $mapped['budget'] ?? null;
+            $cleanBudget = null;
+            if (is_numeric($rawBudget)) {
+                $cleanBudget = (float) $rawBudget;
+            } elseif (is_string($rawBudget)) {
+                preg_match('/[0-9]+(\.[0-9]+)?/', str_replace(',', '', $rawBudget), $matches);
+                if (!empty($matches[0])) {
+                    $num = (float) $matches[0];
+                    if (str_contains(strtolower($rawBudget), 'cr')) {
+                        $cleanBudget = $num * 10000000;
+                    } elseif (str_contains(strtolower($rawBudget), 'l')) {
+                        $cleanBudget = $num * 100000;
+                    } else {
+                        $cleanBudget = $num;
+                    }
+                }
+            }
+            $budget = $cleanBudget ?: 7500000.00;
+
             // 3. Create New Lead Master Record
             $lead = Lead::create([
                 'lead_code' => Lead::generateUniqueLeadCode(),
@@ -112,7 +132,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 'mobile' => $mobile,
                 'email' => $email,
                 'city' => $mapped['city'] ?? 'Mumbai',
-                'budget' => $mapped['budget'] ?? '₹75.0L',
+                'budget' => $budget,
                 'property_type' => $mapped['property_type'] ?? '2 BHK',
                 'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
                 'status' => 'new',

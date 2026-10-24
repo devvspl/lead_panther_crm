@@ -15,9 +15,15 @@
                     <h2 class="text-xl font-bold text-ink mt-1">{{ $lead->name }}</h2>
                     <p class="text-xs text-muted">{{ $lead->city }} • {{ $lead->property_type }} • ₹{{ number_format($lead->budget / 100000, 1) }}L</p>
                 </div>
-                <button wire:click="close" class="text-muted hover:text-ink p-2 rounded-lg hover:bg-surface">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button wire:click="showFullJourney" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Show Full Lead Journey</span>
+                    </button>
+                    <button wire:click="close" class="text-muted hover:text-ink p-2 rounded-lg hover:bg-surface cursor-pointer">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Body Content -->
@@ -55,7 +61,7 @@
                 <!-- Navigation Tabs -->
                 <div class="border-b border-border flex space-x-6 text-sm font-medium">
                     <button wire:click="$set('activeTab', 'timeline')" class="pb-2 border-b-2 {{ $activeTab === 'timeline' ? 'border-ink text-ink font-bold' : 'border-transparent text-muted hover:text-ink' }}">
-                        Timeline & Audit Log
+                        Timeline &amp; Journey ({{ count($journey['events'] ?? []) }})
                     </button>
                     <button wire:click="$set('activeTab', 'actions')" class="pb-2 border-b-2 {{ $activeTab === 'actions' ? 'border-ink text-ink font-bold' : 'border-transparent text-muted hover:text-ink' }}">
                         Quick Actions
@@ -68,19 +74,32 @@
                 <!-- Tab 1: Timeline -->
                 @if($activeTab === 'timeline')
                     <div class="space-y-4">
-                        <h4 class="text-xs font-bold text-muted uppercase tracking-wider">Stage Transitions</h4>
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-muted uppercase tracking-wider">Lead Journey Milestones</h4>
+                            <button wire:click="showFullJourney" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer">
+                                Expand Interactive Journey &rarr;
+                            </button>
+                        </div>
                         <div class="space-y-3">
-                            @forelse($statusHistory as $history)
-                                <div class="flex items-start space-x-3 text-xs">
-                                    <div class="h-2 w-2 rounded-full bg-accent mt-1.5 flex-shrink-0"></div>
-                                    <div>
-                                        <span class="font-semibold text-ink">Moved to {{ ucfirst(str_replace('_', ' ', $history->to_status)) }}</span>
-                                        <span class="text-muted">from {{ ucfirst(str_replace('_', ' ', $history->from_status)) }}</span>
-                                        <div class="text-[10px] text-muted">{{ \Carbon\Carbon::parse($history->changed_at)->diffForHumans() }}</div>
+                            @forelse($journey['events'] ?? [] as $event)
+                                <div class="flex items-start space-x-3 text-xs p-3 rounded-lg bg-canvas border border-border">
+                                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border {{ $event['color'] }} shrink-0 mt-0.5">
+                                        {{ $event['badge'] }}
+                                    </span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-ink">{{ $event['title'] }}</div>
+                                        <div class="text-muted text-[11px] leading-relaxed mt-0.5">{{ $event['details'] }}</div>
+                                        <div class="text-[10px] text-muted font-mono mt-1 flex items-center space-x-2">
+                                            <span>{{ $event['timestamp']->format('d M Y, h:i A') }}</span>
+                                            <span>•</span>
+                                            <span>{{ $event['timestamp']->diffForHumans() }}</span>
+                                            <span>•</span>
+                                            <span class="font-bold text-gray-700">{{ $event['category'] }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             @empty
-                                <div class="text-xs text-muted">No status transitions logged yet.</div>
+                                <div class="text-xs text-muted">No journey milestones logged yet.</div>
                             @endforelse
                         </div>
                     </div>

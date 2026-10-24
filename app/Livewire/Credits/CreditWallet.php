@@ -139,6 +139,12 @@ class CreditWallet extends Component
             ->take(5)
             ->get() : collect();
 
+        $pricingResolution = app(\App\Services\LeadPricingService::class)->resolveCost(
+            null,
+            null,
+            $client?->organization
+        );
+
         return view('livewire.credits.credit-wallet', [
             'wallet' => $wallet,
             'lastRecharge' => $lastRecharge,
@@ -146,6 +152,7 @@ class CreditWallet extends Component
             'packages' => $packages,
             'rechargeRequests' => $rechargeRequests,
             'client' => $client,
+            'pricingResolution' => $pricingResolution,
         ])->layout('layouts.app');
     }
 

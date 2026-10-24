@@ -4,6 +4,8 @@ namespace App\Livewire\Admin;
 
 use Livewire\Component;
 use App\Models\NotificationTemplate;
+use App\Models\NotificationLog;
+use App\Services\NotificationDeliveryService;
 use App\Livewire\Concerns\HasAdvancedTable;
 
 class NotificationTemplates extends Component
@@ -15,6 +17,14 @@ class NotificationTemplates extends Component
     public string $channel = 'whatsapp';
     public string $subject = '';
     public string $body = '';
+
+    // Test notification dispatch state
+    public string $testChannel = 'whatsapp';
+    public string $testRecipient = '+91 98765 43210';
+    public string $testTemplateKey = '';
+
+    // Log filter
+    public string $logChannelFilter = 'all';
 
     public function tableColumns(): array
     {
@@ -43,7 +53,7 @@ class NotificationTemplates extends Component
     {
         $this->validate([
             'key' => 'required|string',
-            'channel' => 'required|string',
+            'channel' => 'required|in:sms,whatsapp,email,crm,push,database',
             'body' => 'required|string',
         ]);
 
@@ -70,6 +80,48 @@ class NotificationTemplates extends Component
         $this->body = '';
     }
 
+    public function sendTestNotification(): void
+    {
+        $this->validate([
+            'testChannel' => 'required|in:sms,whatsapp,email,crm,push',
+            'testRecipient' => 'required|string',
+        ]);
+
+        try {
+            $key = !empty($this->testTemplateKey) ? $this->testTemplateKey : 'lead_assigned_' . $this->testChannel;
+
+            $log = app(NotificationDeliveryService::class)->send(
+                channel: $this->testChannel,
+                recipient: $this->testRecipient,
+                templateKey: $key,
+                tokens: [
+                    'lead_name' => 'Alexander Pierce',
+                    'lead_code' => 'LP-' . rand(1000, 9999),
+                    'assigned_to' => auth()->user()?->name ?? 'Lead Panther Agent',
+                ]
+            );
+
+            $this->dispatch('toast', type: 'success', message: "Test notification dispatched via " . strtoupper($this->testChannel) . " (Status: " . strtoupper($log->status) . ")!");
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Failed to send test notification: ' . $e->getMessage());
+        }
+    }
+
+    public function retryNotification(int $logId): void
+    {
+        try {
+            $log = app(NotificationDeliveryService::class)->retry($logId);
+            $this->dispatch('toast', type: 'success', message: "Notification #{$log->id} re-delivered successfully (Status: {$log->status}, Retries: {$log->retries}).");
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Retry failed: ' . $e->getMessage());
+        }
+    }
+
+    public function filterLogsByChannel(string $channel): void
+    {
+        $this->logChannelFilter = $channel;
+    }
+
     public function render()
     {
         $query = NotificationTemplate::query();
@@ -92,8 +144,16 @@ class NotificationTemplates extends Component
 
         $templates = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);
 
+        // Recent Notification Delivery Logs
+        $logsQuery = NotificationLog::latest('id');
+        if ($this->logChannelFilter !== 'all') {
+            $logsQuery->where('channel', $this->logChannelFilter);
+        }
+        $logs = $logsQuery->take(15)->get();
+
         return view('livewire.admin.notification-templates', [
             'templates' => $templates,
+            'logs' => $logs,
         ])->layout('layouts.app');
     }
 }

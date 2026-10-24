@@ -344,7 +344,7 @@
                         explicitly after reviewing pulled changes.</p>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                     <button type="button" wire:click="runFollowup('migrate')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
                         <div class="flex items-center justify-between">
@@ -368,6 +368,21 @@
                         </div>
                         <p class="text-[11px] text-muted font-mono truncate" title="php artisan db:seed {{ $selectedSeederClass ? '--class=' . $selectedSeederClass . ' ' : '' }}--force">
                             {{ $selectedSeederClass ? "db:seed --class={$selectedSeederClass}" : 'php artisan db:seed --force' }}
+                        </p>
+                    </button>
+
+                    <button type="button" wire:click="runFollowup('clean_dummy')" wire:loading.attr="disabled"
+                        wire:confirm="Remove all dummy demo leads, campaigns, clients, projects, demo users, and transactions while keeping required system tables, lead sources, and Super Admin accounts?"
+                        class="p-3.5 bg-canvas rounded-xl border border-amber-300 hover:border-amber-500 bg-amber-50/30 text-left transition space-y-1.5 cursor-pointer disabled:opacity-50 shadow-2xs">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs text-amber-900">Clean Dummy Data</span>
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                        <p class="text-[11px] text-amber-800 font-mono truncate" title="Keep required data only">
+                            dev:clean-dummy-data
                         </p>
                     </button>
 

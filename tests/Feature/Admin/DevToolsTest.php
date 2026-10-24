@@ -105,4 +105,71 @@ class DevToolsTest extends TestCase
         $response = $this->actingAs($user)->get('/admin/dev-tools');
         $response->assertForbidden();
     }
+
+    public function test_dev_tools_renders_clean_dummy_data_card(): void
+    {
+        $admin = User::factory()->create(['email' => 'admin@leadpanther.com']);
+        $admin->assignRole('super-admin');
+
+        Livewire::actingAs($admin)
+            ->test(DevTools::class)
+            ->assertSee('Remove Dummy Data')
+            ->assertSee('CLEAN DUMMY DATA')
+            ->assertSee('Keep Required');
+    }
+
+    public function test_clean_dummy_data_requires_confirmation_phrase(): void
+    {
+        $admin = User::factory()->create(['email' => 'admin@leadpanther.com']);
+        $admin->assignRole('super-admin');
+
+        Organization::create(['name' => 'Demo Org']);
+
+        Livewire::actingAs($admin)
+            ->test(DevTools::class)
+            ->set('cleanConfirmPhrase', 'WRONG PHRASE')
+            ->call('cleanDummyData')
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('organizations', ['name' => 'Demo Org']);
+    }
+
+    public function test_clean_dummy_data_purges_demo_data_and_preserves_required_data(): void
+    {
+        $admin = User::factory()->create(['email' => 'admin@leadpanther.com']);
+        $admin->assignRole('super-admin');
+
+        $demoUser = User::factory()->create(['email' => 'demouser@demo.com']);
+        $demoOrg = Organization::create(['name' => 'Demo Real Estate Inc']);
+
+        Livewire::actingAs($admin)
+            ->test(DevTools::class)
+            ->set('cleanConfirmPhrase', 'CLEAN DUMMY DATA')
+            ->call('cleanDummyData')
+            ->assertDispatched('toast');
+
+        // Demo data should be removed
+        $this->assertDatabaseMissing('users', ['email' => 'demouser@demo.com']);
+        $this->assertDatabaseMissing('organizations', ['name' => 'Demo Real Estate Inc']);
+
+        // Required data should be preserved
+        $this->assertDatabaseHas('users', ['email' => 'admin@leadpanther.com', 'id' => 1]);
+        $this->assertDatabaseHas('organizations', ['name' => 'Lead Panther Platform HQ']);
+        $this->assertDatabaseHas('lead_sources', ['name' => 'meta']);
+    }
+
+    public function test_artisan_clean_dummy_data_command_executes_successfully(): void
+    {
+        $admin = User::factory()->create(['email' => 'admin@leadpanther.com']);
+        $admin->assignRole('super-admin');
+
+        $demoUser = User::factory()->create(['email' => 'sales99@demo.com']);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('dev:clean-dummy-data', ['--force' => true]);
+        $this->assertEquals(0, $exitCode);
+
+        $this->assertDatabaseMissing('users', ['email' => 'sales99@demo.com']);
+        $this->assertDatabaseHas('users', ['email' => 'admin@leadpanther.com', 'id' => 1]);
+        $this->assertDatabaseHas('organizations', ['name' => 'Lead Panther Platform HQ']);
+    }
 }

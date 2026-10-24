@@ -52,8 +52,67 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Seed Dummy Data Section -->
+    <!-- Action Cards Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 1. Remove Dummy Data (Keep Required System Data) - RECOMMENDED -->
+        <div class="bg-surface rounded-card border-2 border-amber-500/50 p-6 shadow-sm flex flex-col justify-between space-y-4">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2 text-amber-700 font-bold">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Remove Dummy Data</span>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                        Keep Required
+                    </span>
+                </div>
+
+                <p class="text-xs text-muted leading-relaxed">
+                    Safely purge all dummy leads, demo campaigns, clients, projects, demo sales/partner users, and transactions.
+                </p>
+
+                <div class="p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1.5 font-medium">
+                    <div class="font-bold flex items-center space-x-1.5 text-amber-950">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Preserved Required Data:</span>
+                    </div>
+                    <ul class="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
+                        <li>Super Admin user (<code class="font-bold">admin@leadpanther.com</code>)</li>
+                        <li>Spatie Roles &amp; Permissions</li>
+                        <li>Lead Sources &amp; Replacement Reasons</li>
+                        <li>Git &amp; Integration Credentials</li>
+                        <li>General Settings &amp; Platform Org</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1.5 pt-1">
+                    <label class="block text-xs font-bold text-ink">Type <span class="font-mono text-amber-700">CLEAN DUMMY DATA</span> to confirm:</label>
+                    <input 
+                        type="text" 
+                        wire:model.live="cleanConfirmPhrase"
+                        placeholder="CLEAN DUMMY DATA"
+                        class="w-full px-3 py-2 text-xs rounded-lg border border-border bg-canvas text-ink focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition font-mono uppercase tracking-wider"
+                    />
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-border">
+                <button 
+                    wire:click="cleanDummyData"
+                    wire:loading.attr="disabled"
+                    @disabled(trim($cleanConfirmPhrase) !== 'CLEAN DUMMY DATA')
+                    class="w-full inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-amber-600 text-white font-bold text-xs rounded-lg hover:bg-amber-700 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+                >
+                    <svg wire:loading wire:target="cleanDummyData" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span wire:loading.remove wire:target="cleanDummyData">Clean Dummy Data (Keep Required)</span>
+                    <span wire:loading wire:target="cleanDummyData">Cleaning Dummy Data...</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Seed Dummy Data Section -->
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col justify-between space-y-4">
             <div class="space-y-3">
                 <div class="flex items-center space-x-2 text-ink font-bold">
@@ -91,7 +150,7 @@
             </div>
         </div>
 
-        <!-- Clear All Data Section (Danger Guarded) -->
+        <!-- 3. Clear All Data Section (Danger Guarded) -->
         <div class="bg-surface rounded-card border-2 border-red-500/40 p-6 shadow-sm flex flex-col justify-between space-y-4">
             <div class="space-y-3">
                 <div class="flex items-center space-x-2 text-danger font-bold">

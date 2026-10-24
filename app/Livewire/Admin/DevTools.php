@@ -16,8 +16,10 @@ use App\Models\AuditLog;
 class DevTools extends Component
 {
     public string $confirmPhrase = '';
+    public string $cleanConfirmPhrase = '';
     public bool $isSeeding = false;
     public bool $isClearing = false;
+    public bool $isCleaningDummy = false;
     public array $stats = [];
     public array $lastSeedSummary = [];
 
@@ -120,6 +122,30 @@ class DevTools extends Component
             $this->dispatch('toast', type: 'error', message: 'Reset failed: ' . $e->getMessage());
         } finally {
             $this->isClearing = false;
+        }
+    }
+
+    public function cleanDummyData(\App\Services\DatabaseCleanupService $cleanupService): void
+    {
+        if (trim($this->cleanConfirmPhrase) !== 'CLEAN DUMMY DATA') {
+            $this->dispatch('toast', type: 'error', message: 'Exact confirmation phrase "CLEAN DUMMY DATA" required.');
+            return;
+        }
+
+        $this->isCleaningDummy = true;
+
+        try {
+            $result = $cleanupService->clean();
+
+            $this->cleanConfirmPhrase = '';
+            $this->lastSeedSummary = [];
+            $this->refreshStats();
+
+            $this->dispatch('toast', type: 'success', message: "Dummy data removed successfully! Preserved Super Admin and {$result['super_admins_preserved']} account(s), platform organization, and required system lookups.");
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: 'Cleanup failed: ' . $e->getMessage());
+        } finally {
+            $this->isCleaningDummy = false;
         }
     }
 

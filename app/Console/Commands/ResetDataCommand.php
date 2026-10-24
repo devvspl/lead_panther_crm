@@ -14,7 +14,7 @@ class ResetDataCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'dev:reset-data {--force : Force execution even if not in local/staging}';
+    protected $signature = 'dev:reset-data {--force : Force execution even if not in local/staging} {--keep-required : Keep required lookups, lead sources, settings, and platform organization}';
 
     /**
      * The console command description.
@@ -26,11 +26,18 @@ class ResetDataCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(\App\Services\DatabaseCleanupService $cleanupService): int
     {
         if (!in_array(config('app.env'), ['local', 'staging', 'testing']) && !$this->option('force')) {
             $this->error('ResetDataCommand is strictly prohibited in production environments.');
             return 1;
+        }
+
+        if ($this->option('keep-required')) {
+            $this->info('Cleaning dummy data while keeping required configuration and Super Admin...');
+            $result = $cleanupService->clean();
+            $this->info("Completed. Preserved {$result['super_admins_preserved']} super admin(s). Cleared {$result['records_removed']} dummy records across {$result['tables_cleaned']} tables.");
+            return 0;
         }
 
         $databaseName = DB::getDatabaseName();
@@ -86,11 +93,35 @@ class ResetDataCommand extends Command
                 }
             });
 
-            // Re-assign super-admin role to remaining admin users if needed
-            $superAdmins = User::whereIn('email', ['admin@leadpanther.com'])->get();
-            foreach ($superAdmins as $admin) {
-                if (!$admin->hasRole('super-admin')) {
-                    $admin->assignRole('super-admin');
+            // Ensure admin@leadpanther.com exists with ID 1 and has Super Admin role
+            $admin = User::where('email', 'admin@leadpanther.com')->orWhere('id', 1)->first();
+            if (!$admin) {
+                DB::table('users')->insert([
+                    'id' => 1,
+                    'name' => 'Super Admin',
+                    'email' => 'admin@leadpanther.com',
+                    'password' => bcrypt('password'),
+                    'phone' => '+919800000001',
+                    'status' => 'active',
+                    'email_verified_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $admin = User::find(1);
+            } elseif ($admin->id !== 1 && !User::where('id', 1)->exists()) {
+                $oldId = $admin->id;
+                DB::table('users')->where('id', $oldId)->update(['id' => 1]);
+                DB::table('model_has_roles')
+                    ->where('model_type', User::class)
+                    ->where('model_id', $oldId)
+                    ->update(['model_id' => 1]);
+                $admin = User::find(1);
+            }
+
+            if ($admin) {
+                $canonicalRole = \Spatie\Permission\Models\Role::whereIn('name', ['Super Admin', 'super-admin'])->first();
+                if ($canonicalRole && !$admin->hasRole($canonicalRole->name)) {
+                    $admin->assignRole($canonicalRole->name);
                 }
             }
 

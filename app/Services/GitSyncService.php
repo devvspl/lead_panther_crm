@@ -854,6 +854,7 @@ class GitSyncService
             'npm' => ['npm', 'run', 'build'],
             'clear_cache' => ['php', 'artisan', 'optimize:clear'],
             'cache_all' => ['php', 'artisan', 'optimize'],
+            'clean_dummy', 'clean_dummy_data' => ['php', 'artisan', 'dev:clean-dummy-data', '--force'],
             default => throw new \InvalidArgumentException("Invalid follow-up action: {$actionType}"),
         };
 

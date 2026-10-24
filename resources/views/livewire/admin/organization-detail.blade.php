@@ -26,13 +26,13 @@
                     <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
                         <span>{{ $organization->name }}</span>
                         @if($organization->status === 'active')
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
+                                <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
                                 Active
                             </span>
                         @else
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
-                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-950 border border-red-300">
+                                <span class="w-2 h-2 rounded-full bg-red-600"></span>
                                 Suspended
                             </span>
                         @endif
@@ -47,24 +47,38 @@
         </div>
 
         <!-- Header Actions -->
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <!-- Full Workbook Excel Export Button -->
+            <button 
+                type="button" 
+                wire:click="exportFullExcel" 
+                class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                title="Export All Organization Tabs into Multi-Sheet Excel"
+            >
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Export All (Excel)</span>
+            </button>
+
+            <!-- Suspend / Activate -->
             <button 
                 type="button" 
                 wire:click="toggleOrganizationStatus" 
                 wire:confirm="Are you sure you want to change this organization's status?"
-                class="px-3.5 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                class="px-3 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
             >
                 @if($organization->status === 'active')
                     <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>Suspend Org</span>
+                    <span>Suspend</span>
                 @else
                     <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>Activate Org</span>
+                    <span>Activate</span>
                 @endif
             </button>
 
@@ -72,7 +86,7 @@
                 <button 
                     type="button" 
                     wire:click="startEditing" 
-                    class="px-3.5 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                    class="px-3 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
                 >
                     <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
@@ -182,28 +196,28 @@
             <div class="text-[10px] text-muted">Direct registered clients</div>
         </div>
 
-        <!-- Card 3: Projects Count -->
+        <!-- Card 3: Directly Assigned Leads -->
+        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
+            <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                <span>Direct Leads</span>
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+            </div>
+            <div class="text-2xl font-bold font-mono text-ink">{{ $directlyAssignedLeadsCount }}</div>
+            <div class="text-[10px] text-muted">Of {{ number_format($totalLeadsCount) }} total org leads</div>
+        </div>
+
+        <!-- Card 4: Projects -->
         <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
             <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                 <span>Projects</span>
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                 </svg>
             </div>
             <div class="text-2xl font-bold font-mono text-ink">{{ $totalProjectsCount }}</div>
             <div class="text-[10px] text-muted">Active real estate projects</div>
-        </div>
-
-        <!-- Card 4: Leads Count -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-            <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Total Leads</span>
-                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-            </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalLeadsCount) }}</div>
-            <div class="text-[10px] text-muted">Managed across clients</div>
         </div>
 
         <!-- Card 5: Wallet Balance -->
@@ -221,60 +235,90 @@
 
     <!-- Tabbed Navigation Bar -->
     <div class="border-b border-border">
-        <nav class="flex space-x-2 sm:space-x-6 -mb-px overflow-x-auto text-xs font-semibold">
+        <nav class="flex space-x-2 sm:space-x-5 -mb-px overflow-x-auto text-xs font-semibold">
             <!-- Tab 1: Overview -->
-            <button 
-                type="button" 
-                wire:click="setTab('overview')"
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'overview']) }}" 
+                wire:click.prevent="setTab('overview')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'overview' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                 </svg>
                 <span>Overview & Profile</span>
-            </button>
+            </a>
 
             <!-- Tab 2: Team Members -->
-            <button 
-                type="button" 
-                wire:click="setTab('team')"
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'team']) }}" 
+                wire:click.prevent="setTab('team')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'team' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
                 <span>Team Members</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-canvas border border-border {{ $activeTab === 'team' ? 'text-primary' : 'text-muted' }}">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'team' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
                     {{ $totalUsersCount }}
                 </span>
-            </button>
+            </a>
 
             <!-- Tab 3: Clients & Projects -->
-            <button 
-                type="button" 
-                wire:click="setTab('clients')"
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'clients']) }}" 
+                wire:click.prevent="setTab('clients')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'clients' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                 </svg>
                 <span>Clients & Projects</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-canvas border border-border {{ $activeTab === 'clients' ? 'text-primary' : 'text-muted' }}">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
                     {{ $totalClientsCount }}
                 </span>
-            </button>
+            </a>
 
-            <!-- Tab 4: Activity Log -->
-            <button 
-                type="button" 
-                wire:click="setTab('activity')"
+            <!-- Tab 4: Directly Assigned Leads (NEW) -->
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'leads']) }}" 
+                wire:click.prevent="setTab('leads')"
+                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span>Direct Leads</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'leads' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
+                    {{ $directlyAssignedLeadsCount }}
+                </span>
+            </a>
+
+            <!-- Tab 5: Credits & Wallet (NEW) -->
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'credits']) }}" 
+                wire:click.prevent="setTab('credits')"
+                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'credits' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <span>Credits & Wallet</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
+                    {{ number_format($totalWalletBalance) }}
+                </span>
+            </a>
+
+            <!-- Tab 6: Activity Log -->
+            <a 
+                href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'activity']) }}" 
+                wire:click.prevent="setTab('activity')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'activity' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <span>Activity & Audit</span>
-            </button>
+            </a>
         </nav>
     </div>
 
@@ -293,7 +337,18 @@
                             </span>
                             <span>Organization Profile Details</span>
                         </h3>
-                        <span class="text-xs text-muted">ID: <strong class="text-ink font-mono">#{{ $organization->id }}</strong></span>
+                        <div class="flex items-center gap-2">
+                            <button 
+                                type="button" 
+                                wire:click="exportTabExcel('overview')" 
+                                class="px-2.5 py-1 text-xs rounded-lg border border-border hover:bg-canvas text-muted hover:text-ink transition cursor-pointer flex items-center gap-1"
+                                title="Export Overview to Excel"
+                            >
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                <span>Export Tab</span>
+                            </button>
+                            <span class="text-xs text-muted">ID: <strong class="text-ink font-mono">#{{ $organization->id }}</strong></span>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -515,6 +570,16 @@
                 <div class="flex items-center gap-2 shrink-0">
                     <button 
                         type="button" 
+                        wire:click="exportTabExcel('team')" 
+                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Export Team Members to Excel"
+                    >
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export Tab</span>
+                    </button>
+
+                    <button 
+                        type="button" 
                         wire:click="openAddMemberModal" 
                         class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
@@ -582,7 +647,6 @@
                         <tbody class="divide-y divide-border">
                             @forelse($teamMembers as $member)
                                 <tr class="hover:bg-canvas/30 transition">
-                                    <!-- Name & Avatar -->
                                     <td class="py-3 px-4">
                                         <div class="flex items-center gap-3">
                                             <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-border text-ink font-bold text-xs flex items-center justify-center shrink-0">
@@ -595,22 +659,19 @@
                                         </div>
                                     </td>
 
-                                    <!-- Email -->
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ $member->email }}
                                     </td>
 
-                                    <!-- Role -->
                                     <td class="py-3 px-4">
                                         @php
                                             $roleName = $member->roles->first()?->name;
                                         @endphp
-                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider {{ in_array(strtolower($roleName ?? ''), ['super admin', 'super-admin']) ? 'bg-purple-50 text-purple-700 border-purple-200' : (in_array(strtolower($roleName ?? ''), ['builder']) ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-canvas text-ink border-border') }}">
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider {{ in_array(strtolower($roleName ?? ''), ['super admin', 'super-admin']) ? 'bg-purple-100 text-purple-950 border-purple-300' : (in_array(strtolower($roleName ?? ''), ['builder']) ? 'bg-blue-100 text-blue-950 border-blue-300' : 'bg-slate-100 text-slate-900 border-slate-300') }}">
                                             {{ $roleName ? ucwords(str_replace(['-', '_'], ' ', $roleName)) : 'No Role' }}
                                         </span>
                                     </td>
 
-                                    <!-- Status -->
                                     <td class="py-3 px-4">
                                         <button 
                                             type="button" 
@@ -619,28 +680,25 @@
                                             title="Click to toggle user status"
                                         >
                                             @if(($member->status ?? 'active') === 'active')
-                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
                                                     Active
                                                 </span>
                                             @else
-                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-950 border border-red-300">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span>
                                                     Inactive
                                                 </span>
                                             @endif
                                         </button>
                                     </td>
 
-                                    <!-- Joined -->
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ $member->created_at ? $member->created_at->format('M d, Y') : '—' }}
                                     </td>
 
-                                    <!-- Actions -->
                                     <td class="py-3 px-4 text-right">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <!-- Impersonate -->
                                             <a 
                                                 href="{{ route('admin.users.impersonate', $member->id) }}" 
                                                 class="p-1.5 rounded-lg border border-border bg-surface hover:bg-purple-50 text-purple-700 hover:border-purple-300 transition shadow-2xs inline-flex items-center justify-center cursor-pointer"
@@ -651,7 +709,6 @@
                                                 </svg>
                                             </a>
 
-                                            <!-- Activation Token -->
                                             <button 
                                                 type="button" 
                                                 wire:click="generateUserActivationLink({{ $member->id }})" 
@@ -663,7 +720,6 @@
                                                 </svg>
                                             </button>
 
-                                            <!-- Remove from Org -->
                                             <button 
                                                 type="button" 
                                                 wire:click="removeUserFromOrganization({{ $member->id }})" 
@@ -701,16 +757,28 @@
                     <h3 class="text-sm font-bold text-ink">Registered Clients ({{ $totalClientsCount }})</h3>
                     <p class="text-xs text-muted">Clients managed under {{ $organization->name }} with their credit wallets & projects.</p>
                 </div>
-                <button 
-                    type="button" 
-                    wire:click="openCreateClientModal" 
-                    class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                    </svg>
-                    <span>Register Client</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button" 
+                        wire:click="exportTabExcel('clients')" 
+                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Export Clients & Projects to Excel"
+                    >
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export Tab</span>
+                    </button>
+
+                    <button 
+                        type="button" 
+                        wire:click="openCreateClientModal" 
+                        class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span>Register Client</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Clients Grid Cards -->
@@ -722,7 +790,7 @@
                                 <h4 class="text-sm font-bold text-ink truncate">{{ $client->name }}</h4>
                                 <div class="text-[11px] text-muted font-mono truncate">{{ $client->billing_email ?: 'No billing email' }}</div>
                             </div>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 {{ $client->status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200' }}">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 {{ $client->status === 'active' ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-red-100 text-red-950 border border-red-300' }}">
                                 {{ $client->status }}
                             </span>
                         </div>
@@ -759,6 +827,18 @@
                                 </div>
                             </div>
                         @endif
+
+                        <div class="pt-2 border-t border-border flex items-center justify-between text-xs">
+                            <button 
+                                type="button" 
+                                wire:click="openCreditModal({{ $client->id }})" 
+                                class="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                <span>Adjust Credits</span>
+                            </button>
+                            <span class="text-[10px] text-muted font-mono">ID: #{{ $client->id }}</span>
+                        </div>
                     </div>
                 @empty
                     <div class="col-span-3 p-12 text-center text-xs text-muted border border-dashed border-border rounded-2xl">
@@ -769,12 +849,377 @@
         </div>
     @endif
 
-    <!-- TAB 4: ACTIVITY & AUDIT -->
+    <!-- TAB 4: DIRECTLY ASSIGNED LEADS (NEW) -->
+    @if($activeTab === 'leads')
+        <div class="space-y-4">
+            <!-- Filter & Action Bar for Leads -->
+            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2.5 flex-1">
+                    <!-- Search Input -->
+                    <div class="relative flex-1 min-w-[220px] max-w-sm">
+                        <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.300ms="leadSearch" 
+                            placeholder="Search leads by code, name, phone..."
+                            class="w-full h-8 pl-9 pr-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                        >
+                    </div>
+
+                    <!-- Assignment Filter -->
+                    <select 
+                        wire:model.live="leadAssignmentFilter" 
+                        class="h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer"
+                    >
+                        <option value="all">All Assignments</option>
+                        <option value="assigned">Directly Assigned Only</option>
+                        <option value="unassigned">Unassigned Only</option>
+                    </select>
+
+                    <!-- Status Filter -->
+                    <select 
+                        wire:model.live="leadStatusFilter" 
+                        class="h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer"
+                    >
+                        <option value="all">All Stages & Statuses</option>
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="site_visit">Site Visit</option>
+                        <option value="converted">Converted</option>
+                        <option value="lost">Lost</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <button 
+                        type="button" 
+                        wire:click="exportTabExcel('leads')" 
+                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Export Leads to Excel"
+                    >
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export Tab</span>
+                    </button>
+
+                    <button 
+                        type="button" 
+                        wire:click="openCreateLeadModal" 
+                        class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span>Add & Direct Assign Lead</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-canvas/60 text-muted uppercase tracking-wider text-[10px] font-bold border-b border-border">
+                            <tr>
+                                <th class="py-3 px-4">Lead Code & Name</th>
+                                <th class="py-3 px-4">Contact Phone</th>
+                                <th class="py-3 px-4">Client / Project</th>
+                                <th class="py-3 px-4">Directly Assigned To</th>
+                                <th class="py-3 px-4">Status Stage</th>
+                                <th class="py-3 px-4">Created Date</th>
+                                <th class="py-3 px-4 text-right">Reassign</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            @forelse($leads as $lead)
+                                <tr class="hover:bg-canvas/30 transition">
+                                    <!-- Lead Code & Name -->
+                                    <td class="py-3 px-4">
+                                        <div>
+                                            <div class="font-bold text-ink text-xs">{{ $lead->name }}</div>
+                                            <div class="text-[11px] font-mono font-bold text-primary tracking-tight">{{ $lead->lead_code }}</div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Phone & Email -->
+                                    <td class="py-3 px-4 font-mono text-[11px]">
+                                        <div class="text-ink font-semibold">{{ $lead->mobile }}</div>
+                                        @if($lead->email)
+                                            <div class="text-[11px] text-muted truncate max-w-[170px]">{{ $lead->email }}</div>
+                                        @endif
+                                    </td>
+
+                                    <!-- Client & Project -->
+                                    <td class="py-3 px-4">
+                                        <div class="font-bold text-ink">{{ $lead->client?->name ?: '—' }}</div>
+                                        <div class="text-[10px] text-muted">{{ $lead->project?->name ?: 'No Project' }}</div>
+                                    </td>
+
+                                    <!-- Directly Assigned Agent -->
+                                    <td class="py-3 px-4">
+                                        @if($lead->assignedTo)
+                                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 border border-blue-300 text-[11px] font-bold shadow-2xs">
+                                                <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                                                <span class="text-blue-950 font-bold">{{ $lead->assignedTo->name }}</span>
+                                            </div>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-950 text-[10px] font-bold">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0"></span>
+                                                <span>Unassigned</span>
+                                            </span>
+                                        @endif
+                                    </td>
+
+                                    <!-- Status -->
+                                    <td class="py-3 px-4">
+                                        @php
+                                            $statusKey = strtolower(trim($lead->status ?? 'new'));
+                                            $stageBadge = match($statusKey) {
+                                                'new' => 'bg-sky-100 text-sky-950 border-sky-300',
+                                                'contacted' => 'bg-amber-100 text-amber-950 border-amber-300',
+                                                'qualified' => 'bg-emerald-100 text-emerald-950 border-emerald-300',
+                                                'proposal_sent', 'proposal' => 'bg-purple-100 text-purple-950 border-purple-300',
+                                                'negotiation' => 'bg-indigo-100 text-indigo-950 border-indigo-300',
+                                                'won', 'closed_won' => 'bg-green-100 text-green-950 border-green-300',
+                                                'lost', 'closed_lost', 'dropped' => 'bg-red-100 text-red-950 border-red-300',
+                                                'disqualified', 'junk' => 'bg-slate-100 text-slate-800 border-slate-300',
+                                                default => 'bg-neutral-100 text-neutral-900 border-neutral-300',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border {{ $stageBadge }}">
+                                            {{ ucfirst(str_replace(['_', '-'], ' ', $lead->status)) }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Created Date -->
+                                    <td class="py-3 px-4 font-mono text-muted text-[11px]">
+                                        {{ $lead->created_at ? $lead->created_at->format('M d, Y') : '—' }}
+                                    </td>
+
+                                    <!-- Inline Reassign Dropdown -->
+                                    <td class="py-3 px-4 text-right">
+                                        <select 
+                                            wire:change="reassignLead({{ $lead->id }}, $event.target.value || null)"
+                                            class="h-7 px-2 text-[10px] bg-canvas border border-border rounded-lg text-ink font-semibold focus:ring-1 focus:ring-primary cursor-pointer"
+                                        >
+                                            <option value="">Unassign</option>
+                                            @foreach($teamMembers as $tm)
+                                                <option value="{{ $tm->id }}" @selected($lead->assigned_to == $tm->id)>
+                                                    {{ $tm->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-xs text-muted">
+                                        No leads found matching your criteria for this organization.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                @if($leads->hasPages())
+                    <div class="p-3 border-t border-border bg-canvas/30">
+                        {{ $leads->links() }}
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    <!-- TAB 5: CREDITS & WALLET (NEW) -->
+    @if($activeTab === 'credits')
+        <div class="space-y-6">
+            <!-- Credits Header & KPI Strip -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                        <span>Total Available Credits</span>
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance) }}</div>
+                    <div class="text-[10px] text-muted">Across all clients under {{ $organization->name }}</div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                        <span>Total Recharged</span>
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                        </svg>
+                    </div>
+                    <div class="text-2xl font-bold font-mono text-emerald-600">{{ number_format($totalCreditsRecharged) }}</div>
+                    <div class="text-[10px] text-muted">Total credits allocated/recharged</div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                        <span>Total Deducted / Spent</span>
+                        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                        </svg>
+                    </div>
+                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted) }}</div>
+                    <div class="text-[10px] text-muted">Consumed on lead deliveries</div>
+                </div>
+            </div>
+
+            <!-- Controls bar for Credits -->
+            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-muted font-semibold">Filter:</span>
+                    <div class="inline-flex p-0.5 rounded-lg bg-canvas border border-border text-xs">
+                        <button 
+                            type="button" 
+                            wire:click="$set('creditFilterType', 'all')" 
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'all' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}"
+                        >
+                            All
+                        </button>
+                        <button 
+                            type="button" 
+                            wire:click="$set('creditFilterType', 'recharge')" 
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'recharge' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}"
+                        >
+                            Recharges
+                        </button>
+                        <button 
+                            type="button" 
+                            wire:click="$set('creditFilterType', 'deduct')" 
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'deduct' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}"
+                        >
+                            Deductions
+                        </button>
+                        <button 
+                            type="button" 
+                            wire:click="$set('creditFilterType', 'refund')" 
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'refund' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}"
+                        >
+                            Refunds
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button 
+                        type="button" 
+                        wire:click="exportTabExcel('credits')" 
+                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Export Credits History to Excel"
+                    >
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export Tab</span>
+                    </button>
+
+                    <button 
+                        type="button" 
+                        wire:click="openCreditModal()" 
+                        class="px-3.5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span>Recharge / Adjust Credits</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Transactions Table -->
+            <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-canvas/60 text-muted uppercase tracking-wider text-[10px] font-bold border-b border-border">
+                            <tr>
+                                <th class="py-3 px-4">Tx ID</th>
+                                <th class="py-3 px-4">Client</th>
+                                <th class="py-3 px-4">Transaction Type</th>
+                                <th class="py-3 px-4">Lead Reference</th>
+                                <th class="py-3 px-4">Credits Before</th>
+                                <th class="py-3 px-4">Amount In / Out</th>
+                                <th class="py-3 px-4">Balance After</th>
+                                <th class="py-3 px-4 text-right">Date & Time</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            @forelse($creditTransactions as $tx)
+                                <tr class="hover:bg-canvas/30 transition">
+                                    <td class="py-3 px-4 font-mono text-[11px] text-muted">#{{ $tx->id }}</td>
+                                    <td class="py-3 px-4 font-bold text-ink">{{ $tx->client?->name ?: '—' }}</td>
+                                    <td class="py-3 px-4">
+                                        @php
+                                            $typeBadge = match($tx->transaction_type) {
+                                                'recharge' => 'bg-emerald-100 text-emerald-950 border-emerald-300',
+                                                'refund' => 'bg-blue-100 text-blue-950 border-blue-300',
+                                                'reserve' => 'bg-amber-100 text-amber-950 border-amber-300',
+                                                'deduct' => 'bg-purple-100 text-purple-950 border-purple-300',
+                                                default => 'bg-slate-100 text-slate-900 border-slate-300',
+                                            };
+                                        @endphp
+                                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $typeBadge }}">
+                                            {{ $tx->transaction_type }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-muted text-[11px]">
+                                        {{ $tx->lead?->lead_code ?: 'Direct Allocation' }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-muted text-[11px]">
+                                        {{ number_format($tx->credit_before, 2) }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund']) ? 'text-emerald-600' : 'text-red-500' }}">
+                                        {{ in_array($tx->transaction_type, ['recharge', 'refund']) ? '+' : '-' }}{{ number_format($tx->credit_used, 2) }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
+                                        {{ number_format($tx->credit_after, 2) }}
+                                    </td>
+                                    <td class="py-3 px-4 font-mono text-muted text-[11px] text-right">
+                                        {{ $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y • h:i A') : '—' }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="p-8 text-center text-xs text-muted">
+                                        No credit transactions recorded yet for this organization.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                @if($creditTransactions->hasPages())
+                    <div class="p-3 border-t border-border bg-canvas/30">
+                        {{ $creditTransactions->links() }}
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
+    <!-- TAB 6: ACTIVITY & AUDIT -->
     @if($activeTab === 'activity')
         <div class="space-y-4">
-            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs">
-                <h3 class="text-sm font-bold text-ink">Organization Audit Trail</h3>
-                <p class="text-xs text-muted">Recent updates and actions recorded for this organization or its assigned members.</p>
+            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-ink">Organization Audit Trail</h3>
+                    <p class="text-xs text-muted">Recent updates and actions recorded for this organization or its assigned members.</p>
+                </div>
+                <button 
+                    type="button" 
+                    wire:click="exportTabExcel('activity')" 
+                    class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                    title="Export Audit Logs to Excel"
+                >
+                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span>Export Tab</span>
+                </button>
             </div>
 
             <div class="bg-surface rounded-2xl border border-border shadow-2xs divide-y divide-border overflow-hidden">
@@ -959,6 +1404,232 @@
                         class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
                         <span>Create Client</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-modal>
+
+    <!-- MODAL 3: ADD DIRECTLY CREATED & ASSIGNED LEAD (NEW) -->
+    <x-modal name="create-org-lead-modal" :show="$showCreateLeadModal" maxWidth="xl">
+        <div class="p-5 sm:p-6 space-y-5">
+            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Add Directly Assigned Lead</h3>
+                        <p class="text-xs text-muted">Create lead under <strong class="text-ink">{{ $organization->name }}</strong> and assign directly to an agent</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeCreateLeadModal" class="text-muted hover:text-ink cursor-pointer p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form wire:submit.prevent="createDirectlyAssignedLead" class="space-y-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="font-bold text-ink">Lead Name <span class="text-red-500">*</span></label>
+                        <input 
+                            type="text" 
+                            wire:model="newLeadName" 
+                            placeholder="e.g. Ramesh Patel"
+                            class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                        >
+                        @error('newLeadName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Mobile / Phone <span class="text-red-500">*</span></label>
+                        <input 
+                            type="text" 
+                            wire:model="newLeadMobile" 
+                            placeholder="e.g. +91 9876543210"
+                            class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                        >
+                        @error('newLeadMobile') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="font-bold text-ink">Email Address <span class="text-muted font-normal">(Optional)</span></label>
+                        <input 
+                            type="email" 
+                            wire:model="newLeadEmail" 
+                            placeholder="e.g. ramesh@example.com"
+                            class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                        >
+                        @error('newLeadEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Directly Assign To Agent</label>
+                        <select 
+                            wire:model="newLeadAssignedTo" 
+                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer"
+                        >
+                            <option value="">Unassigned Pool</option>
+                            @foreach($teamMembers as $tm)
+                                <option value="{{ $tm->id }}">{{ $tm->name }} ({{ $tm->roles->first()?->name ?: 'Member' }})</option>
+                            @endforeach
+                        </select>
+                        @error('newLeadAssignedTo') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="font-bold text-ink">Target Client <span class="text-red-500">*</span></label>
+                        <select 
+                            wire:model.live="newLeadClientId" 
+                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer"
+                        >
+                            <option value="">Select Client</option>
+                            @foreach($clients as $c)
+                                <option value="{{ $c->id }}">{{ $c->name }} (Bal: {{ number_format($c->wallet?->balance ?? 0) }})</option>
+                            @endforeach
+                        </select>
+                        @error('newLeadClientId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Associated Project</label>
+                        <select 
+                            wire:model="newLeadProjectId" 
+                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer"
+                        >
+                            <option value="">Auto-select or General Project</option>
+                            @foreach($clientProjects as $proj)
+                                <option value="{{ $proj->id }}">{{ $proj->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="font-bold text-ink">Requirement Notes</label>
+                    <textarea 
+                        wire:model="newLeadRequirement" 
+                        rows="2" 
+                        placeholder="e.g. Looking for 3 BHK in prime location, budget 1.5 Cr"
+                        class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                    ></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                    <button 
+                        type="button" 
+                        wire:click="closeCreateLeadModal" 
+                        class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span>Create & Direct Assign</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-modal>
+
+    <!-- MODAL 4: RECHARGE / ADJUST CREDITS (NEW) -->
+    <x-modal name="adjust-org-credits-modal" :show="$showCreditModal" maxWidth="md">
+        <div class="p-5 sm:p-6 space-y-5">
+            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-900/30">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Recharge / Adjust Credits</h3>
+                        <p class="text-xs text-muted">Allocate or deduct credits for clients under <strong class="text-ink">{{ $organization->name }}</strong></p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeCreditModal" class="text-muted hover:text-ink cursor-pointer p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form wire:submit.prevent="executeCreditAdjustment" class="space-y-4 text-xs">
+                <div>
+                    <label class="font-bold text-ink">Select Target Client <span class="text-red-500">*</span></label>
+                    <select 
+                        wire:model="selectedCreditClientId" 
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer"
+                    >
+                        <option value="">Select Client</option>
+                        @foreach($clients as $cl)
+                            <option value="{{ $cl->id }}">
+                                {{ $cl->name }} (Current Balance: {{ number_format($cl->wallet?->balance ?? 0) }})
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('selectedCreditClientId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="grid grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="font-bold text-ink">Action Type <span class="text-red-500">*</span></label>
+                        <select 
+                            wire:model="creditAdjustmentType" 
+                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer"
+                        >
+                            <option value="recharge">+ Recharge / Credit</option>
+                            <option value="refund">+ Refund / Adjustment</option>
+                            <option value="deduct">- Deduct / Debit</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Credit Amount <span class="text-red-500">*</span></label>
+                        <input 
+                            type="number" 
+                            wire:model="creditAmount" 
+                            step="1" 
+                            min="1"
+                            class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                        >
+                        @error('creditAmount') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div>
+                    <label class="font-bold text-ink">Reason / Reference <span class="text-red-500">*</span></label>
+                    <input 
+                        type="text" 
+                        wire:model="creditReason" 
+                        placeholder="e.g. Bank Transfer Ref #12345 or Monthly quota"
+                        class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1"
+                    >
+                    @error('creditReason') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                    <button 
+                        type="button" 
+                        wire:click="closeCreditModal" 
+                        class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                        <span>Apply Credit Adjustment</span>
                     </button>
                 </div>
             </form>

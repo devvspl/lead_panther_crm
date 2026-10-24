@@ -6,6 +6,11 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Organization;
 use App\Models\Client;
+use App\Models\Lead;
+use App\Models\Project;
+use App\Models\CreditWallet;
+use App\Models\CreditTransaction;
+use App\Models\LeadSource;
 use App\Livewire\Admin\OrganizationManager;
 use App\Livewire\Admin\OrganizationDetail;
 use Livewire\Livewire;
@@ -451,5 +456,215 @@ class OrganizationManagerTest extends TestCase
             'status' => 'active',
         ]);
     }
+
+    public function test_organization_detail_creates_and_reassigns_directly_assigned_lead(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Prestige Estates Ltd',
+            'status' => 'active',
+        ]);
+
+        $agent1 = User::factory()->create([
+            'organization_id' => $org->id,
+            'name' => 'Agent One',
+        ]);
+        $agent2 = User::factory()->create([
+            'organization_id' => $org->id,
+            'name' => 'Agent Two',
+        ]);
+
+        $client = Client::create([
+            'organization_id' => $org->id,
+            'name' => 'Prestige Lakeside Habitat',
+            'status' => 'active',
+        ]);
+
+        $project = Project::create([
+            'client_id' => $client->id,
+            'name' => 'Prestige Tower A',
+            'status' => 'active',
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org])
+            ->call('setTab', 'leads')
+            ->assertSet('activeTab', 'leads')
+            ->call('openCreateLeadModal')
+            ->assertSet('showCreateLeadModal', true)
+            ->set('newLeadName', 'Anil Kumar')
+            ->set('newLeadMobile', '+919988776655')
+            ->set('newLeadEmail', 'anil@example.com')
+            ->set('newLeadClientId', $client->id)
+            ->set('newLeadProjectId', $project->id)
+            ->set('newLeadAssignedTo', $agent1->id)
+            ->set('newLeadStatus', 'new')
+            ->set('newLeadRequirement', '3 BHK luxury apartment')
+            ->call('createDirectlyAssignedLead')
+            ->assertDispatched('toast')
+            ->assertSet('showCreateLeadModal', false);
+
+        $this->assertDatabaseHas('leads', [
+            'name' => 'Anil Kumar',
+            'mobile' => '+919988776655',
+            'client_id' => $client->id,
+            'project_id' => $project->id,
+            'assigned_to' => $agent1->id,
+        ]);
+
+        $createdLead = Lead::where('mobile', '+919988776655')->first();
+        $this->assertNotNull($createdLead);
+        $this->assertEquals($agent1->id, $createdLead->assigned_to);
+
+        // Reassign to Agent Two
+        $component->call('reassignLead', $createdLead->id, $agent2->id)
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('leads', [
+            'id' => $createdLead->id,
+            'assigned_to' => $agent2->id,
+        ]);
+    }
+
+    public function test_organization_detail_recharges_and_adjusts_client_credits(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Godrej Properties HQ',
+            'status' => 'active',
+        ]);
+
+        $client = Client::create([
+            'organization_id' => $org->id,
+            'name' => 'Godrej Prime Chembur',
+            'status' => 'active',
+        ]);
+
+        $wallet = CreditWallet::create([
+            'client_id' => $client->id,
+            'balance' => 100.00,
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org])
+            ->call('setTab', 'credits')
+            ->assertSet('activeTab', 'credits')
+            ->call('openCreditModal', $client->id)
+            ->assertSet('showCreditModal', true)
+            ->set('selectedCreditClientId', $client->id)
+            ->set('creditAdjustmentType', 'recharge')
+            ->set('creditAmount', 250.00)
+            ->set('creditReason', 'Payment received via RTGS')
+            ->call('executeCreditAdjustment')
+            ->assertDispatched('toast')
+            ->assertSet('showCreditModal', false);
+
+        $this->assertEquals(350.00, (float)CreditWallet::where('client_id', $client->id)->value('balance'));
+
+        $this->assertDatabaseHas('credit_transactions', [
+            'client_id' => $client->id,
+            'transaction_type' => 'recharge',
+            'credit_before' => 100.00,
+            'credit_used' => 250.00,
+            'credit_after' => 350.00,
+        ]);
+    }
+
+    public function test_organization_detail_exports_full_multitab_excel_and_individual_tabs(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Tata Realty Hub',
+            'status' => 'active',
+        ]);
+
+        $client = Client::create([
+            'organization_id' => $org->id,
+            'name' => 'Tata Promont',
+            'status' => 'active',
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(OrganizationDetail::class, ['organization' => $org]);
+
+        // Full Multi-sheet Workbook Export
+        $fullExport = $component->call('exportFullExcel');
+        $this->assertNotNull($fullExport);
+
+        // Tab-specific Exports
+        $teamExport = $component->call('exportTabExcel', 'team');
+        $this->assertNotNull($teamExport);
+
+        $leadsExport = $component->call('exportTabExcel', 'leads');
+        $this->assertNotNull($leadsExport);
+
+        $creditsExport = $component->call('exportTabExcel', 'credits');
+        $this->assertNotNull($creditsExport);
+
+        $clientsExport = $component->call('exportTabExcel', 'clients');
+        $this->assertNotNull($clientsExport);
+
+        $activityExport = $component->call('exportTabExcel', 'activity');
+        $this->assertNotNull($activityExport);
+    }
+
+    public function test_organization_detail_tab_in_url_and_pagination_goto_page(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create([
+            'name' => 'Brigade Horizon',
+            'status' => 'active',
+        ]);
+
+        $client = Client::create([
+            'organization_id' => $org->id,
+            'name' => 'Brigade Horizon Client',
+            'status' => 'active',
+        ]);
+
+        $project = Project::create([
+            'client_id' => $client->id,
+            'name' => 'Brigade Horizon Phase 1',
+            'status' => 'active',
+        ]);
+
+        $source = LeadSource::first();
+
+        // Create 20 leads to trigger multi-page pagination
+        for ($i = 1; $i <= 20; $i++) {
+            Lead::create([
+                'lead_code' => "LP-BRIG-{$i}",
+                'name' => "Lead {$i}",
+                'mobile' => "+9198000000" . str_pad($i, 2, '0', STR_PAD_LEFT),
+                'client_id' => $client->id,
+                'project_id' => $project->id,
+                'lead_source_id' => $source->id,
+                'status' => 'new',
+            ]);
+        }
+
+        // Test passing tab in query parameter
+        $response = $this->actingAs($admin)->get(route('admin.organizations.show', ['organization' => $org->id, 'tab' => 'credits']));
+        $response->assertStatus(200);
+
+        // Test Livewire component respects tab and handles gotoPage() pagination without method not found exception
+        Livewire::actingAs($admin)
+            ->withQueryParams(['tab' => 'leads'])
+            ->test(OrganizationDetail::class, ['organization' => $org])
+            ->assertSet('activeTab', 'leads')
+            ->call('gotoPage', 2)
+            ->assertStatus(200)
+            ->call('setTab', 'credits')
+            ->assertSet('activeTab', 'credits');
+    }
 }
+
 

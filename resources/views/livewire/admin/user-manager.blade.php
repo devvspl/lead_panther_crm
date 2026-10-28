@@ -34,10 +34,10 @@
         <x-slot:filters>
             <div class="space-y-3">
                 <div>
-                    <label class="text-[11px] font-bold text-ink block mb-1">Filter Organization</label>
+                    <label class="text-[11px] font-bold text-ink block mb-1">Filter Client</label>
                     <select wire:model.live="filterOrganizationId"
                         class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Organizations</option>
+                        <option value="">All Clients</option>
                         @foreach($organizations as $org)
                             <option value="{{ $org->id }}">{{ $org->name }}</option>
                         @endforeach
@@ -96,7 +96,7 @@
                             @endif
                         </div>
                         <p class="text-xs text-muted">
-                            {{ $userDetailsMode === 'view' ? 'Read-only profile and role permissions information.' : 'Update permitted user fields, organization assignment, and role permissions.' }}
+                            {{ $userDetailsMode === 'view' ? 'Read-only profile and role permissions information.' : 'Update permitted user fields, clients assignment, and role permissions.' }}
                         </p>
                     </div>
                 </div>
@@ -163,9 +163,10 @@
 
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Parent
-                                    Organization</span>
+                                    Client</span>
                                 <div class="text-sm font-bold text-ink truncate">
-                                    {{ $selectedUser->organization?->name ?: 'Platform HQ (No Organization)' }}</div>
+                                    {{ $selectedUser->organization?->name ?: 'Platform HQ (No Client)' }}
+                                </div>
                             </div>
 
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">
@@ -294,10 +295,10 @@
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                 <div>
-                                    <label class="font-bold text-ink">Parent Organization <span
-                                            class="text-muted font-normal">(Optional for Platform HQ)</span></label>
+                                    <label class="font-bold text-ink">Client <span class="text-muted font-normal">(Optional for
+                                            Platform HQ)</span></label>
                                     <x-ui.themed-select wire:model="editOrganizationId" :options="$orgOptions"
-                                        placeholder="Select Organization" searchable="true" class="w-full mt-1" />
+                                        placeholder="Select Client" searchable="true" class="w-full mt-1" />
                                     @error('editOrganizationId') <span
                                     class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                                 </div>
@@ -413,10 +414,10 @@
                 </div>
 
                 <div>
-                    <label class="font-bold text-ink">Parent Organization <span class="text-muted font-normal">(Optional
+                    <label class="font-bold text-ink">Client <span class="text-muted font-normal">(Optional
                             for Platform HQ)</span></label>
                     <x-ui.themed-select wire:model="newUserOrganizationId" :options="$orgOptions"
-                        placeholder="Select Organization" searchable="true" class="w-full mt-1" />
+                        placeholder="Select Client" searchable="true" class="w-full mt-1" />
                     @error('newUserOrganizationId') <span
                     class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>

@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">B2B Organization User Invites</h1>
+            <h1 class="text-xl font-bold tracking-tight text-ink">B2B Clients User Invites</h1>
             <p class="text-xs text-muted">Invite team members to your organization. Public self-registration is disabled.</p>
         </div>
     </div>
@@ -51,9 +51,9 @@
         @endif
     </div>
 
-    <!-- Invited Organization Users Table Component -->
+    <!-- Invited Clients Users Table Component -->
     <div class="space-y-2">
-        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Organization Users</h2>
+        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Clients Users</h2>
 
         <x-ui.advanced-table 
             :columns="$this->tableColumns()"
@@ -63,8 +63,8 @@
             :sortDirection="$sortDirection"
             :showFilterDropdown="false"
             searchPlaceholder="Search users by name, email, ID..."
-            emptyTitle="No Organization Users Found"
-            emptyMessage="No users invited to this organization yet."
+            emptyTitle="No Clients Users Found"
+            emptyMessage="No users invited to this clients yet."
         />
     </div>
 </div>

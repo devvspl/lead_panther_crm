@@ -89,9 +89,9 @@ class OrganizationManagerTest extends TestCase
         $admin->assignRole('Super Admin');
 
         $csvContent = "Organization Name,Status\n" .
-                      "Godrej Properties,active\n" .
-                      "Anarock Property Consultants,active\n" .
-                      "Central Platform Ops,suspended\n";
+            "Godrej Properties,active\n" .
+            "Anarock Property Consultants,active\n" .
+            "Central Platform Ops,suspended\n";
 
         $file = UploadedFile::fake()->createWithContent('organizations.csv', $csvContent);
 
@@ -132,11 +132,11 @@ class OrganizationManagerTest extends TestCase
         ]);
 
         $csvContent = "Organization Name,Status\n" .
-                      "Existing Builder Ltd,active\n" . // duplicate in DB
-                      ",active\n" . // missing name
-                      "Duplicate Batch Corp,active\n" .
-                      "Duplicate Batch Corp,active\n" . // duplicate in file
-                      "Valid Channel Partner,active\n"; // valid
+            "Existing Builder Ltd,active\n" . // duplicate in DB
+            ",active\n" . // missing name
+            "Duplicate Batch Corp,active\n" .
+            "Duplicate Batch Corp,active\n" . // duplicate in file
+            "Valid Channel Partner,active\n"; // valid
 
         $file = UploadedFile::fake()->createWithContent('organizations_with_errors.csv', $csvContent);
 
@@ -370,7 +370,7 @@ class OrganizationManagerTest extends TestCase
         $response->assertSee('Godrej Properties HQ');
         $response->assertSee('Overview & Profile', false);
         $response->assertSee('Team Members');
-        $response->assertSee('Clients & Projects', false);
+        $response->assertSee('Projects', false);
         $response->assertSee('Activity & Audit', false);
     }
 
@@ -563,7 +563,7 @@ class OrganizationManagerTest extends TestCase
             ->assertDispatched('toast')
             ->assertSet('showCreditModal', false);
 
-        $this->assertEquals(350.00, (float)CreditWallet::where('client_id', $client->id)->value('balance'));
+        $this->assertEquals(350.00, (float) CreditWallet::where('client_id', $client->id)->value('balance'));
 
         $this->assertDatabaseHas('credit_transactions', [
             'client_id' => $client->id,

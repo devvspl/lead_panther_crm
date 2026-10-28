@@ -94,7 +94,7 @@ class OrganizationDetail extends Component
         }
 
         $roles = $this->availableRoles;
-        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string)(array_key_first($roles) ?? 'Builder');
+        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string) (array_key_first($roles) ?? 'Builder');
     }
 
     public function setTab(string $tab): void
@@ -226,7 +226,7 @@ class OrganizationDetail extends Component
     {
         $this->reset(['newUserName', 'newUserEmail', 'newUserPassword', 'generatedInviteLink']);
         $roles = $this->availableRoles;
-        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string)(array_key_first($roles) ?? 'Builder');
+        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string) (array_key_first($roles) ?? 'Builder');
         $this->showAddMemberModal = true;
         $this->dispatch('open-modal', 'add-org-member-modal');
     }
@@ -460,7 +460,8 @@ class OrganizationDetail extends Component
         // Try reserving credit for lead
         try {
             CreditTransaction::reserveForLead($lead);
-        } catch (Throwable $e) {}
+        } catch (Throwable $e) {
+        }
 
         $assignedName = $lead->assignedTo?->name ?: 'Direct Pool';
         $this->closeCreateLeadModal();
@@ -524,7 +525,7 @@ class OrganizationDetail extends Component
                 ]);
             }
 
-            $before = (float)$wallet->balance;
+            $before = (float) $wallet->balance;
             if ($this->creditAdjustmentType === 'recharge' || $this->creditAdjustmentType === 'refund') {
                 $after = $before + $this->creditAmount;
                 $txType = $this->creditAdjustmentType;
@@ -601,8 +602,8 @@ class OrganizationDetail extends Component
             $filename = "organization_{$slug}_clients_projects_{$date}.xlsx";
             return Excel::download(new BaseStyledExport(
                 data: $data,
-                title: 'Clients & Projects',
-                subtitle: "Clients & Projects | {$org->name} | {$exportedAt}",
+                title: 'Projects',
+                subtitle: "Projects | {$org->name} | {$exportedAt}",
                 headings: ['Client ID', 'Client Name', 'Billing Email', 'Status', 'Projects Count', 'Wallet Balance', 'Created Date'],
                 columns: [
                     'id',
@@ -610,7 +611,7 @@ class OrganizationDetail extends Component
                     fn($c) => $c->billing_email ?: '—',
                     'status',
                     'projects_count',
-                    fn($c) => (float)($c->wallet?->balance ?? 0),
+                    fn($c) => (float) ($c->wallet?->balance ?? 0),
                     fn($c) => $c->created_at ? $c->created_at->format('M d, Y H:i') : '—',
                 ],
                 statusColumns: ['status']
@@ -688,7 +689,7 @@ class OrganizationDetail extends Component
                     ->where(function ($q) use ($org, $userIds) {
                         $q->where(function ($sq) use ($org) {
                             $sq->where('subject_type', Organization::class)
-                               ->where('subject_id', $org->id);
+                                ->where('subject_id', $org->id);
                         });
                         if (!empty($userIds)) {
                             $q->orWhereIn('user_id', $userIds);
@@ -697,7 +698,8 @@ class OrganizationDetail extends Component
                     ->latest('created_at')
                     ->take(100)
                     ->get();
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+            }
 
             $filename = "organization_{$slug}_audit_trail_{$date}.xlsx";
             return Excel::download(new BaseStyledExport(
@@ -732,15 +734,15 @@ class OrganizationDetail extends Component
             $search = '%' . trim($this->userSearch) . '%';
             $usersQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', $search)
-                  ->orWhere('email', 'like', $search)
-                  ->orWhere('phone', 'like', $search);
+                    ->orWhere('email', 'like', $search)
+                    ->orWhere('phone', 'like', $search);
             });
         }
         if ($this->userRoleFilter !== 'all') {
             $roleFilter = $this->userRoleFilter;
             $usersQuery->whereHas('roles', function ($q) use ($roleFilter) {
                 $q->where('name', $roleFilter)
-                  ->orWhere('name', strtolower(str_replace(' ', '-', $roleFilter)));
+                    ->orWhere('name', strtolower(str_replace(' ', '-', $roleFilter)));
             });
         }
         $teamMembers = $usersQuery->orderBy('name')->get();
@@ -776,9 +778,9 @@ class OrganizationDetail extends Component
             $search = '%' . trim($this->leadSearch) . '%';
             $leadsQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', $search)
-                  ->orWhere('mobile', 'like', $search)
-                  ->orWhere('email', 'like', $search)
-                  ->orWhere('lead_code', 'like', $search);
+                    ->orWhere('mobile', 'like', $search)
+                    ->orWhere('email', 'like', $search)
+                    ->orWhere('lead_code', 'like', $search);
             });
         }
 
@@ -857,7 +859,7 @@ class OrganizationDetail extends Component
                 ->where(function ($q) use ($orgId, $userIds) {
                     $q->where(function ($sq) use ($orgId) {
                         $sq->where('subject_type', Organization::class)
-                           ->where('subject_id', $orgId);
+                            ->where('subject_id', $orgId);
                     });
                     if (!empty($userIds)) {
                         $q->orWhereIn('user_id', $userIds);
@@ -866,7 +868,8 @@ class OrganizationDetail extends Component
                 ->latest('created_at')
                 ->take(20)
                 ->get();
-        } catch (Throwable $e) {}
+        } catch (Throwable $e) {
+        }
 
         // Projects for the selected client in create lead modal
         $clientProjects = $this->newLeadClientId
@@ -885,11 +888,11 @@ class OrganizationDetail extends Component
             'totalProjectsCount' => $totalProjectsCount,
             'totalLeadsCount' => $totalLeadsCount,
             'directlyAssignedLeadsCount' => $directlyAssignedLeadsCount,
-            'totalOpeningBalance' => (float)$totalOpeningBalance,
-            'totalWalletBalance' => (float)$totalWalletBalance,
-            'globalDefaultLeadCost' => (float)$globalDefaultLeadCost,
-            'totalCreditsRecharged' => (float)$totalCreditsRecharged,
-            'totalCreditsDeducted' => (float)$totalCreditsDeducted,
+            'totalOpeningBalance' => (float) $totalOpeningBalance,
+            'totalWalletBalance' => (float) $totalWalletBalance,
+            'globalDefaultLeadCost' => (float) $globalDefaultLeadCost,
+            'totalCreditsRecharged' => (float) $totalCreditsRecharged,
+            'totalCreditsDeducted' => (float) $totalCreditsDeducted,
             'auditLogs' => $auditLogs,
             'clientProjects' => $clientProjects,
         ])->layout('layouts.app');

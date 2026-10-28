@@ -163,7 +163,7 @@ class NavigationConfig
             ],
             'organizations' => [
                 'key' => 'organizations',
-                'label' => 'Organizations',
+                'label' => 'Clients',
                 'url' => route('admin.organizations'),
                 'data_nav_route' => 'admin/organizations',
                 'data_nav_exact' => 'true',

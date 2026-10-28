@@ -78,6 +78,15 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
 
     public function map($row): array
     {
+        if (empty($this->columns)) {
+            if (is_array($row)) {
+                return array_values($row);
+            }
+            if ($row instanceof Collection) {
+                return $row->values()->toArray();
+            }
+        }
+
         $mapped = [];
         foreach ($this->columns as $col) {
             $val = '';

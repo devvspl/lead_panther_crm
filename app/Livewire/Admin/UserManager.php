@@ -54,23 +54,29 @@ class UserManager extends Component
             ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
             ['key' => 'name', 'label' => 'Full Name', 'type' => 'user_name', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'email', 'label' => 'Email Address', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted'],
-            ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2],
-            ['key' => 'primary_role_name', 'label' => 'Role', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
-                'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'super-admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-                'Builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-                'builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
-                'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
-            ]],
+            ['key' => 'organization_name', 'label' => 'Client', 'type' => 'text', 'priority' => 2],
+            [
+                'key' => 'primary_role_name',
+                'label' => 'Role',
+                'type' => 'badge',
+                'priority' => 1,
+                'badgeMap' => [
+                    'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'super-admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                    'Builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                    'builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                    'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
+                    'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
+                ]
+            ],
             ['key' => 'created_at', 'label' => 'Registered', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'user_actions', 'priority' => 1],
         ];
@@ -150,7 +156,7 @@ class UserManager extends Component
     public function openUserDetailsModal(int $userId): void
     {
         $this->selectedUserId = $userId;
-        $this->selectedUser = User::with(['roles', 'organization'])->find($userId);
+        $this->selectedUser = User::with(['roles', 'clients'])->find($userId);
 
         if (!$this->selectedUser) {
             $this->dispatch('toast', type: 'error', message: 'User not found.');
@@ -231,7 +237,7 @@ class UserManager extends Component
         $role = Role::firstOrCreate(['name' => $this->editRole, 'guard_name' => 'web']);
         $user->syncRoles([$role->name]);
 
-        $this->selectedUser = User::with(['roles', 'organization'])->find($this->selectedUserId);
+        $this->selectedUser = User::with(['roles', 'clients'])->find($this->selectedUserId);
         $this->userDetailsMode = 'view';
         $this->editPassword = '';
 
@@ -286,21 +292,21 @@ class UserManager extends Component
     public function getOrganizationOptionsProperty(): array
     {
         $orgs = Organization::where('status', 'active')->orderBy('name')->get();
-        $options = ['' => 'Platform HQ (No Organization)'];
+        $options = ['' => 'Platform HQ (No Client)'];
         foreach ($orgs as $org) {
-            $options[(string)$org->id] = $org->name;
+            $options[(string) $org->id] = $org->name;
         }
         return $options;
     }
 
     protected function getFilteredQuery()
     {
-        $query = User::with(['roles', 'organization']);
+        $query = User::with(['roles', 'clients']);
 
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('email', 'like', '%' . $this->search . '%');
+                    ->orWhere('email', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -364,10 +370,10 @@ class UserManager extends Component
                 $u->email,
                 $u->organization ? $u->organization->name : 'Platform HQ',
                 $u->getRoleNames()->first() ?? 'No Role Assigned',
-                $u->created_at->format('Y-m-d H:i:s'),
+                $u->created_at ? $u->created_at->format('Y-m-d H:i:s') : '',
             ];
         }
 
-        return app(\App\Services\ExportService::class)->downloadExcel($filename, $headings, $rows);
+        return app(\App\Services\ExportService::class)->downloadExcel($filename, $headings, $rows, 'Users Directory');
     }
 }

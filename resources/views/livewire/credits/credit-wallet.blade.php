@@ -61,7 +61,7 @@
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col justify-between space-y-3">
             <h3 class="text-xs font-bold uppercase text-muted tracking-wider">Client Billing & Rate</h3>
             <div class="space-y-2">
-                <div class="text-sm font-bold text-ink">{{ $client->name ?? 'Organization Client' }}</div>
+                <div class="text-sm font-bold text-ink">{{ $client->name ?? 'Clients Client' }}</div>
                 <div class="text-xs text-muted">{{ $client->billing_email ?? 'billing@client.com' }}</div>
                 <div class="p-2.5 rounded-lg bg-canvas border border-border text-xs space-y-1">
                     <div class="flex items-center justify-between">

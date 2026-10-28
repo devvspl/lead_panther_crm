@@ -66,13 +66,20 @@ class OrganizationManager extends Component
     {
         return [
             ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
-            ['key' => 'name', 'label' => 'Organization Name', 'type' => 'org_name', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'name', 'label' => 'Client Name', 'type' => 'org_name', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'users_count', 'label' => 'Users Count', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink font-mono'],
-            ['key' => 'clients_count', 'label' => 'Clients Count', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted'],
-            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
-                'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'suspended' => 'bg-red-50 text-red-700 border border-red-200',
-            ]],
+            ['key' => 'clients_count', 'label' => 'Projects Count', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted'],
+            [
+                'key' => 'status',
+                'label' => 'Status',
+                'type' => 'badge',
+                'sortable' => true,
+                'priority' => 1,
+                'badgeMap' => [
+                    'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'suspended' => 'bg-red-50 text-red-700 border border-red-200',
+                ]
+            ],
             ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'org_actions', 'priority' => 1],
         ];
@@ -81,7 +88,7 @@ class OrganizationManager extends Component
     public function quickFilters(): array
     {
         return [
-            ['key' => 'all', 'label' => 'All Organizations'],
+            ['key' => 'all', 'label' => 'All Clients'],
             ['key' => 'active', 'label' => 'Active'],
             ['key' => 'suspended', 'label' => 'Suspended'],
         ];
@@ -154,16 +161,16 @@ class OrganizationManager extends Component
                 @unlink($cleanTempPath);
 
                 foreach ($rawRows as $r) {
-                    if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string)$v) !== ''))) {
-                        $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string)($v ?? '')), 'UTF-8', 'UTF-8'), $r);
+                    if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string) $v) !== ''))) {
+                        $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string) ($v ?? '')), 'UTF-8', 'UTF-8'), $r);
                     }
                 }
             } else {
                 $handle = fopen($path, 'r');
                 if ($handle !== false) {
                     while (($r = fgetcsv($handle)) !== false) {
-                        if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string)$v) !== ''))) {
-                            $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string)($v ?? '')), 'UTF-8', 'UTF-8'), $r);
+                        if (is_array($r) && !empty(array_filter($r, fn($v) => $v !== null && trim((string) $v) !== ''))) {
+                            $rows[] = array_map(fn($v) => mb_convert_encoding(trim((string) ($v ?? '')), 'UTF-8', 'UTF-8'), $r);
                         }
                     }
                     fclose($handle);
@@ -180,11 +187,11 @@ class OrganizationManager extends Component
             $foundHeader = false;
 
             foreach ($rows as $idx => $r) {
-                $cells = array_map(fn($c) => strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string)$c))), $r);
+                $cells = array_map(fn($c) => strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string) $c))), $r);
                 $hasName = false;
 
                 foreach ($cells as $c) {
-                    if (in_array($c, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'organization'])) {
+                    if (in_array($c, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients'])) {
                         $hasName = true;
                         break;
                     }
@@ -201,7 +208,7 @@ class OrganizationManager extends Component
             if (!$foundHeader) {
                 foreach ($rows as $idx => $r) {
                     $rowText = strtolower(implode(' ', array_filter($r)));
-                    if (str_contains($rowText, 'organization') || str_contains($rowText, 'name')) {
+                    if (str_contains($rowText, 'clients') || str_contains($rowText, 'name')) {
                         $headerRowIndex = $idx;
                         $foundHeader = true;
                         break;
@@ -214,8 +221,8 @@ class OrganizationManager extends Component
             $statusIdx = null;
 
             foreach ($headerRow as $colIdx => $colName) {
-                $colNormalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string)$colName)));
-                if (in_array($colNormalized, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'organization'])) {
+                $colNormalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string) $colName)));
+                if (in_array($colNormalized, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients'])) {
                     $nameIdx = $colIdx;
                 } elseif (in_array($colNormalized, ['status', 'initialstatus', 'state'])) {
                     $statusIdx = $colIdx;
@@ -223,8 +230,10 @@ class OrganizationManager extends Component
             }
 
             // Fallback column indices if headers were generic
-            if ($nameIdx === null && isset($headerRow[0])) $nameIdx = 0;
-            if ($statusIdx === null && isset($headerRow[1])) $statusIdx = 1;
+            if ($nameIdx === null && isset($headerRow[0]))
+                $nameIdx = 0;
+            if ($statusIdx === null && isset($headerRow[1]))
+                $statusIdx = 1;
 
             $dataRows = array_slice($rows, $headerRowIndex + 1);
             $this->totalImportRows = count($dataRows);
@@ -238,8 +247,8 @@ class OrganizationManager extends Component
 
             foreach ($dataRows as $offset => $row) {
                 $rowNum = $headerRowIndex + 1 + $offset + 1; // 1-based actual row number in file
-                $rawName = isset($row[$nameIdx]) ? trim((string)$row[$nameIdx]) : '';
-                $rawStatus = ($statusIdx !== null && isset($row[$statusIdx])) ? trim((string)$row[$statusIdx]) : '';
+                $rawName = isset($row[$nameIdx]) ? trim((string) $row[$nameIdx]) : '';
+                $rawStatus = ($statusIdx !== null && isset($row[$statusIdx])) ? trim((string) $row[$statusIdx]) : '';
 
                 // Skip blank/spacer rows
                 if ($rawName === '' && $rawStatus === '') {
@@ -251,7 +260,7 @@ class OrganizationManager extends Component
                 $normStatus = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', $rawStatus)));
 
                 if (
-                    in_array($normName, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'organization']) ||
+                    in_array($normName, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients']) ||
                     in_array($normStatus, ['status', 'initialstatus', 'state', 'expectedformat'])
                 ) {
                     continue;
@@ -483,7 +492,7 @@ class OrganizationManager extends Component
         }
 
         $roles = $this->availableRoles;
-        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string)(array_key_first($roles) ?? 'Builder');
+        $this->newUserRole = isset($roles['Builder']) ? 'Builder' : (string) (array_key_first($roles) ?? 'Builder');
 
         $this->reset(['newUserName', 'newUserEmail', 'newUserPassword', 'generatedInviteLink']);
         $this->showUserModal = true;
@@ -630,9 +639,9 @@ class OrganizationManager extends Component
     public function exportExcel()
     {
         $data = $this->getFilteredQuery()->get();
-        $filename = "organizations-directory_" . now()->format('Y-m-d') . ".xlsx";
+        $filename = "clients-directory_" . now()->format('Y-m-d') . ".xlsx";
 
-        $headings = ['Org ID', 'Organization Name', 'Users Count', 'Clients Count', 'Status', 'Created At'];
+        $headings = ['Client ID', 'Client Name', 'Users Count', 'Projects Count', 'Status', 'Created At'];
         $columns = [
             'id',
             'name',
@@ -649,7 +658,7 @@ class OrganizationManager extends Component
         return \Maatwebsite\Excel\Facades\Excel::download(
             new \App\Exports\BaseStyledExport(
                 data: $data,
-                title: 'Multi-Tenant Organizations Directory',
+                title: 'Multi-Tenant Clients Directory',
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,

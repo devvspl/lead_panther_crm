@@ -173,7 +173,7 @@
                         <p>We may collect and process the following categories of information:</p>
                         <ul class="list-disc pl-5 space-y-2">
                             <li><strong>Direct Account &amp; Profile Data:</strong> Name, professional email address,
-                                mobile phone number, job role, organization name, and authentication credentials when
+                                mobile phone number, job role, clients name, and authentication credentials when
                                 creating or accessing a CRM user account.</li>
                             <li><strong>Lead Information Submitted via Forms:</strong> Full name, email address, phone
                                 number, city, location preferences, budget criteria, property requirements, and
@@ -272,7 +272,7 @@
                             following strictly limited circumstances:
                         </p>
                         <ul class="list-disc pl-5 space-y-2">
-                            <li><strong>Authorized Organization Users:</strong> Lead information is accessible only to
+                            <li><strong>Authorized Clients Users:</strong> Lead information is accessible only to
                                 authenticated users (e.g., builders, channel partners, and sales executives) who have
                                 been granted explicit permissions within the subscribing tenant organization.</li>
                             <li><strong>Infrastructure &amp; Hosting Providers:</strong> Trusted third-party hosting,
@@ -411,7 +411,8 @@
                         <div class="flex items-center gap-2">
                             <span
                                 class="text-xs px-2 py-0.5 rounded-pill bg-canvas border border-border text-muted font-mono font-bold">12</span>
-                            <h2 class="text-lg sm:text-xl font-bold tracking-tight text-ink">User Data Deletion Instructions</h2>
+                            <h2 class="text-lg sm:text-xl font-bold tracking-tight text-ink">User Data Deletion
+                                Instructions</h2>
                         </div>
                         <p>
                             If you have submitted your contact information through a Lead Panther CRM form, or via a

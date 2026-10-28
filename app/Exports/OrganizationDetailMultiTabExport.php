@@ -46,16 +46,16 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
 
         // 1. Overview Sheet
         $overviewData = collect([
-            (object)['property' => 'Organization ID', 'value' => '#ORG-' . str_pad($org->id, 4, '0', STR_PAD_LEFT)],
-            (object)['property' => 'Organization Name', 'value' => $org->name],
-            (object)['property' => 'Status', 'value' => ucfirst($org->status)],
-            (object)['property' => 'Total Team Members', 'value' => (string)count($userIds)],
-            (object)['property' => 'Total Registered Clients', 'value' => (string)count($clientIds)],
-            (object)['property' => 'Total Projects', 'value' => (string)$totalProjects],
-            (object)['property' => 'Total Leads (Org & Assigned)', 'value' => (string)$totalLeads],
-            (object)['property' => 'Total Credit Wallet Balance', 'value' => number_format((float)$walletBalance, 2)],
-            (object)['property' => 'Created At', 'value' => $org->created_at ? $org->created_at->format('M d, Y H:i') : '—'],
-            (object)['property' => 'Last Updated', 'value' => $org->updated_at ? $org->updated_at->format('M d, Y H:i') : '—'],
+            (object) ['property' => 'Organization ID', 'value' => '#ORG-' . str_pad($org->id, 4, '0', STR_PAD_LEFT)],
+            (object) ['property' => 'Organization Name', 'value' => $org->name],
+            (object) ['property' => 'Status', 'value' => ucfirst($org->status)],
+            (object) ['property' => 'Total Team Members', 'value' => (string) count($userIds)],
+            (object) ['property' => 'Total Registered Clients', 'value' => (string) count($clientIds)],
+            (object) ['property' => 'Total Projects', 'value' => (string) $totalProjects],
+            (object) ['property' => 'Total Leads (Org & Assigned)', 'value' => (string) $totalLeads],
+            (object) ['property' => 'Total Credit Wallet Balance', 'value' => number_format((float) $walletBalance, 2)],
+            (object) ['property' => 'Created At', 'value' => $org->created_at ? $org->created_at->format('M d, Y H:i') : '—'],
+            (object) ['property' => 'Last Updated', 'value' => $org->updated_at ? $org->updated_at->format('M d, Y H:i') : '—'],
         ]);
 
         $sheets[] = new BaseStyledExport(
@@ -84,12 +84,12 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
             statusColumns: ['status']
         );
 
-        // 3. Clients & Projects Sheet
+        // 3. Projects Sheet
         $clientsData = Client::where('organization_id', $org->id)->with(['projects', 'wallet'])->withCount(['projects', 'leads'])->orderBy('name')->get();
         $sheets[] = new BaseStyledExport(
             data: $clientsData,
-            title: 'Clients & Projects',
-            subtitle: "Registered Clients & Projects | {$org->name} | {$exportedAt}",
+            title: 'Projects',
+            subtitle: "Registered Projects | {$org->name} | {$exportedAt}",
             headings: ['Client ID', 'Client Name', 'Billing Email', 'Status', 'Projects Count', 'Projects List', 'Wallet Balance', 'Created Date'],
             columns: [
                 'id',
@@ -98,7 +98,7 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
                 'status',
                 'projects_count',
                 fn($c) => $c->projects->pluck('name')->implode(', ') ?: 'None',
-                fn($c) => number_format((float)($c->wallet?->balance ?? 0), 2),
+                fn($c) => number_format((float) ($c->wallet?->balance ?? 0), 2),
                 fn($c) => $c->created_at ? $c->created_at->format('M d, Y H:i') : '—',
             ],
             statusColumns: ['status']
@@ -172,7 +172,7 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
                 ->where(function ($q) use ($org, $userIds) {
                     $q->where(function ($sq) use ($org) {
                         $sq->where('subject_type', Organization::class)
-                           ->where('subject_id', $org->id);
+                            ->where('subject_id', $org->id);
                     });
                     if (!empty($userIds)) {
                         $q->orWhereIn('user_id', $userIds);
@@ -181,7 +181,8 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
                 ->latest('created_at')
                 ->take(100)
                 ->get();
-        } catch (Throwable $e) {}
+        } catch (Throwable $e) {
+        }
 
         $sheets[] = new BaseStyledExport(
             data: $auditData,

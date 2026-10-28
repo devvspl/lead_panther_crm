@@ -97,3 +97,4 @@ class RoleSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }
+

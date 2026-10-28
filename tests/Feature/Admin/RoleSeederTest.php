@@ -81,3 +81,4 @@ class RoleSeederTest extends TestCase
         $this->assertTrue($execUser->hasRole('sales-executive'));
     }
 }
+

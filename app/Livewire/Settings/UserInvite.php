@@ -15,7 +15,7 @@ class UserInvite extends Component
 
     public string $name = '';
     public string $email = '';
-    public string $roleName = 'Sales Executive';
+    public string $roleName = 'Executive';
 
     public ?string $generatedInviteLink = null;
 
@@ -26,11 +26,13 @@ class UserInvite extends Component
             ['key' => 'name', 'label' => 'Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'email', 'label' => 'Email', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 1],
             ['key' => 'role', 'label' => 'Role', 'type' => 'badge', 'sortable' => false, 'priority' => 1, 'badgeMap' => [
-                'Sales Executive' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
-            ], 'default' => 'Sales Executive'],
+                'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+            ], 'default' => 'Executive'],
         ];
     }
 

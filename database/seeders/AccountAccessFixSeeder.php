@@ -18,14 +18,12 @@ class AccountAccessFixSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Ensure all Spatie roles exist in standard Title Case
+        // 1. Ensure the 4 canonical Spatie roles exist
         $canonicalRoles = [
             'Super Admin',
-            'Builder',
+            'Builder/Developer',
             'Channel Partner',
-            'Sales Executive',
-            'Account Manager',
-            'Client',
+            'Executive',
         ];
 
         foreach ($canonicalRoles as $title) {
@@ -52,16 +50,12 @@ class AccountAccessFixSeeder extends Seeder
 
             if ($email === 'admin@leadpanther.com' || str_contains($name, 'Super Admin')) {
                 $titleRole = 'Super Admin';
-            } elseif (str_contains($name, 'Builder Manager') || str_starts_with($email, 'builder')) {
-                $titleRole = 'Builder';
+            } elseif (str_contains($name, 'Builder') || str_starts_with($email, 'builder')) {
+                $titleRole = 'Builder/Developer';
             } elseif (str_contains($name, 'Partner') || str_contains($email, 'cp.com')) {
                 $titleRole = 'Channel Partner';
-            } elseif (str_contains($name, 'Sales Exec') || str_starts_with($email, 'sales')) {
-                $titleRole = 'Sales Executive';
-            } elseif (str_contains($name, 'Account Manager') || str_starts_with($email, 'accountmgr')) {
-                $titleRole = 'Account Manager';
-            } elseif (str_contains($name, 'Client User') || str_starts_with($email, 'client')) {
-                $titleRole = 'Client';
+            } else {
+                $titleRole = 'Executive';
             }
 
             if ($titleRole) {

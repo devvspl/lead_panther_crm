@@ -23,11 +23,13 @@ class OrgSettingsAndSecurityTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Builder']);
-        Role::create(['name' => 'Channel Partner']);
-        Role::create(['name' => 'Sales Executive']);
-        Role::create(['name' => 'Account Manager']);
+        Role::firstOrCreate(['name' => 'Super Admin']);
+        Role::firstOrCreate(['name' => 'Builder/Developer']);
+        Role::firstOrCreate(['name' => 'Builder']);
+        Role::firstOrCreate(['name' => 'Channel Partner']);
+        Role::firstOrCreate(['name' => 'Executive']);
+        Role::firstOrCreate(['name' => 'Sales Executive']);
+        Role::firstOrCreate(['name' => 'Account Manager']);
     }
 
     public function test_partner_and_builder_team_managers(): void

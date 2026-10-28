@@ -75,26 +75,33 @@ class User extends Authenticatable
     public static function normalizeRoleName(mixed $role): mixed
     {
         if (is_string($role)) {
-            $normalized = match (strtolower(str_replace(['-', '_'], ' ', $role))) {
+            $cleaned = strtolower(str_replace(['-', '_'], ' ', $role));
+            $target = match ($cleaned) {
                 'super admin' => 'Super Admin',
-                'builder' => 'Builder',
+                'builder', 'builder/developer', 'builder developer' => 'Builder/Developer',
                 'channel partner' => 'Channel Partner',
-                'sales executive' => 'Sales Executive',
-                'account manager' => 'Account Manager',
-                'client' => 'Client',
+                'executive', 'sales executive', 'account manager', 'client' => 'Executive',
                 default => $role,
             };
 
-            if ($normalized !== $role) {
-                if (\Spatie\Permission\Models\Role::where('name', $normalized)->exists()) {
-                    return $normalized;
-                }
-                if (\Spatie\Permission\Models\Role::where('name', $role)->exists()) {
-                    return $role;
-                }
+            // If target role exists, always prefer the canonical target
+            if (\Spatie\Permission\Models\Role::where('name', $target)->exists()) {
+                return $target;
             }
 
-            return $normalized;
+            // Fallback for unmigrated test cases that created legacy names
+            if ($target === 'Builder/Developer' && \Spatie\Permission\Models\Role::where('name', 'Builder')->exists()) {
+                return 'Builder';
+            }
+            if ($target === 'Executive' && \Spatie\Permission\Models\Role::where('name', 'Sales Executive')->exists()) {
+                return 'Sales Executive';
+            }
+
+            if (\Spatie\Permission\Models\Role::where('name', $role)->exists()) {
+                return $role;
+            }
+
+            return $target;
         }
 
         return $role;
@@ -129,7 +136,11 @@ class User extends Authenticatable
 
             return $roles === '*' 
                 || $this->roles->contains('name', $roles) 
-                || $this->roles->contains('name', $normalized);
+                || $this->roles->contains('name', $normalized)
+                || ($normalized === 'Builder/Developer' && ($this->roles->contains('name', 'Builder') || $this->roles->contains('name', 'Builder/Developer')))
+                || ($roles === 'Builder' && $this->roles->contains('name', 'Builder/Developer'))
+                || ($normalized === 'Executive' && ($this->roles->contains('name', 'Sales Executive') || $this->roles->contains('name', 'Executive')))
+                || ($roles === 'Sales Executive' && $this->roles->contains('name', 'Executive'));
         }
 
         if (is_array($roles)) {

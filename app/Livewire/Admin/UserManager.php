@@ -28,7 +28,7 @@ class UserManager extends Component
     public string $editEmail = '';
     public ?string $editPhone = '';
     public ?int $editOrganizationId = null;
-    public string $editRole = 'Sales Executive';
+    public string $editRole = 'Executive';
     public string $editStatus = 'active';
     public string $editPassword = '';
 
@@ -39,7 +39,7 @@ class UserManager extends Component
     public string $newUserEmail = '';
     public ?string $newUserPhone = '';
     public ?int $newUserOrganizationId = null;
-    public string $newUserRole = 'Sales Executive';
+    public string $newUserRole = 'Executive';
     public string $newUserPassword = '';
     public ?string $generatedInviteLink = null;
 
@@ -58,14 +58,16 @@ class UserManager extends Component
             ['key' => 'primary_role_name', 'label' => 'Role', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
                 'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'super-admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                 'Builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                 'builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
                 'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
             ]],
@@ -79,16 +81,16 @@ class UserManager extends Component
         return [
             ['key' => 'all', 'label' => 'All Users'],
             ['key' => 'super_admin', 'label' => 'Super Admins'],
-            ['key' => 'sales_executive', 'label' => 'Sales Executives'],
+            ['key' => 'builder_developer', 'label' => 'Builders / Developers'],
             ['key' => 'channel_partner', 'label' => 'Channel Partners'],
-            ['key' => 'account_manager', 'label' => 'Account Managers'],
+            ['key' => 'executive', 'label' => 'Executives'],
         ];
     }
 
     public function openCreateUserModal(): void
     {
         $this->reset(['newUserName', 'newUserEmail', 'newUserPhone', 'newUserOrganizationId', 'newUserPassword', 'generatedInviteLink']);
-        $this->newUserRole = 'Sales Executive';
+        $this->newUserRole = 'Executive';
         $this->showCreateModal = true;
         $this->showCreateUserOffcanvas = true;
         $this->dispatch('open-modal', 'create-user-modal');
@@ -271,12 +273,10 @@ class UserManager extends Component
 
         if (empty($roles)) {
             $roles = [
-                'Builder' => 'Builder',
-                'Channel Partner' => 'Channel Partner',
-                'Sales Executive' => 'Sales Executive',
-                'Account Manager' => 'Account Manager',
-                'Client' => 'Client',
                 'Super Admin' => 'Super Admin',
+                'Builder/Developer' => 'Builder/Developer',
+                'Channel Partner' => 'Channel Partner',
+                'Executive' => 'Executive',
             ];
         }
 
@@ -311,7 +311,7 @@ class UserManager extends Component
         // Role Filter (from legacy or direct select)
         if (!empty($this->roleFilter)) {
             $rf = $this->roleFilter;
-            $rfSpaced = str_replace('-', ' ', $rf);
+            $rfSpaced = str_replace(['-', '_'], ' ', $rf);
             $rfKebab = str_replace(' ', '-', strtolower($rf));
             $query->whereHas('roles', fn($q) => $q->where('name', $rf)->orWhere('name', $rfSpaced)->orWhere('name', $rfKebab));
         }
@@ -319,12 +319,12 @@ class UserManager extends Component
         // Quick filter pills
         if ($this->statusFilter === 'super_admin') {
             $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Super Admin', 'super-admin', 'super_admin']));
-        } elseif ($this->statusFilter === 'sales_executive') {
-            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Sales Executive', 'sales-executive', 'sales_executive']));
+        } elseif ($this->statusFilter === 'builder_developer') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder']));
         } elseif ($this->statusFilter === 'channel_partner') {
             $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Channel Partner', 'channel-partner', 'channel_partner']));
-        } elseif ($this->statusFilter === 'account_manager') {
-            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Account Manager', 'account-manager', 'account_manager']));
+        } elseif ($this->statusFilter === 'executive') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Executive', 'Sales Executive', 'sales-executive']));
         }
 
         if (!empty($this->sortField)) {

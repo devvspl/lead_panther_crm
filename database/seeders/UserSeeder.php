@@ -48,7 +48,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $user->assignRole('Builder');
+            $user->assignRole('Builder/Developer');
         }
 
         // 6 Channel Partner Users
@@ -69,7 +69,7 @@ class UserSeeder extends Seeder
             }
         }
 
-        // 15 Sales Executives
+        // 15 Executives
         for ($s = 1; $s <= 15; $s++) {
             $salesUser = User::firstOrCreate(
                 ['email' => 'sales' . $s . '@leadpanther.com'],
@@ -82,10 +82,10 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $salesUser->assignRole('Sales Executive');
+            $salesUser->assignRole('Executive');
         }
 
-        // 3 Account Managers
+        // 3 Account Managers (Executive role)
         for ($am = 1; $am <= 3; $am++) {
             $amUser = User::firstOrCreate(
                 ['email' => 'accountmgr' . $am . '@leadpanther.com'],
@@ -98,10 +98,10 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $amUser->assignRole('Account Manager');
+            $amUser->assignRole('Executive');
         }
 
-        // 4 Client Users
+        // 4 Client Users (Executive role)
         for ($c = 1; $c <= 4; $c++) {
             $clientUser = User::firstOrCreate(
                 ['email' => 'client' . $c . '@client.com'],
@@ -114,7 +114,7 @@ class UserSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
-            $clientUser->assignRole('Client');
+            $clientUser->assignRole('Executive');
         }
     }
 }

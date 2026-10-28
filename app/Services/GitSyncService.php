@@ -67,7 +67,7 @@ class GitSyncService
         ?string $committerEmail = null
     ): void {
         $account = $this->getGitAccount();
-        $account->update(['status' => 'active', 'name' => 'Git Repository Integration']);
+        $account->update(['status' => 'active']);
 
         $account->setCredential('remote_url', trim($remoteUrl));
         $account->setCredential('username', trim($username));

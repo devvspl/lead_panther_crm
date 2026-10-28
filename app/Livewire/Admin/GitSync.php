@@ -61,11 +61,22 @@ class GitSync extends Component
     public ?array $lastFollowupResult = null;
     public string $selectedSeederClass = '';
 
-    // Database Migrations & Seeders Manager
-    public string $dbManagerTab = 'migrations'; // 'migrations' | 'seeders'
+    // Database Migrations, Seeders & Test Suite Manager
+    public string $dbManagerTab = 'migrations'; // 'migrations' | 'seeders' | 'tests'
     public string $dbSearch = '';
     public string $migrationFilter = 'all'; // 'all' | 'pending' | 'ran'
     public ?string $executingSingleItem = null; // e.g. 'migration:2026_...' or 'seeder:UserSeeder'
+
+    // Test Suite Management State
+    public string $testFolderFilter = 'all'; // 'all' | folder relative path like 'tests/Unit'
+    public string $testStatusFilter = 'all'; // 'all' | 'passed' | 'failed' | 'untested'
+    public ?array $lastTestResult = null;
+    public array $testRunCache = [];
+    public ?string $executingTestTarget = null; // 'all' | 'folder:...' | 'file:...'
+    public bool $showGenerateTestModal = false;
+    public string $newTestName = '';
+    public string $newTestType = 'Feature'; // 'Feature' | 'Unit'
+    public string $newTestFolder = 'Admin';
 
     public function mount(GitSyncService $gitService): void
     {
@@ -724,6 +735,209 @@ class GitSync extends Component
         $this->lastFollowupResult = null;
     }
 
+    public function runSingleTest(string $testPath, GitSyncService $gitService): void
+    {
+        $safePath = str_replace('\\', '/', trim($testPath));
+        if (empty($safePath) || !str_starts_with($safePath, 'tests/') || !file_exists(base_path($safePath))) {
+            $this->dispatch('toast', type: 'error', message: "Invalid test path: {$testPath}");
+            return;
+        }
+
+        $userId = auth()->id() ?? 0;
+        $this->isFollowupRunning = true;
+        $this->executingSingleItem = 'test:' . $safePath;
+        $this->executingTestTarget = 'file:' . $safePath;
+        $this->lastTestResult = null;
+
+        try {
+            $result = $gitService->runTest($safePath, $userId);
+            $this->lastTestResult = $result;
+
+            $this->testRunCache[$safePath] = [
+                'successful' => $result['successful'],
+                'duration' => $result['duration'],
+                'summary' => $result['summary'],
+                'timestamp' => now()->format('M d, Y H:i:s'),
+            ];
+
+            if ($result['successful']) {
+                $this->dispatch('toast', type: 'success', message: "Test passed: {$result['summary']}");
+            } else {
+                $this->dispatch('toast', type: 'error', message: "Test failed: {$result['summary']}");
+            }
+        } catch (Throwable $e) {
+            $this->lastTestResult = [
+                'action' => 'test: ' . $safePath,
+                'target' => $safePath,
+                'successful' => false,
+                'stdout' => '',
+                'stderr' => $e->getMessage(),
+                'summary' => 'Error: ' . $e->getMessage(),
+                'duration' => '0s',
+            ];
+            $this->dispatch('toast', type: 'error', message: "Execution error: {$e->getMessage()}");
+        } finally {
+            $this->isFollowupRunning = false;
+            $this->executingSingleItem = null;
+            $this->executingTestTarget = null;
+        }
+    }
+
+    public function runFolderTests(?string $folder = null, ?GitSyncService $gitService = null): void
+    {
+        $gitService = $gitService ?? app(GitSyncService::class);
+        $targetFolder = $folder ?: $this->testFolderFilter;
+
+        if ($targetFolder === 'all' || empty($targetFolder)) {
+            $this->runAllTests($gitService);
+            return;
+        }
+
+        $safeFolder = str_replace('\\', '/', trim($targetFolder));
+        if (!str_starts_with($safeFolder, 'tests/') || !is_dir(base_path($safeFolder))) {
+            $this->dispatch('toast', type: 'error', message: "Invalid test folder: {$safeFolder}");
+            return;
+        }
+
+        $userId = auth()->id() ?? 0;
+        $this->isFollowupRunning = true;
+        $this->executingSingleItem = 'test_folder:' . $safeFolder;
+        $this->executingTestTarget = 'folder:' . $safeFolder;
+        $this->lastTestResult = null;
+
+        try {
+            $result = $gitService->runTest($safeFolder, $userId);
+            $this->lastTestResult = $result;
+
+            $allFilesInFolder = File::files(base_path($safeFolder));
+            foreach ($allFilesInFolder as $f) {
+                if (str_ends_with($f->getFilename(), 'Test.php')) {
+                    $rel = $safeFolder . '/' . $f->getFilename();
+                    $this->testRunCache[$rel] = [
+                        'successful' => $result['successful'],
+                        'duration' => $result['duration'],
+                        'summary' => $result['summary'],
+                        'timestamp' => now()->format('M d, Y H:i:s'),
+                    ];
+                }
+            }
+
+            if ($result['successful']) {
+                $this->dispatch('toast', type: 'success', message: "Folder tests completed: {$result['summary']}");
+            } else {
+                $this->dispatch('toast', type: 'error', message: "Folder tests had failures: {$result['summary']}");
+            }
+        } catch (Throwable $e) {
+            $this->lastTestResult = [
+                'action' => 'test_folder: ' . $safeFolder,
+                'target' => $safeFolder,
+                'successful' => false,
+                'stdout' => '',
+                'stderr' => $e->getMessage(),
+                'summary' => 'Error: ' . $e->getMessage(),
+                'duration' => '0s',
+            ];
+            $this->dispatch('toast', type: 'error', message: "Folder execution error: {$e->getMessage()}");
+        } finally {
+            $this->isFollowupRunning = false;
+            $this->executingSingleItem = null;
+            $this->executingTestTarget = null;
+        }
+    }
+
+    public function runAllTests(?GitSyncService $gitService = null): void
+    {
+        $gitService = $gitService ?? app(GitSyncService::class);
+        $userId = auth()->id() ?? 0;
+        $this->isFollowupRunning = true;
+        $this->executingSingleItem = 'test_all';
+        $this->executingTestTarget = 'all';
+        $this->lastTestResult = null;
+
+        try {
+            $result = $gitService->runTest('', $userId);
+            $this->lastTestResult = $result;
+
+            if ($result['successful']) {
+                $this->dispatch('toast', type: 'success', message: "All tests passed: {$result['summary']}");
+            } else {
+                $this->dispatch('toast', type: 'error', message: "Test run completed with failures: {$result['summary']}");
+            }
+        } catch (Throwable $e) {
+            $this->lastTestResult = [
+                'action' => 'test_all',
+                'target' => 'all',
+                'successful' => false,
+                'stdout' => '',
+                'stderr' => $e->getMessage(),
+                'summary' => 'Error: ' . $e->getMessage(),
+                'duration' => '0s',
+            ];
+            $this->dispatch('toast', type: 'error', message: "Test execution error: {$e->getMessage()}");
+        } finally {
+            $this->isFollowupRunning = false;
+            $this->executingSingleItem = null;
+            $this->executingTestTarget = null;
+        }
+    }
+
+    public function openGenerateTestModal(): void
+    {
+        $this->newTestName = '';
+        $this->newTestType = 'Feature';
+        if ($this->testFolderFilter !== 'all' && !empty($this->testFolderFilter)) {
+            $folder = preg_replace('#^tests/(Feature|Unit)/?#', '', $this->testFolderFilter);
+            $this->newTestFolder = $folder ?: 'Admin';
+            $this->newTestType = str_starts_with($this->testFolderFilter, 'tests/Unit') ? 'Unit' : 'Feature';
+        } else {
+            $this->newTestFolder = 'Admin';
+        }
+        $this->showGenerateTestModal = true;
+    }
+
+    public function closeGenerateTestModal(): void
+    {
+        $this->showGenerateTestModal = false;
+        $this->newTestName = '';
+    }
+
+    public function createTestFile(GitSyncService $gitService): void
+    {
+        $this->validate([
+            'newTestName' => 'required|string|min:2|max:100',
+            'newTestType' => 'required|in:Feature,Unit',
+            'newTestFolder' => 'nullable|string|max:100',
+        ]);
+
+        $userId = auth()->id() ?? 0;
+
+        try {
+            $result = $gitService->generateTestFile(
+                name: $this->newTestName,
+                type: $this->newTestType,
+                subfolder: $this->newTestFolder,
+                userId: $userId
+            );
+
+            if ($result['successful']) {
+                $this->dispatch('toast', type: 'success', message: "Test file generated: {$result['path']}");
+                $this->showGenerateTestModal = false;
+                $this->dbSearch = $result['name'];
+                $this->testFolderFilter = 'all';
+                $this->newTestName = '';
+            } else {
+                $this->dispatch('toast', type: 'error', message: $result['message']);
+            }
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: "Failed to generate test: {$e->getMessage()}");
+        }
+    }
+
+    public function clearTestConsole(): void
+    {
+        $this->lastTestResult = null;
+    }
+
     public function checkSyncProgress(GitSyncService $gitService): void
     {
         $userId = auth()->id() ?? 0;
@@ -769,6 +983,9 @@ class GitSync extends Component
                 if (str_contains($val, 'restore')) {
                     return 'bg-purple-50 text-purple-700 border border-purple-200';
                 }
+                if (str_contains($val, 'test')) {
+                    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+                }
                 return 'bg-canvas text-ink border border-border';
             }],
             ['key' => 'user_name', 'label' => 'Performed By', 'type' => 'text', 'priority' => 1, 'class' => 'font-semibold text-ink'],
@@ -787,6 +1004,7 @@ class GitSync extends Component
             ['key' => 'pull', 'label' => 'Pull Events'],
             ['key' => 'revert', 'label' => 'Reverts & Restores'],
             ['key' => 'followup', 'label' => 'Maintenance Tasks'],
+            ['key' => 'test', 'label' => 'Test Runs'],
         ];
     }
 
@@ -816,6 +1034,8 @@ class GitSync extends Component
             });
         } elseif ($this->statusFilter === 'followup') {
             $query->where('action', 'like', '%followup%');
+        } elseif ($this->statusFilter === 'test') {
+            $query->where('action', 'like', '%test%');
         }
 
         if (!empty($this->sortField)) {
@@ -941,6 +1161,216 @@ class GitSync extends Component
         return $seeders;
     }
 
+    public function getTestsProperty(): array
+    {
+        $testDir = base_path('tests');
+        if (!File::isDirectory($testDir)) {
+            return [];
+        }
+
+        $allFiles = File::allFiles($testDir);
+        $tests = [];
+
+        // Check recent test audit logs for persistent execution history
+        $lastRuns = [];
+        try {
+            $logs = AuditLog::where('action', 'git_run_test')
+                ->latest('id')
+                ->take(150)
+                ->get();
+
+            foreach ($logs as $log) {
+                $from = is_array($log->from_value) ? $log->from_value : json_decode($log->from_value, true);
+                $to = is_array($log->to_value) ? $log->to_value : json_decode($log->to_value, true);
+                $target = $from['target'] ?? null;
+                if ($target && !isset($lastRuns[$target])) {
+                    $lastRuns[$target] = [
+                        'successful' => $to['successful'] ?? true,
+                        'duration' => $to['duration'] ?? null,
+                        'summary' => $to['summary'] ?? null,
+                        'timestamp' => $log->created_at,
+                        'user' => $log->user?->name ?: 'Super Admin',
+                    ];
+                }
+            }
+        } catch (Throwable $e) {}
+
+        foreach ($allFiles as $file) {
+            $filename = $file->getFilename();
+            if (!str_ends_with($filename, 'Test.php')) {
+                continue;
+            }
+
+            $relativePath = str_replace('\\', '/', $file->getRelativePathname());
+            $fullRelativePath = 'tests/' . $relativePath;
+            $className = str_replace('.php', '', $filename);
+            $folderRelative = dirname($fullRelativePath);
+            $folderLabel = preg_replace('#^tests/#', '', $folderRelative) ?: 'Root';
+
+            $isUnit = str_starts_with($fullRelativePath, 'tests/Unit');
+            $suiteType = $isUnit ? 'Unit' : 'Feature';
+
+            // Count test methods inside file
+            $content = @file_get_contents($file->getRealPath()) ?: '';
+            $methodCount = preg_match_all('/public\s+function\s+(test[a-zA-Z0-9_]*|it_[a-zA-Z0-9_]*)/i', $content, $m);
+            if ($methodCount === 0) {
+                $methodCount = preg_match_all('/#\[Test\]/i', $content, $m);
+            }
+
+            // Check cached run in current session or audit logs
+            $cached = $this->testRunCache[$fullRelativePath] ?? null;
+            $auditRun = $lastRuns[$fullRelativePath] ?? null;
+
+            $status = 'untested';
+            $duration = null;
+            $lastRunTime = null;
+            $lastRunUser = null;
+            $summaryText = null;
+
+            if ($cached) {
+                $status = $cached['successful'] ? 'passed' : 'failed';
+                $duration = $cached['duration'] ?? null;
+                $lastRunTime = $cached['timestamp'] ?? 'Just now';
+                $lastRunUser = 'You';
+                $summaryText = $cached['summary'] ?? null;
+            } elseif ($auditRun) {
+                $status = ($auditRun['successful'] ?? false) ? 'passed' : 'failed';
+                $duration = $auditRun['duration'] ?? null;
+                $lastRunTime = $auditRun['timestamp'] ? $auditRun['timestamp']->format('M d, Y H:i') : null;
+                $lastRunUser = $auditRun['user'] ?? null;
+                $summaryText = $auditRun['summary'] ?? null;
+            }
+
+            // Filter by folder
+            if ($this->testFolderFilter !== 'all' && $this->testFolderFilter !== $folderRelative) {
+                continue;
+            }
+
+            // Filter by status
+            if ($this->testStatusFilter === 'passed' && $status !== 'passed') {
+                continue;
+            }
+            if ($this->testStatusFilter === 'failed' && $status !== 'failed') {
+                continue;
+            }
+            if ($this->testStatusFilter === 'untested' && $status !== 'untested') {
+                continue;
+            }
+
+            // Filter by search keyword
+            if (!empty($this->dbSearch)) {
+                $search = strtolower(trim($this->dbSearch));
+                $match = str_contains(strtolower($filename), $search)
+                    || str_contains(strtolower($className), $search)
+                    || str_contains(strtolower($fullRelativePath), $search)
+                    || str_contains(strtolower($folderLabel), $search)
+                    || str_contains(strtolower($suiteType), $search);
+                if (!$match) {
+                    continue;
+                }
+            }
+
+            $tests[] = [
+                'filename' => $filename,
+                'class' => $className,
+                'path' => $fullRelativePath,
+                'folder' => $folderRelative,
+                'folder_label' => $folderLabel,
+                'suite_type' => $suiteType,
+                'methods_count' => $methodCount ?: 1,
+                'status' => $status,
+                'duration' => $duration,
+                'last_run' => $lastRunTime,
+                'last_user' => $lastRunUser,
+                'summary' => $summaryText,
+            ];
+        }
+
+        // Sort by folder, then class name
+        usort($tests, function ($a, $b) {
+            $cmp = strcmp($a['folder'], $b['folder']);
+            if ($cmp !== 0) return $cmp;
+            return strcmp($a['class'], $b['class']);
+        });
+
+        return $tests;
+    }
+
+    public function getTestFoldersProperty(): array
+    {
+        $testDir = base_path('tests');
+        if (!File::isDirectory($testDir)) {
+            return [];
+        }
+
+        $allFiles = File::allFiles($testDir);
+        $folderCounts = [];
+
+        foreach ($allFiles as $file) {
+            if (!str_ends_with($file->getFilename(), 'Test.php')) {
+                continue;
+            }
+            $relativePath = str_replace('\\', '/', $file->getRelativePathname());
+            $fullRelativePath = 'tests/' . $relativePath;
+            $folder = dirname($fullRelativePath);
+            $folderCounts[$folder] = ($folderCounts[$folder] ?? 0) + 1;
+        }
+
+        ksort($folderCounts);
+
+        $folders = [];
+        $totalAll = array_sum($folderCounts);
+        $folders[] = [
+            'folder' => 'all',
+            'label' => 'All Folders',
+            'count' => $totalAll,
+        ];
+
+        foreach ($folderCounts as $folder => $count) {
+            $label = preg_replace('#^tests/#', '', $folder) ?: 'Root';
+            $folders[] = [
+                'folder' => $folder,
+                'label' => $label,
+                'count' => $count,
+            ];
+        }
+
+        return $folders;
+    }
+
+    public function getTestStatsProperty(): array
+    {
+        $testDir = base_path('tests');
+        if (!File::isDirectory($testDir)) {
+            return ['total' => 0, 'passed' => 0, 'failed' => 0, 'untested' => 0];
+        }
+
+        $allFiles = File::allFiles($testDir);
+        $total = 0;
+        foreach ($allFiles as $file) {
+            if (str_ends_with($file->getFilename(), 'Test.php')) {
+                $total++;
+            }
+        }
+
+        $passed = 0;
+        $failed = 0;
+        foreach ($this->testRunCache as $item) {
+            if (($item['successful'] ?? false)) {
+                $passed++;
+            } else {
+                $failed++;
+            }
+        }
+
+        return [
+            'total' => $total,
+            'passed' => $passed,
+            'failed' => $failed,
+            'untested' => max(0, $total - ($passed + $failed)),
+        ];
+    }
+
     public function render()
     {
         $gitAuditLogs = $this->getFilteredAuditLogsQuery()->paginate($this->perPage);
@@ -952,6 +1382,9 @@ class GitSync extends Component
             'migrations' => $this->migrations,
             'migrationStats' => $this->migrationStats,
             'seeders' => $this->seeders,
+            'tests' => $this->tests,
+            'testFolders' => $this->testFolders,
+            'testStats' => $this->testStats,
         ])->layout('layouts.app');
     }
 }

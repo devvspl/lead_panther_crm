@@ -156,7 +156,7 @@ class UserManager extends Component
     public function openUserDetailsModal(int $userId): void
     {
         $this->selectedUserId = $userId;
-        $this->selectedUser = User::with(['roles', 'clients'])->find($userId);
+        $this->selectedUser = User::with(['roles', 'organization'])->find($userId);
 
         if (!$this->selectedUser) {
             $this->dispatch('toast', type: 'error', message: 'User not found.');
@@ -237,7 +237,7 @@ class UserManager extends Component
         $role = Role::firstOrCreate(['name' => $this->editRole, 'guard_name' => 'web']);
         $user->syncRoles([$role->name]);
 
-        $this->selectedUser = User::with(['roles', 'clients'])->find($this->selectedUserId);
+        $this->selectedUser = User::with(['roles', 'organization'])->find($this->selectedUserId);
         $this->userDetailsMode = 'view';
         $this->editPassword = '';
 
@@ -301,7 +301,7 @@ class UserManager extends Component
 
     protected function getFilteredQuery()
     {
-        $query = User::with(['roles', 'clients']);
+        $query = User::with(['roles', 'organization']);
 
         if (!empty($this->search)) {
             $query->where(function ($q) {

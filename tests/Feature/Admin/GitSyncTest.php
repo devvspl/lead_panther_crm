@@ -732,4 +732,209 @@ class GitSyncTest extends TestCase
             ->call('clearFollowupConsole')
             ->assertSet('lastFollowupResult', null);
     }
+
+    public function test_database_manager_renders_tests_tab(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $test = Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->assertSee('1. Migrations')
+            ->assertSee('2. Seeders')
+            ->assertSee('3. Tests');
+
+        $stats = $test->get('testStats');
+        $this->assertIsArray($stats);
+        $this->assertArrayHasKey('total', $stats);
+        $this->assertGreaterThan(0, $stats['total']);
+
+        // Switch to tests tab
+        $test->set('dbManagerTab', 'tests')
+            ->assertSet('dbManagerTab', 'tests')
+            ->assertSee('RoleSeederTest')
+            ->assertSee('Run All Tests')
+            ->assertSee('Generate Test');
+
+        $tests = $test->get('tests');
+        $this->assertIsArray($tests);
+        $this->assertNotEmpty($tests);
+
+        $folders = $test->get('testFolders');
+        $this->assertIsArray($folders);
+        $this->assertNotEmpty($folders);
+    }
+
+    public function test_can_filter_tests_by_folder_and_search(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $test = Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('dbManagerTab', 'tests');
+
+        // Filter by folder: tests/Unit
+        $test->set('testFolderFilter', 'tests/Unit');
+        $unitTests = $test->get('tests');
+        $this->assertNotEmpty($unitTests);
+        foreach ($unitTests as $item) {
+            $this->assertEquals('tests/Unit', $item['folder']);
+            $this->assertEquals('Unit', $item['suite_type']);
+        }
+
+        // Search by keyword
+        $test->set('testFolderFilter', 'all')
+            ->set('dbSearch', 'RoleSeeder');
+        $searchResult = $test->get('tests');
+        $this->assertNotEmpty($searchResult);
+        foreach ($searchResult as $item) {
+            $this->assertTrue(
+                str_contains($item['class'], 'RoleSeeder') ||
+                str_contains($item['filename'], 'RoleSeeder')
+            );
+        }
+    }
+
+    public function test_can_execute_single_test_via_action_column(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $mockGitService = $this->createMock(GitSyncService::class);
+        $mockGitService->method('getCredentials')->willReturn([
+            'remote_url' => 'https://github.com/mock/repo.git',
+            'username' => 'user',
+            'access_token' => 'mock_token',
+            'default_branch' => 'main',
+        ]);
+        $mockGitService->method('getRepoStatus')->willReturn([
+            'current_branch' => 'main',
+            'current_commit' => 'abc1234',
+            'short_commit' => 'abc1234',
+            'last_commit_info' => 'Initial commit',
+            'modified_files' => [],
+            'modified_count' => 0,
+            'ahead_count' => 0,
+            'behind_count' => 0,
+            'recent_commits' => [],
+        ]);
+
+        $mockGitService->expects($this->once())
+            ->method('runTest')
+            ->with(
+                $this->equalTo('tests/Unit/ExampleTest.php'),
+                $this->equalTo($admin->id)
+            )
+            ->willReturn([
+                'action' => 'test: tests/Unit/ExampleTest.php',
+                'target' => 'tests/Unit/ExampleTest.php',
+                'successful' => true,
+                'stdout' => 'Tests: 1 passed (1 assertion)',
+                'stderr' => '',
+                'summary' => 'Tests: 1 passed (1 assertion)',
+                'duration' => '0.5s',
+            ]);
+
+        $this->app->instance(GitSyncService::class, $mockGitService);
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('dbManagerTab', 'tests')
+            ->call('runSingleTest', 'tests/Unit/ExampleTest.php')
+            ->assertDispatched('toast', fn($event, $params) => $params['type'] === 'success')
+            ->assertSet('lastTestResult.successful', true)
+            ->assertSee('Tests: 1 passed (1 assertion)');
+    }
+
+    public function test_can_open_and_close_generate_test_modal(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('dbManagerTab', 'tests')
+            ->assertSet('showGenerateTestModal', false)
+            ->call('openGenerateTestModal')
+            ->assertSet('showGenerateTestModal', true)
+            ->assertSee('Generate Test File')
+            ->call('closeGenerateTestModal')
+            ->assertSet('showGenerateTestModal', false);
+    }
+
+    public function test_can_generate_new_test_file(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $mockGitService = $this->createMock(GitSyncService::class);
+        $mockGitService->method('getCredentials')->willReturn([
+            'remote_url' => 'https://github.com/mock/repo.git',
+            'username' => 'user',
+            'access_token' => 'mock_token',
+            'default_branch' => 'main',
+        ]);
+        $mockGitService->method('getRepoStatus')->willReturn([
+            'current_branch' => 'main',
+            'current_commit' => 'abc1234',
+            'short_commit' => 'abc1234',
+            'last_commit_info' => 'Initial commit',
+            'modified_files' => [],
+            'modified_count' => 0,
+            'ahead_count' => 0,
+            'behind_count' => 0,
+            'recent_commits' => [],
+        ]);
+
+        $mockGitService->expects($this->once())
+            ->method('generateTestFile')
+            ->with(
+                $this->equalTo('MockGeneratorDemoTest'),
+                $this->equalTo('Feature'),
+                $this->equalTo('Admin'),
+                $this->equalTo($admin->id)
+            )
+            ->willReturn([
+                'successful' => true,
+                'path' => 'tests/Feature/Admin/MockGeneratorDemoTest.php',
+                'name' => 'MockGeneratorDemoTest',
+                'type' => 'Feature',
+                'folder' => 'Admin',
+                'message' => 'Test file created successfully: tests/Feature/Admin/MockGeneratorDemoTest.php',
+            ]);
+
+        $this->app->instance(GitSyncService::class, $mockGitService);
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('dbManagerTab', 'tests')
+            ->set('newTestName', 'MockGeneratorDemoTest')
+            ->set('newTestType', 'Feature')
+            ->set('newTestFolder', 'Admin')
+            ->call('createTestFile')
+            ->assertDispatched('toast', fn($event, $params) => $params['type'] === 'success')
+            ->assertSet('showGenerateTestModal', false)
+            ->assertSet('dbSearch', 'MockGeneratorDemoTest');
+    }
+
+    public function test_can_clear_test_console(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(GitSync::class)
+            ->set('lastTestResult', [
+                'action' => 'test',
+                'target' => 'tests/Unit/ExampleTest.php',
+                'successful' => true,
+                'stdout' => 'Passed',
+                'stderr' => '',
+                'summary' => '1 passed',
+                'duration' => '0.2s',
+            ])
+            ->call('clearTestConsole')
+            ->assertSet('lastTestResult', null);
+    }
 }

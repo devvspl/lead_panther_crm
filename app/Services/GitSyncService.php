@@ -880,6 +880,148 @@ class GitSyncService
     }
 
     /**
+     * Run Test Suite or Single/Folder Test.
+     */
+    public function runTest(string $target = '', ?int $userId = null): array
+    {
+        $safeTarget = trim($target);
+        if (!empty($safeTarget)) {
+            $safeTarget = str_replace('\\', '/', $safeTarget);
+            $safeTarget = preg_replace('/[^a-zA-Z0-9_\\/.-]/', '', $safeTarget);
+            if (!str_starts_with($safeTarget, 'tests/') || str_contains($safeTarget, '..')) {
+                throw new \InvalidArgumentException("Invalid test target path: {$target}");
+            }
+            if (!file_exists(base_path($safeTarget))) {
+                throw new \InvalidArgumentException("Test target not found: {$target}");
+            }
+        }
+
+        $command = array_values(array_filter([
+            'php',
+            'artisan',
+            'test',
+            $safeTarget ?: null,
+            '--without-tty',
+        ]));
+
+        $timeout = empty($safeTarget) ? 360 : 180;
+        $startTime = microtime(true);
+        $res = $this->runCommand($command, timeout: $timeout);
+        $duration = round(microtime(true) - $startTime, 2);
+
+        $rawOutput = $res['stdout'] ?: $res['stderr'];
+        // Strip ANSI escape codes
+        $cleanOutput = preg_replace('/\x1b\[[0-9;]*[a-zA-Z]/', '', (string)$rawOutput);
+
+        $hasFailed = str_contains($cleanOutput, 'FAILED') || str_contains($cleanOutput, 'FAIL ') || !$res['successful'];
+        $isSuccessful = $res['successful'] && !$hasFailed;
+
+        // Parse summary line if available
+        $summary = '';
+        if (preg_match('/Tests:\s+[^\r\n]+/i', $cleanOutput, $matches)) {
+            $summary = trim($matches[0]);
+        } elseif ($isSuccessful) {
+            $summary = 'Tests passed successfully (' . $duration . 's)';
+        } else {
+            $summary = 'Tests failed (' . $duration . 's)';
+        }
+
+        $this->logAudit(
+            userId: $userId,
+            action: 'git_run_test',
+            fromValue: ['target' => $safeTarget ?: 'all'],
+            toValue: [
+                'successful' => $isSuccessful,
+                'target' => $safeTarget ?: 'all',
+                'summary' => $summary,
+                'duration' => $duration . 's',
+            ]
+        );
+
+        return [
+            'action' => 'test: ' . ($safeTarget ?: 'all'),
+            'target' => $safeTarget ?: 'all',
+            'successful' => $isSuccessful,
+            'stdout' => $cleanOutput,
+            'stderr' => $res['stderr'],
+            'summary' => $summary,
+            'duration' => $duration . 's',
+        ];
+    }
+
+    /**
+     * Generate a new test file using php artisan make:test.
+     */
+    public function generateTestFile(string $name, string $type = 'Feature', string $subfolder = '', ?int $userId = null): array
+    {
+        $cleanName = preg_replace('/[^a-zA-Z0-9_]/', '', (string)$name);
+        $cleanName = str_replace('.php', '', $cleanName);
+        if (empty($cleanName)) {
+            throw new \InvalidArgumentException("Test name cannot be empty.");
+        }
+        if (!str_ends_with($cleanName, 'Test')) {
+            $cleanName .= 'Test';
+        }
+
+        $isUnit = strtolower(trim($type)) === 'unit';
+        $suiteFolder = $isUnit ? 'Unit' : 'Feature';
+
+        $cleanSubfolder = trim(preg_replace('/[^a-zA-Z0-9_\\/]/', '', (string)$subfolder), '/');
+        
+        $relativeClass = !empty($cleanSubfolder) 
+            ? str_replace('/', '\\', $cleanSubfolder) . '\\' . $cleanName 
+            : $cleanName;
+
+        $targetRelativePath = 'tests/' . $suiteFolder . '/' . (!empty($cleanSubfolder) ? $cleanSubfolder . '/' : '') . $cleanName . '.php';
+
+        if (file_exists(base_path($targetRelativePath))) {
+            return [
+                'successful' => false,
+                'path' => $targetRelativePath,
+                'name' => $cleanName,
+                'message' => "Test file already exists at {$targetRelativePath}",
+            ];
+        }
+
+        $command = [
+            'php',
+            'artisan',
+            'make:test',
+            $relativeClass,
+        ];
+        if ($isUnit) {
+            $command[] = '--unit';
+        }
+
+        $res = $this->runCommand($command, timeout: 60);
+        $created = file_exists(base_path($targetRelativePath));
+
+        $this->logAudit(
+            userId: $userId,
+            action: 'git_generate_test',
+            fromValue: [
+                'name' => $cleanName,
+                'type' => $suiteFolder,
+                'subfolder' => $cleanSubfolder,
+            ],
+            toValue: [
+                'successful' => $created,
+                'path' => $targetRelativePath,
+                'output' => $res['stdout'] ?: $res['stderr'],
+            ]
+        );
+
+        return [
+            'successful' => $created,
+            'path' => $targetRelativePath,
+            'name' => $cleanName,
+            'type' => $suiteFolder,
+            'folder' => $cleanSubfolder,
+            'message' => $created ? "Test file created successfully: {$targetRelativePath}" : ($res['stderr'] ?: $res['stdout']),
+        ];
+    }
+
+    /**
      * Helper to write structured AuditLog entry.
      */
     protected function logAudit(?int $userId, string $action, array $fromValue, array $toValue): void

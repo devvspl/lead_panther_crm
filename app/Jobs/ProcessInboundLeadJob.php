@@ -89,6 +89,22 @@ class ProcessInboundLeadJob implements ShouldQueue
             $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
 
+            // Auto-create or map Campaign from Meta campaign name if not explicitly mapped
+            if (!empty($mapped['campaign']) && !$campaignId) {
+                $campaign = \App\Models\Campaign::firstOrCreate(
+                    [
+                        'project_id' => $projectId,
+                        'name' => $mapped['campaign'],
+                    ],
+                    [
+                        'lead_source_id' => $leadSource->id,
+                        'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
+                        'status' => 'active',
+                    ]
+                );
+                $campaignId = $campaign->id;
+            }
+
             $mobile = $mapped['mobile'] ?? '9999999999';
             $email = $mapped['email'] ?? 'unknown@example.com';
 
@@ -155,6 +171,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 'mobile' => $mobile,
                 'email' => $email,
                 'city' => $mapped['city'] ?? 'Mumbai',
+                'location' => $mapped['location'] ?? null,
                 'budget' => $budget,
                 'property_type' => $mapped['property_type'] ?? '2 BHK',
                 'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
@@ -169,6 +186,28 @@ class ProcessInboundLeadJob implements ShouldQueue
                 'key' => 'utm_source',
                 'value' => $mapped['raw_utm']['utm_source'] ?? $type,
             ]);
+
+            if (!empty($mapped['leadgen_id'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $mapped['leadgen_id']]);
+            }
+            if (!empty($mapped['form'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_id', 'value' => (string) $mapped['form']]);
+            }
+            if (!empty($mapped['campaign'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_name', 'value' => $mapped['campaign']]);
+            }
+            if (!empty($mapped['campaign_id'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_id', 'value' => (string) $mapped['campaign_id']]);
+            }
+            if (!empty($mapped['ad_set'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
+            }
+            if (!empty($mapped['ad'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_name', 'value' => $mapped['ad']]);
+            }
+            if (!empty($mapped['custom_fields'])) {
+                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);
+            }
 
             LeadMetadata::create([
                 'lead_id' => $lead->id,

@@ -77,6 +77,16 @@ class Lead extends Model
         return $this->hasMany(SiteVisit::class);
     }
 
+    public function metadata(): HasMany
+    {
+        return $this->hasMany(LeadMetadata::class);
+    }
+
+    public function getMetaAttribute(string $key, mixed $default = null): mixed
+    {
+        return $this->metadata->firstWhere('key', $key)?->value ?? $default;
+    }
+
     /**
      * Calculate dynamic rule-based lead score (0-100).
      */
@@ -155,6 +165,11 @@ class Lead extends Model
     public function getProjectNameAttribute(): string
     {
         return $this->project?->name ?: 'N/A';
+    }
+
+    public function getCampaignNameAttribute(): string
+    {
+        return $this->campaign?->name ?: '-';
     }
 
     public function getLeadSourceNameAttribute(): string

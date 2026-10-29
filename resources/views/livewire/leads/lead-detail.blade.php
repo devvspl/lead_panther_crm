@@ -50,12 +50,78 @@
                     </div>
                     <div>
                         <div class="text-[10px] font-bold text-muted uppercase">Campaign</div>
-                        <div class="text-xs font-semibold text-ink mt-0.5">{{ $lead->campaign?->name ?: 'Direct' }}</div>
+                        <div class="text-xs font-semibold text-ink mt-0.5 truncate">{{ $lead->campaign?->name ?: ($lead->getMetaAttribute('meta_campaign_name') ?: 'Direct') }}</div>
                     </div>
                     <div>
                         <div class="text-[10px] font-bold text-muted uppercase">Lead Score</div>
                         <div class="text-xs font-semibold text-ink mt-0.5">{{ $lead->lead_score }} / 100</div>
                     </div>
+                </div>
+
+                @php
+                    $metaCamp = $lead->getMetaAttribute('meta_campaign_name') ?: $lead->campaign?->name;
+                    $metaAdset = $lead->getMetaAttribute('meta_adset_name');
+                    $metaAd = $lead->getMetaAttribute('meta_ad_name');
+                    $metaForm = $lead->getMetaAttribute('meta_form_name') ?: $lead->getMetaAttribute('meta_form_id');
+                    $metaLeadgenId = $lead->getMetaAttribute('meta_leadgen_id');
+                @endphp
+
+                @if($metaCamp || $metaAdset || $metaAd || $metaForm)
+                    <!-- Meta Lead Ads Intelligence Banner -->
+                    <div class="p-4 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-blue-900 flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-blue-600 fill-current" viewBox="0 0 24 24">
+                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                                </svg>
+                                <span>Meta Lead Ads Intelligence</span>
+                            </span>
+                            @if($metaLeadgenId)
+                                <span class="font-mono text-[10px] text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded font-semibold">Lead ID: {{ $metaLeadgenId }}</span>
+                            @endif
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                            @if($metaCamp)
+                                <div class="bg-white/80 p-2 rounded-lg border border-blue-100">
+                                    <div class="text-[9px] font-bold text-blue-600 uppercase">Campaign</div>
+                                    <div class="font-semibold text-ink truncate" title="{{ $metaCamp }}">{{ $metaCamp }}</div>
+                                </div>
+                            @endif
+                            @if($metaAdset)
+                                <div class="bg-white/80 p-2 rounded-lg border border-blue-100">
+                                    <div class="text-[9px] font-bold text-blue-600 uppercase">Ad Set</div>
+                                    <div class="font-semibold text-ink truncate" title="{{ $metaAdset }}">{{ $metaAdset }}</div>
+                                </div>
+                            @endif
+                            @if($metaAd)
+                                <div class="bg-white/80 p-2 rounded-lg border border-blue-100">
+                                    <div class="text-[9px] font-bold text-blue-600 uppercase">Ad Creative</div>
+                                    <div class="font-semibold text-ink truncate" title="{{ $metaAd }}">{{ $metaAd }}</div>
+                                </div>
+                            @endif
+                            @if($metaForm)
+                                <div class="bg-white/80 p-2 rounded-lg border border-blue-100">
+                                    <div class="text-[9px] font-bold text-blue-600 uppercase">Lead Form</div>
+                                    <div class="font-semibold text-ink truncate" title="{{ $metaForm }}">{{ $metaForm }}</div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Customer Inquiry & Custom Requirements -->
+                <div class="p-4 bg-canvas rounded-card border border-border space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <h4 class="font-bold text-ink uppercase tracking-wider text-[11px]">Customer Inquiry &amp; Form Responses</h4>
+                        <span class="text-[10px] text-muted font-medium">{{ $lead->property_type }} • {{ $lead->budget_formatted }}</span>
+                    </div>
+                    @if($lead->requirement)
+                        <div class="text-xs text-ink whitespace-pre-line bg-surface p-3.5 rounded-lg border border-border font-sans leading-relaxed">
+                            {{ $lead->requirement }}
+                        </div>
+                    @else
+                        <div class="text-xs text-muted italic bg-surface p-3 rounded-lg border border-border">No specific requirement notes recorded.</div>
+                    @endif
                 </div>
 
                 <!-- Navigation Tabs -->

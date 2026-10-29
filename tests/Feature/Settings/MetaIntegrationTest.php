@@ -506,4 +506,109 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals('Virat Kohli', $lead->name);
         $this->assertEquals('virat@example.com', $lead->email);
     }
+
+    public function test_meta_pull_captures_all_campaign_ad_and_custom_question_metadata(): void
+    {
+        $org = Organization::create(['name' => 'Prestige HQ', 'type' => 'builder', 'status' => 'active']);
+        $admin = User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        $client = Client::create(['name' => 'Prestige Estates', 'organization_id' => $org->id]);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Prestige Highrise']);
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Comprehensive Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => '99887766554433',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'mock_full_meta_token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v19.0/form_meta_full/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'leadgen_comp_9999',
+                        'created_time' => '2026-10-29T14:30:00+0000',
+                        'campaign_name' => 'Prestige Festive Sky Villas',
+                        'campaign_id' => 'meta_camp_8899',
+                        'adset_name' => 'HNI Highrise Target',
+                        'adset_id' => 'meta_adset_77',
+                        'ad_name' => 'Sunset Penthouse Video',
+                        'ad_id' => 'meta_ad_66',
+                        'form_id' => 'form_meta_full',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Deepika Padukone']],
+                            ['name' => 'phone_number', 'values' => ['+919877788899']],
+                            ['name' => 'email', 'values' => ['deepika@example.com']],
+                            ['name' => 'city', 'values' => ['Bengaluru']],
+                            ['name' => 'location', 'values' => ['Whitefield']],
+                            ['name' => 'budget', 'values' => ['₹2.5 Cr - ₹3.5 Cr']],
+                            ['name' => 'property_type', 'values' => ['4 BHK Penthouse']],
+                            ['name' => 'when_planning_to_buy', 'values' => ['Immediate within 30 days']],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Leads\LeadKanban::class)
+            ->set('selectedPortalAccountId', $account->id)
+            ->set('customFormId', 'form_meta_full')
+            ->set('syncProjectId', $project->id)
+            ->call('pullMetaLeads')
+            ->assertDispatched('toast');
+
+        // Verify lead is created
+        $lead = \App\Models\Lead::where('mobile', '919877788899')->first();
+        $this->assertNotNull($lead);
+        $this->assertEquals('Deepika Padukone', $lead->name);
+        $this->assertEquals('deepika@example.com', $lead->email);
+        $this->assertEquals('Bengaluru', $lead->city);
+        $this->assertEquals('Whitefield', $lead->location);
+        $this->assertEquals(25000000.00, (float) $lead->budget);
+        $this->assertEquals('4 BHK Penthouse', $lead->property_type);
+
+        // Verify Campaign auto-created and linked
+        $campaign = \App\Models\Campaign::where('name', 'Prestige Festive Sky Villas')->first();
+        $this->assertNotNull($campaign);
+        $this->assertEquals($campaign->id, $lead->campaign_id);
+
+        // Verify requirement contains custom answers
+        $this->assertStringContainsString('Immediate within 30 days', $lead->requirement);
+        $this->assertStringContainsString('Sunset Penthouse Video', $lead->requirement);
+
+        // Verify LeadMetadata records
+        $this->assertEquals('leadgen_comp_9999', $lead->getMetaAttribute('meta_leadgen_id'));
+        $this->assertEquals('Prestige Festive Sky Villas', $lead->getMetaAttribute('meta_campaign_name'));
+        $this->assertEquals('HNI Highrise Target', $lead->getMetaAttribute('meta_adset_name'));
+        $this->assertEquals('Sunset Penthouse Video', $lead->getMetaAttribute('meta_ad_name'));
+        $this->assertNotNull($lead->getMetaAttribute('meta_form_answers'));
+        $this->assertNotNull($lead->getMetaAttribute('raw_json'));
+    }
+
+    public function test_lead_kanban_modal_contains_only_meta_ads_sync_and_removes_other_tabs(): void
+    {
+        $org = Organization::create(['name' => 'Tata HQ', 'type' => 'builder', 'status' => 'active']);
+        $admin = User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Leads\LeadKanban::class)
+            ->assertSee('+ Pull Meta Leads')
+            ->assertSee('Meta Ads Sync')
+            ->assertDontSee('Single Manual Lead')
+            ->assertDontSee('Bulk CSV Upload');
+    }
 }

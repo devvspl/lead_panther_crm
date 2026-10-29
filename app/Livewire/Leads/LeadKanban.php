@@ -580,6 +580,7 @@ class LeadKanban extends Component
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 2],
+            ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2],
             ['key' => 'current_stage', 'label' => 'Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                 'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
@@ -657,7 +658,8 @@ class LeadKanban extends Component
                 $this->customFormId ?: null,
                 (int) ($this->pullLimit ?: 25),
                 $this->syncProjectId ?: null,
-                $this->syncCampaignId ?: null
+                $this->syncCampaignId ?: null,
+                $this->customPageAccessToken ?: null
             );
 
             $this->pullSummary = [

@@ -314,12 +314,12 @@
             <!-- Pull / Manual Ingest Leads Action Button -->
             <button type="button" wire:click="openPullLeadsModal"
                 class="inline-flex items-center gap-1.5 px-3.5 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs shrink-0 cursor-pointer"
-                title="Sync existing leads from Meta Lead Ads or create manually">
-                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                title="Sync existing leads directly from Meta Lead Ads">
+                <svg class="w-3.5 h-3.5 text-blue-400 fill-current" viewBox="0 0 24 24">
+                    <path
+                        d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                 </svg>
-                <span>+ Pull / Add Leads</span>
+                <span>+ Pull Meta Leads</span>
             </button>
 
             <x-ui.export-button target="exportExcel" />
@@ -515,10 +515,17 @@
                                         <span class="text-xs font-extrabold text-ink">
                                             {{ is_numeric($lead->budget) ? '₹' . number_format($lead->budget / 100000, 1) . 'L' : $lead->budget }}
                                         </span>
-                                        <span
-                                            class="px-2 py-0.5 text-[9px] font-bold uppercase rounded bg-canvas text-muted border border-border">
-                                            {{ $lead->leadSource?->name ?: 'Direct' }}
-                                        </span>
+                                        <div class="flex items-center gap-1">
+                                            @if($lead->campaign?->name)
+                                                <span class="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[90px]" title="Campaign: {{ $lead->campaign->name }}">
+                                                    {{ $lead->campaign->name }}
+                                                </span>
+                                            @endif
+                                            <span
+                                                class="px-2 py-0.5 text-[9px] font-bold uppercase rounded bg-canvas text-muted border border-border">
+                                                {{ $lead->leadSource?->name ?: 'Direct' }}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <!-- Bottom Row: Avatar & Days in Stage -->
@@ -623,222 +630,120 @@
     <!-- Include Full Lead Journey Timeline Drawer Component -->
     <livewire:leads.lead-timeline />
 
-    <!-- Manual Lead Ingestion & Meta Sync Offcanvas Drawer -->
-    <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Pull & Ingest Leads"
-        subtitle="Sync existing historical leads from Meta Lead Ads or create new CRM leads manually." maxWidth="lg">
+    <!-- Meta Lead Ads Sync Offcanvas Drawer -->
+    <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Meta Ads Sync"
+        subtitle="Pull and synchronize leads, campaigns, and ad form data directly from Meta (Facebook & Instagram Lead Ads)." maxWidth="lg">
         <x-slot:headerIcon>
-            <div class="p-1.5 rounded-lg bg-canvas text-ink border border-border">
-                <svg class="w-4 h-4 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            <div class="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path
+                        d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                 </svg>
             </div>
         </x-slot:headerIcon>
 
-        <div class="space-y-5 text-xs">
-            <!-- Mode Switcher Tabs -->
-            <div class="flex p-1 bg-canvas rounded-lg border border-border">
-                <button type="button" wire:click="$set('pullMode', 'meta')"
-                    class="flex-1 py-1.5 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 {{ $pullMode === 'meta' ? 'bg-surface text-ink shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
-                    <svg class="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                    </svg>
-                    <span>Meta Ads Sync</span>
-                </button>
-                <button type="button" wire:click="$set('pullMode', 'manual')"
-                    class="flex-1 py-1.5 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 {{ $pullMode === 'manual' ? 'bg-surface text-ink shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                    </svg>
-                    <span>Single Manual Lead</span>
-                </button>
-                <a href="{{ route('leads.upload') }}"
-                    class="flex-1 py-1.5 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 text-muted hover:text-ink">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span>Bulk CSV Upload</span>
-                </a>
+        <div class="space-y-4 text-xs">
+            <div>
+                <label class="font-bold text-ink">Select Connected Meta Account</label>
+                @php
+                    $accOptions = [];
+                    foreach ($portalAccounts as $acc) {
+                        $accOptions[(string) $acc->id] = $acc->name . ' (' . ucfirst($acc->type) . ')';
+                    }
+                @endphp
+                @if(empty($accOptions))
+                    <div class="p-3 bg-canvas rounded-lg border border-border text-muted text-[11px] mt-1 space-y-1">
+                        <p>No Meta Portal Accounts configured yet.</p>
+                        <a href="{{ route('settings.integrations') }}"
+                            class="font-bold text-primary hover:underline block">
+                            &rarr; Configure Meta Page Access Token in Integrations
+                        </a>
+                    </div>
+                @else
+                    <x-ui.themed-select wire:model.live="selectedPortalAccountId" :options="$accOptions"
+                        placeholder="Choose Account" class="w-full mt-1" />
+                @endif
             </div>
 
-            <!-- Tab 1: Meta Ads Pull Options -->
-            @if($pullMode === 'meta')
-                <div class="space-y-4">
-                    <div>
-                        <label class="font-bold text-ink">Select Connected Meta Account</label>
-                        @php
-                            $accOptions = [];
-                            foreach ($portalAccounts as $acc) {
-                                $accOptions[(string) $acc->id] = $acc->name . ' (' . ucfirst($acc->type) . ')';
-                            }
-                        @endphp
-                        @if(empty($accOptions))
-                            <div class="p-3 bg-canvas rounded-lg border border-border text-muted text-[11px] mt-1 space-y-1">
-                                <p>No Meta Portal Accounts configured yet.</p>
-                                <a href="{{ route('settings.integrations') }}"
-                                    class="font-bold text-primary hover:underline block">
-                                    &rarr; Configure Meta Page Access Token in Integrations
-                                </a>
-                            </div>
-                        @else
-                            <x-ui.themed-select wire:model.live="selectedPortalAccountId" :options="$accOptions"
-                                placeholder="Choose Account" class="w-full mt-1" />
-                        @endif
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="font-bold text-ink">Leadgen Form ID <span
-                                    class="text-muted font-normal">(Optional)</span></label>
-                            <input type="text" wire:model="customFormId" placeholder="e.g. 123456789 (Leave blank for all)"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
-                        </div>
-                        <div>
-                            <label class="font-bold text-ink">Max Leads to Pull</label>
-                            <select wire:model="pullLimit"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
-                                <option value="10">10 Most Recent Leads</option>
-                                <option value="25">25 Leads</option>
-                                <option value="50">50 Leads</option>
-                                <option value="100">100 Leads</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="font-bold text-ink">Assign to Project <span
-                                    class="text-muted font-normal">(Optional Override)</span></label>
-                            @php
-                                $projOptions = ['' => 'Default / Mapped Project'];
-                                foreach ($allProjects as $p) {
-                                    $projOptions[(string) $p->id] = $p->name;
-                                }
-                            @endphp
-                            <x-ui.themed-select wire:model="syncProjectId" :options="$projOptions"
-                                placeholder="Auto from Mapping" class="w-full mt-1" />
-                        </div>
-                        <div>
-                            <label class="font-bold text-ink">Assign to Campaign <span
-                                    class="text-muted font-normal">(Optional Override)</span></label>
-                            @php
-                                $campOptions = ['' => 'Default / Mapped Campaign'];
-                                foreach ($allCampaigns as $c) {
-                                    $campOptions[(string) $c->id] = $c->name;
-                                }
-                            @endphp
-                            <x-ui.themed-select wire:model="syncCampaignId" :options="$campOptions"
-                                placeholder="Auto from Mapping" class="w-full mt-1" />
-                        </div>
-                    </div>
-
-                    <!-- Custom Access Token Override -->
-                    <div>
-                        <label class="font-bold text-ink">Custom Page Access Token <span
-                                class="text-muted font-normal">(Optional Override)</span></label>
-                        <input type="password" wire:model="customPageAccessToken"
-                            placeholder="Use saved token from account or paste direct Graph token"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
-                    </div>
-
-                    @if($pullSummary)
-                        <div class="p-4 bg-canvas rounded-xl border border-border space-y-2 mt-3">
-                            <div class="font-bold text-ink flex items-center justify-between text-xs">
-                                <span>Sync Summary Results</span>
-                                <span class="text-emerald-600 font-bold">✓ Complete</span>
-                            </div>
-                            <div class="grid grid-cols-4 gap-2 text-center pt-1">
-                                <div class="bg-surface p-2 rounded-lg border border-border">
-                                    <div class="text-base font-bold text-ink">{{ $pullSummary['fetched'] }}</div>
-                                    <div class="text-[10px] text-muted">Fetched</div>
-                                </div>
-                                <div class="bg-surface p-2 rounded-lg border border-emerald-200">
-                                    <div class="text-base font-bold text-emerald-600">{{ $pullSummary['created'] }}</div>
-                                    <div class="text-[10px] text-muted">Created</div>
-                                </div>
-                                <div class="bg-surface p-2 rounded-lg border border-amber-200">
-                                    <div class="text-base font-bold text-amber-600">{{ $pullSummary['duplicates'] }}</div>
-                                    <div class="text-[10px] text-muted">Duplicates</div>
-                                </div>
-                                <div class="bg-surface p-2 rounded-lg border border-border">
-                                    <div class="text-base font-bold text-red-500">{{ $pullSummary['errors'] }}</div>
-                                    <div class="text-[10px] text-muted">Errors</div>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="font-bold text-ink">Leadgen Form ID <span
+                            class="text-muted font-normal">(Optional)</span></label>
+                    <input type="text" wire:model="customFormId" placeholder="e.g. 123456789 (Leave blank for all)"
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
                 </div>
-            @endif
+                <div>
+                    <label class="font-bold text-ink">Max Leads to Pull</label>
+                    <select wire:model="pullLimit"
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
+                        <option value="10">10 Most Recent Leads</option>
+                        <option value="25">25 Leads</option>
+                        <option value="50">50 Leads</option>
+                        <option value="100">100 Leads</option>
+                    </select>
+                </div>
+            </div>
 
-            <!-- Tab 2: Single Manual Lead Entry -->
-            @if($pullMode === 'manual')
-                <div class="space-y-3">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="font-bold text-ink">Lead Full Name <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="manualName" placeholder="e.g. Vikram Singhania"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
-                            @error('manualName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
-                        </div>
-                        <div>
-                            <label class="font-bold text-ink">Mobile Number <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="manualMobile" placeholder="e.g. 9876543210"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
-                            @error('manualMobile') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
-                        </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="font-bold text-ink">Assign to Project <span
+                            class="text-muted font-normal">(Optional Override)</span></label>
+                    @php
+                        $projOptions = ['' => 'Default / Mapped Project'];
+                        foreach ($allProjects as $p) {
+                            $projOptions[(string) $p->id] = $p->name;
+                        }
+                    @endphp
+                    <x-ui.themed-select wire:model="syncProjectId" :options="$projOptions"
+                        placeholder="Auto from Mapping" class="w-full mt-1" />
+                </div>
+                <div>
+                    <label class="font-bold text-ink">Assign to Campaign <span
+                            class="text-muted font-normal">(Optional Override)</span></label>
+                    @php
+                        $campOptions = ['' => 'Auto from Meta Campaign'];
+                        foreach ($allCampaigns as $c) {
+                            $campOptions[(string) $c->id] = $c->name;
+                        }
+                    @endphp
+                    <x-ui.themed-select wire:model="syncCampaignId" :options="$campOptions"
+                        placeholder="Auto from Meta Campaign" class="w-full mt-1" />
+                </div>
+            </div>
+
+            <!-- Custom Access Token Override -->
+            <div>
+                <label class="font-bold text-ink">Custom Page Access Token <span
+                        class="text-muted font-normal">(Optional Override)</span></label>
+                <input type="password" wire:model="customPageAccessToken"
+                    placeholder="Use saved token from account or paste direct Graph token"
+                    class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
+                <p class="text-[10px] text-muted mt-1">Leave blank to use the saved token from Integrations settings.</p>
+            </div>
+
+            @if($pullSummary)
+                <div class="p-4 bg-canvas rounded-xl border border-border space-y-2 mt-3">
+                    <div class="font-bold text-ink flex items-center justify-between text-xs">
+                        <span>Sync Summary Results</span>
+                        <span class="text-emerald-600 font-bold">✓ Complete</span>
                     </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="font-bold text-ink">Email Address</label>
-                            <input type="email" wire:model="manualEmail" placeholder="e.g. vikram@example.com"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
-                            @error('manualEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
+                    <div class="grid grid-cols-4 gap-2 text-center pt-1">
+                        <div class="bg-surface p-2 rounded-lg border border-border">
+                            <div class="text-base font-bold text-ink">{{ $pullSummary['fetched'] }}</div>
+                            <div class="text-[10px] text-muted">Fetched</div>
                         </div>
-                        <div>
-                            <label class="font-bold text-ink">Target Project <span class="text-red-500">*</span></label>
-                            @php
-                                $mProjOptions = ['' => 'Select Project'];
-                                foreach ($allProjects as $p) {
-                                    $mProjOptions[(string) $p->id] = $p->name;
-                                }
-                            @endphp
-                            <x-ui.themed-select wire:model="manualProjectId" :options="$mProjOptions"
-                                placeholder="Select Project" class="w-full mt-1" />
-                            @error('manualProjectId') <span
-                            class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                        <div class="bg-surface p-2 rounded-lg border border-emerald-200">
+                            <div class="text-base font-bold text-emerald-600">{{ $pullSummary['created'] }}</div>
+                            <div class="text-[10px] text-muted">Created</div>
                         </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <label class="font-bold text-ink">Property Type</label>
-                            <input type="text" wire:model="manualPropertyType" placeholder="2 BHK / 3 BHK / Villa"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <div class="bg-surface p-2 rounded-lg border border-amber-200">
+                            <div class="text-base font-bold text-amber-600">{{ $pullSummary['duplicates'] }}</div>
+                            <div class="text-[10px] text-muted">Duplicates</div>
                         </div>
-                        <div>
-                            <label class="font-bold text-ink">Budget</label>
-                            <input type="text" wire:model="manualBudget" placeholder="e.g. ₹85.0L"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <div class="bg-surface p-2 rounded-lg border border-border">
+                            <div class="text-base font-bold text-red-500">{{ $pullSummary['errors'] }}</div>
+                            <div class="text-[10px] text-muted">Errors</div>
                         </div>
-                        <div>
-                            <label class="font-bold text-ink">City</label>
-                            <input type="text" wire:model="manualCity" placeholder="e.g. Mumbai"
-                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="font-bold text-ink">Requirement Notes</label>
-                        <textarea wire:model="manualRequirement" rows="2"
-                            placeholder="Client inquiry notes, specific preferences, or channel source..."
-                            class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 focus:ring-2 focus:ring-ink"></textarea>
                     </div>
                 </div>
             @endif
@@ -846,29 +751,22 @@
 
         <x-slot:footer>
             <button type="button" wire:click="closePullLeadsModal"
-                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition">
+                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
                 Close
             </button>
 
-            @if($pullMode === 'meta')
-                <button type="button" wire:click="pullMetaLeads" wire:loading.attr="disabled"
-                    class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-2 disabled:opacity-60 cursor-pointer">
-                    <svg wire:loading wire:target="pullMetaLeads" class="animate-spin h-3.5 w-3.5 text-white" fill="none"
-                        viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                    <span wire:loading.remove wire:target="pullMetaLeads">Pull &amp; Ingest Meta Leads</span>
-                    <span wire:loading wire:target="pullMetaLeads">Fetching from Graph API...</span>
-                </button>
-            @elseif($pullMode === 'manual')
-                <button type="button" wire:click="createManualLead" wire:loading.attr="disabled"
-                    class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-2 cursor-pointer">
-                    <span>+ Add Lead to CRM</span>
-                </button>
-            @endif
+            <button type="button" wire:click="pullMetaLeads" wire:loading.attr="disabled"
+                class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs flex items-center gap-2 disabled:opacity-60 cursor-pointer">
+                <svg wire:loading wire:target="pullMetaLeads" class="animate-spin h-3.5 w-3.5 text-white" fill="none"
+                    viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+                <span wire:loading.remove wire:target="pullMetaLeads">Pull &amp; Ingest Meta Leads</span>
+                <span wire:loading wire:target="pullMetaLeads">Fetching from Graph API...</span>
+            </button>
         </x-slot:footer>
     </x-ui.offcanvas>
 

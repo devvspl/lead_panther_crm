@@ -134,7 +134,7 @@ class LeadDetail extends Component
 
     public function render(\App\Services\LeadJourneyService $journeyService)
     {
-        $lead = $this->leadId ? Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo'])->find($this->leadId) : null;
+        $lead = $this->leadId ? Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo', 'metadata'])->find($this->leadId) : null;
         $communications = $this->leadId ? LeadCommunication::where('lead_id', $this->leadId)->latest()->get() : [];
         $statusHistory = $this->leadId ? LeadStatusHistory::where('lead_id', $this->leadId)->latest('changed_at')->get() : [];
         $replacementReasons = ReplacementReason::all();

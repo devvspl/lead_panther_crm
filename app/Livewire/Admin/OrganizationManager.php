@@ -224,6 +224,7 @@ class OrganizationManager extends Component
             $userEmailIdx = null;
             $userPhoneIdx = null;
             $userRoleIdx = null;
+            $userPasswordIdx = null;
 
             foreach ($headerRow as $colIdx => $colName) {
                 $colNormalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string) $colName)));
@@ -245,6 +246,8 @@ class OrganizationManager extends Component
                     $userPhoneIdx = $colIdx;
                 } elseif (in_array($colNormalized, ['userrole', 'role', 'assignedrole', 'userroles'])) {
                     $userRoleIdx = $colIdx;
+                } elseif (in_array($colNormalized, ['password', 'userpassword', 'loginpassword', 'pass'])) {
+                    $userPasswordIdx = $colIdx;
                 }
             }
 
@@ -275,6 +278,7 @@ class OrganizationManager extends Component
                 $rawUserEmail = ($userEmailIdx !== null && isset($row[$userEmailIdx])) ? trim((string) $row[$userEmailIdx]) : '';
                 $rawUserPhone = ($userPhoneIdx !== null && isset($row[$userPhoneIdx])) ? trim((string) $row[$userPhoneIdx]) : '';
                 $rawUserRole = ($userRoleIdx !== null && isset($row[$userRoleIdx])) ? trim((string) $row[$userRoleIdx]) : '';
+                $rawPassword = ($userPasswordIdx !== null && isset($row[$userPasswordIdx])) ? trim((string) $row[$userPasswordIdx]) : '';
 
                 // Skip blank/spacer rows
                 if ($rawName === '' && $rawStatus === '' && $rawUserName === '' && $rawUserEmail === '') {
@@ -411,6 +415,7 @@ class OrganizationManager extends Component
                         'user_email' => $cleanUserEmail,
                         'user_phone' => $cleanUserPhone,
                         'user_role' => $cleanRole,
+                        'password' => $rawPassword !== '' ? $rawPassword : 'password',
                     ];
                 }
             }
@@ -453,7 +458,7 @@ class OrganizationManager extends Component
                         'name' => $row['user_name'] ?? $row['name'],
                         'email' => $row['user_email'],
                         'phone' => $row['user_phone'] ?? null,
-                        'password' => bcrypt(Str::random(16)),
+                        'password' => bcrypt(!empty($row['password']) ? $row['password'] : 'password'),
                         'status' => $userStatus,
                         'email_verified_at' => now(),
                     ]);

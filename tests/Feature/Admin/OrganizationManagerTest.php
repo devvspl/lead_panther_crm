@@ -181,6 +181,7 @@ class OrganizationManagerTest extends TestCase
         $this->assertEquals('+919876543210', $builderUser->phone);
         $this->assertEquals($prestigeOrg->id, $builderUser->organization_id);
         $this->assertTrue($builderUser->hasRole('Builder/Developer'));
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password', $builderUser->password));
 
         $apexOrg = Organization::where('name', 'Apex Realty Advisors')->first();
         $this->assertNotNull($apexOrg);
@@ -190,6 +191,7 @@ class OrganizationManagerTest extends TestCase
         $this->assertEquals('+919812345678', $brokerUser->phone);
         $this->assertEquals($apexOrg->id, $brokerUser->organization_id);
         $this->assertTrue($brokerUser->hasRole('Broker'));
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password', $brokerUser->password));
 
         // Check wallets created
         $this->assertDatabaseHas('client_wallets', [

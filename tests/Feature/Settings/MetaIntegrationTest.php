@@ -296,6 +296,23 @@ class MetaIntegrationTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_meta_webhook_get_without_params_returns_online_status(): void
+    {
+        $account = PortalAccount::create([
+            'name' => 'Meta Live Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        $response = $this->get("/api/webhooks/meta/{$account->id}");
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'status' => 'online',
+            'portal_account_id' => $account->id,
+        ]);
+    }
+
     public function test_meta_webhook_post_lead_event_success(): void
     {
         \Illuminate\Support\Facades\Queue::fake();

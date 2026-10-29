@@ -21,6 +21,18 @@ class MetaWebhookController extends Controller
             $verifyToken = $request->query('hub_verify_token') ?? $request->query('hub.verify_token');
             $challenge = $request->query('hub_challenge') ?? $request->query('hub.challenge');
 
+            // Direct browser check / health ping without Meta challenge parameters
+            if (empty($mode) && empty($challenge) && empty($verifyToken)) {
+                return response()->json([
+                    'status' => 'online',
+                    'service' => 'Lead Panther Meta Webhook',
+                    'portal_account_id' => $portalAccount->id,
+                    'account_name' => $portalAccount->name,
+                    'message' => 'Endpoint is active and ready to receive Meta webhooks.',
+                    'hint' => 'In Meta App Dashboard > Webhooks, set Callback URL to this endpoint and enter your Webhook Verify Token.',
+                ], 200);
+            }
+
             if ($mode !== 'subscribe' || empty($challenge)) {
                 return response('Forbidden', 403);
             }

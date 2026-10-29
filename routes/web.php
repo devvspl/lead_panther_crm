@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Builder\BuilderDashboardController;
+use App\Http\Controllers\Broker\BrokerDashboardController;
 use App\Http\Controllers\ChannelPartner\PartnerDashboardController;
 use App\Http\Controllers\Sales\SalesDashboardController;
 use App\Http\Controllers\Client\ClientDashboardController;
@@ -52,7 +53,11 @@ Route::view('/developer/docs', 'pages.docs');
 Route::view('pending-approval', 'pages.auth.pending-approval')->middleware(['auth'])->name('auth.pending-approval');
 
 // Authenticated Core Dashboard
-Route::view('dashboard', 'pages.dashboard')->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('dashboard', function () {
+    $user = auth()->user();
+    $role = \App\Support\NavigationConfig::getRoleKey($user);
+    return view('pages.dashboard', ['role' => $role]);
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 // Impersonation Stop Route
 Route::get('/impersonate/stop', [ImpersonationController::class, 'stop'])->middleware(['auth'])->name('impersonate.stop');
@@ -140,6 +145,10 @@ Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->na
 Route::middleware(['auth', 'role:Super Admin|super-admin|Builder/Developer|Builder|builder'])->prefix('builder')->name('builder.')->group(function () {
     Route::get('/dashboard', [BuilderDashboardController::class, 'index'])->name('dashboard');
     Route::get('/team', BuilderTeamManager::class)->name('team');
+});
+
+Route::middleware(['auth', 'role:Super Admin|super-admin|Broker|broker'])->prefix('broker')->name('broker.')->group(function () {
+    Route::get('/dashboard', [BrokerDashboardController::class, 'index'])->name('dashboard');
 });
 
 Route::middleware(['auth', 'role:Super Admin|super-admin|Channel Partner|channel-partner'])->prefix('partner')->name('partner.')->group(function () {

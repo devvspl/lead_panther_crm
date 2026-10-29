@@ -31,10 +31,11 @@ new #[Layout('layouts.guest')]
         // Role-based Spatie permission redirect logic
         $targetRoute = match (true) {
             $user->hasRole('Super Admin') => route('admin.dashboard', absolute: false),
-            $user->hasRole('Builder') => route('builder.dashboard', absolute: false),
+            $user->hasRole('Builder/Developer') || $user->hasRole('Builder') => route('builder.dashboard', absolute: false),
+            $user->hasRole('Broker') => route('broker.dashboard', absolute: false),
             $user->hasRole('Channel Partner') => route('partner.dashboard', absolute: false),
-            $user->hasRole('Sales Executive') => route('sales.dashboard', absolute: false),
-            $user->hasRole('Account Manager') => route('client.dashboard', absolute: false),
+            $user->hasRole('Executive') || $user->hasRole('Sales Executive') => route('sales.dashboard', absolute: false),
+            $user->hasRole('Account Manager') || $user->hasRole('Client') => route('client.dashboard', absolute: false),
             default => route('dashboard', absolute: false),
         };
 

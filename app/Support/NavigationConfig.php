@@ -12,12 +12,13 @@ class NavigationConfig
             return 'guest';
         }
 
-        $roles = $user->getRoleNames()->map(fn($r) => strtolower(str_replace(' ', '-', $r)));
+        $roles = $user->getRoleNames()->map(fn($r) => strtolower(trim(str_replace([' ', '/', '_'], '-', $r))));
 
         if ($roles->contains('super-admin')) return 'super-admin';
-        if ($roles->contains('builder')) return 'builder';
-        if ($roles->contains('channel-partner')) return 'channel-partner';
-        if ($roles->contains('sales-executive')) return 'sales-executive';
+        if ($roles->contains('builder-developer') || $roles->contains('builder') || $roles->contains('developer')) return 'builder';
+        if ($roles->contains('broker')) return 'broker';
+        if ($roles->contains('channel-partner') || $roles->contains('partner')) return 'channel-partner';
+        if ($roles->contains('sales-executive') || $roles->contains('executive') || $roles->contains('sales')) return 'sales-executive';
         if ($roles->contains('account-manager')) return 'account-manager';
         if ($roles->contains('client')) return 'client';
 
@@ -35,7 +36,10 @@ class NavigationConfig
                 'failed-jobs', 'recharge-queue', 'backups', 'git-sync'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
-                'dashboard', 'leads', 'bulk-import', 'distribution', 'reports', 'integrations', 'team'
+                'dashboard', 'leads', 'bulk-import', 'distribution', 'credits', 'reports', 'integrations', 'team'
+            ],
+            'broker' => [
+                'dashboard', 'leads', 'credits', 'reports'
             ],
             'channel-partner' => [
                 'dashboard', 'leads', 'reports', 'team'
@@ -60,6 +64,16 @@ class NavigationConfig
         $allowedKeys = static::getAllowedItemKeys($user);
         $roleKey = static::getRoleKey($user);
 
+        $dashboardRoute = match ($roleKey) {
+            'super-admin' => route('admin.dashboard'),
+            'builder' => route('builder.dashboard'),
+            'broker' => route('broker.dashboard'),
+            'channel-partner' => route('partner.dashboard'),
+            'sales-executive' => route('sales.dashboard'),
+            'client', 'account-manager' => route('client.dashboard'),
+            default => route('dashboard'),
+        };
+
         $teamRoute = match ($roleKey) {
             'builder' => route('builder.team'),
             'channel-partner' => route('partner.team'),
@@ -82,7 +96,7 @@ class NavigationConfig
             'dashboard' => [
                 'key' => 'dashboard',
                 'label' => 'Dashboard',
-                'url' => route('dashboard'),
+                'url' => $dashboardRoute,
                 'data_nav_route' => 'dashboard',
                 'data_nav_exact' => 'true',
                 'data_nav_root' => 'true',

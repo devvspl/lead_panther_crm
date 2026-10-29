@@ -71,3 +71,4 @@ class SyncMetaLeadsCommand extends Command
         return Command::SUCCESS;
     }
 }
+

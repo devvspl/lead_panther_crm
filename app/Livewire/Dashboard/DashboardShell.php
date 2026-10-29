@@ -37,7 +37,7 @@ class DashboardShell extends Component
     protected function getScopedLeadsQuery()
     {
         $user = auth()->user();
-        $query = Lead::query();
+        $query = Lead::withoutGlobalScope(\App\Models\Scopes\ClientScope::class);
 
         if (!$user) {
             return $query;
@@ -48,7 +48,8 @@ class DashboardShell extends Component
                 return $query->where(function ($q) use ($user) {
                     $q->where('client_id', $user->id);
                     if ($user->organization_id) {
-                        $q->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
+                        $q->orWhere('client_id', $user->organization_id)
+                          ->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
                     }
                 });
 
@@ -173,16 +174,19 @@ class DashboardShell extends Component
                 $userWallet = CreditWallet::where('client_id', $orgPrimaryUserId)->value('balance') ?? 0;
             }
             $walletBalance = (int) ($userWallet ?? 0);
-            $projectsCount = Project::where(function ($q) use ($user) {
-                $q->where('client_id', $user?->id);
-                if ($user?->organization_id) {
-                    $q->orWhere('organization_id', $user->organization_id);
-                }
-            })->count();
-            $bookingsCount = Booking::whereHas('lead', fn($q) => $q->where(function ($sub) use ($user) {
+            $projectsCount = Project::withoutGlobalScope(\App\Models\Scopes\ClientScope::class)
+                ->where(function ($q) use ($user) {
+                    $q->where('client_id', $user?->id);
+                    if ($user?->organization_id) {
+                        $q->orWhere('client_id', $user->organization_id)
+                          ->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
+                    }
+                })->count();
+            $bookingsCount = Booking::whereHas('lead', fn($q) => $q->withoutGlobalScope(\App\Models\Scopes\ClientScope::class)->where(function ($sub) use ($user) {
                 $sub->where('client_id', $user?->id);
                 if ($user?->organization_id) {
-                    $sub->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
+                    $sub->orWhere('client_id', $user->organization_id)
+                        ->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
                 }
             }))->count();
 

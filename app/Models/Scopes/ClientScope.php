@@ -21,16 +21,25 @@ class ClientScope implements Scope
             return;
         }
 
-        $clientId = $user->organization_id ?? $user->client_id ?? null;
+        $clientId = $user->id;
+        $orgId = $user->organization_id ?? null;
 
-        if ($clientId) {
-            if ($model->getTable() === 'campaigns') {
-                $builder->whereHas('project', function ($q) use ($clientId) {
-                    $q->where('client_id', $clientId);
+        if ($model->getTable() === 'campaigns') {
+            $builder->whereHas('project', function ($q) use ($clientId, $orgId) {
+                $q->where(function ($sub) use ($clientId, $orgId) {
+                    $sub->where('client_id', $clientId);
+                    if ($orgId) {
+                        $sub->orWhere('client_id', $orgId);
+                    }
                 });
-            } else {
-                $builder->where($model->getTable() . '.client_id', $clientId);
-            }
+            });
+        } else {
+            $builder->where(function ($q) use ($model, $clientId, $orgId) {
+                $q->where($model->getTable() . '.client_id', $clientId);
+                if ($orgId) {
+                    $q->orWhere($model->getTable() . '.client_id', $orgId);
+                }
+            });
         }
     }
 }

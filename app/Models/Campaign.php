@@ -24,6 +24,6 @@ class Campaign extends Model
 
     public function client(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
     {
-        return $this->hasOneThrough(Client::class, Project::class, 'id', 'id', 'project_id', 'client_id');
+        return $this->hasOneThrough(User::class, Project::class, 'id', 'id', 'project_id', 'client_id');
     }
 }

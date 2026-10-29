@@ -12,9 +12,9 @@ class CampaignPausedNotification extends Notification
 {
     use Queueable;
 
-    public Client $client;
+    public mixed $client;
 
-    public function __construct(Client $client)
+    public function __construct(mixed $client)
     {
         $this->client = $client;
     }

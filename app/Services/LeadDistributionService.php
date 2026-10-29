@@ -125,7 +125,7 @@ class LeadDistributionService
         }
 
         if ($lead->client_id) {
-            $client = DB::table('clients')->where('id', $lead->client_id)->first();
+            $client = DB::table('users')->where('id', $lead->client_id)->first();
             if ($client?->organization_id) {
                 return (int) $client->organization_id;
             }
@@ -133,9 +133,9 @@ class LeadDistributionService
 
         if ($lead->project_id) {
             $project = DB::table('projects')
-                ->join('clients', 'projects.client_id', '=', 'clients.id')
+                ->join('users', 'projects.client_id', '=', 'users.id')
                 ->where('projects.id', $lead->project_id)
-                ->select('clients.organization_id')
+                ->select('users.organization_id')
                 ->first();
 
             if ($project?->organization_id) {
@@ -161,25 +161,27 @@ class LeadDistributionService
             $query->where('organization_id', $organizationId);
         }
 
-        $agents = $query->whereHas('roles', function ($q) {
-            $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive', 'Builder', 'Channel Partner']);
+        $salesRoles = ['sales-executive', 'Sales Executive', 'sales_executive', 'Executive', 'Channel Partner'];
+
+        $agents = $query->whereHas('roles', function ($q) use ($salesRoles) {
+            $q->whereIn('name', $salesRoles);
         })->get();
 
-        // If no role-restricted users found in this org, take any active org users
+        // Safe fallback if no dedicated sales agents exist in this org
+        if ($agents->isEmpty()) {
+            $agents = User::where('status', 'active')
+                ->whereHas('roles', fn($q) => $q->whereIn('name', $salesRoles))
+                ->get();
+        }
+
         if ($agents->isEmpty() && $organizationId) {
             $agents = User::where('status', 'active')
                 ->where('organization_id', $organizationId)
                 ->get();
         }
 
-        // Safe fallback for unseeded legacy tests where users lack organization_id
         if ($agents->isEmpty()) {
-            $agents = User::where('status', 'active')
-                ->whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))
-                ->get();
-            if ($agents->isEmpty()) {
-                $agents = User::where('status', 'active')->get();
-            }
+            $agents = User::where('status', 'active')->get();
         }
 
         return $agents;

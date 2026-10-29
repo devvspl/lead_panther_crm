@@ -34,6 +34,31 @@ class User extends Authenticatable
         return $this->hasMany(SalesTeamMember::class);
     }
 
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class, 'client_id');
+    }
+
+    public function leads(): HasMany
+    {
+        return $this->hasMany(Lead::class, 'client_id');
+    }
+
+    public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CreditWallet::class, 'client_id');
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class, 'client_id');
+    }
+
+    public function rechargeRequests(): HasMany
+    {
+        return $this->hasMany(RechargeRequest::class, 'client_id');
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *

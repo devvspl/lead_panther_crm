@@ -12,12 +12,12 @@ class Organization extends Model
 
     public function clients(): HasMany
     {
-        return $this->hasMany(Client::class);
+        return $this->hasMany(User::class);
     }
 
     public function projects(): HasManyThrough
     {
-        return $this->hasManyThrough(Project::class, Client::class);
+        return $this->hasManyThrough(Project::class, User::class, 'organization_id', 'client_id');
     }
 
     public function users(): HasMany

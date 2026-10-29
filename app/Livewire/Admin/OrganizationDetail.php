@@ -89,7 +89,7 @@ class OrganizationDetail extends Component
         $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
 
         $requestedTab = request()->query('tab');
-        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'credits', 'activity'])) {
+        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
             $this->activeTab = $requestedTab;
         }
 
@@ -99,7 +99,7 @@ class OrganizationDetail extends Component
 
     public function setTab(string $tab): void
     {
-        if (in_array($tab, ['overview', 'team', 'clients', 'credits', 'activity'])) {
+        if (in_array($tab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
             $this->activeTab = $tab;
             $this->resetPage();
         }
@@ -417,7 +417,7 @@ class OrganizationDetail extends Component
             'newLeadName' => 'required|string|max:255',
             'newLeadMobile' => 'required|string|max:25',
             'newLeadEmail' => 'nullable|email|max:255',
-            'newLeadClientId' => 'required|exists:clients,id',
+            'newLeadClientId' => 'required|exists:users,id',
             'newLeadAssignedTo' => 'nullable|exists:users,id',
             'newLeadStatus' => 'required|string',
         ]);
@@ -508,7 +508,7 @@ class OrganizationDetail extends Component
     public function executeCreditAdjustment(): void
     {
         $this->validate([
-            'selectedCreditClientId' => 'required|exists:clients,id',
+            'selectedCreditClientId' => 'required|exists:users,id',
             'creditAmount' => 'required|numeric|min:1',
             'creditAdjustmentType' => 'required|in:recharge,refund,deduct',
             'creditReason' => 'required|string|min:3',
@@ -756,9 +756,9 @@ class OrganizationDetail extends Component
 
         // 3. Projects Query
         $projects = DB::table('projects')
-            ->join('clients', 'projects.client_id', '=', 'clients.id')
-            ->where('clients.organization_id', $orgId)
-            ->select('projects.*', 'clients.name as client_name')
+            ->join('users', 'projects.client_id', '=', 'users.id')
+            ->where('users.organization_id', $orgId)
+            ->select('projects.*', 'users.name as client_name')
             ->orderBy('projects.name')
             ->get();
 

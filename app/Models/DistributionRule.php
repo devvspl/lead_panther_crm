@@ -31,7 +31,7 @@ class DistributionRule extends Model
 
     private static function pickRoundRobin(DistributionRule $rule, Lead $lead): ?User
     {
-        $execs = User::whereHas('roles', fn($q) => $q->whereIn('name', ['sales-executive', 'Sales Executive', 'sales_executive']))->pluck('id')->toArray();
+        $execs = User::whereHas('roles', fn($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive', 'sales_executive']))->pluck('id')->toArray();
         if (empty($execs)) {
             $execs = User::pluck('id')->toArray();
         }

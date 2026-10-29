@@ -16,7 +16,7 @@ class AdminCredits extends Component
 
     public bool $showAdjustModal = false;
     public ?int $selectedClientId = null;
-    public string $adjustmentType = 'credit'; // credit or debit
+    public string $adjustmentType = 'credit'; 
     public float $adjustmentAmount = 100.00;
     public string $reason = '';
 
@@ -89,7 +89,7 @@ class AdminCredits extends Component
     public function executeAdjustment(): void
     {
         $this->validate([
-            'selectedClientId' => 'required|exists:clients,id',
+            'selectedClientId' => 'required|exists:users,id',
             'adjustmentAmount' => 'required|numeric|min:1',
             'adjustmentType' => 'required|in:credit,debit',
             'reason' => 'required|string|min:5',

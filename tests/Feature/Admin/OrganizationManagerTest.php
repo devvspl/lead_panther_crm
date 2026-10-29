@@ -34,13 +34,13 @@ class OrganizationManagerTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(OrganizationManager::class)
-            ->assertSee('Organizations Management')
-            ->assertSee('Register Organization')
+            ->assertSee('Clients Management')
+            ->assertSee('Register Client')
             ->call('openRegisterOrgModal', 'create')
             ->assertSet('showCreateOrgModal', true)
             ->assertSet('orgModalTab', 'create')
-            ->assertSee('Create Organization')
-            ->assertSee('Import Organizations')
+            ->assertSee('Create Client')
+            ->assertSee('Import Clients')
             ->set('orgModalTab', 'import')
             ->assertSee('Download Import Template')
             ->assertSee('Required Columns & Sample Format')
@@ -227,7 +227,7 @@ class OrganizationManagerTest extends TestCase
             ->assertSet('orgDetailsMode', 'view')
             ->assertSet('editingOrgId', $org->id)
             ->assertSee('Lodha Group Commercials')
-            ->assertSee('#ORG-' . str_pad($org->id, 4, '0', STR_PAD_LEFT))
+            ->assertSee('#CLI-' . str_pad($org->id, 4, '0', STR_PAD_LEFT))
             ->call('switchOrgDetailsMode', 'edit')
             ->assertSet('orgDetailsMode', 'edit')
             ->assertSet('editName', 'Lodha Group Commercials')
@@ -450,7 +450,7 @@ class OrganizationManagerTest extends TestCase
             ->assertDispatched('toast')
             ->assertSet('showCreateClientModal', false);
 
-        $this->assertDatabaseHas('clients', [
+        $this->assertDatabaseHas('users', [
             'name' => 'Hiranandani Estate Thane',
             'organization_id' => $org->id,
             'status' => 'active',

@@ -58,8 +58,6 @@ class DatabaseCleanupService
         'project_units',
         'campaigns',
         'campaign_sources',
-        'clients',
-        'client_users',
         'client_wallets',
         'channel_partners',
         'credit_transactions',

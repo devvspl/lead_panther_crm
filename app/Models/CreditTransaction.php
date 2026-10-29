@@ -21,7 +21,7 @@ class CreditTransaction extends Model
 
     public function client()
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(User::class, 'client_id');
     }
 
     public function lead()
@@ -82,7 +82,7 @@ class CreditTransaction extends Model
                 event(new CampaignPaused($lead, 'Credit balance exhausted'));
 
                 NotificationLog::create([
-                    'notifiable_type' => Client::class,
+                    'notifiable_type' => User::class,
                     'notifiable_id' => $lead->client_id,
                     'channel' => 'crm',
                     'status' => 'sent',

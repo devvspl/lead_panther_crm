@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\User;
-use App\Models\ClientUser;
 use App\Models\Client;
 use App\Models\SalesTeamMember;
 use App\Models\SalesTeam;
@@ -57,21 +56,9 @@ class VerifyUserAccess extends Command
         $rolesStr = !empty($roles) ? implode(', ', $roles) : "NONE";
         $this->line("Assigned Roles:    {$rolesStr}");
 
-        // 3. Client Pivot Check
-        $isClientUser = $user->hasRole('client') || $user->hasRole('Client');
-        $clientUserLink = ClientUser::where('user_id', $user->id)->first();
-        $clientStr = "N/A (Not Client Role)";
-
-        if ($isClientUser) {
-            if ($clientUserLink) {
-                $client = Client::find($clientUserLink->client_id);
-                $clientName = $client ? $client->name : 'Unknown';
-                $primaryStr = $clientUserLink->is_primary_contact ? ' (Primary Contact)' : '';
-                $clientStr = "Linked to Client ID {$clientUserLink->client_id} ({$clientName}){$primaryStr}";
-            } else {
-                $clientStr = "MISSING PIVOT LINK";
-            }
-        }
+        // 3. Client Check
+        $isClientUser = $user->hasRole('client') || $user->hasRole('Client') || $user->hasRole('Builder/Developer');
+        $clientStr = $isClientUser ? "Direct User Client (Managed in users table)" : "N/A (Not Client Role)";
         $this->line("Client Link:       {$clientStr}");
 
         // 4. Sales Team Check
@@ -108,9 +95,6 @@ class VerifyUserAccess extends Command
             $failures[] = "User has no Spatie permissions role assigned";
         }
 
-        if ($isClientUser && !$clientUserLink) {
-            $failures[] = "User has 'client' role but lacks a client_users pivot row";
-        }
 
         if ($isSalesExec && !$salesMemberLink) {
             $failures[] = "User has 'sales-executive' role but lacks a sales_team_members row";

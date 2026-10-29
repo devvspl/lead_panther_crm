@@ -6,7 +6,6 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Organization;
 use App\Models\Client;
-use App\Models\ClientUser;
 use App\Models\SalesTeam;
 use App\Models\SalesTeamMember;
 use Spatie\Permission\Models\Role;
@@ -62,33 +61,8 @@ class AccountAccessFixSeeder extends Seeder
                 $user->syncRoles([$titleRole]);
             }
 
-            // c. CLIENT_USERS PIVOT
-            if ($titleRole === 'Client' || $user->hasRole('Client')) {
-                $orgId = $user->organization_id ?? Organization::first()?->id;
-
-                if ($orgId) {
-                    $client = Client::firstOrCreate(
-                        ['organization_id' => $orgId],
-                        [
-                            'name' => 'Client Org ' . $orgId,
-                            'billing_email' => $user->email,
-                            'status' => 'active',
-                        ]
-                    );
-
-                    $hasPrimary = ClientUser::where('client_id', $client->id)->exists();
-
-                    ClientUser::firstOrCreate(
-                        [
-                            'client_id' => $client->id,
-                            'user_id' => $user->id,
-                        ],
-                        [
-                            'is_primary_contact' => !$hasPrimary,
-                        ]
-                    );
-                }
-            }
+            // c. CLIENT ROLE
+            // Client is now directly managed via User account with Builder/Developer or Executive role
 
             // d. SALES TEAM MEMBERSHIP
             if ($titleRole === 'Sales Executive' || $user->hasRole('Sales Executive')) {

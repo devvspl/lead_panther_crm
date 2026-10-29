@@ -13,7 +13,7 @@ class CampaignPaused
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public Lead $lead;
-    public ?Client $client;
+    public mixed $client;
     public string $reason;
 
     public function __construct(Lead $lead, string $reason = 'Credit balance exhausted')

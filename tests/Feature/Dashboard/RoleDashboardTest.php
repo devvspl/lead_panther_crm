@@ -149,3 +149,4 @@ class RoleDashboardTest extends TestCase
         $this->assertNotContains('organizations', $allowed);
     }
 }
+

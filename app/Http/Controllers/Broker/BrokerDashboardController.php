@@ -12,3 +12,4 @@ class BrokerDashboardController extends Controller
         return view('pages.dashboard', ['role' => 'broker']);
     }
 }
+

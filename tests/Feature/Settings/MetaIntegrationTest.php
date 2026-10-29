@@ -450,4 +450,60 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals('Rohit Sharma', $lead->name);
         $this->assertEquals($project->id, $lead->project_id);
     }
+
+    public function test_sync_meta_leads_artisan_command_syncs_forms_and_leads(): void
+    {
+        $org = Organization::create(['name' => 'Brigade HQ', 'status' => 'active']);
+        $client = Client::create(['name' => 'Brigade Group', 'organization_id' => $org->id]);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Brigade El Dorado']);
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Automated Sync Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => '109283746501928',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'mock_sync_access_token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v19.0/109283746501928/leadgen_forms*' => Http::response([
+                'data' => [
+                    ['id' => 'form_auto_7788', 'name' => 'Brigade Lead Form 1'],
+                ]
+            ], 200),
+            'https://graph.facebook.com/v19.0/form_auto_7788/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'leadgen_7788_1',
+                        'created_time' => '2026-08-17T12:00:00+0000',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Virat Kohli']],
+                            ['name' => 'phone_number', 'values' => ['+919811122233']],
+                            ['name' => 'email', 'values' => ['virat@example.com']],
+                            ['name' => 'city', 'values' => ['Bengaluru']],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $this->artisan('meta:sync-leads', ['--account' => $account->id])
+            ->expectsOutputToContain('Meta sync complete: 1 new leads imported')
+            ->assertExitCode(0);
+
+        $lead = \App\Models\Lead::where('mobile', '919811122233')->first();
+        $this->assertNotNull($lead);
+        $this->assertEquals('Virat Kohli', $lead->name);
+        $this->assertEquals('virat@example.com', $lead->email);
+    }
 }

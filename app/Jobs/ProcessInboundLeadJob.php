@@ -40,6 +40,29 @@ class ProcessInboundLeadJob implements ShouldQueue
                 ? $this->webhookLog->payload 
                 : (json_decode($this->webhookLog->payload, true) ?: []);
 
+            // If Meta webhook with leadgen_id, fetch full lead field data from Meta Graph API
+            if ($type === 'meta') {
+                $leadgenId = $raw['entry'][0]['changes'][0]['value']['leadgen_id'] ?? $raw['leadgen_id'] ?? null;
+                $hasFieldData = !empty($raw['field_data']) || !empty($raw['entry'][0]['changes'][0]['value']['field_data']);
+
+                if ($leadgenId && !$hasFieldData && $account) {
+                    $token = $account->getCredential('access_token');
+                    if ($token) {
+                        try {
+                            $fbRes = \Illuminate\Support\Facades\Http::timeout(15)->get("https://graph.facebook.com/v19.0/{$leadgenId}", [
+                                'access_token' => $token,
+                                'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
+                            ]);
+                            if ($fbRes->successful() && is_array($fbRes->json())) {
+                                $raw = array_merge($raw, $fbRes->json());
+                            }
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning("ProcessInboundLeadJob: Failed fetching leadgen {$leadgenId} from Graph API: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
+
             // 1. Normalize Payload via Source Mapper
             $mapped = match ($type) {
                 'google' => (new GoogleLeadMapper())->map($raw),

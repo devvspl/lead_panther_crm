@@ -40,8 +40,11 @@ Schedule::command('followups:check-due')->everyFifteenMinutes();
 // Schedule 3: Auto-offline Inactive Team Members (Every 5 Minutes)
 Schedule::command('team:auto-offline')->everyFiveMinutes();
 
-// Schedule 4: Daily Backup of Database + Documents Disk
+// Schedule 4: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
+Schedule::command('meta:sync-leads')->everyTenMinutes();
+
+// Schedule 5: Daily Backup of Database + Documents Disk
 Schedule::command('backup:run')->daily();
 
-// Schedule 5: Weekly Cleanup of Old Backups
+// Schedule 6: Weekly Cleanup of Old Backups
 Schedule::command('backup:clean')->weekly();

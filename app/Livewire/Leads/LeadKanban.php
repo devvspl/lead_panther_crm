@@ -641,147 +641,37 @@ class LeadKanban extends Component
             if ($this->selectedPortalAccountId) {
                 $account = \App\Models\PortalAccount::with(['credentials', 'formMappings'])->find($this->selectedPortalAccountId);
             }
+            if (!$account) {
+                $account = \App\Models\PortalAccount::where('type', 'meta')->where('status', 'active')->first();
+            }
 
-            $pageId = $account?->getCredential('page_id') ?? '';
-            $accessToken = $this->customPageAccessToken ?: ($account?->getCredential('access_token') ?? '');
-            $formId = $this->customFormId;
-
-            if (empty($accessToken)) {
-                $this->dispatch('toast', type: 'error', message: 'No Page Access Token found. Please enter or configure credentials in Settings > Integrations.');
+            if (!$account) {
+                $this->dispatch('toast', type: 'error', message: 'No Meta Account found. Please configure credentials in Settings > Integrations.');
                 $this->isPulling = false;
                 return;
             }
 
-            // Determine Target Form IDs
-            $targetFormIds = [];
-            if (!empty($formId)) {
-                $targetFormIds[] = $formId;
-            } elseif ($account && $account->formMappings->isNotEmpty()) {
-                $targetFormIds = $account->formMappings->pluck('form_id')->toArray();
-            } elseif (!empty($pageId)) {
-                // Discover active forms for page from Graph API
-                $formsResponse = \Illuminate\Support\Facades\Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
-                    'access_token' => $accessToken,
-                    'fields' => 'id,name,status',
-                ]);
-
-                if ($formsResponse->successful() && is_array($formsResponse->json('data'))) {
-                    foreach ($formsResponse->json('data') as $f) {
-                        $targetFormIds[] = $f['id'];
-                    }
-                }
-            }
-
-            if (empty($targetFormIds)) {
-                $this->dispatch('toast', type: 'error', message: 'No Leadgen Form ID found. Please specify a Form ID or configure Form Mappings.');
-                $this->isPulling = false;
-                return;
-            }
-
-            $totalFetched = 0;
-            $totalCreated = 0;
-            $totalDuplicates = 0;
-            $totalErrors = 0;
-
-            $metaMapper = new \App\Support\LeadMappers\MetaLeadMapper();
-            $client = \App\Models\Client::first();
-            $clientId = $client?->id ?: 1;
-            $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
-
-            foreach ($targetFormIds as $currentFormId) {
-                $leadsResponse = \Illuminate\Support\Facades\Http::timeout(15)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", [
-                    'access_token' => $accessToken,
-                    'limit' => $this->pullLimit ?: 25,
-                    'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
-                ]);
-
-                if (!$leadsResponse->successful()) {
-                    $totalErrors++;
-                    continue;
-                }
-
-                $leadsData = $leadsResponse->json('data') ?? [];
-                $totalFetched += count($leadsData);
-
-                // Match form mapping for project & campaign assignment
-                $mapping = $account ? \App\Models\LeadFormMapping::where('portal_account_id', $account->id)->where('form_id', $currentFormId)->first() : null;
-                $projectId = $this->syncProjectId ?: ($mapping?->project_id ?: (Project::where('client_id', $clientId)->first()?->id ?: 1));
-                $campaignId = $this->syncCampaignId ?: ($mapping?->campaign_id ?: null);
-
-                foreach ($leadsData as $rawLead) {
-                    try {
-                        $rawLead['form_id'] = $currentFormId;
-                        $mapped = $metaMapper->map($rawLead);
-
-                        $mobile = $mapped['mobile'] ?: '9876543210';
-                        $email = $mapped['email'] ?: 'meta_user@example.com';
-
-                        // 90-Day Duplicate Check
-                        $existingLead = Lead::where('client_id', $clientId)
-                            ->where('created_at', '>=', now()->subDays(90))
-                            ->where(function ($q) use ($mobile, $email) {
-                                $q->where('mobile', $mobile);
-                                if ($email && $email !== 'meta_user@example.com') {
-                                    $q->orWhere('email', $email);
-                                }
-                            })
-                            ->first();
-
-                        if ($existingLead) {
-                            $totalDuplicates++;
-                            continue;
-                        }
-
-                        // Create Lead
-                        $lead = Lead::create([
-                            'lead_code' => Lead::generateUniqueLeadCode(),
-                            'client_id' => $clientId,
-                            'project_id' => $projectId,
-                            'campaign_id' => $campaignId,
-                            'lead_source_id' => $leadSource->id,
-                            'name' => $mapped['name'] ?? 'Meta Lead',
-                            'mobile' => $mobile,
-                            'email' => $email,
-                            'city' => $mapped['city'] ?? 'Mumbai',
-                            'budget' => $mapped['budget'] ?? '₹75.0L',
-                            'property_type' => $mapped['property_type'] ?? '2 BHK',
-                            'requirement' => $mapped['requirement'] ?? 'Manual sync from Meta Ads Form #' . $currentFormId,
-                            'status' => 'new',
-                            'current_stage' => 'new',
-                            'assigned_to' => null,
-                        ]);
-
-                        // Save Metadata
-                        LeadMetadata::create([
-                            'lead_id' => $lead->id,
-                            'key' => 'meta_leadgen_id',
-                            'value' => $rawLead['id'] ?? '',
-                        ]);
-
-                        LeadMetadata::create([
-                            'lead_id' => $lead->id,
-                            'key' => 'raw_json',
-                            'value' => json_encode($rawLead),
-                        ]);
-
-                        // Dispatch Event for Credit Reservation / Auto Distribution
-                        event(new \App\Events\LeadCreated($lead));
-
-                        $totalCreated++;
-                    } catch (\Throwable $e) {
-                        $totalErrors++;
-                    }
-                }
-            }
+            $syncService = app(\App\Services\MetaLeadSyncService::class);
+            $result = $syncService->sync(
+                $account,
+                $this->customFormId ?: null,
+                (int) ($this->pullLimit ?: 25),
+                $this->syncProjectId ?: null,
+                $this->syncCampaignId ?: null
+            );
 
             $this->pullSummary = [
-                'fetched' => $totalFetched,
-                'created' => $totalCreated,
-                'duplicates' => $totalDuplicates,
-                'errors' => $totalErrors,
+                'fetched' => $result['total_fetched'],
+                'created' => $result['total_created'],
+                'duplicates' => $result['total_duplicates'],
+                'errors' => $result['total_errors'],
             ];
 
-            $this->dispatch('toast', type: 'success', title: 'Sync Completed', message: "Pulled {$totalCreated} new leads from Meta ({$totalDuplicates} duplicates skipped).");
+            if ($result['success']) {
+                $this->dispatch('toast', type: 'success', title: 'Sync Completed', message: $result['message']);
+            } else {
+                $this->dispatch('toast', type: 'error', title: 'Sync Issue', message: $result['message']);
+            }
         } catch (\Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Sync failed: ' . $e->getMessage());
         } finally {

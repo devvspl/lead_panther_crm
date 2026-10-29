@@ -105,6 +105,7 @@ class User extends Authenticatable
                 'super admin' => 'Super Admin',
                 'builder', 'builder/developer', 'builder developer' => 'Builder/Developer',
                 'channel partner' => 'Channel Partner',
+                'broker' => 'Broker',
                 'executive', 'sales executive', 'account manager', 'client' => 'Executive',
                 default => $role,
             };
@@ -164,6 +165,7 @@ class User extends Authenticatable
                 || $this->roles->contains('name', $normalized)
                 || ($normalized === 'Builder/Developer' && ($this->roles->contains('name', 'Builder') || $this->roles->contains('name', 'Builder/Developer')))
                 || ($roles === 'Builder' && $this->roles->contains('name', 'Builder/Developer'))
+                || ($normalized === 'Broker' && ($this->roles->contains('name', 'Broker') || $this->roles->contains('name', 'broker')))
                 || ($normalized === 'Executive' && ($this->roles->contains('name', 'Sales Executive') || $this->roles->contains('name', 'Executive')))
                 || ($roles === 'Sales Executive' && $this->roles->contains('name', 'Executive'));
         }

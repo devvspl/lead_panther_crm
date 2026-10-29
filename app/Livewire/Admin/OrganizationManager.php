@@ -7,6 +7,7 @@ use Livewire\WithFileUploads;
 use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\CreditWallet;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
@@ -219,21 +220,41 @@ class OrganizationManager extends Component
             $headerRow = $rows[$headerRowIndex] ?? [];
             $nameIdx = null;
             $statusIdx = null;
+            $userNameIdx = null;
+            $userEmailIdx = null;
+            $userPhoneIdx = null;
+            $userRoleIdx = null;
 
             foreach ($headerRow as $colIdx => $colName) {
                 $colNormalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', (string) $colName)));
-                if (in_array($colNormalized, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients'])) {
+                if (in_array($colNormalized, ['organizationname', 'orgname', 'company', 'companyname', 'clientname', 'clientsname'])) {
                     $nameIdx = $colIdx;
+                } elseif (in_array($colNormalized, ['username', 'contactperson', 'fullname', 'contactname', 'primaryuser', 'clientcontact'])) {
+                    $userNameIdx = $colIdx;
+                } elseif ($colNormalized === 'name' || $colNormalized === 'clients') {
+                    if ($nameIdx === null) {
+                        $nameIdx = $colIdx;
+                    } else {
+                        $userNameIdx = $colIdx;
+                    }
                 } elseif (in_array($colNormalized, ['status', 'initialstatus', 'state'])) {
                     $statusIdx = $colIdx;
+                } elseif (in_array($colNormalized, ['useremail', 'email', 'loginemail', 'contactemail', 'emailaddress'])) {
+                    $userEmailIdx = $colIdx;
+                } elseif (in_array($colNormalized, ['userphone', 'phone', 'phonenumber', 'mobile', 'mobilenumber', 'contactphone'])) {
+                    $userPhoneIdx = $colIdx;
+                } elseif (in_array($colNormalized, ['userrole', 'role', 'assignedrole', 'userroles'])) {
+                    $userRoleIdx = $colIdx;
                 }
             }
 
-            // Fallback column indices if headers were generic
-            if ($nameIdx === null && isset($headerRow[0]))
-                $nameIdx = 0;
-            if ($statusIdx === null && isset($headerRow[1]))
-                $statusIdx = 1;
+            // Fallback column indices if positional/generic
+            if ($nameIdx === null && isset($headerRow[0])) $nameIdx = 0;
+            if ($statusIdx === null && isset($headerRow[1])) $statusIdx = 1;
+            if ($userNameIdx === null && isset($headerRow[2])) $userNameIdx = 2;
+            if ($userEmailIdx === null && isset($headerRow[3])) $userEmailIdx = 3;
+            if ($userPhoneIdx === null && isset($headerRow[4])) $userPhoneIdx = 4;
+            if ($userRoleIdx === null && isset($headerRow[5])) $userRoleIdx = 5;
 
             $dataRows = array_slice($rows, $headerRowIndex + 1);
             $this->totalImportRows = count($dataRows);
@@ -244,14 +265,19 @@ class OrganizationManager extends Component
             }
 
             $seenNamesInBatch = [];
+            $seenEmailsInBatch = [];
 
             foreach ($dataRows as $offset => $row) {
                 $rowNum = $headerRowIndex + 1 + $offset + 1; // 1-based actual row number in file
                 $rawName = isset($row[$nameIdx]) ? trim((string) $row[$nameIdx]) : '';
                 $rawStatus = ($statusIdx !== null && isset($row[$statusIdx])) ? trim((string) $row[$statusIdx]) : '';
+                $rawUserName = ($userNameIdx !== null && isset($row[$userNameIdx])) ? trim((string) $row[$userNameIdx]) : '';
+                $rawUserEmail = ($userEmailIdx !== null && isset($row[$userEmailIdx])) ? trim((string) $row[$userEmailIdx]) : '';
+                $rawUserPhone = ($userPhoneIdx !== null && isset($row[$userPhoneIdx])) ? trim((string) $row[$userPhoneIdx]) : '';
+                $rawUserRole = ($userRoleIdx !== null && isset($row[$userRoleIdx])) ? trim((string) $row[$userRoleIdx]) : '';
 
                 // Skip blank/spacer rows
-                if ($rawName === '' && $rawStatus === '') {
+                if ($rawName === '' && $rawStatus === '' && $rawUserName === '' && $rawUserEmail === '') {
                     continue;
                 }
 
@@ -260,7 +286,7 @@ class OrganizationManager extends Component
                 $normStatus = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', '', $rawStatus)));
 
                 if (
-                    in_array($normName, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients']) ||
+                    in_array($normName, ['name', 'organizationname', 'orgname', 'company', 'companyname', 'clients', 'clientsname']) ||
                     in_array($normStatus, ['status', 'initialstatus', 'state', 'expectedformat'])
                 ) {
                     continue;
@@ -301,11 +327,79 @@ class OrganizationManager extends Component
                     }
                 }
 
+                // 3. User Name (defaults to Organization Name if blank)
+                $cleanUserName = $rawUserName !== '' ? $rawUserName : $rawName;
+                if (mb_strlen($cleanUserName) > 255) {
+                    $rowErrors[] = "User Name cannot exceed 255 characters.";
+                }
+
+                // 4. User Email (validated if provided, auto-generated unique if blank)
+                $cleanUserEmail = '';
+                if ($rawUserEmail !== '') {
+                    $normEmail = strtolower($rawUserEmail);
+                    if (!filter_var($rawUserEmail, FILTER_VALIDATE_EMAIL)) {
+                        $rowErrors[] = "Invalid user email format '{$rawUserEmail}'.";
+                    } elseif (isset($seenEmailsInBatch[$normEmail])) {
+                        $rowErrors[] = "Duplicate user email '{$rawUserEmail}' in uploaded file.";
+                    } elseif (User::whereRaw('LOWER(email) = ?', [$normEmail])->exists()) {
+                        $rowErrors[] = "User email '{$rawUserEmail}' already exists in database.";
+                    } else {
+                        $seenEmailsInBatch[$normEmail] = true;
+                        $cleanUserEmail = $normEmail;
+                    }
+                } else {
+                    // Auto-generate clean unique email if user email was omitted in file
+                    $baseSlug = Str::slug($rawName);
+                    if ($baseSlug === '') {
+                        $baseSlug = 'client';
+                    }
+                    $candidateEmail = $baseSlug . '@leadpanther.crm';
+                    $counter = 1;
+                    while (isset($seenEmailsInBatch[strtolower($candidateEmail)]) || User::whereRaw('LOWER(email) = ?', [strtolower($candidateEmail)])->exists()) {
+                        $candidateEmail = $baseSlug . '_' . $counter . '@leadpanther.crm';
+                        $counter++;
+                    }
+                    $seenEmailsInBatch[strtolower($candidateEmail)] = true;
+                    $cleanUserEmail = strtolower($candidateEmail);
+                }
+
+                // 5. User Phone
+                $cleanUserPhone = $rawUserPhone !== '' ? $rawUserPhone : null;
+                if ($cleanUserPhone !== null && mb_strlen($cleanUserPhone) > 50) {
+                    $rowErrors[] = "User Phone cannot exceed 50 characters.";
+                }
+
+                // 6. User Role (defaults to Builder/Developer)
+                $cleanRole = 'Builder/Developer';
+                if ($rawUserRole !== '') {
+                    $roleNorm = strtolower(trim($rawUserRole));
+                    if (in_array($roleNorm, ['broker', 'agent/broker'])) {
+                        $cleanRole = 'Broker';
+                    } elseif (in_array($roleNorm, ['channel partner', 'channelpartner', 'channel_partner', 'cp'])) {
+                        $cleanRole = 'Channel Partner';
+                    } elseif (in_array($roleNorm, ['executive', 'sales executive', 'sales'])) {
+                        $cleanRole = 'Executive';
+                    } elseif (in_array($roleNorm, ['super admin', 'superadmin', 'admin'])) {
+                        $cleanRole = 'Super Admin';
+                    } elseif (in_array($roleNorm, ['builder', 'developer', 'builder/developer', 'builder / developer', 'builderdeveloper'])) {
+                        $cleanRole = 'Builder/Developer';
+                    } else {
+                        $matchedRole = Role::whereRaw('LOWER(name) = ?', [$roleNorm])->first();
+                        if ($matchedRole) {
+                            $cleanRole = $matchedRole->name;
+                        } else {
+                            $rowErrors[] = "Invalid user role '{$rawUserRole}'. Allowed values: Builder/Developer, Broker, Channel Partner, Executive.";
+                        }
+                    }
+                }
+
                 if (!empty($rowErrors)) {
                     $this->importErrors[] = [
                         'row' => $rowNum,
                         'name' => $rawName ?: '—',
                         'status' => $rawStatus ?: 'active',
+                        'user_name' => $cleanUserName,
+                        'user_email' => $rawUserEmail ?: '—',
                         'errors' => $rowErrors,
                     ];
                 } else {
@@ -313,6 +407,10 @@ class OrganizationManager extends Component
                         'row' => $rowNum,
                         'name' => $rawName,
                         'status' => $cleanStatus,
+                        'user_name' => $cleanUserName,
+                        'user_email' => $cleanUserEmail,
+                        'user_phone' => $cleanUserPhone,
+                        'user_role' => $cleanRole,
                     ];
                 }
             }
@@ -320,10 +418,10 @@ class OrganizationManager extends Component
             if (!empty($this->importErrors)) {
                 $errorCount = count($this->importErrors);
                 $validCount = count($this->importRows);
-                $this->dispatch('toast', type: 'warning', message: "Validated: {$validCount} valid organizations, {$errorCount} row(s) with errors.");
+                $this->dispatch('toast', type: 'warning', message: "Validated: {$validCount} valid record(s), {$errorCount} row(s) with errors.");
             } else {
                 $validCount = count($this->importRows);
-                $this->dispatch('toast', type: 'success', message: "Validation passed! All {$validCount} organization(s) ready to import.");
+                $this->dispatch('toast', type: 'success', message: "Validation passed! All {$validCount} organization & user record(s) ready to import.");
             }
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Failed to process file: ' . $e->getMessage());
@@ -342,10 +440,35 @@ class OrganizationManager extends Component
 
             DB::transaction(function () use (&$importedCount) {
                 foreach ($this->importRows as $row) {
-                    Organization::create([
+                    // 1. Create Organization in organizations table
+                    $org = Organization::create([
                         'name' => $row['name'],
                         'status' => $row['status'] ?? 'active',
                     ]);
+
+                    // 2. Create User in users table linked to this organization
+                    $userStatus = ($row['status'] ?? 'active') === 'active' ? 'active' : 'inactive';
+                    $user = User::create([
+                        'organization_id' => $org->id,
+                        'name' => $row['user_name'] ?? $row['name'],
+                        'email' => $row['user_email'],
+                        'phone' => $row['user_phone'] ?? null,
+                        'password' => bcrypt(Str::random(16)),
+                        'status' => $userStatus,
+                        'email_verified_at' => now(),
+                    ]);
+
+                    // 3. Assign Role to User
+                    $roleName = $row['user_role'] ?? 'Builder/Developer';
+                    $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+                    $user->assignRole($role->name);
+
+                    // 4. Initialize Credit Wallet for User
+                    CreditWallet::firstOrCreate(
+                        ['client_id' => $user->id],
+                        ['balance' => 0.00]
+                    );
+
                     $importedCount++;
                 }
             });
@@ -356,9 +479,9 @@ class OrganizationManager extends Component
             $this->dispatch('close-modal', 'register-organization-modal');
 
             if ($skippedCount > 0) {
-                $this->dispatch('toast', type: 'success', message: "Import completed! Created {$importedCount} organizations ({$skippedCount} invalid rows were skipped).");
+                $this->dispatch('toast', type: 'success', message: "Import completed! Created {$importedCount} organizations & users ({$skippedCount} invalid rows were skipped).");
             } else {
-                $this->dispatch('toast', type: 'success', message: "Successfully imported {$importedCount} organizations.");
+                $this->dispatch('toast', type: 'success', message: "Successfully imported {$importedCount} organizations and associated users.");
             }
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Import error: ' . $e->getMessage());
@@ -372,13 +495,15 @@ class OrganizationManager extends Component
 
         return response()->streamDownload(function () use ($errors) {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['Row Number', 'Organization Name', 'Status', 'Errors']);
+            fputcsv($output, ['Row Number', 'Organization Name', 'Status', 'User Name', 'User Email', 'Errors']);
 
             foreach ($errors as $err) {
                 fputcsv($output, [
                     $err['row'] ?? '',
                     $err['name'] ?? '',
                     $err['status'] ?? '',
+                    $err['user_name'] ?? '',
+                    $err['user_email'] ?? '',
                     implode(' | ', $err['errors'] ?? []),
                 ]);
             }
@@ -398,12 +523,12 @@ class OrganizationManager extends Component
 
         return response()->streamDownload(function () {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['Organization Name', 'Status']);
-            fputcsv($output, ['Prestige Estates Projects Ltd', 'active']);
-            fputcsv($output, ['Apex Realty Advisory Partners', 'active']);
-            fputcsv($output, ['Brigade Enterprises Limited', 'active']);
-            fputcsv($output, ['Square Yards Advisory', 'active']);
-            fputcsv($output, ['Platform Administration Group', 'active']);
+            fputcsv($output, ['Organization Name', 'Status', 'User Name', 'User Email', 'User Phone', 'User Role']);
+            fputcsv($output, ['Prestige Estates Projects Ltd', 'active', 'Rajesh Sharma', 'rajesh@prestige.com', '+919876543210', 'Builder/Developer']);
+            fputcsv($output, ['Apex Realty Advisory Partners', 'active', 'Pooja Mehta', 'pooja@apexrealty.com', '+919812345678', 'Broker']);
+            fputcsv($output, ['Brigade Enterprises Limited', 'active', 'Anil Verma', 'anil@brigade.com', '+919845612345', 'Channel Partner']);
+            fputcsv($output, ['Square Yards Advisory', 'active', 'Vikram Singh', 'vikram@squareyards.com', '+919822334455', 'Executive']);
+            fputcsv($output, ['Platform Administration Group', 'active', 'Admin Contact', 'contact@platform.com', '+919800112233', 'Builder/Developer']);
             fclose($output);
         }, $filename, ['Content-Type' => 'text/csv']);
     }

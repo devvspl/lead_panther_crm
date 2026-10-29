@@ -68,6 +68,8 @@ class UserManager extends Component
                     'builder' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                     'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                     'channel-partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'Broker' => 'bg-cyan-50 text-cyan-700 border border-cyan-200',
+                    'broker' => 'bg-cyan-50 text-cyan-700 border border-cyan-200',
                     'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                     'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                     'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -89,6 +91,7 @@ class UserManager extends Component
             ['key' => 'super_admin', 'label' => 'Super Admins'],
             ['key' => 'builder_developer', 'label' => 'Builders / Developers'],
             ['key' => 'channel_partner', 'label' => 'Channel Partners'],
+            ['key' => 'broker', 'label' => 'Brokers'],
             ['key' => 'executive', 'label' => 'Executives'],
         ];
     }
@@ -282,6 +285,7 @@ class UserManager extends Component
                 'Super Admin' => 'Super Admin',
                 'Builder/Developer' => 'Builder/Developer',
                 'Channel Partner' => 'Channel Partner',
+                'Broker' => 'Broker',
                 'Executive' => 'Executive',
             ];
         }
@@ -329,6 +333,8 @@ class UserManager extends Component
             $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder']));
         } elseif ($this->statusFilter === 'channel_partner') {
             $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Channel Partner', 'channel-partner', 'channel_partner']));
+        } elseif ($this->statusFilter === 'broker') {
+            $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Broker', 'broker']));
         } elseif ($this->statusFilter === 'executive') {
             $query->whereHas('roles', fn($q) => $q->whereIn('name', ['Executive', 'Sales Executive', 'sales-executive']));
         }

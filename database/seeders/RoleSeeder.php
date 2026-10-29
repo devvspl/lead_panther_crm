@@ -49,7 +49,7 @@ class RoleSeeder extends Seeder
 
         Schema::enableForeignKeyConstraints();
 
-        // 4. Create ONLY the 4 requested roles with their permissions
+        // 4. Create ONLY the requested roles with their permissions
         $rolesWithPermissions = [
             'Super Admin' => Permission::all(),
             'Builder/Developer' => [
@@ -59,6 +59,9 @@ class RoleSeeder extends Seeder
             ],
             'Channel Partner' => [
                 'view-leads', 'create-leads', 'replace-leads', 'view-reports'
+            ],
+            'Broker' => [
+                'view-leads', 'create-leads', 'edit-leads', 'replace-leads', 'view-reports'
             ],
             'Executive' => [
                 'view-leads', 'create-leads', 'edit-leads', 'replace-leads', 'view-reports'
@@ -86,6 +89,8 @@ class RoleSeeder extends Seeder
 
             if (str_contains($email, 'builder') || str_contains($name, 'builder')) {
                 $user->assignRole('Builder/Developer');
+            } elseif (str_contains($email, 'broker') || str_contains($name, 'broker')) {
+                $user->assignRole('Broker');
             } elseif (str_contains($email, 'partner') || str_contains($email, 'cp.com') || str_contains($name, 'partner')) {
                 $user->assignRole('Channel Partner');
             } else {

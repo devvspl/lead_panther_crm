@@ -119,6 +119,87 @@ class OrganizationManagerTest extends TestCase
             'name' => 'Central Platform Ops',
             'status' => 'suspended',
         ]);
+
+        // Users automatically created in users table for each imported organization
+        $godrejOrg = Organization::where('name', 'Godrej Properties')->first();
+        $this->assertNotNull($godrejOrg);
+        $this->assertDatabaseHas('users', [
+            'organization_id' => $godrejOrg->id,
+            'name' => 'Godrej Properties',
+        ]);
+
+        $anarockOrg = Organization::where('name', 'Anarock Property Consultants')->first();
+        $this->assertNotNull($anarockOrg);
+        $this->assertDatabaseHas('users', [
+            'organization_id' => $anarockOrg->id,
+            'name' => 'Anarock Property Consultants',
+        ]);
+    }
+
+    public function test_import_organizations_and_users_both_tables_with_broker_and_builder_roles(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $csvContent = "Organization Name,Status,User Name,User Email,User Phone,User Role\n" .
+            "Prestige Estates Ltd,active,Rajesh Sharma,rajesh.test@prestige.com,+919876543210,Builder/Developer\n" .
+            "Apex Realty Advisors,active,Pooja Mehta,pooja.test@apexrealty.com,+919812345678,Broker\n" .
+            "Square Yards Advisory,active,Vikram Singh,vikram.test@squareyards.com,+919822334455,Executive\n";
+
+        $file = UploadedFile::fake()->createWithContent('org_and_users.csv', $csvContent);
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationManager::class)
+            ->call('openRegisterOrgModal', 'import')
+            ->set('importFile', $file)
+            ->assertCount('importRows', 3)
+            ->assertCount('importErrors', 0)
+            ->call('processImport')
+            ->assertSet('showCreateOrgModal', false)
+            ->assertDispatched('toast');
+
+        // Check organizations table
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Prestige Estates Ltd',
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Apex Realty Advisors',
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Square Yards Advisory',
+            'status' => 'active',
+        ]);
+
+        // Check users table
+        $prestigeOrg = Organization::where('name', 'Prestige Estates Ltd')->first();
+        $this->assertNotNull($prestigeOrg);
+        $builderUser = User::where('email', 'rajesh.test@prestige.com')->first();
+        $this->assertNotNull($builderUser);
+        $this->assertEquals('Rajesh Sharma', $builderUser->name);
+        $this->assertEquals('+919876543210', $builderUser->phone);
+        $this->assertEquals($prestigeOrg->id, $builderUser->organization_id);
+        $this->assertTrue($builderUser->hasRole('Builder/Developer'));
+
+        $apexOrg = Organization::where('name', 'Apex Realty Advisors')->first();
+        $this->assertNotNull($apexOrg);
+        $brokerUser = User::where('email', 'pooja.test@apexrealty.com')->first();
+        $this->assertNotNull($brokerUser);
+        $this->assertEquals('Pooja Mehta', $brokerUser->name);
+        $this->assertEquals('+919812345678', $brokerUser->phone);
+        $this->assertEquals($apexOrg->id, $brokerUser->organization_id);
+        $this->assertTrue($brokerUser->hasRole('Broker'));
+
+        // Check wallets created
+        $this->assertDatabaseHas('client_wallets', [
+            'client_id' => $builderUser->id,
+            'balance' => 0.00,
+        ]);
+        $this->assertDatabaseHas('client_wallets', [
+            'client_id' => $brokerUser->id,
+            'balance' => 0.00,
+        ]);
     }
 
     public function test_import_organizations_with_row_errors_and_download_errors_csv(): void
@@ -204,6 +285,16 @@ class OrganizationManagerTest extends TestCase
         $this->assertDatabaseHas('organizations', [
             'name' => 'Apex Realty Advisory Partners',
             'status' => 'active',
+        ]);
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'Rajesh Sharma',
+            'email' => 'rajesh@prestige.com',
+        ]);
+
+        $this->assertDatabaseHas('users', [
+            'name' => 'Pooja Mehta',
+            'email' => 'pooja@apexrealty.com',
         ]);
 
         // Cleanup

@@ -17,11 +17,12 @@ class AccountAccessFixSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Ensure the 4 canonical Spatie roles exist
+        // 1. Ensure the canonical Spatie roles exist
         $canonicalRoles = [
             'Super Admin',
             'Builder/Developer',
             'Channel Partner',
+            'Broker',
             'Executive',
         ];
 
@@ -51,6 +52,8 @@ class AccountAccessFixSeeder extends Seeder
                 $titleRole = 'Super Admin';
             } elseif (str_contains($name, 'Builder') || str_starts_with($email, 'builder')) {
                 $titleRole = 'Builder/Developer';
+            } elseif (str_contains($name, 'Broker') || str_contains($email, 'broker')) {
+                $titleRole = 'Broker';
             } elseif (str_contains($name, 'Partner') || str_contains($email, 'cp.com')) {
                 $titleRole = 'Channel Partner';
             } else {

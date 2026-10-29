@@ -159,7 +159,7 @@
                         </div>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-[11px] border-collapse">
+                            <table class="w-full text-left text-[11px] border-collapse whitespace-nowrap">
                                 <thead>
                                     <tr class="bg-canvas/30 text-muted border-b border-border">
                                         <th class="py-2 px-3 font-semibold">
@@ -167,30 +167,48 @@
                                         </th>
                                         <th class="py-2 px-3 font-semibold">Status <span
                                                 class="text-muted font-normal">(Optional)</span></th>
+                                        <th class="py-2 px-3 font-semibold">User Name <span
+                                                class="text-muted font-normal">(Optional)</span></th>
+                                        <th class="py-2 px-3 font-semibold">User Email <span
+                                                class="text-muted font-normal">(Optional)</span></th>
+                                        <th class="py-2 px-3 font-semibold">User Phone <span
+                                                class="text-muted font-normal">(Optional)</span></th>
+                                        <th class="py-2 px-3 font-semibold">User Role <span
+                                                class="text-muted font-normal">(Optional)</span></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-border font-mono text-[11px]">
                                     <tr class="hover:bg-canvas/40">
                                         <td class="py-1.5 px-3 text-ink font-sans font-medium">Prestige Estates Ltd</td>
                                         <td class="py-1.5 px-3 text-emerald-700">active</td>
+                                        <td class="py-1.5 px-3 text-ink font-sans font-medium">Rajesh Sharma</td>
+                                        <td class="py-1.5 px-3 text-muted">rajesh@prestige.com</td>
+                                        <td class="py-1.5 px-3 text-muted">+919876543210</td>
+                                        <td class="py-1.5 px-3 font-sans font-semibold text-primary">Builder/Developer</td>
                                     </tr>
                                     <tr class="hover:bg-canvas/40">
                                         <td class="py-1.5 px-3 text-ink font-sans font-medium">Apex Realty Advisors</td>
                                         <td class="py-1.5 px-3 text-emerald-700">active</td>
+                                        <td class="py-1.5 px-3 text-ink font-sans font-medium">Pooja Mehta</td>
+                                        <td class="py-1.5 px-3 text-muted">pooja@apexrealty.com</td>
+                                        <td class="py-1.5 px-3 text-muted">+919812345678</td>
+                                        <td class="py-1.5 px-3 font-sans font-semibold text-primary">Broker</td>
                                     </tr>
                                     <tr class="hover:bg-canvas/40">
-                                        <td class="py-1.5 px-3 text-ink font-sans font-medium">Platform Administration</td>
+                                        <td class="py-1.5 px-3 text-ink font-sans font-medium">Square Yards Advisory</td>
                                         <td class="py-1.5 px-3 text-emerald-700">active</td>
+                                        <td class="py-1.5 px-3 text-ink font-sans font-medium">Vikram Singh</td>
+                                        <td class="py-1.5 px-3 text-muted">vikram@squareyards.com</td>
+                                        <td class="py-1.5 px-3 text-muted">+919822334455</td>
+                                        <td class="py-1.5 px-3 font-sans font-semibold text-primary">Executive</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                         <div
-                            class="px-3.5 py-2 bg-canvas/40 border-t border-border text-[10px] text-muted flex items-center justify-between">
-                            <span>* Clients Name must be unique and non-empty</span>
-                            <span>Status defaults to <code class="text-ink font-bold">active</code> (allowed: <code
-                                    class="text-ink font-bold">active</code>, <code
-                                    class="text-ink font-bold">suspended</code>)</span>
+                            class="px-3.5 py-2 bg-canvas/40 border-t border-border text-[10px] text-muted flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <span>* Creates entries in <strong>both Organizations and Users</strong> tables upon import.</span>
+                            <span>Allowed roles: <code class="text-ink font-bold">Builder/Developer</code>, <code class="text-ink font-bold">Broker</code>, <code class="text-ink font-bold">Channel Partner</code>, <code class="text-ink font-bold">Executive</code></span>
                         </div>
                     </div>
 
@@ -341,6 +359,8 @@
                                             <th class="py-1.5 px-3 font-semibold">Row #</th>
                                             <th class="py-1.5 px-3 font-semibold">Clients Name</th>
                                             <th class="py-1.5 px-3 font-semibold">Status</th>
+                                            <th class="py-1.5 px-3 font-semibold">Primary User</th>
+                                            <th class="py-1.5 px-3 font-semibold">Role</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-border">
@@ -352,6 +372,15 @@
                                                     <span
                                                         class="px-2 py-0.5 rounded text-[10px] font-bold font-mono {{ $row['status'] === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200' }}">
                                                         {{ $row['status'] }}
+                                                    </span>
+                                                </td>
+                                                <td class="py-1.5 px-3">
+                                                    <div class="font-medium text-ink">{{ $row['user_name'] ?? $row['name'] }}</div>
+                                                    <div class="text-[10px] text-muted font-mono">{{ $row['user_email'] }}</div>
+                                                </td>
+                                                <td class="py-1.5 px-3">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                                        {{ $row['user_role'] ?? 'Builder/Developer' }}
                                                     </span>
                                                 </td>
                                             </tr>

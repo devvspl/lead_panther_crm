@@ -161,7 +161,7 @@ class LeadDistributionService
             $query->where('organization_id', $organizationId);
         }
 
-        $salesRoles = ['sales-executive', 'Sales Executive', 'sales_executive', 'Executive', 'Channel Partner'];
+        $salesRoles = ['sales-executive', 'Sales Executive', 'sales_executive', 'Executive', 'Channel Partner', 'Broker'];
 
         $agents = $query->whereHas('roles', function ($q) use ($salesRoles) {
             $q->whereIn('name', $salesRoles);

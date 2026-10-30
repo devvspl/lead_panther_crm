@@ -92,6 +92,11 @@ class User extends Authenticatable
         return $this->getRoleNames()->first() ?: 'No Role';
     }
 
+    public function getRoleAttribute(): string
+    {
+        return $this->getRoleNames()->first() ?: 'No Role';
+    }
+
     public function getOrganizationNameAttribute(): string
     {
         return $this->organization?->name ?: 'Platform HQ';

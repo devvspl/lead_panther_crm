@@ -46,17 +46,45 @@ class OrgSettingsAndSecurityTest extends TestCase
 
         $this->assertDatabaseHas('users', ['email' => 'exec@partner.com']);
 
-        $builderUser = User::factory()->create();
-        $builderUser->assignRole('Builder');
+        $org = Organization::create(['name' => 'Apex Realty Developers', 'type' => 'builder']);
+        $builderUser = User::factory()->create(['organization_id' => $org->id]);
+        $builderUser->assignRole('Builder/Developer');
 
+        // Test Builder adding an Executive
         Livewire::actingAs($builderUser)
             ->test(BuilderTeamManager::class)
             ->set('memberName', 'Builder Exec')
             ->set('memberEmail', 'exec@builder.com')
-            ->set('roleName', 'Sales Executive')
+            ->set('roleName', 'Executive')
             ->call('addMember');
 
-        $this->assertDatabaseHas('users', ['email' => 'exec@builder.com']);
+        $this->assertDatabaseHas('users', [
+            'email' => 'exec@builder.com',
+            'organization_id' => $org->id,
+        ]);
+        $execUser = User::where('email', 'exec@builder.com')->first();
+        $this->assertTrue($execUser->hasRole('Executive'));
+
+        // Test Builder adding a Channel Partner (syncs to users and channel_partners table)
+        Livewire::actingAs($builderUser)
+            ->test(BuilderTeamManager::class)
+            ->set('memberName', 'Apex Associate CP')
+            ->set('memberEmail', 'cp@apex.com')
+            ->set('roleName', 'Channel Partner')
+            ->call('addMember');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'cp@apex.com',
+            'organization_id' => $org->id,
+        ]);
+        $cpUser = User::where('email', 'cp@apex.com')->first();
+        $this->assertTrue($cpUser->hasRole('Channel Partner'));
+
+        $this->assertDatabaseHas('channel_partners', [
+            'name' => 'Apex Associate CP',
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
     }
 
     public function test_organization_profile_saves_name(): void

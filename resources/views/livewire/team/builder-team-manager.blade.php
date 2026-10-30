@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Builder Direct Team Management</h1>
-            <p class="text-xs text-muted">Manage your developer organization's sales executives and team members.</p>
+            <p class="text-xs text-muted">Create and manage your organization's Executives and Channel Partners.</p>
         </div>
     </div>
 
@@ -38,8 +38,8 @@
                 <label class="font-bold text-ink">Role <span class="text-red-500">*</span></label>
                 <x-ui.themed-select 
                     wire:model="roleName" 
-                    :options="['Executive' => 'Executive', 'Sales Executive' => 'Sales Executive']" 
-                    placeholder="Role" 
+                    :options="['Executive' => 'Executive', 'Channel Partner' => 'Channel Partner']" 
+                    placeholder="Select Role" 
                     class="w-full mt-1" 
                 />
                 @error('roleName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror

@@ -62,13 +62,13 @@ class RoleDashboardTest extends TestCase
             ->assertOk()
             ->assertSee('Builder / Developer Dashboard');
 
-        // Navigation check: builder role key is 'builder'
+        // Navigation check: builder role key is 'builder' with only dashboard and team
         $this->assertEquals('builder', NavigationConfig::getRoleKey($builder));
         $allowed = NavigationConfig::getAllowedItemKeys($builder);
-        $this->assertContains('dashboard', $allowed);
-        $this->assertContains('leads', $allowed);
-        $this->assertContains('credits', $allowed);
-        $this->assertContains('team', $allowed);
+        $this->assertEquals(['dashboard', 'team'], $allowed);
+        $this->assertNotContains('leads', $allowed);
+        $this->assertNotContains('credits', $allowed);
+        $this->assertNotContains('integrations', $allowed);
         $this->assertNotContains('organizations', $allowed);
     }
 

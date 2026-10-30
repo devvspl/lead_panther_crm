@@ -35,7 +35,7 @@ class NavigationConfig
                 'failed-jobs', 'recharge-queue', 'backups', 'git-sync'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
-                'dashboard', 'leads', 'bulk-import', 'distribution', 'credits', 'reports', 'integrations', 'team'
+                'dashboard', 'team'
             ],
             'broker' => [
                 'dashboard', 'leads', 'credits', 'reports'

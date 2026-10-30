@@ -148,7 +148,7 @@ class DashboardShell extends Component
                 ['label' => 'My Availability', 'url' => route('distribution.availability'), 'icon' => 'clock', 'primary' => false],
             ],
             'client' => [
-                ['label' => 'My Leads', 'url' => route('account_manager.leads'), 'icon' => 'leads', 'primary' => true],
+                ['label' => 'My Leads', 'url' => route('leads.index'), 'icon' => 'leads', 'primary' => true],
                 ['label' => 'Wallet & Credits', 'url' => route('credits.wallet'), 'icon' => 'wallet', 'primary' => false],
                 ['label' => 'Replacements', 'url' => route('replacements.client'), 'icon' => 'replacements', 'primary' => false],
             ],

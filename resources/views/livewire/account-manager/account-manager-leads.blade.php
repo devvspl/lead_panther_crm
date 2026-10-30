@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Account Manager Overview</h1>
+            <h1 class="text-xl font-bold tracking-tight text-ink">Client Leads Overview</h1>
             <p class="text-xs text-muted">Audited operational leads view with server-enforced PII masking (Mobile &
                 Email).</p>
         </div>
@@ -25,7 +25,7 @@
             :sortDirection="$sortDirection" 
             searchPlaceholder="Search lead code, name..."
             emptyTitle="No Leads Found" 
-            emptyMessage="No leads found matching your account manager criteria."
+            emptyMessage="No leads found matching your search criteria."
         >
             <!-- Custom Filters Slot -->
             <x-slot:filters>

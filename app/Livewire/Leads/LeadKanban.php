@@ -763,8 +763,8 @@ class LeadKanban extends Component
         $columns = [
             'lead_code',
             'name',
-            fn($l) => ($user && ($user->hasRole('Account Manager') || $user->hasRole('account-manager'))) ? substr_replace($l->mobile, '******', 2, 6) : $l->mobile,
-            fn($l) => ($user && ($user->hasRole('Account Manager') || $user->hasRole('account-manager'))) ? substr_replace($l->email, '****', 2, 4) : $l->email,
+            'mobile',
+            'email',
             fn($l) => $l->project?->name ?: 'N/A',
             fn($l) => $l->leadSource?->name ?: 'Direct Ingestion',
             fn($l) => $l->assignedTo?->name ?: 'Unassigned',

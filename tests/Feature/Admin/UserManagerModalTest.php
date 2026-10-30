@@ -111,7 +111,7 @@ class UserManagerModalTest extends TestCase
             ->set('editEmail', 'meera.nair@sobha.com')
             ->set('editPhone', '+91 9876500000')
             ->set('editOrganizationId', $org2->id)
-            ->set('editRole', 'Account Manager')
+            ->set('editRole', 'Broker')
             ->set('editStatus', 'suspended')
             ->call('updateUser')
             ->assertSet('userDetailsMode', 'view')
@@ -123,7 +123,7 @@ class UserManagerModalTest extends TestCase
         $this->assertEquals('+91 9876500000', $user->phone);
         $this->assertEquals($org2->id, $user->organization_id);
         $this->assertEquals('suspended', $user->status);
-        $this->assertTrue($user->hasRole('Account Manager'));
+        $this->assertTrue($user->hasRole('Broker'));
     }
 
     public function test_update_user_validation_rules(): void

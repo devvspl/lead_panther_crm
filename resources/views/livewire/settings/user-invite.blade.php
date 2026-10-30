@@ -28,7 +28,7 @@
                 <label class="font-bold text-ink">Assigned Role</label>
                 <x-ui.themed-select 
                     wire:model="roleName"
-                    :options="['sales-executive' => 'Sales Executive', 'account-manager' => 'Account Manager', 'builder' => 'Builder Manager', 'channel-partner' => 'Channel Partner Manager']"
+                    :options="['Executive' => 'Executive', 'Builder/Developer' => 'Builder / Developer', 'Broker' => 'Broker', 'Channel Partner' => 'Channel Partner']"
                     placeholder="Assigned Role"
                     searchable="true"
                     class="w-full mt-1"

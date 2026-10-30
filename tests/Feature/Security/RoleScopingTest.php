@@ -22,7 +22,7 @@ class RoleScopingTest extends TestCase
         Role::create(['name' => 'Super Admin']);
         Role::create(['name' => 'Builder']);
         Role::create(['name' => 'Channel Partner']);
-        Role::create(['name' => 'Account Manager']);
+        Role::create(['name' => 'Broker']);
         Role::create(['name' => 'Sales Executive']);
     }
 

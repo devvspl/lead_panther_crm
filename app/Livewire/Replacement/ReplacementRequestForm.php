@@ -88,7 +88,7 @@ class ReplacementRequestForm extends Component
             $replacement->approve(auth()->id() ?? 1);
             $this->dispatch('toast', type: 'success', message: 'Replacement Auto-Approved! Replacement lead created and credit refunded.');
         } else {
-            $this->dispatch('toast', type: 'success', message: 'Replacement claim submitted for Account Manager review.');
+            $this->dispatch('toast', type: 'success', message: 'Replacement claim submitted for review.');
         }
 
         $this->dispatch('lead-updated');

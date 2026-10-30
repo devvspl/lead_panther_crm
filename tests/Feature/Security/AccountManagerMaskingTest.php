@@ -23,18 +23,16 @@ class AccountManagerMaskingTest extends TestCase
     {
         parent::setUp();
         Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Account Manager']);
-        Role::create(['name' => 'account-manager']);
+        Role::create(['name' => 'Client']);
     }
 
-    public function test_account_manager_api_response_masks_mobile_and_email(): void
+    public function test_client_api_response_masks_mobile_and_email(): void
     {
-        $am = User::factory()->create(['name' => 'Account Manager User']);
-        $am->assignRole('Account Manager');
-
         $org = Organization::create(['name' => 'Org Sec', 'type' => 'builder']);
-        $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Sec']);
-        $project = Project::create(['client_id' => $client->id, 'name' => 'Project Sec']);
+        $clientUser = User::factory()->create(['name' => 'Client User', 'organization_id' => $org->id]);
+        $clientUser->assignRole('Client');
+
+        $project = Project::create(['client_id' => $clientUser->id, 'name' => 'Project Sec']);
         $source = LeadSource::create(['name' => 'meta']);
 
         $rawMobile = '9811223344';
@@ -42,13 +40,13 @@ class AccountManagerMaskingTest extends TestCase
 
         $lead = Lead::factory()->create([
             'project_id' => $project->id,
-            'client_id' => $client->id,
+            'client_id' => $clientUser->id,
             'lead_source_id' => $source->id,
             'mobile' => $rawMobile,
             'email' => $rawEmail,
         ]);
 
-        $response = $this->actingAs($am)->getJson("/api/leads/{$lead->id}");
+        $response = $this->actingAs($clientUser)->getJson("/api/leads/{$lead->id}");
         $response->assertOk();
 
         // Assert unmasked raw PII strings do NOT appear in response payload
@@ -91,14 +89,13 @@ class AccountManagerMaskingTest extends TestCase
         $response->assertJsonPath('data.email', $rawEmail);
     }
 
-    public function test_account_manager_dashboard_renders_masked_data(): void
+    public function test_client_dashboard_renders_masked_data(): void
     {
-        $am = User::factory()->create();
-        $am->assignRole('Account Manager');
-
         $org = Organization::create(['name' => 'Org Sec 3', 'type' => 'builder']);
-        $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Sec 3']);
-        $project = Project::create(['client_id' => $client->id, 'name' => 'Project Sec 3']);
+        $clientUser = User::factory()->create(['organization_id' => $org->id]);
+        $clientUser->assignRole('Client');
+
+        $project = Project::create(['client_id' => $clientUser->id, 'name' => 'Project Sec 3']);
         $source = LeadSource::create(['name' => 'portal']);
 
         $rawMobile = '9833445566';
@@ -106,16 +103,16 @@ class AccountManagerMaskingTest extends TestCase
 
         $lead = Lead::factory()->create([
             'project_id' => $project->id,
-            'client_id' => $client->id,
+            'client_id' => $clientUser->id,
             'lead_source_id' => $source->id,
             'mobile' => $rawMobile,
             'email' => $rawEmail,
         ]);
 
-        $response = $this->actingAs($am)->get('/account-manager/leads');
+        $response = $this->actingAs($clientUser)->get('/client/leads');
         $response->assertOk();
 
-        Livewire::actingAs($am)
+        Livewire::actingAs($clientUser)
             ->test(AccountManagerLeads::class)
             ->assertSee(LeadPresenter::maskMobile($rawMobile))
             ->assertDontSee($rawMobile);

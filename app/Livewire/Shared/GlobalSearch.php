@@ -47,7 +47,7 @@ class GlobalSearch extends Component
             $projects = Project::where('name', 'like', "%{$query}%")->take(5)->get();
 
             // 4. Search People / Users
-            if (auth()->user()?->hasAnyRole(['Super Admin', 'Builder', 'Channel Partner', 'Account Manager'])) {
+            if (auth()->user()?->hasAnyRole(['Super Admin', 'Builder/Developer', 'Builder', 'Broker', 'Channel Partner'])) {
                 $people = User::where('name', 'like', "%{$query}%")
                     ->orWhere('email', 'like', "%{$query}%")
                     ->take(5)

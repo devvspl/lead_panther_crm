@@ -90,7 +90,7 @@
                         <a href="#role-builder" class="block px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition">Builder Admin Operations</a>
                         <a href="#role-partner" class="block px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition">Channel Partner Operations</a>
                         <a href="#role-sales" class="block px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition">Sales Executive Daily Routine</a>
-                        <a href="#role-account-manager" class="block px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition">Account Manager &amp; Client</a>
+                        <a href="#role-broker" class="block px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition">Broker Operations</a>
                     </div>
 
                     <div class="space-y-1">
@@ -605,18 +605,18 @@ php artisan schedule:work</code></pre>
                         </div>
                     </div>
 
-                    <!-- Account Manager / Client -->
-                    <div class="p-5 rounded-xl bg-surface border border-border space-y-3" id="role-account-manager">
+                    <!-- Broker Operations -->
+                    <div class="p-5 rounded-xl bg-surface border border-border space-y-3" id="role-broker">
                         <div class="flex items-center space-x-2">
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Role</span>
-                            <h3 class="text-base font-bold text-ink">Account Manager / Client</h3>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">Role</span>
+                            <h3 class="text-base font-bold text-ink">Broker Operations</h3>
                         </div>
                         <p class="text-xs text-muted leading-relaxed">
-                            Account Managers monitor performance and review quality claims while protecting lead privacy:
+                            Brokers have direct access to customized leads, real-time credit wallets, and performance metrics:
                         </p>
                         <ul class="text-xs text-muted list-disc list-inside space-y-1.5">
-                            <li><strong>PII Masking Protection</strong> (<code class="text-primary font-mono">/account-manager/leads</code>): Phone numbers and emails are automatically masked (<code class="font-mono">98****3210</code>) for privacy compliance.</li>
-                            <li><strong>Replacement Approval Queue</strong> (<code class="text-primary font-mono">/replacements</code>): Review pending claims with full visibility into the agent's SLA status (<code class="font-mono text-emerald-600">SLA Met</code> vs <code class="font-mono text-rose-600">SLA Missed</code>) before approving or rejecting with mandatory audit notes.</li>
+                            <li><strong>Broker Dashboard</strong> (<code class="text-primary font-mono">/broker/dashboard</code>): Real-time view of leads assigned, site visit bookings, and credit ledger.</li>
+                            <li><strong>Replacement Queue Review</strong> (<code class="text-primary font-mono">/replacements</code>): Inspect agent SLA compliance badge (<code class="font-mono text-emerald-600">SLA Met</code> vs <code class="font-mono text-rose-600">SLA Missed</code>) and submit replacements.</li>
                         </ul>
                     </div>
                 </section>

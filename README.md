@@ -365,7 +365,7 @@ php artisan test
 ---
 
 ## 🔒 Security & Compliance
-- **PII Data Masking**: Mobile numbers and emails are automatically masked for standard agents and account managers based on role permissions.
+- **PII Data Masking**: Mobile numbers and emails can be automatically masked for confidentiality based on role permissions.
 - **Tenant Isolation**: Multi-tenant database queries enforce strict tenant boundaries via `ClientScoped` global scopes.
 - **Immutable Audit Trail**: All authentication, administrative actions, schema mutations, and Git deployments are logged into an immutable `audit_logs` table with request IP and payload sanitization.
 

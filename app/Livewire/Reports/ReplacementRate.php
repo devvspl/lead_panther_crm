@@ -57,7 +57,7 @@ class ReplacementRate extends Component
             $user = auth()->user();
             $clientsQuery = Client::query();
 
-            if ($user && ($user->hasRole('Client') || $user->hasRole('Account Manager'))) {
+            if ($user && $user->hasRole('Client')) {
                 $clientsQuery->where('organization_id', $user->organization_id);
             }
 

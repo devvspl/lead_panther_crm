@@ -242,7 +242,7 @@
                         <p>We process collected information for the following legitimate business purposes:</p>
                         <ul class="list-disc pl-5 space-y-2">
                             <li>To create, organize, and manage CRM lead records within tenant-isolated databases.</li>
-                            <li>To enable authorized sales agents and account managers to contact prospective buyers
+                            <li>To enable authorized sales agents and team executives to contact prospective buyers
                                 regarding their inquiries.</li>
                             <li>To operate, maintain, and provide core CRM capabilities including SLA timers, automated
                                 lead distribution, and analytics.</li>

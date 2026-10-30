@@ -85,13 +85,13 @@ class UserSeeder extends Seeder
             $salesUser->assignRole('Executive');
         }
 
-        // 3 Account Managers (Executive role)
+        // 3 Executives (Executive role)
         for ($am = 1; $am <= 3; $am++) {
             $amUser = User::firstOrCreate(
-                ['email' => 'accountmgr' . $am . '@leadpanther.com'],
+                ['email' => 'executive' . $am . '@leadpanther.com'],
                 [
                     'organization_id' => $platformOrg->id ?? null,
-                    'name' => 'Account Manager ' . $am,
+                    'name' => 'Executive ' . $am,
                     'password' => bcrypt('password'),
                     'phone' => '+91980000030' . $am,
                     'status' => 'active',

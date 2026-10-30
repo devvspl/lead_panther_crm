@@ -202,6 +202,9 @@ class OrganizationDetail extends Component
         $roles = [];
 
         foreach ($dbRoles as $roleName) {
+            if (in_array(strtolower(trim($roleName)), ['account manager', 'account-manager'])) {
+                continue;
+            }
             $label = ucwords(str_replace(['-', '_'], ' ', $roleName));
             if (!isset($roles[$label])) {
                 $roles[$label] = $label;
@@ -210,11 +213,10 @@ class OrganizationDetail extends Component
 
         if (empty($roles)) {
             $roles = [
-                'Builder' => 'Builder',
+                'Builder/Developer' => 'Builder/Developer',
+                'Broker' => 'Broker',
                 'Channel Partner' => 'Channel Partner',
-                'Sales Executive' => 'Sales Executive',
-                'Account Manager' => 'Account Manager',
-                'Client' => 'Client',
+                'Executive' => 'Executive',
                 'Super Admin' => 'Super Admin',
             ];
         }

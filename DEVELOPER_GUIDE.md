@@ -27,7 +27,7 @@
    - [Builder Admin](#builder-admin)
    - [Channel Partner](#channel-partner)
    - [Sales Executive](#sales-executive)
-   - [Account Manager / Client](#account-manager--client)
+   - [Broker / Executive Operations](#broker--executive-operations)
 8. [Automated Testing & Quality Assurance](#8-automated-testing--quality-assurance)
 9. [Troubleshooting & Operations](#9-troubleshooting--operations)
 
@@ -324,8 +324,8 @@ curl -X POST "http://localhost:8000/api/leads/manual" \
   4. Drag and drop Kanban cards through: *Contacted &rarr; Interested &rarr; Site Visit &rarr; Proposal &rarr; Booking &rarr; Closed Won*.
   5. If number is fake, submit replacement request.
 
-### Account Manager / Client
-- **PII Masking Protection** (`/account-manager/leads`): Customer mobile numbers and emails are automatically masked for confidentiality.
+### Broker / Executive Operations
+- **Role-Tailored Dashboards**: Direct access to lead queues, call metrics, and performance analytics.
 - **Replacement Queue Review** (`/replacements`): Inspect agent SLA compliance badge (`SLA Met` vs `SLA Missed`) before approving or rejecting replacement claims.
 
 ---

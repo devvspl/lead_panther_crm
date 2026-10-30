@@ -71,12 +71,12 @@ class SourcePerformance extends Component
             $query = Lead::query()->where('created_at', '>=', now()->subDays($this->days));
 
             if ($user) {
-                if ($user->hasRole('Client') || $user->hasRole('Account Manager')) {
+                if ($user->hasRole('Client')) {
                     $client = Client::where('organization_id', $user->organization_id)->first();
                     if ($client) {
                         $query->where('client_id', $client->id);
                     }
-                } elseif ($user->hasRole('Sales Executive')) {
+                } elseif ($user->hasRole('Sales Executive') || $user->hasRole('Executive')) {
                     $query->where('assigned_to', $user->id);
                 }
             }

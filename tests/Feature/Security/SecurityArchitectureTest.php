@@ -24,7 +24,7 @@ class SecurityArchitectureTest extends TestCase
         Role::create(['name' => 'Super Admin']);
         Role::create(['name' => 'Builder']);
         Role::create(['name' => 'Channel Partner']);
-        Role::create(['name' => 'Account Manager']);
+        Role::create(['name' => 'Executive']);
     }
 
     public function test_security_headers_middleware_appends_headers(): void
@@ -49,7 +49,7 @@ class SecurityArchitectureTest extends TestCase
         $source = LeadSource::create(['name' => 'meta']);
 
         $user1 = User::factory()->create(['organization_id' => $org1->id]);
-        $user1->assignRole('Account Manager');
+        $user1->assignRole('Executive');
 
         $lead1 = Lead::factory()->create(['client_id' => $client1->id, 'project_id' => $project1->id, 'lead_source_id' => $source->id]);
         $lead2 = Lead::factory()->create(['client_id' => $client2->id, 'project_id' => $project2->id, 'lead_source_id' => $source->id]);

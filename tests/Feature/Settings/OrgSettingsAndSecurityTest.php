@@ -29,7 +29,7 @@ class OrgSettingsAndSecurityTest extends TestCase
         Role::firstOrCreate(['name' => 'Channel Partner']);
         Role::firstOrCreate(['name' => 'Executive']);
         Role::firstOrCreate(['name' => 'Sales Executive']);
-        Role::firstOrCreate(['name' => 'Account Manager']);
+        Role::firstOrCreate(['name' => 'Broker']);
     }
 
     public function test_partner_and_builder_team_managers(): void

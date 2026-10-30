@@ -29,9 +29,9 @@ class UserInvite extends Component
                 'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                 'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'Broker' => 'bg-cyan-50 text-cyan-700 border border-cyan-200',
                 'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
             ], 'default' => 'Executive'],
         ];
     }

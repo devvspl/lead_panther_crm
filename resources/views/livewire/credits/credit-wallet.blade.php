@@ -74,7 +74,7 @@
                 </div>
             </div>
             <div class="text-[11px] text-muted border-t border-border pt-3">
-                Need custom rate or enterprise invoicing? Contact your Account Manager.
+                Need custom rate or enterprise invoicing? Contact Platform Support.
             </div>
         </div>
     </div>

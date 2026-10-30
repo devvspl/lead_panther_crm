@@ -61,12 +61,12 @@ class SlaDashboard extends Component
         $query = Lead::query();
 
         if ($user) {
-            if ($user->hasRole('Client') || $user->hasRole('Account Manager')) {
+            if ($user->hasRole('Client')) {
                 $client = Client::where('organization_id', $user->organization_id)->first();
                 if ($client) {
                     $query->where('client_id', $client->id);
                 }
-            } elseif ($user->hasRole('Sales Executive')) {
+            } elseif ($user->hasRole('Sales Executive') || $user->hasRole('Executive')) {
                 $query->where('assigned_to', $user->id);
             }
         }
@@ -109,12 +109,12 @@ class SlaDashboard extends Component
         $query = Lead::with(['client', 'assignedTo']);
 
         if ($user) {
-            if ($user->hasRole('Client') || $user->hasRole('Account Manager')) {
+            if ($user->hasRole('Client')) {
                 $client = Client::where('organization_id', $user->organization_id)->first();
                 if ($client) {
                     $query->where('client_id', $client->id);
                 }
-            } elseif ($user->hasRole('Sales Executive')) {
+            } elseif ($user->hasRole('Sales Executive') || $user->hasRole('Executive')) {
                 $query->where('assigned_to', $user->id);
             }
         }

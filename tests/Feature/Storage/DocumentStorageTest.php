@@ -19,7 +19,7 @@ class DocumentStorageTest extends TestCase
     {
         parent::setUp();
         Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Account Manager']);
+        Role::create(['name' => 'Executive']);
     }
 
     public function test_authorized_user_can_download_document_via_signed_url(): void
@@ -30,7 +30,7 @@ class DocumentStorageTest extends TestCase
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Storage 1']);
 
         $user = User::factory()->create(['organization_id' => $org->id]);
-        $user->assignRole('Account Manager');
+        $user->assignRole('Executive');
 
         $filePath = "{$client->id}/101/proposal_2026.pdf";
         Storage::disk('documents')->put($filePath, 'PDF proposal content sample text');
@@ -57,7 +57,7 @@ class DocumentStorageTest extends TestCase
         $client2 = Client::create(['organization_id' => $org2->id, 'name' => 'Client Storage B']);
 
         $userFromOrg2 = User::factory()->create(['organization_id' => $org2->id]);
-        $userFromOrg2->assignRole('Account Manager');
+        $userFromOrg2->assignRole('Executive');
 
         $filePath = "{$client1->id}/202/invoice_555.pdf";
         Storage::disk('documents')->put($filePath, 'Confidential invoice content for Tenant 1');

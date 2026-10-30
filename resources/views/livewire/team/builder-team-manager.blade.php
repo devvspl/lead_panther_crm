@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Builder Direct Team Management</h1>
-            <p class="text-xs text-muted">Manage your developer organization's sales executives and account managers.</p>
+            <p class="text-xs text-muted">Manage your developer organization's sales executives and team members.</p>
         </div>
     </div>
 
@@ -38,7 +38,7 @@
                 <label class="font-bold text-ink">Role <span class="text-red-500">*</span></label>
                 <x-ui.themed-select 
                     wire:model="roleName" 
-                    :options="['Sales Executive' => 'Sales Executive', 'Account Manager' => 'Account Manager']" 
+                    :options="['Executive' => 'Executive', 'Sales Executive' => 'Sales Executive']" 
                     placeholder="Role" 
                     class="w-full mt-1" 
                 />

@@ -35,7 +35,7 @@ new #[Layout('layouts.guest')]
             $user->hasRole('Broker') => route('broker.dashboard', absolute: false),
             $user->hasRole('Channel Partner') => route('partner.dashboard', absolute: false),
             $user->hasRole('Executive') || $user->hasRole('Sales Executive') => route('sales.dashboard', absolute: false),
-            $user->hasRole('Account Manager') || $user->hasRole('Client') => route('client.dashboard', absolute: false),
+            $user->hasRole('Client') => route('client.dashboard', absolute: false),
             default => route('dashboard', absolute: false),
         };
 

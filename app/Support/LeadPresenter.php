@@ -9,10 +9,15 @@ class LeadPresenter
 {
     public static function isAccountManager(?User $user = null): bool
     {
+        return false;
+    }
+
+    public static function shouldMaskPii(?User $user = null): bool
+    {
         $user = $user ?? auth()->user();
         if (!$user) return false;
 
-        return $user->hasRole('Account Manager') || $user->hasRole('account-manager');
+        return $user->hasRole('Client') || $user->hasRole('client');
     }
 
     public static function maskMobile(string $mobile): string
@@ -51,7 +56,7 @@ class LeadPresenter
 
     public static function present(Lead $lead, ?User $user = null): array
     {
-        $shouldMask = static::isAccountManager($user);
+        $shouldMask = static::shouldMaskPii($user);
 
         return [
             'id' => $lead->id,

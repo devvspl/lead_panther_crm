@@ -19,7 +19,6 @@ class NavigationConfig
         if ($roles->contains('broker')) return 'broker';
         if ($roles->contains('channel-partner') || $roles->contains('partner')) return 'channel-partner';
         if ($roles->contains('sales-executive') || $roles->contains('executive') || $roles->contains('sales')) return 'sales-executive';
-        if ($roles->contains('account-manager')) return 'account-manager';
         if ($roles->contains('client')) return 'client';
 
         return 'guest';
@@ -47,9 +46,6 @@ class NavigationConfig
             'sales-executive' => [
                 'dashboard', 'leads', 'distribution'
             ],
-            'account-manager' => [
-                'dashboard', 'leads', 'replacements', 'reports'
-            ],
             'client' => [
                 'dashboard', 'leads', 'credits', 'replacements', 'reports'
             ],
@@ -70,7 +66,7 @@ class NavigationConfig
             'broker' => route('broker.dashboard'),
             'channel-partner' => route('partner.dashboard'),
             'sales-executive' => route('sales.dashboard'),
-            'client', 'account-manager' => route('client.dashboard'),
+            'client' => route('client.dashboard'),
             default => route('dashboard'),
         };
 
@@ -80,10 +76,7 @@ class NavigationConfig
             default => route('dashboard'),
         };
 
-        $leadsRoute = match ($roleKey) {
-            'account-manager' => route('account_manager.leads'),
-            default => route('leads.index'),
-        };
+        $leadsRoute = route('leads.index');
 
         $replacementsRoute = match ($roleKey) {
             'client' => route('replacements.client'),

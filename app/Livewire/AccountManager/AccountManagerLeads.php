@@ -82,7 +82,7 @@ class AccountManagerLeads extends Component
         $rawLeads = $query->latest('id')->get();
         $data = $rawLeads->map(fn($lead) => LeadPresenter::present($lead, $user));
 
-        $filename = "account-manager-leads_" . now()->format('Y-m-d') . ".xlsx";
+        $filename = "client-leads_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Lead Code', 'Name', 'Phone (Masked)', 'Email (Masked)', 'Project', 'Campaign', 'Assigned Executive', 'Stage'];
         $columns = [
@@ -103,7 +103,7 @@ class AccountManagerLeads extends Component
         return \Maatwebsite\Excel\Facades\Excel::download(
             new \App\Exports\BaseStyledExport(
                 data: $data,
-                title: 'Account Manager Leads Directory',
+                title: 'Client Leads Directory',
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,

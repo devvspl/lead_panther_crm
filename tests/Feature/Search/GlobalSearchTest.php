@@ -23,7 +23,7 @@ class GlobalSearchTest extends TestCase
     {
         parent::setUp();
         Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Account Manager']);
+        Role::create(['name' => 'Client']);
     }
 
     public function test_global_search_returns_grouped_results(): void
@@ -52,21 +52,20 @@ class GlobalSearchTest extends TestCase
             ->assertSee('Apex Client');
     }
 
-    public function test_global_search_masks_pii_for_account_manager(): void
+    public function test_global_search_masks_pii_for_client_role(): void
     {
-        $am = User::factory()->create(['name' => 'Account Manager Searcher']);
-        $am->assignRole('Account Manager');
-
         $org = Organization::create(['name' => 'Org Mask Search', 'type' => 'builder']);
-        $client = Client::create(['organization_id' => $org->id, 'name' => 'Client Mask']);
-        $project = Project::create(['client_id' => $client->id, 'name' => 'Project Mask']);
+        $clientUser = User::factory()->create(['name' => 'Client Searcher', 'organization_id' => $org->id]);
+        $clientUser->assignRole('Client');
+
+        $project = Project::create(['client_id' => $clientUser->id, 'name' => 'Project Mask']);
         $source = LeadSource::create(['name' => 'google']);
 
         $rawMobile = '9877665544';
 
         $lead = Lead::factory()->create([
             'project_id' => $project->id,
-            'client_id' => $client->id,
+            'client_id' => $clientUser->id,
             'lead_source_id' => $source->id,
             'name' => 'Sensitive Lead',
             'mobile' => $rawMobile,
@@ -74,7 +73,7 @@ class GlobalSearchTest extends TestCase
 
         $maskedMobile = LeadPresenter::maskMobile($rawMobile);
 
-        Livewire::actingAs($am)
+        Livewire::actingAs($clientUser)
             ->test(GlobalSearch::class)
             ->set('search', 'Sensitive')
             ->assertSee($maskedMobile)

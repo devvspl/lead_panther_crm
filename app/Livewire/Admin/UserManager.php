@@ -73,8 +73,6 @@ class UserManager extends Component
                     'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                     'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                     'sales-executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                    'Account Manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                    'account-manager' => 'bg-amber-50 text-amber-700 border border-amber-200',
                     'Client' => 'bg-slate-50 text-slate-700 border border-slate-200',
                     'client' => 'bg-slate-50 text-slate-700 border border-slate-200',
                 ]

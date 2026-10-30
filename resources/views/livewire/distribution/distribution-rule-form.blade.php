@@ -41,7 +41,7 @@
                         <span class="text-xs font-bold text-ink">Manual Manager Queue</span>
                         <input type="radio" wire:model="ruleType" value="manual" class="text-ink">
                     </div>
-                    <p class="text-[11px] text-muted">Leads sit unassigned until an Account Manager assigns them
+                    <p class="text-[11px] text-muted">Leads sit unassigned until a manager assigns them
                         manually.</p>
                 </div>
 

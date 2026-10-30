@@ -99,8 +99,10 @@ Route::get('/projects/{project}/distribution', DistributionRuleForm::class)->mid
 
 Route::get('/distribution/availability', TeamAvailability::class)->middleware(['auth'])->name('distribution.availability');
 
-// Account Manager Dedicated Leads View
-Route::get('/account-manager/leads', AccountManagerLeads::class)->middleware(['auth'])->name('account_manager.leads');
+// Dedicated Client Leads View (Redirect legacy link to Leads)
+Route::get('/account-manager/leads', function () {
+    return redirect()->route('leads.index');
+})->middleware(['auth'])->name('account_manager.leads');
 
 // Replacement Queue & Client History Routes
 Route::get('/replacements', ReplacementQueue::class)->middleware(['auth'])->name('replacements.queue');
@@ -160,7 +162,7 @@ Route::middleware(['auth', 'role:Super Admin|super-admin|Executive|Sales Executi
     Route::get('/dashboard', [SalesDashboardController::class, 'index'])->name('dashboard');
 });
 
-Route::middleware(['auth', 'role:Super Admin|super-admin|Executive|Account Manager|account-manager|Client|client'])->prefix('client')->name('client.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|super-admin|Executive|Client|client'])->prefix('client')->name('client.')->group(function () {
     Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
     Route::get('/leads', AccountManagerLeads::class)->name('leads');
 });

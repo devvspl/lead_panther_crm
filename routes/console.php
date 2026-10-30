@@ -31,20 +31,23 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule 1: Check Low Credit Balances & Notify Client Admins (Hourly)
+// Schedule 1: Process Background Queue Jobs (Every Minute - for Shared Hosting / Hostinger)
+Schedule::command('queue:work --stop-when-empty --tries=3')->everyMinute()->withoutOverlapping();
+
+// Schedule 2: Check Low Credit Balances & Notify Client Admins (Hourly)
 Schedule::command('credits:check-low-balances')->hourly();
 
-// Schedule 2: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
+// Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
 Schedule::command('followups:check-due')->everyFifteenMinutes();
 
-// Schedule 3: Auto-offline Inactive Team Members (Every 5 Minutes)
+// Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
 Schedule::command('team:auto-offline')->everyFiveMinutes();
 
-// Schedule 4: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
+// Schedule 5: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
 Schedule::command('meta:sync-leads')->everyTenMinutes();
 
-// Schedule 5: Daily Backup of Database + Documents Disk
+// Schedule 6: Daily Backup of Database + Documents Disk
 Schedule::command('backup:run')->daily();
 
-// Schedule 6: Weekly Cleanup of Old Backups
+// Schedule 7: Weekly Cleanup of Old Backups
 Schedule::command('backup:clean')->weekly();

@@ -182,4 +182,40 @@ class OrgSettingsAndSecurityTest extends TestCase
         $response = $this->actingAs($partner)->get('/admin/dashboard');
         $response->assertStatus(403);
     }
+
+    public function test_meta_lead_form_mapping_saves_client_and_project_routing(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $org = \App\Models\Organization::create(['name' => 'Skyline Developers', 'status' => 'active']);
+        $clientUser = User::factory()->create(['organization_id' => $org->id, 'name' => 'Skyline Builder']);
+        $clientUser->assignRole('Builder/Developer');
+
+        $project = \App\Models\Project::create([
+            'client_id' => $clientUser->id,
+            'name' => 'Panchsheel Greens 2',
+            'status' => 'active',
+        ]);
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Ads Main Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->set('selectedMappingAccountId', $account->id)
+            ->set('formClientMap.1144292554640400', $clientUser->id)
+            ->set('formProjectMap.1144292554640400', $project->id)
+            ->call('saveFormMapping', '1144292554640400', 'Panchsheel Greens 2');
+
+        $this->assertDatabaseHas('lead_form_mappings', [
+            'portal_account_id' => $account->id,
+            'form_id' => '1144292554640400',
+            'client_id' => $clientUser->id,
+            'project_id' => $project->id,
+        ]);
+    }
 }

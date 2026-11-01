@@ -8,6 +8,7 @@ use App\Models\IntegrationCredential;
 use App\Models\LeadFormMapping;
 use App\Models\Project;
 use App\Models\Campaign;
+use App\Models\Client;
 use App\Services\GitSyncService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -28,6 +29,7 @@ class IntegrationsManager extends Component
     public string $metaAccessToken = '';
     public string $metaVerifyToken = '';
     public ?int $metaDefaultProjectId = null;
+    public ?int $metaDefaultClientId = null;
     public string $metaLastSyncedTime = '';
     public string $metaHealthStatus = '';
     public string $metaHealthMessage = '';
@@ -60,12 +62,19 @@ class IntegrationsManager extends Component
     public array $connectionStatus = [];
     public bool $isTesting = false;
 
-    // Form Mapping State (Kept for background compatibility with tests/services)
+    // Form Mapping State
     public ?int $selectedMappingAccountId = null;
     public array $availableForms = [];
+    public array $formClientMap = [];
     public array $formProjectMap = [];
     public array $formCampaignMap = [];
     public bool $isFetchingForms = false;
+
+    // Advanced Table State for Meta Lead Forms
+    public string $search = '';
+    public string $sortField = '';
+    public string $sortDirection = 'asc';
+    public array $visibleColumns = [];
 
     public function mount(): void
     {
@@ -104,6 +113,27 @@ class IntegrationsManager extends Component
             $this->metaVerifyToken = $account->getCredential('verify_token') ?? '';
             $defaultProj = $account->getCredential('default_project_id');
             $this->metaDefaultProjectId = $defaultProj ? (int) $defaultProj : null;
+            $defaultClient = $account->getCredential('default_client_id');
+            $this->metaDefaultClientId = $defaultClient ? (int) $defaultClient : null;
+
+            $this->selectedMappingAccountId = $account->id;
+            foreach ($account->formMappings as $mapping) {
+                $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
+                $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
+                $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
+            }
+
+            if (empty($this->availableForms) && $account->formMappings->isNotEmpty()) {
+                $forms = [];
+                foreach ($account->formMappings as $m) {
+                    $forms[] = [
+                        'id' => $m->form_id,
+                        'name' => $m->form_name,
+                        'status' => strtoupper($m->status ?: 'ACTIVE'),
+                    ];
+                }
+                $this->availableForms = $forms;
+            }
             $this->apiSecret = $this->metaAccessToken;
             $this->metaLastSyncedTime = $account->updated_at ? $account->updated_at->format('d M Y, h:i A') : '';
             $this->metaHealthStatus = $account->health_status ?: ($account->credentials()->exists() ? 'healthy' : 'untested');
@@ -226,6 +256,7 @@ class IntegrationsManager extends Component
                 'app_id' => $this->metaAppId,
                 'app_secret' => $this->metaAppSecret,
                 'default_project_id' => $this->metaDefaultProjectId ? (string) $this->metaDefaultProjectId : '',
+                'default_client_id' => $this->metaDefaultClientId ? (string) $this->metaDefaultClientId : '',
             ];
 
             foreach ($credentials as $key => $val) {
@@ -234,7 +265,7 @@ class IntegrationsManager extends Component
                         ['portal_account_id' => $account->id, 'key_name' => $key],
                         ['encrypted_value' => $val]
                     );
-                } elseif (in_array($key, ['app_secret', 'default_project_id']) && ($val === null || $val === '')) {
+                } elseif (in_array($key, ['app_secret', 'default_project_id', 'default_client_id']) && ($val === null || $val === '')) {
                     IntegrationCredential::where('portal_account_id', $account->id)
                         ->where('key_name', $key)
                         ->delete();
@@ -572,9 +603,11 @@ class IntegrationsManager extends Component
         }
 
         $this->formProjectMap = [];
+        $this->formClientMap = [];
         $this->formCampaignMap = [];
         foreach ($account->formMappings as $mapping) {
             $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
+            $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
             $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
         }
 
@@ -617,6 +650,16 @@ class IntegrationsManager extends Component
         $this->isFetchingForms = false;
     }
 
+    public function updatedFormProjectMap($value, $key): void
+    {
+        if (!empty($value)) {
+            $project = Project::find($value);
+            if ($project && $project->client_id) {
+                $this->formClientMap[$key] = $project->client_id;
+            }
+        }
+    }
+
     public function saveFormMapping(string $formId, string $formName): void
     {
         if (!$this->selectedMappingAccountId) {
@@ -633,7 +676,22 @@ class IntegrationsManager extends Component
         }
 
         $projectId = $this->formProjectMap[$formId] ?? null;
+        $clientId = $this->formClientMap[$formId] ?? null;
         $campaignId = $this->formCampaignMap[$formId] ?? null;
+
+        // If client was specified and project exists, link project to client
+        if ($projectId && $clientId) {
+            $proj = Project::find($projectId);
+            if ($proj && (int) $proj->client_id !== (int) $clientId) {
+                $proj->update(['client_id' => (int) $clientId]);
+            }
+        } elseif ($projectId && !$clientId) {
+            $proj = Project::find($projectId);
+            if ($proj?->client_id) {
+                $clientId = $proj->client_id;
+                $this->formClientMap[$formId] = $clientId;
+            }
+        }
 
         LeadFormMapping::updateOrCreate(
             [
@@ -642,59 +700,163 @@ class IntegrationsManager extends Component
             ],
             [
                 'form_name' => $formName,
-                'project_id' => $projectId ?: null,
-                'campaign_id' => $campaignId ?: null,
+                'client_id' => $clientId ? (int) $clientId : null,
+                'project_id' => $projectId ? (int) $projectId : null,
+                'campaign_id' => $campaignId ? (int) $campaignId : null,
                 'status' => 'active',
             ]
         );
 
-        $this->dispatch('toast', type: 'success', message: "Mapping for [{$formName}] saved successfully.");
+        $clientName = '';
+        if ($clientId) {
+            $c = Client::find($clientId) ?? \App\Models\User::find($clientId);
+            $clientName = $c ? " to [{$c->name}]" : '';
+        }
+
+        $this->dispatch('toast', type: 'success', message: "Mapping for [{$formName}]{$clientName} saved successfully.");
+    }
+
+    public function sortBy(string $field): void
+    {
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+    }
+
+    public function getFilteredAvailableFormsProperty(): \Illuminate\Support\Collection
+    {
+        $forms = collect($this->availableForms);
+
+        if (!empty($this->search)) {
+            $term = strtolower(trim($this->search));
+            $forms = $forms->filter(function ($item) use ($term) {
+                $id = strtolower((string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '')));
+                $name = strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
+                return str_contains($id, $term) || str_contains($name, $term);
+            });
+        }
+
+        if ($this->sortField) {
+            $forms = $forms->sortBy(function ($item) {
+                if ($this->sortField === 'form_name') {
+                    return is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '');
+                }
+                return is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '');
+            }, SORT_REGULAR, $this->sortDirection === 'desc');
+        }
+
+        return $forms->values();
     }
 
     public function availableFormsTableColumns(): array
     {
+        $clients = Client::with('organization')->orderBy('name')->get();
+        if ($clients->isEmpty()) {
+            $clients = \App\Models\User::whereHas('roles', function ($q) {
+                $q->whereIn('name', ['Builder/Developer', 'Broker', 'client', 'Client']);
+            })->with('organization')->orderBy('name')->get();
+        }
+        if ($clients->isEmpty()) {
+            $clients = \App\Models\User::with('organization')->orderBy('name')->get();
+        }
+
+        $projects = Project::where('status', 'active')->orderBy('name')->get();
+        if ($projects->isEmpty()) {
+            $projects = Project::orderBy('name')->get();
+        }
+
+        $campaigns = Campaign::where('status', 'active')->orderBy('name')->get();
+
         return [
-            ['key' => 'form_name', 'label' => 'Form Name & ID', 'render' => function($row) {
-                $fId = is_array($row) ? $row['id'] : $row->id;
-                $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form ' . $fId;
-                return '<div class="font-bold text-ink">' . e($fName) . '</div><div class="font-mono text-muted text-[10px] mt-0.5">ID: ' . e($fId) . '</div>';
-            }, 'priority' => 1],
-            ['key' => 'meta_status', 'label' => 'Meta Status', 'render' => function($row) {
-                $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
-                return '<span class="px-2 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">' . e($status) . '</span>';
-            }, 'priority' => 1],
-            ['key' => 'project', 'label' => 'Assigned CRM Project', 'render' => function($row) {
-                $fId = is_array($row) ? $row['id'] : $row->id;
-                $selected = $this->formProjectMap[$fId] ?? '';
-                $projects = Project::where('status', 'active')->orderBy('name')->get();
-                if ($projects->isEmpty()) {
-                    $projects = Project::orderBy('name')->get();
-                }
-                $html = '<select wire:model="formProjectMap.' . $fId . '" class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"><option value="">-- Select Project --</option>';
-                foreach ($projects as $p) {
-                    $sel = $selected == $p->id ? ' selected' : '';
-                    $html .= '<option value="' . $p->id . '"' . $sel . '>' . e($p->name) . '</option>';
-                }
-                $html .= '</select>';
-                return $html;
-            }, 'priority' => 1],
-            ['key' => 'campaign', 'label' => 'Assigned CRM Campaign', 'render' => function($row) {
-                $fId = is_array($row) ? $row['id'] : $row->id;
-                $selected = $this->formCampaignMap[$fId] ?? '';
-                $campaigns = Campaign::where('status', 'active')->get();
-                $html = '<select wire:model="formCampaignMap.' . $fId . '" class="h-7 px-2.5 rounded-lg border border-border bg-white text-ink text-xs focus:ring-1 focus:ring-ink"><option value="">-- Optional Campaign --</option>';
-                foreach ($campaigns as $c) {
-                    $sel = $selected == $c->id ? ' selected' : '';
-                    $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name) . '</option>';
-                }
-                $html .= '</select>';
-                return $html;
-            }, 'priority' => 1],
-            ['key' => 'action', 'label' => 'Action', 'align' => 'right', 'render' => function($row) {
-                $fId = is_array($row) ? $row['id'] : $row->id;
-                $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form ' . $fId;
-                return '<button wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3 py-1 bg-ink text-white font-semibold text-[11px] rounded-lg hover:bg-neutral-800 transition">Save</button>';
-            }, 'priority' => 1],
+            [
+                'key' => 'form_name',
+                'label' => 'Meta Form Name & ID',
+                'priority' => 1,
+                'render' => function ($row) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
+                    return '<div class="font-bold text-ink leading-tight">' . e($fName) . '</div>'
+                        . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>';
+                },
+            ],
+            [
+                'key' => 'meta_status',
+                'label' => 'Status',
+                'priority' => 1,
+                'render' => function ($row) {
+                    $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
+                    return '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">' . e($status) . '</span>';
+                },
+            ],
+            [
+                'key' => 'client',
+                'label' => 'Client / Organization Account',
+                'priority' => 1,
+                'render' => function ($row) use ($clients) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $selected = $this->formClientMap[$fId] ?? '';
+                    $html = '<select wire:model.live="formClientMap.' . $fId . '" class="w-full min-w-[170px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
+                    $html .= '<option value="">-- Assign Client / Org --</option>';
+                    foreach ($clients as $c) {
+                        $sel = ((string) $selected === (string) $c->id) ? ' selected' : '';
+                        $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
+                        $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name . $orgName) . '</option>';
+                    }
+                    $html .= '</select>';
+                    return $html;
+                },
+            ],
+            [
+                'key' => 'project',
+                'label' => 'Assign CRM Project',
+                'priority' => 1,
+                'render' => function ($row) use ($projects) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $selected = $this->formProjectMap[$fId] ?? '';
+                    $html = '<select wire:model.live="formProjectMap.' . $fId . '" class="w-full min-w-[150px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
+                    $html .= '<option value="">-- Auto Match by Name --</option>';
+                    foreach ($projects as $p) {
+                        $sel = ((string) $selected === (string) $p->id) ? ' selected' : '';
+                        $html .= '<option value="' . $p->id . '"' . $sel . '>' . e($p->name) . '</option>';
+                    }
+                    $html .= '</select>';
+                    return $html;
+                },
+            ],
+            [
+                'key' => 'campaign',
+                'label' => 'Assign CRM Campaign',
+                'priority' => 2,
+                'render' => function ($row) use ($campaigns) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $selected = $this->formCampaignMap[$fId] ?? '';
+                    $html = '<select wire:model.live="formCampaignMap.' . $fId . '" class="w-full min-w-[130px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
+                    $html .= '<option value="">-- Optional Campaign --</option>';
+                    foreach ($campaigns as $c) {
+                        $sel = ((string) $selected === (string) $c->id) ? ' selected' : '';
+                        $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name) . '</option>';
+                    }
+                    $html .= '</select>';
+                    return $html;
+                },
+            ],
+            [
+                'key' => 'action',
+                'label' => 'Action',
+                'align' => 'right',
+                'priority' => 1,
+                'render' => function ($row) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
+                    return '<button type="button" wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3.5 py-1.5 bg-ink text-white font-semibold text-xs rounded-lg hover:bg-neutral-800 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5 shrink-0">'
+                        . '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+                        . '<span>Save</span>'
+                        . '</button>';
+                },
+            ],
         ];
     }
 
@@ -718,10 +880,21 @@ class IntegrationsManager extends Component
 
     public function render()
     {
+        $clients = Client::with('organization')->orderBy('name')->get();
+        if ($clients->isEmpty()) {
+            $clients = \App\Models\User::whereHas('roles', function ($q) {
+                $q->whereIn('name', ['Builder/Developer', 'Broker', 'client', 'Client']);
+            })->with('organization')->orderBy('name')->get();
+        }
+        if ($clients->isEmpty()) {
+            $clients = \App\Models\User::with('organization')->orderBy('name')->get();
+        }
+
         $projects = Project::orderBy('name')->get();
         $campaigns = Campaign::orderBy('name')->get();
 
         return view('livewire.settings.integrations-manager', [
+            'clients' => $clients,
             'projects' => $projects,
             'campaigns' => $campaigns,
         ])->layout('layouts.app');

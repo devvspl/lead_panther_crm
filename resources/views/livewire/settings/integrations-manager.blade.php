@@ -268,19 +268,35 @@
                     <p class="text-[11px] text-muted mt-1">Requires <code class="font-bold text-ink">leads_retrieval</code> and <code class="font-bold text-ink">pages_show_list</code> permissions.</p>
                 </div>
 
-                <!-- Row 3.5: Default Assigned CRM Project -->
-                <div>
-                    <label class="font-bold text-ink">Default CRM Project for Incoming Meta Leads</label>
-                    <select
-                        wire:model="metaDefaultProjectId"
-                        class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-1 focus:ring-ink transition mt-1"
-                    >
-                        <option value="">-- Auto-match / Create Project based on Meta Form Name --</option>
-                        @foreach($projects as $p)
-                            <option value="{{ $p->id }}">{{ $p->name }}</option>
-                        @endforeach
-                    </select>
-                    <p class="text-[11px] text-muted mt-1">Incoming leads from unmapped forms will automatically route to this project (or auto-match by form name).</p>
+                <!-- Row 3.5: Default Assigned CRM Project & Client -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="font-bold text-ink">Default Client / Organization Account</label>
+                        <select
+                            wire:model="metaDefaultClientId"
+                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-1 focus:ring-ink transition mt-1"
+                        >
+                            <option value="">-- Primary Platform Client / Builder --</option>
+                            @foreach($clients as $c)
+                                <option value="{{ $c->id }}">{{ $c->name }}{{ $c->organization ? ' (' . $c->organization->name . ')' : '' }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[11px] text-muted mt-1">Default account that will receive incoming unmapped Meta leads.</p>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Default CRM Project for Incoming Meta Leads</label>
+                        <select
+                            wire:model="metaDefaultProjectId"
+                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-1 focus:ring-ink transition mt-1"
+                        >
+                            <option value="">-- Auto-match / Create Project based on Meta Form Name --</option>
+                            @foreach($projects as $p)
+                                <option value="{{ $p->id }}">{{ $p->name }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[11px] text-muted mt-1">Incoming leads from unmapped forms will automatically route to this project.</p>
+                    </div>
                 </div>
 
                 <!-- Row 4: Webhook Verify Token & Callback URL -->
@@ -344,16 +360,23 @@
 
                 <!-- Meta Leadgen Forms & Per-Form Project Mapping -->
                 <div class="pt-4 border-t border-border space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Meta Page Lead Forms &amp; Project Routing</h3>
-                            <p class="text-[11px] text-muted">Map individual Facebook leadgen forms to specific CRM projects.</p>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                                <span>Meta Page Lead Forms &amp; Project Routing</span>
+                                @if(!empty($availableForms))
+                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-canvas text-ink border border-border">
+                                        {{ count($availableForms) }} Forms
+                                    </span>
+                                @endif
+                            </h3>
+                            <p class="text-[11px] text-muted">Map individual Facebook leadgen forms to specific CRM projects and assign leads to client / organization accounts.</p>
                         </div>
                         <button
                             type="button"
                             wire:click="fetchLeadForms"
                             wire:loading.attr="disabled"
-                            class="px-3 py-1.5 bg-canvas border border-border rounded-xl text-ink font-semibold text-xs hover:bg-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            class="px-3.5 py-1.5 bg-canvas border border-border rounded-xl text-ink font-semibold text-xs hover:bg-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 self-start sm:self-auto"
                         >
                             <svg wire:loading.remove wire:target="fetchLeadForms" class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             <svg wire:loading wire:target="fetchLeadForms" class="animate-spin w-3.5 h-3.5 text-ink" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -361,60 +384,16 @@
                         </button>
                     </div>
 
-                    @if(!empty($availableForms))
-                        <div class="overflow-x-auto border border-border rounded-xl">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-canvas border-b border-border text-muted font-bold text-[10px] uppercase">
-                                    <tr>
-                                        <th class="py-2.5 px-3">Form Name &amp; ID</th>
-                                        <th class="py-2.5 px-3">Status</th>
-                                        <th class="py-2.5 px-3">Assign CRM Project</th>
-                                        <th class="py-2.5 px-3 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-border bg-white">
-                                    @foreach($availableForms as $form)
-                                        @php
-                                            $fId = is_array($form) ? $form['id'] : $form->id;
-                                            $fName = (is_array($form) ? ($form['name'] ?? null) : $form->name) ?: 'Lead Form #' . $fId;
-                                            $fStatus = (is_array($form) ? ($form['status'] ?? null) : $form->status) ?: 'ACTIVE';
-                                        @endphp
-                                        <tr class="hover:bg-canvas/50">
-                                            <td class="py-2 px-3">
-                                                <div class="font-bold text-ink">{{ $fName }}</div>
-                                                <div class="font-mono text-[10px] text-muted">ID: {{ $fId }}</div>
-                                            </td>
-                                            <td class="py-2 px-3">
-                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    {{ strtoupper($fStatus) }}
-                                                </span>
-                                            </td>
-                                            <td class="py-2 px-3">
-                                                <select
-                                                    wire:model="formProjectMap.{{ $fId }}"
-                                                    class="h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink"
-                                                >
-                                                    <option value="">-- Auto Match by Name --</option>
-                                                    @foreach($projects as $p)
-                                                        <option value="{{ $p->id }}">{{ $p->name }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </td>
-                                            <td class="py-2 px-3 text-right">
-                                                <button
-                                                    type="button"
-                                                    wire:click="saveFormMapping('{{ $fId }}', '{{ addslashes($fName) }}')"
-                                                    class="px-3 py-1 bg-ink text-white font-semibold text-[11px] rounded-lg hover:bg-neutral-800 transition cursor-pointer"
-                                                >
-                                                    Save
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
+                    <x-ui.advanced-table 
+                        :columns="$this->availableFormsTableColumns()"
+                        :rows="$this->filteredAvailableForms"
+                        :showFilterDropdown="false"
+                        :showConfigurations="false"
+                        searchPlaceholder="Search Meta lead forms by name or ID..."
+                        emptyTitle="No Meta Lead Forms Loaded"
+                        emptyMessage="Click 'Fetch Forms from Meta' to load all active leadgen forms from your connected Facebook Page."
+                        tableName="meta_page_forms"
+                    />
                 </div>
             </div>
         @endif

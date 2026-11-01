@@ -14,6 +14,11 @@ class LeadFormMapping extends Model
         return $this->belongsTo(PortalAccount::class);
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

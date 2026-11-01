@@ -235,16 +235,22 @@ class MetaLeadSyncService
                 $project = Project::where('client_id', $clientId)->first() ?? Project::first();
             }
 
+            // Resolve target client/organization: mapping client -> project client -> default client
+            $targetClientId = $mapping?->client_id ?: ($project?->client_id ?: $clientId);
+
             if (!$project) {
                 $project = Project::create([
-                    'client_id' => $clientId,
+                    'client_id' => $targetClientId,
                     'name' => $formName ?: 'Meta Lead Ads Project',
                     'status' => 'active',
                 ]);
+            } elseif ($mapping?->client_id && $project->client_id !== $mapping->client_id) {
+                // Keep project client aligned if mapped explicitly
+                $project->update(['client_id' => $mapping->client_id]);
             }
 
             $projectId = $project->id;
-            $leadClientId = $project->client_id ?: $clientId;
+            $leadClientId = $project->client_id ?: $targetClientId;
 
             try {
                 $leadsResponse = Http::timeout(20)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", [

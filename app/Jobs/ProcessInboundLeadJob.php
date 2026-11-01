@@ -82,10 +82,23 @@ class ProcessInboundLeadJob implements ShouldQueue
 
             // Determine Client & Project & LeadSource
             $client = Client::first();
-            $clientId = $client?->id ?: 1;
-            $project = $mapping?->project ?: Project::where('client_id', $clientId)->first();
-            $projectId = $project?->id ?: 1;
-            $clientId = $project?->client_id ?: $clientId;
+            $defaultClientId = $client?->id ?: (\App\Models\User::first()?->id ?: 1);
+            $targetClientId = $mapping?->client_id ?: ($mapping?->project?->client_id ?: $defaultClientId);
+
+            $project = $mapping?->project;
+            if (!$project) {
+                $project = Project::where('client_id', $targetClientId)->first() ?? Project::first();
+            }
+            if (!$project) {
+                $project = Project::create([
+                    'client_id' => $targetClientId,
+                    'name' => $mapped['campaign'] ?? 'Inbound Leads Project',
+                    'status' => 'active',
+                ]);
+            }
+
+            $projectId = $project->id;
+            $clientId = $targetClientId;
             $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
 

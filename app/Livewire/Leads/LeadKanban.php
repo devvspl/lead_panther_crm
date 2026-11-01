@@ -658,8 +658,7 @@ class LeadKanban extends Component
                 $this->customFormId ?: null,
                 (int) ($this->pullLimit ?: 25),
                 $this->syncProjectId ?: null,
-                $this->syncCampaignId ?: null,
-                $this->customPageAccessToken ?: null
+                $this->syncCampaignId ?: null
             );
 
             $this->pullSummary = [

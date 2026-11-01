@@ -99,6 +99,26 @@ class MetaLeadSyncService
             ];
         }
 
+        // Auto-resolve genuine Page Access Token if User or System-User token was passed
+        if (!empty($pageId) && !empty($accessToken)) {
+            try {
+                $probe = Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}", [
+                    'fields' => 'id,name,access_token',
+                    'access_token' => $accessToken,
+                ]);
+
+                if ($probe->successful() && $probe->json('access_token')) {
+                    $resolvedPageToken = $probe->json('access_token');
+                    if (!empty($resolvedPageToken) && $resolvedPageToken !== $accessToken) {
+                        $accessToken = $resolvedPageToken;
+                        $account->setCredential('access_token', $resolvedPageToken);
+                    }
+                }
+            } catch (Throwable $e) {
+                // Ignore probe failure and fallback to existing token
+            }
+        }
+
         // 1. Discover Target Leadgen Form IDs
         $targetForms = []; // array of ['id' => ..., 'name' => ...]
 

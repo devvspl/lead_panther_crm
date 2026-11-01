@@ -711,15 +711,7 @@
                 </div>
             </div>
 
-            <!-- Custom Access Token Override -->
-            <div>
-                <label class="font-bold text-ink">Custom Page Access Token <span
-                        class="text-muted font-normal">(Optional Override)</span></label>
-                <input type="password" wire:model="customPageAccessToken"
-                    placeholder="Use saved token from account or paste direct Graph token"
-                    class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
-                <p class="text-[10px] text-muted mt-1">Leave blank to use the saved token from Integrations settings.</p>
-            </div>
+
 
             @if($pullSummary)
                 <div class="p-4 bg-canvas rounded-xl border border-border space-y-2 mt-3">

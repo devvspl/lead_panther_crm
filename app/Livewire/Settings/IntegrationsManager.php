@@ -203,6 +203,19 @@ class IntegrationsManager extends Component
         }
 
         if (!empty($this->metaPageId)) {
+            // Auto-resolve genuine Page Access Token if a User or System User token was entered
+            try {
+                $probe = Http::timeout(8)->get("https://graph.facebook.com/v19.0/{$this->metaPageId}", [
+                    'fields' => 'id,name,access_token',
+                    'access_token' => $this->metaAccessToken,
+                ]);
+                if ($probe->successful() && $probe->json('access_token')) {
+                    $this->metaAccessToken = $probe->json('access_token');
+                }
+            } catch (Throwable $e) {
+                // Proceed with existing token if network fails
+            }
+
             $credentials = [
                 'page_id' => $this->metaPageId,
                 'access_token' => $this->metaAccessToken,
@@ -294,6 +307,20 @@ class IntegrationsManager extends Component
                     $msg = "Connected — Page: {$pageName}";
                     $this->metaHealthStatus = 'healthy';
                     $this->metaHealthMessage = $msg;
+
+                    // If Meta returned a dedicated Page Access Token, auto-upgrade and save it
+                    $pageAccessToken = $response->json('access_token');
+                    if ($pageAccessToken && $pageAccessToken !== $this->metaAccessToken) {
+                        $this->metaAccessToken = $pageAccessToken;
+                        $this->apiSecret = $pageAccessToken;
+                        if ($this->selectedAccountId) {
+                            IntegrationCredential::updateOrCreate(
+                                ['portal_account_id' => $this->selectedAccountId, 'key_name' => 'access_token'],
+                                ['encrypted_value' => $pageAccessToken]
+                            );
+                        }
+                    }
+
                     if ($this->selectedAccountId) {
                         PortalAccount::where('id', $this->selectedAccountId)->update([
                             'health_status' => 'healthy',

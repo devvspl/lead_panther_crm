@@ -272,29 +272,25 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="font-bold text-ink">Default Client / Organization Account</label>
-                        <select
-                            wire:model="metaDefaultClientId"
-                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-1 focus:ring-ink transition mt-1"
-                        >
-                            <option value="">-- Primary Platform Client / Builder --</option>
-                            @foreach($clients as $c)
-                                <option value="{{ $c->id }}">{{ $c->name }}{{ $c->organization ? ' (' . $c->organization->name . ')' : '' }}</option>
-                            @endforeach
-                        </select>
+                        <x-ui.themed-select
+                            wire:model.live="metaDefaultClientId"
+                            :options="$clientOptions"
+                            searchable="true"
+                            placeholder="-- Primary Platform Client / Builder --"
+                            class="w-full mt-1"
+                        />
                         <p class="text-[11px] text-muted mt-1">Default account that will receive incoming unmapped Meta leads.</p>
                     </div>
 
                     <div>
                         <label class="font-bold text-ink">Default CRM Project for Incoming Meta Leads</label>
-                        <select
-                            wire:model="metaDefaultProjectId"
-                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-1 focus:ring-ink transition mt-1"
-                        >
-                            <option value="">-- Auto-match / Create Project based on Meta Form Name --</option>
-                            @foreach($projects as $p)
-                                <option value="{{ $p->id }}">{{ $p->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-ui.themed-select
+                            wire:model.live="metaDefaultProjectId"
+                            :options="$projectOptions"
+                            searchable="true"
+                            placeholder="-- Auto-match / Create Project based on Meta Form Name --"
+                            class="w-full mt-1"
+                        />
                         <p class="text-[11px] text-muted mt-1">Incoming leads from unmapped forms will automatically route to this project.</p>
                     </div>
                 </div>

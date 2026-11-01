@@ -695,7 +695,7 @@
                         }
                     @endphp
                     <x-ui.themed-select wire:model="syncProjectId" :options="$projOptions"
-                        placeholder="Auto from Mapping" class="w-full mt-1" />
+                        searchable="true" placeholder="Auto from Mapping" class="w-full mt-1" />
                 </div>
                 <div>
                     <label class="font-bold text-ink">Assign to Campaign <span
@@ -707,7 +707,7 @@
                         }
                     @endphp
                     <x-ui.themed-select wire:model="syncCampaignId" :options="$campOptions"
-                        placeholder="Auto from Meta Campaign" class="w-full mt-1" />
+                        searchable="true" placeholder="Auto from Meta Campaign" class="w-full mt-1" />
                 </div>
             </div>
 

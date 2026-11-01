@@ -218,4 +218,39 @@ class OrgSettingsAndSecurityTest extends TestCase
             'project_id' => $project->id,
         ]);
     }
+
+    public function test_select_change_automatically_persists_project_and_client_mapping(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Ads Main Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        $mapping = \App\Models\LeadFormMapping::create([
+            'portal_account_id' => $account->id,
+            'form_id' => '99887766',
+            'form_name' => 'Studio Apartments',
+            'status' => 'active',
+        ]);
+
+        $project = \App\Models\Project::create([
+            'client_id' => $admin->id,
+            'name' => 'Studio Heights',
+            'status' => 'active',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->set('selectedMappingAccountId', $account->id)
+            ->set('formProjectMap.99887766', $project->id);
+
+        $this->assertDatabaseHas('lead_form_mappings', [
+            'form_id' => '99887766',
+            'project_id' => $project->id,
+        ]);
+    }
 }

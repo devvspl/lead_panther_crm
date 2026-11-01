@@ -9,6 +9,7 @@ use App\Models\LeadFormMapping;
 use App\Models\Project;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\LeadSource;
 use App\Services\GitSyncService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -602,34 +603,22 @@ class IntegrationsManager extends Component
             return;
         }
 
-        $this->formProjectMap = [];
-        $this->formClientMap = [];
-        $this->formCampaignMap = [];
-        foreach ($account->formMappings as $mapping) {
-            $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
-            $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
-            $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
-        }
-
         $forms = [];
+        $pageId = $account->getCredential('page_id') ?: $this->metaPageId;
+        $accessToken = $account->getCredential('access_token') ?: $this->metaAccessToken;
 
-        if ($account->type === 'meta') {
-            $pageId = $account->getCredential('page_id') ?: $this->metaPageId;
-            $accessToken = $account->getCredential('access_token') ?: $this->metaAccessToken;
+        if ($account->type === 'meta' && $pageId && $accessToken) {
+            try {
+                $response = Http::timeout(12)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
+                    'access_token' => $accessToken,
+                    'fields' => 'id,name,status,created_time',
+                ]);
 
-            if ($pageId && $accessToken) {
-                try {
-                    $response = Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
-                        'access_token' => $accessToken,
-                        'fields' => 'id,name,status,created_time',
-                    ]);
-
-                    if ($response->successful() && is_array($response->json('data'))) {
-                        $forms = $response->json('data');
-                    }
-                } catch (Throwable $e) {
-                    // Fallback
+                if ($response->successful() && is_array($response->json('data'))) {
+                    $forms = $response->json('data');
                 }
+            } catch (Throwable $e) {
+                // Fallback to local
             }
         }
 
@@ -646,17 +635,145 @@ class IntegrationsManager extends Component
             }
         }
 
+        // Auto-store and sync each Form, Project, Campaign, and Client in Database
+        $defaultClientId = $this->metaDefaultClientId ?: (Client::first()?->id ?? (\App\Models\User::first()?->id ?? 1));
+        $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
+
+        foreach ($forms as $formItem) {
+            $fId = (string) (is_array($formItem) ? $formItem['id'] : $formItem->id);
+            $fName = (string) (is_array($formItem) ? ($formItem['name'] ?? '') : ($formItem->name ?? ''));
+            $cleanName = trim(preg_replace('/\(.*?\)/', '', $fName)) ?: $fName;
+
+            $mapping = LeadFormMapping::firstOrCreate(
+                [
+                    'portal_account_id' => $account->id,
+                    'form_id' => $fId,
+                ],
+                [
+                    'form_name' => $fName ?: ('Lead Form #' . $fId),
+                    'page_id' => $pageId ?? null,
+                    'status' => 'active',
+                ]
+            );
+
+            // 1. Resolve or Auto-create Project in DB
+            $project = $mapping->project_id ? Project::find($mapping->project_id) : null;
+            if (!$project && !empty($this->metaDefaultProjectId)) {
+                $project = Project::find($this->metaDefaultProjectId);
+            }
+            if (!$project && !empty($cleanName)) {
+                $project = Project::where('name', $fName)
+                    ->orWhere('name', 'like', "%{$cleanName}%")
+                    ->first();
+            }
+            if (!$project) {
+                $project = Project::create([
+                    'client_id' => $this->metaDefaultClientId ?: $defaultClientId,
+                    'name' => $cleanName,
+                    'status' => 'active',
+                ]);
+            }
+
+            // 2. Resolve or Auto-create Campaign in DB
+            $campaign = $mapping->campaign_id ? Campaign::find($mapping->campaign_id) : null;
+            if (!$campaign && $project) {
+                $campaign = Campaign::where('project_id', $project->id)
+                    ->where(function ($q) use ($fName, $cleanName) {
+                        $q->where('name', $fName)->orWhere('name', 'like', "%{$cleanName}%");
+                    })
+                    ->first();
+
+                if (!$campaign) {
+                    $campaign = Campaign::create([
+                        'project_id' => $project->id,
+                        'name' => $cleanName . ' Campaign',
+                        'lead_source_id' => $leadSource->id,
+                        'utm_campaign' => Str::slug($cleanName),
+                        'status' => 'active',
+                    ]);
+                }
+            }
+
+            // 3. Resolve Target Client
+            $clientId = $mapping->client_id ?: ($project->client_id ?: $defaultClientId);
+
+            // Keep mapping and project in sync
+            $mapping->update([
+                'form_name' => $fName ?: $mapping->form_name,
+                'project_id' => $project?->id,
+                'campaign_id' => $campaign?->id,
+                'client_id' => $clientId,
+            ]);
+
+            $this->formProjectMap[$fId] = $project?->id;
+            $this->formCampaignMap[$fId] = $campaign?->id;
+            $this->formClientMap[$fId] = $clientId;
+        }
+
         $this->availableForms = $forms;
         $this->isFetchingForms = false;
+
+        $count = count($forms);
+        $this->dispatch('toast', type: 'success', message: "Fetched {$count} Meta forms. Forms, projects, and campaigns stored in database.");
     }
 
     public function updatedFormProjectMap($value, $key): void
     {
-        if (!empty($value)) {
-            $project = Project::find($value);
-            if ($project && $project->client_id) {
-                $this->formClientMap[$key] = $project->client_id;
+        $fId = (string) $key;
+        $projectId = !empty($value) ? (int) $value : null;
+
+        $mapping = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
+            ->where('form_id', $fId)
+            ->first();
+
+        if ($mapping) {
+            $mapping->update(['project_id' => $projectId]);
+
+            if ($projectId) {
+                $project = Project::find($projectId);
+                if ($project && $project->client_id) {
+                    $this->formClientMap[$fId] = $project->client_id;
+                    $mapping->update(['client_id' => $project->client_id]);
+                }
             }
+            $this->dispatch('toast', type: 'success', message: "Assigned project updated for Form #{$fId}");
+        }
+    }
+
+    public function updatedFormClientMap($value, $key): void
+    {
+        $fId = (string) $key;
+        $clientId = !empty($value) ? (int) $value : null;
+
+        $mapping = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
+            ->where('form_id', $fId)
+            ->first();
+
+        if ($mapping) {
+            $mapping->update(['client_id' => $clientId]);
+
+            if ($clientId && $mapping->project_id) {
+                $project = Project::find($mapping->project_id);
+                if ($project && (int) $project->client_id !== $clientId) {
+                    $project->update(['client_id' => $clientId]);
+                }
+            }
+            $this->dispatch('toast', type: 'success', message: "Client account updated for Form #{$fId}");
+        }
+    }
+
+    public function updatedFormCampaignMap($value, $key): void
+    {
+        $fId = (string) $key;
+        $campaignId = !empty($value) ? (int) $value : null;
+
+        $mapping = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
+            ->where('form_id', $fId)
+            ->first();
+
+        if ($mapping) {
+            $mapping->update(['campaign_id' => $campaignId]);
+            $this->dispatch('toast', type: 'success', message: "Campaign updated for Form #{$fId}");
         }
     }
 
@@ -770,6 +887,22 @@ class IntegrationsManager extends Component
 
         $campaigns = Campaign::where('status', 'active')->orderBy('name')->get();
 
+        $clientOptions = ['' => '-- Select Client / Org --'];
+        foreach ($clients as $c) {
+            $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
+            $clientOptions[(string) $c->id] = $c->name . $orgName;
+        }
+
+        $projectOptions = ['' => '-- Auto Match / Create --'];
+        foreach ($projects as $p) {
+            $projectOptions[(string) $p->id] = $p->name;
+        }
+
+        $campaignOptions = ['' => '-- Optional Campaign --'];
+        foreach ($campaigns as $c) {
+            $campaignOptions[(string) $c->id] = $c->name;
+        }
+
         return [
             [
                 'key' => 'form_name',
@@ -795,52 +928,51 @@ class IntegrationsManager extends Component
                 'key' => 'client',
                 'label' => 'Client / Organization Account',
                 'priority' => 1,
-                'render' => function ($row) use ($clients) {
+                'render' => function ($row) use ($clientOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    $selected = $this->formClientMap[$fId] ?? '';
-                    $html = '<select wire:model.live="formClientMap.' . $fId . '" class="w-full min-w-[170px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
-                    $html .= '<option value="">-- Assign Client / Org --</option>';
-                    foreach ($clients as $c) {
-                        $sel = ((string) $selected === (string) $c->id) ? ' selected' : '';
-                        $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
-                        $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name . $orgName) . '</option>';
-                    }
-                    $html .= '</select>';
-                    return $html;
+                    return view('components.ui.themed-select', [
+                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
+                            'wire:model.live' => "formClientMap.{$fId}",
+                        ]),
+                        'options' => $clientOptions,
+                        'searchable' => true,
+                        'placeholder' => '-- Select Client / Org --',
+                        'class' => 'w-full min-w-[180px]',
+                    ])->render();
                 },
             ],
             [
                 'key' => 'project',
                 'label' => 'Assign CRM Project',
                 'priority' => 1,
-                'render' => function ($row) use ($projects) {
+                'render' => function ($row) use ($projectOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    $selected = $this->formProjectMap[$fId] ?? '';
-                    $html = '<select wire:model.live="formProjectMap.' . $fId . '" class="w-full min-w-[150px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
-                    $html .= '<option value="">-- Auto Match by Name --</option>';
-                    foreach ($projects as $p) {
-                        $sel = ((string) $selected === (string) $p->id) ? ' selected' : '';
-                        $html .= '<option value="' . $p->id . '"' . $sel . '>' . e($p->name) . '</option>';
-                    }
-                    $html .= '</select>';
-                    return $html;
+                    return view('components.ui.themed-select', [
+                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
+                            'wire:model.live' => "formProjectMap.{$fId}",
+                        ]),
+                        'options' => $projectOptions,
+                        'searchable' => true,
+                        'placeholder' => '-- Select Project --',
+                        'class' => 'w-full min-w-[170px]',
+                    ])->render();
                 },
             ],
             [
                 'key' => 'campaign',
                 'label' => 'Assign CRM Campaign',
                 'priority' => 2,
-                'render' => function ($row) use ($campaigns) {
+                'render' => function ($row) use ($campaignOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    $selected = $this->formCampaignMap[$fId] ?? '';
-                    $html = '<select wire:model.live="formCampaignMap.' . $fId . '" class="w-full min-w-[130px] h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-ink focus:bg-white transition">';
-                    $html .= '<option value="">-- Optional Campaign --</option>';
-                    foreach ($campaigns as $c) {
-                        $sel = ((string) $selected === (string) $c->id) ? ' selected' : '';
-                        $html .= '<option value="' . $c->id . '"' . $sel . '>' . e($c->name) . '</option>';
-                    }
-                    $html .= '</select>';
-                    return $html;
+                    return view('components.ui.themed-select', [
+                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
+                            'wire:model.live' => "formCampaignMap.{$fId}",
+                        ]),
+                        'options' => $campaignOptions,
+                        'searchable' => true,
+                        'placeholder' => '-- Optional Campaign --',
+                        'class' => 'w-full min-w-[150px]',
+                    ])->render();
                 },
             ],
             [
@@ -851,9 +983,9 @@ class IntegrationsManager extends Component
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
-                    return '<button type="button" wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3.5 py-1.5 bg-ink text-white font-semibold text-xs rounded-lg hover:bg-neutral-800 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5 shrink-0">'
+                    return '<button type="button" wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3 py-1.5 bg-ink text-white font-semibold text-xs rounded-lg hover:bg-neutral-800 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5 shrink-0">'
                         . '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
-                        . '<span>Save</span>'
+                        . '<span>Saved</span>'
                         . '</button>';
                 },
             ],
@@ -893,10 +1025,23 @@ class IntegrationsManager extends Component
         $projects = Project::orderBy('name')->get();
         $campaigns = Campaign::orderBy('name')->get();
 
+        $clientOptions = ['' => '-- Primary Platform Client / Builder --'];
+        foreach ($clients as $c) {
+            $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
+            $clientOptions[(string) $c->id] = $c->name . $orgName;
+        }
+
+        $projectOptions = ['' => '-- Auto Match / Create Project --'];
+        foreach ($projects as $p) {
+            $projectOptions[(string) $p->id] = $p->name;
+        }
+
         return view('livewire.settings.integrations-manager', [
             'clients' => $clients,
             'projects' => $projects,
             'campaigns' => $campaigns,
+            'clientOptions' => $clientOptions,
+            'projectOptions' => $projectOptions,
         ])->layout('layouts.app');
     }
 }

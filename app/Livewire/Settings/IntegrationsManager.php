@@ -129,6 +129,10 @@ class IntegrationsManager extends Component
 
             $this->selectedMappingAccountId = $account->id;
             foreach ($account->formMappings as $mapping) {
+                // If previously saved campaign had " Campaign" suffix, strip it to match Meta exact name
+                if ($mapping->campaign && !empty($mapping->form_name) && $mapping->campaign->name === $mapping->form_name . ' Campaign') {
+                    $mapping->campaign->update(['name' => $mapping->form_name]);
+                }
                 $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
                 $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
                 $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
@@ -676,8 +680,10 @@ class IntegrationsManager extends Component
 
         foreach ($forms as $formItem) {
             $fId = (string) (is_array($formItem) ? $formItem['id'] : $formItem->id);
-            $fName = (string) (is_array($formItem) ? ($formItem['name'] ?? '') : ($formItem->name ?? ''));
-            $cleanName = trim(preg_replace('/\(.*?\)/', '', $fName)) ?: $fName;
+            $fName = trim((string) (is_array($formItem) ? ($formItem['name'] ?? '') : ($formItem->name ?? '')));
+            if (empty($fName)) {
+                $fName = 'Lead Form #' . $fId;
+            }
 
             $mapping = LeadFormMapping::firstOrCreate(
                 [
@@ -685,63 +691,88 @@ class IntegrationsManager extends Component
                     'form_id' => $fId,
                 ],
                 [
-                    'form_name' => $fName ?: ('Lead Form #' . $fId),
+                    'form_name' => $fName,
                     'page_id' => $pageId ?? null,
                     'status' => 'active',
                 ]
             );
 
-            // 1. Resolve or Auto-create Project in DB
-            $project = $mapping->project_id ? Project::find($mapping->project_id) : null;
-            if (!$project && !empty($this->metaDefaultProjectId)) {
-                $project = Project::find($this->metaDefaultProjectId);
+            if ($mapping->form_name !== $fName) {
+                $mapping->update(['form_name' => $fName]);
             }
-            if (!$project && !empty($cleanName)) {
-                $project = Project::where('name', $fName)
-                    ->orWhere('name', 'like', "%{$cleanName}%")
-                    ->first();
+
+            // 1. Resolve or Auto-create Project in DB matching exact Meta name
+            $project = null;
+            if ($mapping->project_id) {
+                $existingProj = Project::find($mapping->project_id);
+                if ($existingProj && ($existingProj->name === $fName || stripos($existingProj->name, $fName) !== false)) {
+                    $project = $existingProj;
+                }
             }
+
+            if (!$project) {
+                $project = Project::where('name', $fName)->first();
+            }
+
             if (!$project) {
                 $project = Project::create([
                     'client_id' => $this->metaDefaultClientId ?: $defaultClientId,
-                    'name' => $cleanName,
+                    'name' => $fName,
                     'status' => 'active',
                 ]);
             }
 
-            // 2. Resolve or Auto-create Campaign in DB
-            $campaign = $mapping->campaign_id ? Campaign::find($mapping->campaign_id) : null;
-            if (!$campaign && $project) {
-                $campaign = Campaign::where('project_id', $project->id)
-                    ->where(function ($q) use ($fName, $cleanName) {
-                        $q->where('name', $fName)->orWhere('name', 'like', "%{$cleanName}%");
-                    })
-                    ->first();
-
-                if (!$campaign) {
-                    $campaign = Campaign::create([
-                        'project_id' => $project->id,
-                        'name' => $cleanName . ' Campaign',
-                        'lead_source_id' => $leadSource->id,
-                        'utm_campaign' => Str::slug($cleanName),
-                        'status' => 'active',
-                    ]);
+            // 2. Resolve or Auto-create Campaign in DB matching EXACT Meta name (same as on Meta, no alteration)
+            $campaign = null;
+            if ($mapping->campaign_id) {
+                $existingCamp = Campaign::find($mapping->campaign_id);
+                if ($existingCamp) {
+                    if ($existingCamp->name === $fName . ' Campaign') {
+                        $existingCamp->update(['name' => $fName]);
+                    }
+                    if ($existingCamp->name === $fName) {
+                        $campaign = $existingCamp;
+                    }
                 }
             }
 
+            if (!$campaign) {
+                $campaign = Campaign::where('name', $fName)->first();
+
+                if (!$campaign) {
+                    $oldCamp = Campaign::where('name', $fName . ' Campaign')->first();
+                    if ($oldCamp) {
+                        $oldCamp->update(['name' => $fName]);
+                        $campaign = $oldCamp;
+                    }
+                }
+            }
+
+            if (!$campaign) {
+                $campaign = Campaign::create([
+                    'project_id' => $project->id,
+                    'name' => $fName,
+                    'lead_source_id' => $leadSource->id,
+                    'utm_campaign' => Str::slug($fName),
+                    'status' => 'active',
+                ]);
+            } elseif ($campaign->project_id !== $project->id) {
+                $campaign->update(['project_id' => $project->id]);
+            }
+
             // 3. Resolve Target Client
-            $clientId = $mapping->client_id ?: ($project->client_id ?: $defaultClientId);
+            $clientId = $this->formClientMap[$fId] ?? ($mapping->client_id ?: ($project->client_id ?: $defaultClientId));
 
             // Keep mapping and project in sync
             $mapping->update([
-                'form_name' => $fName ?: $mapping->form_name,
-                'project_id' => $project?->id,
-                'campaign_id' => $campaign?->id,
+                'form_name' => $fName,
+                'project_id' => $project->id,
+                'campaign_id' => $campaign->id,
                 'client_id' => $clientId,
             ]);
 
-            $this->formProjectMap[$fId] = $project?->id;
-            $this->formCampaignMap[$fId] = $campaign?->id;
+            $this->formProjectMap[$fId] = $project->id;
+            $this->formCampaignMap[$fId] = $campaign->id;
             $this->formClientMap[$fId] = $clientId;
         }
 

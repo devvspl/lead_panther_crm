@@ -707,4 +707,59 @@ class MetaIntegrationTest extends TestCase
         $component->call('exportForms');
         \Maatwebsite\Excel\Facades\Excel::assertDownloaded("meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx");
     }
+
+    public function test_campaign_and_project_names_are_identical_to_meta_form_name_without_alteration(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Exact Name Test Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => '1419517495829988',
+        ]);
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'mock_token_exact_names',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v19.0/1419517495829988/leadgen_forms*' => Http::response([
+                'data' => [
+                    ['id' => '1419517495829988', 'name' => 'Saya South X', 'status' => 'ACTIVE'],
+                    ['id' => '1314553981741865', 'name' => 'Dholers Anjali Vatika-copy (v1)', 'status' => 'ACTIVE'],
+                ],
+                'paging' => []
+            ], 200),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->call('fetchLeadForms', $account->id);
+
+        // Verify Project name is EXACTLY identical to Meta form name
+        $project1 = Project::where('name', 'Saya South X')->first();
+        $this->assertNotNull($project1);
+
+        $project2 = Project::where('name', 'Dholers Anjali Vatika-copy (v1)')->first();
+        $this->assertNotNull($project2);
+
+        // Verify Campaign name is EXACTLY identical to Meta form name (NO ' Campaign' suffix!)
+        $campaign1 = Campaign::where('name', 'Saya South X')->first();
+        $this->assertNotNull($campaign1);
+        $this->assertEquals('Saya South X', $campaign1->name);
+        $this->assertNull(Campaign::where('name', 'Saya South X Campaign')->first());
+
+        $campaign2 = Campaign::where('name', 'Dholers Anjali Vatika-copy (v1)')->first();
+        $this->assertNotNull($campaign2);
+        $this->assertEquals('Dholers Anjali Vatika-copy (v1)', $campaign2->name);
+        $this->assertNull(Campaign::where('name', 'Dholers Anjali Vatika-copy (v1) Campaign')->first());
+    }
 }

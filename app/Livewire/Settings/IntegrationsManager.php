@@ -96,7 +96,9 @@ class IntegrationsManager extends Component
             $this->accountName = $account->name ?? '';
             $this->metaPageId = $account->getCredential('page_id') ?? '';
             $this->metaAppId = $account->getCredential('app_id') ?? '';
-            $this->metaAppSecret = $account->getCredential('app_secret') ?? '';
+            $rawSecret = $account->getCredential('app_secret') ?? '';
+            // If previous bug saved browser login password ("password"), reset to empty
+            $this->metaAppSecret = ($rawSecret === 'password') ? '' : $rawSecret;
             $this->metaAccessToken = $account->getCredential('access_token') ?? '';
             $this->metaVerifyToken = $account->getCredential('verify_token') ?? '';
             $this->apiSecret = $this->metaAccessToken;
@@ -215,11 +217,18 @@ class IntegrationsManager extends Component
                         ['portal_account_id' => $account->id, 'key_name' => $key],
                         ['encrypted_value' => $val]
                     );
+                } elseif ($key === 'app_secret' && ($val === null || $val === '')) {
+                    // If user explicitly cleared the app secret, remove it
+                    IntegrationCredential::where('portal_account_id', $account->id)
+                        ->where('key_name', 'app_secret')
+                        ->delete();
                 }
             }
-        }
 
-        if (!empty($this->apiSecret)) {
+            // Keep apiSecret in sync so any caller referencing it gets the new token
+            $this->apiSecret = $this->metaAccessToken;
+        } elseif (!empty($this->apiSecret)) {
+            // Legacy/Test fallback: only apiSecret was set directly
             IntegrationCredential::updateOrCreate(
                 ['portal_account_id' => $account->id, 'key_name' => $this->credentialKey ?: 'access_token'],
                 ['encrypted_value' => $this->apiSecret]

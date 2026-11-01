@@ -194,12 +194,21 @@
                         <label class="font-bold text-ink">Meta App Secret <span class="text-muted font-normal">(Optional)</span></label>
                         <div class="relative mt-1">
                             <input
-                                :type="showMetaSecret ? 'text' : 'password'"
+                                type="text"
+                                :style="showMetaSecret ? '-webkit-text-security: none;' : '-webkit-text-security: disc;'"
                                 wire:model="metaAppSecret"
-                                value="{{ $metaAppSecret }}"
-                                name="meta_app_secret"
-                                autocomplete="new-password"
-                                placeholder="••••••••••••••••"
+                                name="meta_app_secret_field"
+                                autocomplete="off"
+                                autocorrect="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                data-form-type="other"
+                                data-bwignore="true"
+                                readonly
+                                onfocus="this.removeAttribute('readonly');"
+                                placeholder="Paste App Secret (never shared)"
                                 class="w-full h-9 pl-3.5 pr-10 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ink transition"
                             />
                             <button
@@ -228,11 +237,20 @@
                     </div>
                     <div class="relative mt-1">
                         <input
-                            :type="showMetaToken ? 'text' : 'password'"
+                            type="text"
+                            :style="showMetaToken ? '-webkit-text-security: none;' : '-webkit-text-security: disc;'"
                             wire:model="metaAccessToken"
-                            value="{{ $metaAccessToken }}"
-                            name="meta_access_token"
-                            autocomplete="new-password"
+                            name="meta_access_token_field"
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                            data-lpignore="true"
+                            data-1p-ignore="true"
+                            data-form-type="other"
+                            data-bwignore="true"
+                            readonly
+                            onfocus="this.removeAttribute('readonly');"
                             placeholder="EAABw... (Never-expiring System User Token or Graph Token)"
                             class="w-full h-9 pl-3.5 pr-10 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ink transition"
                         />
@@ -360,9 +378,20 @@
                         <label class="font-bold text-ink">Personal Access Token (PAT)</label>
                         <div class="relative mt-1">
                             <input
-                                :type="showGitToken ? 'text' : 'password'"
+                                type="text"
+                                :style="showGitToken ? '-webkit-text-security: none;' : '-webkit-text-security: disc;'"
                                 wire:model="gitAccessToken"
-                                value="{{ $gitAccessToken }}"
+                                name="git_access_token_field"
+                                autocomplete="off"
+                                autocorrect="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                data-form-type="other"
+                                data-bwignore="true"
+                                readonly
+                                onfocus="this.removeAttribute('readonly');"
                                 placeholder="ghp_••••••••••••••••••••••••••••••••"
                                 class="w-full h-9 pl-3.5 pr-10 rounded-lg border border-border bg-canvas text-ink text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ink transition"
                             />

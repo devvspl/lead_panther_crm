@@ -14,6 +14,7 @@ use App\Livewire\Settings\IntegrationsManager;
 use App\Livewire\Settings\UserInvite;
 use Livewire\Livewire;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class OrgSettingsAndSecurityTest extends TestCase
@@ -143,6 +144,34 @@ class OrgSettingsAndSecurityTest extends TestCase
             ->assertSee('reset-password');
 
         $this->assertDatabaseHas('users', ['email' => 'invited@org.com']);
+    }
+
+    public function test_meta_credentials_update_persists_new_token_and_secret(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Ads Main Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+        $account->setCredential('page_id', '644872052329370');
+        $account->setCredential('access_token', 'OLD_EXPIRED_TOKEN_ABC123');
+        $account->setCredential('app_secret', 'OLD_SECRET_XYZ');
+
+        $newAccessToken = 'NEW_VALID_META_ACCESS_TOKEN_' . Str::random(30);
+        $newAppSecret = 'NEW_APP_SECRET_' . Str::random(16);
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->assertSet('metaAccessToken', 'OLD_EXPIRED_TOKEN_ABC123')
+            ->set('metaAccessToken', $newAccessToken)
+            ->set('metaAppSecret', $newAppSecret)
+            ->call('saveAccount');
+
+        $this->assertEquals($newAccessToken, $account->fresh()->getCredential('access_token'));
+        $this->assertEquals($newAppSecret, $account->fresh()->getCredential('app_secret'));
     }
 
     public function test_channel_partner_hitting_admin_route_returns_403_forbidden(): void

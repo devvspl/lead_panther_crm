@@ -664,4 +664,47 @@ class MetaIntegrationTest extends TestCase
         $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_01']);
         $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_02']);
     }
+
+    public function test_forms_table_has_sr_no_pagination_and_export(): void
+    {
+        \Maatwebsite\Excel\Facades\Excel::fake();
+
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Ads Main Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        $forms = [];
+        for ($i = 1; $i <= 35; $i++) {
+            $forms[] = [
+                'id' => "form_{$i}",
+                'name' => "Property Tower Phase {$i}",
+                'status' => 'ACTIVE',
+            ];
+        }
+
+        $component = Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->set('availableForms', $forms);
+
+        // Verify Sr No column '#' exists
+        $columns = $component->instance()->availableFormsTableColumns();
+        $colKeys = array_column($columns, 'key');
+        $this->assertContains('sr_no', $colKeys);
+
+        // Verify pagination partitions into pages (page 1 has 15 items, total 35)
+        $paginated = $component->instance()->filteredAvailableForms;
+        $this->assertInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class, $paginated);
+        $this->assertEquals(35, $paginated->total());
+        $this->assertEquals(15, $paginated->count());
+        $this->assertEquals(1, $paginated->first()['_sr_no']);
+
+        // Verify exportForms downloads Excel
+        $component->call('exportForms');
+        \Maatwebsite\Excel\Facades\Excel::assertDownloaded("meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx");
+    }
 }

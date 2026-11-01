@@ -3,6 +3,8 @@
 namespace App\Livewire\Settings;
 
 use Livewire\Component;
+use Livewire\WithPagination;
+use Illuminate\Pagination\LengthAwarePaginator;
 use App\Models\PortalAccount;
 use App\Models\IntegrationCredential;
 use App\Models\LeadFormMapping;
@@ -17,6 +19,8 @@ use Throwable;
 
 class IntegrationsManager extends Component
 {
+    use WithPagination;
+
     // Active Tab: 'meta' | 'git'
     public string $activeTab = 'meta';
     public string $portalType = 'meta';
@@ -76,6 +80,12 @@ class IntegrationsManager extends Component
     public string $sortField = '';
     public string $sortDirection = 'asc';
     public array $visibleColumns = [];
+    public int $perPage = 15;
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
 
     public function mount(): void
     {
@@ -868,7 +878,7 @@ class IntegrationsManager extends Component
         }
     }
 
-    public function getFilteredAvailableFormsProperty(): \Illuminate\Support\Collection
+    public function getFilteredAvailableFormsProperty(): \Illuminate\Pagination\LengthAwarePaginator
     {
         $forms = collect($this->availableForms);
 
@@ -890,7 +900,99 @@ class IntegrationsManager extends Component
             }, SORT_REGULAR, $this->sortDirection === 'desc');
         }
 
-        return $forms->values();
+        // Attach global sequential serial number (1, 2, 3...)
+        $srNo = 1;
+        $forms = $forms->map(function ($item) use (&$srNo) {
+            if (is_array($item)) {
+                $item['_sr_no'] = $srNo++;
+            } else {
+                $item->_sr_no = $srNo++;
+            }
+            return $item;
+        });
+
+        $currentPage = $this->getPage();
+        $perPage = $this->perPage ?: 15;
+        $items = $forms->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            $items,
+            $forms->count(),
+            $perPage,
+            $currentPage,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName' => 'page']
+        );
+    }
+
+    public function exportForms()
+    {
+        $forms = collect($this->availableForms);
+
+        if (!empty($this->search)) {
+            $term = strtolower(trim($this->search));
+            $forms = $forms->filter(function ($item) use ($term) {
+                $id = strtolower((string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '')));
+                $name = strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
+                return str_contains($id, $term) || str_contains($name, $term);
+            });
+        }
+
+        $clients = Client::with('organization')->get()->keyBy('id');
+        $users = \App\Models\User::with('organization')->get()->keyBy('id');
+        $projects = Project::all()->keyBy('id');
+        $campaigns = Campaign::all()->keyBy('id');
+
+        $rows = [];
+        $srNo = 1;
+
+        foreach ($forms as $formItem) {
+            $fId = (string) (is_array($formItem) ? $formItem['id'] : $formItem->id);
+            $fName = (string) (is_array($formItem) ? ($formItem['name'] ?? '') : ($formItem->name ?? ''));
+            $status = (string) (is_array($formItem) ? ($formItem['status'] ?? 'ACTIVE') : ($formItem->status ?? 'ACTIVE'));
+
+            $clientId = $this->formClientMap[$fId] ?? null;
+            $projectId = $this->formProjectMap[$fId] ?? null;
+            $campaignId = $this->formCampaignMap[$fId] ?? null;
+
+            $clientName = 'Unassigned';
+            if ($clientId) {
+                $c = $clients->get($clientId) ?? $users->get($clientId);
+                if ($c) {
+                    $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
+                    $clientName = $c->name . $orgName;
+                }
+            }
+
+            $projectName = $projectId && $projects->has($projectId) ? $projects->get($projectId)->name : 'Auto-match by Name';
+            $campaignName = $campaignId && $campaigns->has($campaignId) ? $campaigns->get($campaignId)->name : 'None';
+
+            $rows[] = [
+                'sr_no' => $srNo++,
+                'form_id' => $fId,
+                'form_name' => $fName ?: 'Lead Form #' . $fId,
+                'status' => strtoupper($status),
+                'client' => $clientName,
+                'project' => $projectName,
+                'campaign' => $campaignName,
+            ];
+        }
+
+        $filename = "meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx";
+        $headings = ['#', 'Form ID', 'Form Name', 'Status', 'Client / Organization', 'CRM Project', 'CRM Campaign'];
+
+        $this->dispatch('toast', type: 'success', message: 'Export ready — downloading Excel now.');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\BaseStyledExport(
+                data: collect($rows),
+                title: 'Meta Leadgen Forms Routing Directory',
+                subtitle: 'Exported on ' . now()->format('d M Y, h:i A') . ' | Total: ' . count($rows) . ' Forms',
+                headings: $headings,
+                columns: ['sr_no', 'form_id', 'form_name', 'status', 'client', 'project', 'campaign'],
+                statusColumns: ['status']
+            ),
+            $filename
+        );
     }
 
     public function availableFormsTableColumns(): array
@@ -930,9 +1032,20 @@ class IntegrationsManager extends Component
 
         return [
             [
+                'key' => 'sr_no',
+                'label' => '#',
+                'width' => '5%',
+                'align' => 'center',
+                'priority' => 1,
+                'render' => function ($row) {
+                    $sr = is_array($row) ? ($row['_sr_no'] ?? 1) : ($row->_sr_no ?? 1);
+                    return '<span class="font-mono text-muted text-xs font-semibold">' . e($sr) . '</span>';
+                },
+            ],
+            [
                 'key' => 'form_name',
                 'label' => 'Meta Lead Form',
-                'width' => '28%',
+                'width' => '26%',
                 'priority' => 1,
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -950,7 +1063,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'client',
                 'label' => 'Client / Org',
-                'width' => '23%',
+                'width' => '22%',
                 'priority' => 1,
                 'render' => function ($row) use ($clientOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -968,7 +1081,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'project',
                 'label' => 'CRM Project',
-                'width' => '23%',
+                'width' => '22%',
                 'priority' => 1,
                 'render' => function ($row) use ($projectOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -986,7 +1099,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'campaign',
                 'label' => 'CRM Campaign',
-                'width' => '21%',
+                'width' => '20%',
                 'priority' => 1,
                 'render' => function ($row) use ($campaignOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;

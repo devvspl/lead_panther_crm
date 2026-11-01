@@ -390,7 +390,11 @@
                         emptyTitle="No Meta Lead Forms Loaded"
                         emptyMessage="Click 'Fetch Forms from Meta' to load all active leadgen forms from your connected Facebook Page."
                         tableName="meta_page_forms"
-                    />
+                    >
+                        <x-slot:action>
+                            <x-ui.export-button target="exportForms" label="Export to Excel" class="text-xs" />
+                        </x-slot:action>
+                    </x-ui.advanced-table>
                 </div>
             </div>
         @endif

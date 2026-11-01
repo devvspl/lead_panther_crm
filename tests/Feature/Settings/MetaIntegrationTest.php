@@ -691,10 +691,10 @@ class MetaIntegrationTest extends TestCase
             ->test(IntegrationsManager::class)
             ->set('availableForms', $forms);
 
-        // Verify column layout: Sr No -> Campaign (Left) -> Form Name (Right) -> Client -> Project -> Sync
+        // Verify column layout: Sr No -> Campaign (Left) -> Form Name (Right) -> Client -> Sync (Project column removed)
         $columns = $component->instance()->availableFormsTableColumns();
         $colKeys = array_column($columns, 'key');
-        $this->assertEquals(['sr_no', 'campaign', 'form_name', 'client', 'project', 'action'], $colKeys);
+        $this->assertEquals(['sr_no', 'campaign', 'form_name', 'client', 'action'], $colKeys);
 
         // Verify pagination partitions into pages (page 1 has 15 items, total 35)
         $paginated = $component->instance()->filteredAvailableForms;

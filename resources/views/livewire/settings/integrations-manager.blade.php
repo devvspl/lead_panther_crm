@@ -354,19 +354,19 @@
                     </div>
                 </div>
 
-                <!-- Meta Leadgen Forms & Per-Form Project Mapping -->
+                <!-- Meta Leadgen Forms & Per-Form Campaign Mapping -->
                 <div class="pt-4 border-t border-border space-y-3">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                             <h3 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                                <span>Meta Page Lead Forms &amp; Project Routing</span>
+                                <span>Meta Page Lead Forms &amp; Campaign Routing</span>
                                 @if(!empty($availableForms))
                                     <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-canvas text-ink border border-border">
                                         {{ count($availableForms) }} Forms
                                     </span>
                                 @endif
                             </h3>
-                            <p class="text-[11px] text-muted">Map individual Facebook leadgen forms to specific CRM projects and assign leads to client / organization accounts.</p>
+                            <p class="text-[11px] text-muted">Map individual Facebook leadgen forms to CRM campaigns and assign leads to client / organization accounts.</p>
                         </div>
                         <button
                             type="button"

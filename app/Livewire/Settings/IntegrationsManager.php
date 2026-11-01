@@ -901,6 +901,11 @@ class IntegrationsManager extends Component
         $clientId = $this->formClientMap[$formId] ?? null;
         $campaignId = $this->formCampaignMap[$formId] ?? null;
 
+        if (!$projectId && $campaignId) {
+            $camp = Campaign::find($campaignId);
+            $projectId = $camp?->project_id;
+        }
+
         // If client was specified and project exists, link project to client
         if ($projectId && $clientId) {
             $proj = Project::find($projectId);
@@ -1015,7 +1020,6 @@ class IntegrationsManager extends Component
 
         $clients = Client::with('organization')->get()->keyBy('id');
         $users = \App\Models\User::with('organization')->get()->keyBy('id');
-        $projects = Project::all()->keyBy('id');
         $campaigns = Campaign::all()->keyBy('id');
 
         $rows = [];
@@ -1027,7 +1031,6 @@ class IntegrationsManager extends Component
             $status = (string) (is_array($formItem) ? ($formItem['status'] ?? 'ACTIVE') : ($formItem->status ?? 'ACTIVE'));
 
             $clientId = $this->formClientMap[$fId] ?? null;
-            $projectId = $this->formProjectMap[$fId] ?? null;
             $campaignId = $this->formCampaignMap[$fId] ?? null;
 
             $clientName = 'Unassigned';
@@ -1039,7 +1042,6 @@ class IntegrationsManager extends Component
                 }
             }
 
-            $projectName = $projectId && $projects->has($projectId) ? $projects->get($projectId)->name : 'Auto-match by Name';
             $campaignName = $campaignId && $campaigns->has($campaignId) ? $campaigns->get($campaignId)->name : 'None';
 
             $rows[] = [
@@ -1049,12 +1051,11 @@ class IntegrationsManager extends Component
                 'form_id' => $fId,
                 'status' => strtoupper($status),
                 'client' => $clientName,
-                'project' => $projectName,
             ];
         }
 
         $filename = "meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx";
-        $headings = ['#', 'CRM Campaign', 'Meta Lead Form', 'Form ID', 'Status', 'Client / Organization', 'CRM Project'];
+        $headings = ['#', 'CRM Campaign', 'Meta Lead Form', 'Form ID', 'Status', 'Client / Organization'];
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading Excel now.');
 
@@ -1064,7 +1065,7 @@ class IntegrationsManager extends Component
                 title: 'Meta Leadgen Forms Routing Directory',
                 subtitle: 'Exported on ' . now()->format('d M Y, h:i A') . ' | Total: ' . count($rows) . ' Forms',
                 headings: $headings,
-                columns: ['sr_no', 'campaign', 'form_name', 'form_id', 'status', 'client', 'project'],
+                columns: ['sr_no', 'campaign', 'form_name', 'form_id', 'status', 'client'],
                 statusColumns: ['status']
             ),
             $filename
@@ -1083,22 +1084,12 @@ class IntegrationsManager extends Component
             $clients = \App\Models\User::with('organization')->orderBy('name')->get();
         }
 
-        $projects = Project::where('status', 'active')->orderBy('name')->get();
-        if ($projects->isEmpty()) {
-            $projects = Project::orderBy('name')->get();
-        }
-
         $campaigns = Campaign::where('status', 'active')->orderBy('name')->get();
 
         $clientOptions = ['' => '-- Select Client / Org --'];
         foreach ($clients as $c) {
             $orgName = $c->organization?->name ? ' (' . $c->organization->name . ')' : '';
             $clientOptions[(string) $c->id] = $c->name . $orgName;
-        }
-
-        $projectOptions = ['' => '-- Auto Match / Create --'];
-        foreach ($projects as $p) {
-            $projectOptions[(string) $p->id] = $p->name;
         }
 
         $campaignOptions = ['' => '-- Select Campaign --'];
@@ -1110,7 +1101,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'sr_no',
                 'label' => '#',
-                'width' => '5%',
+                'width' => '6%',
                 'align' => 'center',
                 'priority' => 1,
                 'render' => function ($row) {
@@ -1121,7 +1112,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'campaign',
                 'label' => 'CRM Campaign',
-                'width' => '24%',
+                'width' => '32%',
                 'priority' => 1,
                 'render' => function ($row) use ($campaignOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1139,7 +1130,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'form_name',
                 'label' => 'Meta Lead Form',
-                'width' => '25%',
+                'width' => '32%',
                 'priority' => 1,
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1147,7 +1138,7 @@ class IntegrationsManager extends Component
                     $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
                     return '<div class="min-w-0 pr-1">'
                         . '<div class="flex items-center gap-1.5 flex-wrap">'
-                        . '<span class="font-bold text-ink leading-tight text-xs truncate max-w-[200px]" title="' . e($fName) . '">' . e($fName) . '</span>'
+                        . '<span class="font-bold text-ink leading-tight text-xs truncate max-w-[240px]" title="' . e($fName) . '">' . e($fName) . '</span>'
                         . '<span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">' . e($status) . '</span>'
                         . '</div>'
                         . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>'
@@ -1157,7 +1148,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'client',
                 'label' => 'Client / Org',
-                'width' => '22%',
+                'width' => '24%',
                 'priority' => 1,
                 'render' => function ($row) use ($clientOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1173,27 +1164,9 @@ class IntegrationsManager extends Component
                 },
             ],
             [
-                'key' => 'project',
-                'label' => 'CRM Project',
-                'width' => '19%',
-                'priority' => 1,
-                'render' => function ($row) use ($projectOptions) {
-                    $fId = is_array($row) ? $row['id'] : $row->id;
-                    return view('components.ui.themed-select', [
-                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
-                            'wire:model.live' => "formProjectMap.{$fId}",
-                        ]),
-                        'options' => $projectOptions,
-                        'searchable' => true,
-                        'placeholder' => '-- Select Project --',
-                        'class' => 'w-full',
-                    ])->render();
-                },
-            ],
-            [
                 'key' => 'action',
                 'label' => 'Sync',
-                'width' => '5%',
+                'width' => '6%',
                 'align' => 'center',
                 'priority' => 1,
                 'render' => function ($row) {

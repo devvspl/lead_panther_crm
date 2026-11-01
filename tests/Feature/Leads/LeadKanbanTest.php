@@ -103,4 +103,47 @@ class LeadKanbanTest extends TestCase
             ->set('search', 'Genuine Lead Name')
             ->assertSet('search', 'Genuine Lead Name');
     }
+
+    public function test_lead_detail_and_timeline_with_lead_assignment(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('super-admin');
+
+        $agent = User::factory()->create(['name' => 'Agent Vikram']);
+        $agent->assignRole('sales-executive');
+
+        $org = Organization::create(['name' => 'Test Org', 'type' => 'builder']);
+        $client = Client::create(['organization_id' => $org->id, 'name' => 'Test Client']);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Test Project']);
+        $source = LeadSource::create(['name' => 'meta']);
+
+        $lead = Lead::factory()->create([
+            'client_id' => $client->id,
+            'project_id' => $project->id,
+            'lead_source_id' => $source->id,
+            'assigned_to' => $agent->id,
+            'current_stage' => 'assigned',
+        ]);
+
+        \App\Models\LeadAssignment::create([
+            'lead_id' => $lead->id,
+            'assigned_to' => $agent->id,
+            'assigned_by' => $user->id,
+            'assigned_at' => now(),
+        ]);
+
+        // Assert LeadDetail loads and renders lead journey without RelationNotFoundException
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Leads\LeadDetail::class)
+            ->call('openLead', $lead->id)
+            ->assertSet('isOpen', true)
+            ->assertSee('Agent Vikram');
+
+        // Assert LeadTimeline loads and renders lead journey without RelationNotFoundException
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Leads\LeadTimeline::class)
+            ->call('openJourney', $lead->id)
+            ->assertSet('isOpen', true)
+            ->assertSee('Agent Vikram');
+    }
 }

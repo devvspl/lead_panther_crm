@@ -19,4 +19,14 @@ class LeadAssignment extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to');
     }
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function assignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_by');
+    }
 }

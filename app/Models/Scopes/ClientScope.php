@@ -17,7 +17,7 @@ class ClientScope implements Scope
         $user = auth()->user();
 
         // Super Admin bypasses multi-tenant scoping
-        if ($user->hasRole('Super Admin')) {
+        if ($user->hasRole(['Super Admin', 'super-admin'])) {
             return;
         }
 

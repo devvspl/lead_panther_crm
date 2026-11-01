@@ -185,8 +185,16 @@ class MetaLeadSyncService
 
         $metaMapper = new MetaLeadMapper();
         $client = Client::first();
-        $clientId = $client?->id ?: 1;
+        if (!$client) {
+            $org = \App\Models\Organization::first();
+            $client = Client::create([
+                'name' => $org?->name ?? 'Default Client Organization',
+                'status' => 'active',
+            ]);
+        }
+        $clientId = $client->id;
         $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
+        $defaultConfiguredProjectId = $account->getCredential('default_project_id');
 
         foreach ($targetForms as $formInfo) {
             $currentFormId = $formInfo['id'];
@@ -194,6 +202,49 @@ class MetaLeadSyncService
             $formFetched = 0;
             $formCreated = 0;
             $formDuplicates = 0;
+
+            // Match form mapping for project & campaign assignment
+            $mapping = LeadFormMapping::where('portal_account_id', $account->id)
+                ->where('form_id', $currentFormId)
+                ->first();
+
+            // Resolve valid Project for this form:
+            // 1. Override Project -> 2. Form Mapping -> 3. Account Default Project -> 4. Name Match -> 5. Any Existing Project -> 6. Auto-create Project
+            $project = null;
+
+            if (!empty($overrideProjectId)) {
+                $project = Project::find($overrideProjectId);
+            }
+
+            if (!$project && !empty($mapping?->project_id)) {
+                $project = Project::find($mapping->project_id);
+            }
+
+            if (!$project && !empty($defaultConfiguredProjectId)) {
+                $project = Project::find($defaultConfiguredProjectId);
+            }
+
+            if (!$project && !empty($formName)) {
+                $cleanName = trim(preg_replace('/\(.*?\)/', '', $formName));
+                $project = Project::where('name', $formName)
+                    ->orWhere('name', 'like', "%{$cleanName}%")
+                    ->first();
+            }
+
+            if (!$project) {
+                $project = Project::where('client_id', $clientId)->first() ?? Project::first();
+            }
+
+            if (!$project) {
+                $project = Project::create([
+                    'client_id' => $clientId,
+                    'name' => $formName ?: 'Meta Lead Ads Project',
+                    'status' => 'active',
+                ]);
+            }
+
+            $projectId = $project->id;
+            $leadClientId = $project->client_id ?: $clientId;
 
             try {
                 $leadsResponse = Http::timeout(20)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", [
@@ -219,13 +270,6 @@ class MetaLeadSyncService
                 $formFetched = count($leadsData);
                 $totalFetched += $formFetched;
 
-                // Match form mapping for project & campaign assignment
-                $mapping = LeadFormMapping::where('portal_account_id', $account->id)
-                    ->where('form_id', $currentFormId)
-                    ->first();
-
-                $projectId = $overrideProjectId ?: ($mapping?->project_id ?: (Project::where('client_id', $clientId)->first()?->id ?: 1));
-
                 foreach ($leadsData as $rawLead) {
                     try {
                         $rawLead['form_id'] = $currentFormId;
@@ -236,7 +280,7 @@ class MetaLeadSyncService
                         $email = $mapped['email'] ?: 'meta_user@example.com';
 
                         // 90-Day Deduplication Check
-                        $existingLead = Lead::where('client_id', $clientId)
+                        $existingLead = Lead::where('client_id', $leadClientId)
                             ->where('created_at', '>=', now()->subDays(90))
                             ->where(function ($q) use ($mobile, $email) {
                                 $q->where('mobile', $mobile);
@@ -290,7 +334,7 @@ class MetaLeadSyncService
                         // Create Lead Master Record
                         $lead = Lead::create([
                             'lead_code' => Lead::generateUniqueLeadCode(),
-                            'client_id' => $clientId,
+                            'client_id' => $leadClientId,
                             'project_id' => $projectId,
                             'campaign_id' => $targetCampaignId,
                             'lead_source_id' => $leadSource->id,

@@ -27,6 +27,7 @@ class IntegrationsManager extends Component
     public string $metaAppSecret = '';
     public string $metaAccessToken = '';
     public string $metaVerifyToken = '';
+    public ?int $metaDefaultProjectId = null;
     public string $metaLastSyncedTime = '';
     public string $metaHealthStatus = '';
     public string $metaHealthMessage = '';
@@ -101,6 +102,8 @@ class IntegrationsManager extends Component
             $this->metaAppSecret = ($rawSecret === 'password') ? '' : $rawSecret;
             $this->metaAccessToken = $account->getCredential('access_token') ?? '';
             $this->metaVerifyToken = $account->getCredential('verify_token') ?? '';
+            $defaultProj = $account->getCredential('default_project_id');
+            $this->metaDefaultProjectId = $defaultProj ? (int) $defaultProj : null;
             $this->apiSecret = $this->metaAccessToken;
             $this->metaLastSyncedTime = $account->updated_at ? $account->updated_at->format('d M Y, h:i A') : '';
             $this->metaHealthStatus = $account->health_status ?: ($account->credentials()->exists() ? 'healthy' : 'untested');
@@ -222,6 +225,7 @@ class IntegrationsManager extends Component
                 'verify_token' => $this->metaVerifyToken,
                 'app_id' => $this->metaAppId,
                 'app_secret' => $this->metaAppSecret,
+                'default_project_id' => $this->metaDefaultProjectId ? (string) $this->metaDefaultProjectId : '',
             ];
 
             foreach ($credentials as $key => $val) {
@@ -230,10 +234,9 @@ class IntegrationsManager extends Component
                         ['portal_account_id' => $account->id, 'key_name' => $key],
                         ['encrypted_value' => $val]
                     );
-                } elseif ($key === 'app_secret' && ($val === null || $val === '')) {
-                    // If user explicitly cleared the app secret, remove it
+                } elseif (in_array($key, ['app_secret', 'default_project_id']) && ($val === null || $val === '')) {
                     IntegrationCredential::where('portal_account_id', $account->id)
-                        ->where('key_name', 'app_secret')
+                        ->where('key_name', $key)
                         ->delete();
                 }
             }
@@ -715,6 +718,12 @@ class IntegrationsManager extends Component
 
     public function render()
     {
-        return view('livewire.settings.integrations-manager')->layout('layouts.app');
+        $projects = Project::orderBy('name')->get();
+        $campaigns = Campaign::orderBy('name')->get();
+
+        return view('livewire.settings.integrations-manager', [
+            'projects' => $projects,
+            'campaigns' => $campaigns,
+        ])->layout('layouts.app');
     }
 }

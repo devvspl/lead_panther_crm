@@ -385,6 +385,7 @@
                         :rows="$this->filteredAvailableForms"
                         :showFilterDropdown="false"
                         :showConfigurations="false"
+                        tableClass="table-fixed"
                         searchPlaceholder="Search Meta lead forms by name or ID..."
                         emptyTitle="No Meta Lead Forms Loaded"
                         emptyMessage="Click 'Fetch Forms from Meta' to load all active leadgen forms from your connected Facebook Page."

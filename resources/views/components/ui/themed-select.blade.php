@@ -3,6 +3,7 @@
     'placeholder' => 'Select Option',
     'class' => '',
     'searchable' => false,
+    'align' => 'left',
 ])
 
 @php
@@ -47,15 +48,15 @@
             this.search = '';
         }
     }" 
-    class="relative inline-block text-left text-xs {{ $class }}"
+    class="relative inline-block text-left text-xs w-full min-w-0 {{ $class }}"
 >
     <!-- Trigger Button -->
     <button 
         type="button" 
         @click="open = !open" 
-        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap"
+        class="inline-flex items-center justify-between gap-1.5 h-8 text-xs px-2.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-0 whitespace-nowrap"
     >
-        <span class="truncate font-semibold" x-text="selectedLabel"></span>
+        <span class="truncate font-semibold text-left" x-text="selectedLabel"></span>
         <svg class="w-3.5 h-3.5 text-muted transition-transform duration-150 shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
@@ -75,7 +76,7 @@
         @if($searchable)
             x-effect="if (open) $nextTick(function() { if ($refs.searchInput) $refs.searchInput.focus(); })"
         @endif
-        class="absolute left-0 z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5"
+        class="absolute {{ $align === 'right' ? 'right-0' : 'left-0' }} z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5"
     >
         @if($searchable)
             <!-- Search Input Header -->

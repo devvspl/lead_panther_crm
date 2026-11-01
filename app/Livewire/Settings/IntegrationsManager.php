@@ -906,27 +906,26 @@ class IntegrationsManager extends Component
         return [
             [
                 'key' => 'form_name',
-                'label' => 'Meta Form Name & ID',
+                'label' => 'Meta Lead Form',
+                'width' => '28%',
                 'priority' => 1,
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
-                    return '<div class="font-bold text-ink leading-tight">' . e($fName) . '</div>'
-                        . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>';
-                },
-            ],
-            [
-                'key' => 'meta_status',
-                'label' => 'Status',
-                'priority' => 1,
-                'render' => function ($row) {
                     $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
-                    return '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">' . e($status) . '</span>';
+                    return '<div class="min-w-0 pr-1">'
+                        . '<div class="flex items-center gap-1.5 flex-wrap">'
+                        . '<span class="font-bold text-ink leading-tight text-xs truncate max-w-[200px]" title="' . e($fName) . '">' . e($fName) . '</span>'
+                        . '<span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">' . e($status) . '</span>'
+                        . '</div>'
+                        . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>'
+                        . '</div>';
                 },
             ],
             [
                 'key' => 'client',
-                'label' => 'Client / Organization Account',
+                'label' => 'Client / Org',
+                'width' => '23%',
                 'priority' => 1,
                 'render' => function ($row) use ($clientOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -937,13 +936,14 @@ class IntegrationsManager extends Component
                         'options' => $clientOptions,
                         'searchable' => true,
                         'placeholder' => '-- Select Client / Org --',
-                        'class' => 'w-full min-w-[180px]',
+                        'class' => 'w-full',
                     ])->render();
                 },
             ],
             [
                 'key' => 'project',
-                'label' => 'Assign CRM Project',
+                'label' => 'CRM Project',
+                'width' => '23%',
                 'priority' => 1,
                 'render' => function ($row) use ($projectOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -954,14 +954,15 @@ class IntegrationsManager extends Component
                         'options' => $projectOptions,
                         'searchable' => true,
                         'placeholder' => '-- Select Project --',
-                        'class' => 'w-full min-w-[170px]',
+                        'class' => 'w-full',
                     ])->render();
                 },
             ],
             [
                 'key' => 'campaign',
-                'label' => 'Assign CRM Campaign',
-                'priority' => 2,
+                'label' => 'CRM Campaign',
+                'width' => '21%',
+                'priority' => 1,
                 'render' => function ($row) use ($campaignOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     return view('components.ui.themed-select', [
@@ -971,21 +972,22 @@ class IntegrationsManager extends Component
                         'options' => $campaignOptions,
                         'searchable' => true,
                         'placeholder' => '-- Optional Campaign --',
-                        'class' => 'w-full min-w-[150px]',
+                        'align' => 'right',
+                        'class' => 'w-full',
                     ])->render();
                 },
             ],
             [
                 'key' => 'action',
-                'label' => 'Action',
-                'align' => 'right',
+                'label' => 'Sync',
+                'width' => '5%',
+                'align' => 'center',
                 'priority' => 1,
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
-                    return '<button type="button" wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" class="px-3 py-1.5 bg-ink text-white font-semibold text-xs rounded-lg hover:bg-neutral-800 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5 shrink-0">'
-                        . '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
-                        . '<span>Saved</span>'
+                    return '<button type="button" wire:click="saveFormMapping(\'' . $fId . '\', \'' . addslashes($fName) . '\')" title="Auto-saved to DB. Click to manually re-sync" class="w-7 h-7 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 rounded-lg transition cursor-pointer shadow-2xs inline-flex items-center justify-center">'
+                        . '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
                         . '</button>';
                 },
             ],

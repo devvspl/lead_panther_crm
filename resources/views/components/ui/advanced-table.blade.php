@@ -17,6 +17,7 @@
     'emptyTitle' => 'No Records Found',
     'filterCount' => 0,
     'tableName' => 'table',
+    'tableClass' => '',
 ])
 
 @php
@@ -182,7 +183,7 @@
     <!-- 3. DESKTOP / TABLET DATA TABLE (Hidden below md) -->
     <div class="hidden md:block bg-surface rounded-card border border-border shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-ink border-collapse">
+            <table class="w-full text-left text-xs text-ink border-collapse {{ $tableClass }}">
                 <thead
                     class="bg-canvas border-b border-border text-[10px] uppercase font-bold text-muted tracking-wider select-none">
                     <tr>
@@ -201,8 +202,10 @@
                                 $priority = $col['priority'] ?? 1; // 1 = always, 2 = lg+, 3 = xl+
                                 $priorityClass = $priority === 2 ? 'hidden lg:table-cell' : ($priority === 3 ? 'hidden xl:table-cell' : '');
                                 $alignClass = ($col['align'] ?? 'left') === 'right' ? 'text-right' : (($col['align'] ?? 'left') === 'center' ? 'text-center' : 'text-left');
+                                $colWidth = $col['width'] ?? null;
+                                $widthStyle = $colWidth ? "width: {$colWidth};" : '';
                             @endphp
-                            <th class="py-3 px-3.5 {{ $alignClass }} {{ $priorityClass }}">
+                            <th @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['headerClass'] ?? '' }}">
                                 @if($isSortable)
                                     <button type="button" wire:click="sortBy('{{ $colKey }}')"
                                         class="inline-flex items-center gap-1 hover:text-ink font-bold transition group cursor-pointer">
@@ -265,11 +268,13 @@
                                         $priority = $col['priority'] ?? 1;
                                         $priorityClass = $priority === 2 ? 'hidden lg:table-cell' : ($priority === 3 ? 'hidden xl:table-cell' : '');
                                         $alignClass = ($col['align'] ?? 'left') === 'right' ? 'text-right' : (($col['align'] ?? 'left') === 'center' ? 'text-center' : 'text-left');
+                                        $colWidth = $col['width'] ?? null;
+                                        $widthStyle = $colWidth ? "width: {$colWidth};" : '';
 
                                         // Retrieve raw value
                                         $val = is_object($row) ? data_get($row, $colKey) : ($row[$colKey] ?? null);
                                     @endphp
-                                    <td class="py-3 px-3.5 {{ $alignClass }} {{ $priorityClass }}">
+                                    <td @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['cellClass'] ?? '' }}">
                                         @if(isset(${'cell_' . $colKey}))
                                             {{ ${'cell_' . $colKey}($row) }}
                                         @elseif($type === 'badge')

@@ -128,22 +128,40 @@ class MetaLeadSyncService
             // First try listing from Meta Graph API if pageId is present
             if (!empty($pageId)) {
                 try {
-                    $formsResponse = Http::timeout(15)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
+                    $url = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
+                    $queryParams = [
                         'access_token' => $accessToken,
                         'fields' => 'id,name,status,leads_count',
-                        'limit' => 50,
-                    ]);
+                        'limit' => 100,
+                    ];
 
-                    if ($formsResponse->successful() && is_array($formsResponse->json('data'))) {
-                        foreach ($formsResponse->json('data') as $f) {
-                            $targetForms[] = [
-                                'id' => (string) $f['id'],
-                                'name' => $f['name'] ?? "Form #{$f['id']}",
-                            ];
+                    $pageCount = 0;
+                    while ($url && $pageCount < 20) {
+                        $formsResponse = Http::timeout(15)->get($url, $queryParams);
+                        if (!$formsResponse->successful()) {
+                            $errorMsg = $formsResponse->json('error.message') ?? 'Failed to list lead forms from Meta API';
+                            Log::warning("MetaLeadSyncService: Could not list forms for page {$pageId}: {$errorMsg}");
+                            break;
                         }
-                    } else {
-                        $errorMsg = $formsResponse->json('error.message') ?? 'Failed to list lead forms from Meta API';
-                        Log::warning("MetaLeadSyncService: Could not list forms for page {$pageId}: {$errorMsg}");
+
+                        $data = $formsResponse->json('data');
+                        if (is_array($data) && !empty($data)) {
+                            foreach ($data as $f) {
+                                $targetForms[] = [
+                                    'id' => (string) $f['id'],
+                                    'name' => $f['name'] ?? "Form #{$f['id']}",
+                                ];
+                            }
+                        }
+
+                        $nextUrl = $formsResponse->json('paging.next');
+                        if ($nextUrl) {
+                            $url = $nextUrl;
+                            $queryParams = [];
+                            $pageCount++;
+                        } else {
+                            break;
+                        }
                     }
                 } catch (Throwable $e) {
                     Log::error("MetaLeadSyncService Exception listing forms: " . $e->getMessage());

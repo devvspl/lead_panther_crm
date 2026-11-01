@@ -611,4 +611,57 @@ class MetaIntegrationTest extends TestCase
             ->assertDontSee('Single Manual Lead')
             ->assertDontSee('Bulk CSV Upload');
     }
+
+    public function test_fetch_lead_forms_follows_cursor_pagination_to_retrieve_all_forms(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'High Volume Meta Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => '9988112233',
+        ]);
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'mock_token_multi_page',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v19.0/9988112233/leadgen_forms*' => Http::sequence()
+                ->push([
+                    'data' => [
+                        ['id' => 'form_page1_01', 'name' => 'Form Page One - One', 'status' => 'ACTIVE'],
+                        ['id' => 'form_page1_02', 'name' => 'Form Page One - Two', 'status' => 'ACTIVE'],
+                    ],
+                    'paging' => [
+                        'next' => 'https://graph.facebook.com/v19.0/9988112233/leadgen_forms?access_token=mock_token_multi_page&limit=100&after=cursor_page_2'
+                    ]
+                ], 200)
+                ->push([
+                    'data' => [
+                        ['id' => 'form_page2_01', 'name' => 'Form Page Two - Alpha', 'status' => 'ACTIVE'],
+                        ['id' => 'form_page2_02', 'name' => 'Form Page Two - Beta', 'status' => 'ACTIVE'],
+                    ],
+                    'paging' => []
+                ], 200),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->call('fetchLeadForms', $account->id)
+            ->assertCount('availableForms', 4);
+
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_01']);
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_02']);
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_01']);
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_02']);
+    }
 }

@@ -609,28 +609,53 @@ class IntegrationsManager extends Component
 
         if ($account->type === 'meta' && $pageId && $accessToken) {
             try {
-                $response = Http::timeout(12)->get("https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms", [
+                $url = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
+                $queryParams = [
                     'access_token' => $accessToken,
                     'fields' => 'id,name,status,created_time',
-                ]);
+                    'limit' => 100,
+                ];
 
-                if ($response->successful() && is_array($response->json('data'))) {
-                    $forms = $response->json('data');
+                $pageCount = 0;
+                while ($url && $pageCount < 20) { // Safety guard up to 2,000 forms
+                    $response = Http::timeout(15)->get($url, $queryParams);
+                    if (!$response->successful()) {
+                        break;
+                    }
+
+                    $data = $response->json('data');
+                    if (is_array($data) && !empty($data)) {
+                        foreach ($data as $item) {
+                            $forms[] = $item;
+                        }
+                    }
+
+                    $nextUrl = $response->json('paging.next');
+                    if ($nextUrl) {
+                        $url = $nextUrl;
+                        $queryParams = []; // nextUrl already contains access_token and after cursor
+                        $pageCount++;
+                    } else {
+                        break;
+                    }
                 }
             } catch (Throwable $e) {
                 // Fallback to local
             }
         }
 
-        if (empty($forms)) {
-            $savedMappings = $account->formMappings;
-            if ($savedMappings->isNotEmpty()) {
-                foreach ($savedMappings as $m) {
+        // Also merge any existing mappings from database so no previously saved forms are lost
+        $fetchedIds = array_map(fn($f) => (string) (is_array($f) ? $f['id'] : $f->id), $forms);
+        $savedMappings = $account->formMappings;
+        if ($savedMappings->isNotEmpty()) {
+            foreach ($savedMappings as $m) {
+                if (!in_array((string) $m->form_id, $fetchedIds)) {
                     $forms[] = [
-                        'id' => $m->form_id,
+                        'id' => (string) $m->form_id,
                         'name' => $m->form_name,
                         'status' => strtoupper($m->status ?: 'ACTIVE'),
                     ];
+                    $fetchedIds[] = (string) $m->form_id;
                 }
             }
         }

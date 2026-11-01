@@ -623,38 +623,68 @@ class IntegrationsManager extends Component
 
         if ($account->type === 'meta' && $pageId && $accessToken) {
             try {
-                $url = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
-                $queryParams = [
-                    'access_token' => $accessToken,
-                    'fields' => 'id,name,status,created_time',
-                    'limit' => 100,
-                ];
+                $endpoint = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
+                $afterCursor = null;
+                $seenCursors = [];
+                $maxIterations = 500; // Unlimited in practice (up to 50,000 forms)
+                $iteration = 0;
 
-                $pageCount = 0;
-                while ($url && $pageCount < 20) { // Safety guard up to 2,000 forms
-                    $response = Http::timeout(15)->get($url, $queryParams);
+                while ($iteration < $maxIterations) {
+                    $iteration++;
+                    $params = [
+                        'access_token' => $accessToken,
+                        'fields' => 'id,name,status,created_time',
+                        'limit' => 100,
+                    ];
+                    if ($afterCursor) {
+                        $params['after'] = $afterCursor;
+                    }
+
+                    $response = Http::timeout(20)->get($endpoint, $params);
                     if (!$response->successful()) {
+                        $errorMsg = $response->json('error.message') ?? $response->body();
+                        \Illuminate\Support\Facades\Log::warning("IntegrationsManager: Meta API error fetching forms on iteration {$iteration}: {$errorMsg}");
                         break;
                     }
 
                     $data = $response->json('data');
-                    if (is_array($data) && !empty($data)) {
-                        foreach ($data as $item) {
-                            $forms[] = $item;
+                    if (!is_array($data) || empty($data)) {
+                        break;
+                    }
+
+                    foreach ($data as $item) {
+                        $forms[] = $item;
+                    }
+
+                    // If fewer than limit returned, no more forms exist
+                    if (count($data) < 100) {
+                        break;
+                    }
+
+                    // Extract next cursor from paging.cursors.after or paging.next
+                    $nextCursor = $response->json('paging.cursors.after');
+                    if (!$nextCursor) {
+                        $nextUrl = $response->json('paging.next');
+                        if ($nextUrl) {
+                            $parsedUrl = parse_url($nextUrl);
+                            if (!empty($parsedUrl['query'])) {
+                                parse_str($parsedUrl['query'], $parsedQuery);
+                                if (!empty($parsedQuery['after'])) {
+                                    $nextCursor = $parsedQuery['after'];
+                                }
+                            }
                         }
                     }
 
-                    $nextUrl = $response->json('paging.next');
-                    if ($nextUrl) {
-                        $url = $nextUrl;
-                        $queryParams = []; // nextUrl already contains access_token and after cursor
-                        $pageCount++;
-                    } else {
+                    if (!$nextCursor || in_array($nextCursor, $seenCursors, true)) {
                         break;
                     }
+
+                    $seenCursors[] = $nextCursor;
+                    $afterCursor = $nextCursor;
                 }
             } catch (Throwable $e) {
-                // Fallback to local
+                \Illuminate\Support\Facades\Log::warning("IntegrationsManager: Exception fetching forms: " . $e->getMessage());
             }
         }
 
@@ -777,6 +807,7 @@ class IntegrationsManager extends Component
         }
 
         $this->availableForms = $forms;
+        $this->resetPage();
         $this->isFetchingForms = false;
 
         $count = count($forms);
@@ -839,6 +870,14 @@ class IntegrationsManager extends Component
 
         if ($mapping) {
             $mapping->update(['campaign_id' => $campaignId]);
+
+            if ($campaignId) {
+                $camp = Campaign::find($campaignId);
+                if ($camp && $camp->project_id && empty($this->formProjectMap[$fId])) {
+                    $this->formProjectMap[$fId] = $camp->project_id;
+                    $mapping->update(['project_id' => $camp->project_id]);
+                }
+            }
             $this->dispatch('toast', type: 'success', message: "Campaign updated for Form #{$fId}");
         }
     }
@@ -915,10 +954,13 @@ class IntegrationsManager extends Component
 
         if (!empty($this->search)) {
             $term = strtolower(trim($this->search));
-            $forms = $forms->filter(function ($item) use ($term) {
+            $campaigns = Campaign::pluck('name', 'id')->toArray();
+            $forms = $forms->filter(function ($item) use ($term, $campaigns) {
                 $id = strtolower((string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '')));
                 $name = strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
-                return str_contains($id, $term) || str_contains($name, $term);
+                $cId = $this->formCampaignMap[$id] ?? null;
+                $campName = $cId && isset($campaigns[$cId]) ? strtolower($campaigns[$cId]) : '';
+                return str_contains($id, $term) || str_contains($name, $term) || str_contains($campName, $term);
             });
         }
 
@@ -961,10 +1003,13 @@ class IntegrationsManager extends Component
 
         if (!empty($this->search)) {
             $term = strtolower(trim($this->search));
-            $forms = $forms->filter(function ($item) use ($term) {
+            $campaigns = Campaign::pluck('name', 'id')->toArray();
+            $forms = $forms->filter(function ($item) use ($term, $campaigns) {
                 $id = strtolower((string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '')));
                 $name = strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
-                return str_contains($id, $term) || str_contains($name, $term);
+                $cId = $this->formCampaignMap[$id] ?? null;
+                $campName = $cId && isset($campaigns[$cId]) ? strtolower($campaigns[$cId]) : '';
+                return str_contains($id, $term) || str_contains($name, $term) || str_contains($campName, $term);
             });
         }
 
@@ -999,17 +1044,17 @@ class IntegrationsManager extends Component
 
             $rows[] = [
                 'sr_no' => $srNo++,
-                'form_id' => $fId,
+                'campaign' => $campaignName,
                 'form_name' => $fName ?: 'Lead Form #' . $fId,
+                'form_id' => $fId,
                 'status' => strtoupper($status),
                 'client' => $clientName,
                 'project' => $projectName,
-                'campaign' => $campaignName,
             ];
         }
 
         $filename = "meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx";
-        $headings = ['#', 'Form ID', 'Form Name', 'Status', 'Client / Organization', 'CRM Project', 'CRM Campaign'];
+        $headings = ['#', 'CRM Campaign', 'Meta Lead Form', 'Form ID', 'Status', 'Client / Organization', 'CRM Project'];
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading Excel now.');
 
@@ -1019,7 +1064,7 @@ class IntegrationsManager extends Component
                 title: 'Meta Leadgen Forms Routing Directory',
                 subtitle: 'Exported on ' . now()->format('d M Y, h:i A') . ' | Total: ' . count($rows) . ' Forms',
                 headings: $headings,
-                columns: ['sr_no', 'form_id', 'form_name', 'status', 'client', 'project', 'campaign'],
+                columns: ['sr_no', 'campaign', 'form_name', 'form_id', 'status', 'client', 'project'],
                 statusColumns: ['status']
             ),
             $filename
@@ -1056,7 +1101,7 @@ class IntegrationsManager extends Component
             $projectOptions[(string) $p->id] = $p->name;
         }
 
-        $campaignOptions = ['' => '-- Optional Campaign --'];
+        $campaignOptions = ['' => '-- Select Campaign --'];
         foreach ($campaigns as $c) {
             $campaignOptions[(string) $c->id] = $c->name;
         }
@@ -1074,9 +1119,27 @@ class IntegrationsManager extends Component
                 },
             ],
             [
+                'key' => 'campaign',
+                'label' => 'CRM Campaign',
+                'width' => '24%',
+                'priority' => 1,
+                'render' => function ($row) use ($campaignOptions) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    return view('components.ui.themed-select', [
+                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
+                            'wire:model.live' => "formCampaignMap.{$fId}",
+                        ]),
+                        'options' => $campaignOptions,
+                        'searchable' => true,
+                        'placeholder' => '-- Select Campaign --',
+                        'class' => 'w-full',
+                    ])->render();
+                },
+            ],
+            [
                 'key' => 'form_name',
                 'label' => 'Meta Lead Form',
-                'width' => '26%',
+                'width' => '25%',
                 'priority' => 1,
                 'render' => function ($row) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1112,7 +1175,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'project',
                 'label' => 'CRM Project',
-                'width' => '22%',
+                'width' => '19%',
                 'priority' => 1,
                 'render' => function ($row) use ($projectOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1123,25 +1186,6 @@ class IntegrationsManager extends Component
                         'options' => $projectOptions,
                         'searchable' => true,
                         'placeholder' => '-- Select Project --',
-                        'class' => 'w-full',
-                    ])->render();
-                },
-            ],
-            [
-                'key' => 'campaign',
-                'label' => 'CRM Campaign',
-                'width' => '20%',
-                'priority' => 1,
-                'render' => function ($row) use ($campaignOptions) {
-                    $fId = is_array($row) ? $row['id'] : $row->id;
-                    return view('components.ui.themed-select', [
-                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
-                            'wire:model.live' => "formCampaignMap.{$fId}",
-                        ]),
-                        'options' => $campaignOptions,
-                        'searchable' => true,
-                        'placeholder' => '-- Optional Campaign --',
-                        'align' => 'right',
                         'class' => 'w-full',
                     ])->render();
                 },

@@ -680,6 +680,10 @@
                         <option value="25">25 Leads</option>
                         <option value="50">50 Leads</option>
                         <option value="100">100 Leads</option>
+                        <option value="250">250 Leads</option>
+                        <option value="500">500 Leads</option>
+                        <option value="1000">1000 Leads</option>
+                        <option value="0">All Leads (No Limit)</option>
                     </select>
                 </div>
             </div>

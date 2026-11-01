@@ -637,12 +637,12 @@ class MetaIntegrationTest extends TestCase
         Http::fake([
             'https://graph.facebook.com/v19.0/9988112233/leadgen_forms*' => Http::sequence()
                 ->push([
-                    'data' => [
-                        ['id' => 'form_page1_01', 'name' => 'Form Page One - One', 'status' => 'ACTIVE'],
-                        ['id' => 'form_page1_02', 'name' => 'Form Page One - Two', 'status' => 'ACTIVE'],
-                    ],
+                    'data' => array_map(fn($i) => ['id' => "form_page1_{$i}", 'name' => "Form Page 1 - #{$i}", 'status' => 'ACTIVE'], range(1, 100)),
                     'paging' => [
-                        'next' => 'https://graph.facebook.com/v19.0/9988112233/leadgen_forms?access_token=mock_token_multi_page&limit=100&after=cursor_page_2'
+                        'cursors' => [
+                            'before' => 'cursor_before_1',
+                            'after' => 'cursor_after_page_1',
+                        ]
                     ]
                 ], 200)
                 ->push([
@@ -657,10 +657,10 @@ class MetaIntegrationTest extends TestCase
         Livewire::actingAs($admin)
             ->test(IntegrationsManager::class)
             ->call('fetchLeadForms', $account->id)
-            ->assertCount('availableForms', 4);
+            ->assertCount('availableForms', 102);
 
-        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_01']);
-        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_02']);
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_1']);
+        $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page1_100']);
         $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_01']);
         $this->assertDatabaseHas('lead_form_mappings', ['form_id' => 'form_page2_02']);
     }
@@ -691,10 +691,10 @@ class MetaIntegrationTest extends TestCase
             ->test(IntegrationsManager::class)
             ->set('availableForms', $forms);
 
-        // Verify Sr No column '#' exists
+        // Verify column layout: Sr No -> Campaign (Left) -> Form Name (Right) -> Client -> Project -> Sync
         $columns = $component->instance()->availableFormsTableColumns();
         $colKeys = array_column($columns, 'key');
-        $this->assertContains('sr_no', $colKeys);
+        $this->assertEquals(['sr_no', 'campaign', 'form_name', 'client', 'project', 'action'], $colKeys);
 
         // Verify pagination partitions into pages (page 1 has 15 items, total 35)
         $paginated = $component->instance()->filteredAvailableForms;

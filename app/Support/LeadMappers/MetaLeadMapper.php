@@ -152,18 +152,6 @@ class MetaLeadMapper
                     } else {
                         $customQuestions[$rawKey] = $cleanVal;
                     }
-
-                    // Auto-resolve location context from question phrasing if location not explicitly set (e.g. 'schedule_a_site_visit_to_dholera')
-                    if (empty($location)) {
-                        $knownLocations = ['dholera', 'noida', 'gurugram', 'gurgaon', 'delhi', 'mumbai', 'pune', 'bangalore', 'bengaluru', 'hyderabad', 'ghaziabad', 'faridabad', 'jaipur', 'ahmedabad'];
-                        $rawKeyLower = strtolower($rawKey);
-                        foreach ($knownLocations as $cityCandidate) {
-                            if (str_contains($rawKeyLower, $cityCandidate)) {
-                                $location = ucfirst($cityCandidate);
-                                break;
-                            }
-                        }
-                    }
                 }
             }
         }

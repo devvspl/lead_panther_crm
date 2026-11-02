@@ -894,7 +894,7 @@ class MetaIntegrationTest extends TestCase
         $mapped1 = $mapper->map($sample1);
         $this->assertEquals('Jagbir Singh Mehla', $mapped1['name']);
         $this->assertEquals('919878000231', $mapped1['mobile']);
-        $this->assertEquals('Dholera', $mapped1['location']);
+        $this->assertNull($mapped1['location']);
         $this->assertStringContainsString('Would You Like To Schedule A Site Visit To Dholera: Only Want Details On WhatsApp', $mapped1['requirement']);
         $this->assertStringContainsString('When Are You Planning To Purchase: Immediately (0–30 Days)', $mapped1['requirement']);
         $this->assertStringContainsString('Suitable Time For Call ☎️: 12 Noon To 4 PM', $mapped1['requirement']);

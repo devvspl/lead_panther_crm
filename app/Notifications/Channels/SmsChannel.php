@@ -23,7 +23,7 @@ class SmsChannel
         }
 
         $data = $notification->toSms($notifiable);
-        $phone = $data['phone'] ?? $notifiable->phone ?? '9999999999';
+        $phone = $data['phone'] ?? $notifiable->phone ?? '';
         $message = $data['message'] ?? 'SMS Notification from Lead Panther CRM';
 
         try {

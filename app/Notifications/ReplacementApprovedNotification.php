@@ -40,7 +40,7 @@ class ReplacementApprovedNotification extends Notification
     {
         $leadName = $this->replacement->originalLead?->name ?? 'Lead';
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Your replacement request for {$leadName} was approved on Lead Panther CRM.",
         ];
     }
@@ -49,7 +49,7 @@ class ReplacementApprovedNotification extends Notification
     {
         $leadName = $this->replacement->originalLead?->name ?? 'Lead';
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Lead Panther CRM: Replacement for {$leadName} approved.",
         ];
     }

@@ -40,7 +40,7 @@ class FollowupDueNotification extends Notification
     {
         $leadName = $this->followup->lead?->name ?? 'Lead';
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Reminder: Follow-up with {$leadName} is due now on Lead Panther CRM.",
         ];
     }
@@ -49,7 +49,7 @@ class FollowupDueNotification extends Notification
     {
         $leadName = $this->followup->lead?->name ?? 'Lead';
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Lead Panther CRM: Follow-up due for {$leadName}.",
         ];
     }

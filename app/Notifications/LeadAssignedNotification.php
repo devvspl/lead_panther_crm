@@ -39,11 +39,11 @@ class LeadAssignedNotification extends Notification
     public function toWhatsApp($notifiable): array
     {
         $template = NotificationTemplate::where('key', 'lead_assigned_whatsapp')->first();
-        $msg = $template ? $template->render(['lead_name' => $this->lead->name, 'lead_code' => $this->lead->lead_code]) 
-                         : "Hello! New Lead {$this->lead->lead_code} ({$this->lead->name}) assigned to you on Lead Panther CRM.";
+        $msg = $template ? $template->render(['lead_name' => $this->lead->name, 'lead_code' => $this->lead->lead_code])
+            : "Hello! New Lead {$this->lead->lead_code} ({$this->lead->name}) assigned to you on Lead Panther CRM.";
 
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => $msg,
         ];
     }
@@ -51,7 +51,7 @@ class LeadAssignedNotification extends Notification
     public function toSms($notifiable): array
     {
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Lead Panther CRM: New lead {$this->lead->name} assigned to you.",
         ];
     }

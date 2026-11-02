@@ -38,7 +38,7 @@ class CampaignPausedNotification extends Notification
     public function toWhatsApp($notifiable): array
     {
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Alert: Lead Panther CRM campaigns for {$this->client->name} were PAUSED due to 0 credit balance. Please recharge now.",
         ];
     }
@@ -46,7 +46,7 @@ class CampaignPausedNotification extends Notification
     public function toSms($notifiable): array
     {
         return [
-            'phone' => $notifiable->phone ?? '9999999999',
+            'phone' => $notifiable->phone ?? '',
             'message' => "Lead Panther CRM Alert: Campaigns paused for {$this->client->name} due to zero balance.",
         ];
     }

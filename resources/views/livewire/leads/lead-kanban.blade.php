@@ -23,7 +23,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">Total Leads</span>
                     <div class="text-2xl font-bold text-ink mt-2 tracking-tight">
-                        {{ number_format($analytics['totalLeads']) }}</div>
+                        {{ number_format($analytics['totalLeads']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">In selected analytics scope</div>
                 </div>
                 <div
@@ -41,7 +42,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">New Leads Today</span>
                     <div class="text-2xl font-bold text-ink mt-2 tracking-tight">
-                        {{ number_format($analytics['newLeadsToday']) }}</div>
+                        {{ number_format($analytics['newLeadsToday']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">Created since 12:00 AM</div>
                 </div>
                 <div
@@ -59,7 +61,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">Assigned</span>
                     <div class="text-2xl font-bold text-ink mt-2 tracking-tight">
-                        {{ number_format($analytics['assignedCount']) }}</div>
+                        {{ number_format($analytics['assignedCount']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">Currently in Assigned stage</div>
                 </div>
                 <div
@@ -77,7 +80,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">Pending Response</span>
                     <div class="text-2xl font-bold text-ink mt-2 tracking-tight">
-                        {{ number_format($analytics['pendingResponse']) }}</div>
+                        {{ number_format($analytics['pendingResponse']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">Assigned, uncontacted</div>
                 </div>
                 <div
@@ -95,7 +99,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">SLA Breached</span>
                     <div class="text-2xl font-bold text-danger mt-2 tracking-tight">
-                        {{ number_format($analytics['slaBreachedCount']) }}</div>
+                        {{ number_format($analytics['slaBreachedCount']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-danger font-semibold">&gt; 30 min first response</div>
                 </div>
                 <div
@@ -114,7 +119,8 @@
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">Site Visits (This
                         Week)</span>
                     <div class="text-2xl font-bold text-ink mt-2 tracking-tight">
-                        {{ number_format($analytics['siteVisitsThisWeek']) }}</div>
+                        {{ number_format($analytics['siteVisitsThisWeek']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">Scheduled site visits</div>
                 </div>
                 <div
@@ -132,7 +138,8 @@
                 <div>
                     <span class="text-xs font-semibold text-muted uppercase tracking-wider">Bookings (This Month)</span>
                     <div class="text-2xl font-bold text-emerald-600 mt-2 tracking-tight">
-                        {{ number_format($analytics['bookingsThisMonth']) }}</div>
+                        {{ number_format($analytics['bookingsThisMonth']) }}
+                    </div>
                     <div class="mt-2 text-[11px] text-muted">Bookings / Closed Won</div>
                 </div>
                 <div
@@ -254,19 +261,9 @@
             <!-- Search (Rendered in top bar for Kanban view; Table view uses integrated table search) -->
             @if($viewMode === 'kanban')
                 <div class="relative w-40 sm:w-48">
-                    <input 
-                        type="search" 
-                        name="kanban_search_query"
-                        id="kanban_search_query"
-                        autocomplete="off"
-                        autocorrect="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        data-form-type="other"
-                        wire:model.live.debounce.300ms="search" 
-                        placeholder="Search leads..."
+                    <input type="search" name="kanban_search_query" id="kanban_search_query" autocomplete="off"
+                        autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
+                        data-form-type="other" wire:model.live.debounce.300ms="search" placeholder="Search leads..."
                         class="w-full h-8 pl-3 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:bg-surface">
                 </div>
             @endif
@@ -395,30 +392,30 @@
     @else
         <!-- PART 4: KANBAN BOARD GRID (CONTAINED HORIZONTAL SCROLL) -->
         <div x-data="{
-                    isMouseDown: false,
-                    startX: 0,
-                    scrollLeft: 0,
-                    onMouseDown(e) {
-                        if (e.button !== 0) return;
-                        if (e.target.closest('button, input, select, a, [data-lead-id]')) return;
-                        this.isMouseDown = true;
-                        this.startX = e.pageX - $el.offsetLeft;
-                        this.scrollLeft = $el.scrollLeft;
-                    },
-                    onMouseMove(e) {
-                        if (!this.isMouseDown) return;
-                        e.preventDefault();
-                        const x = e.pageX - $el.offsetLeft;
-                        const walk = (x - this.startX) * 1.5;
-                        $el.scrollLeft = this.scrollLeft - walk;
-                    },
-                    onMouseUp() {
-                        this.isMouseDown = false;
-                    },
-                    onMouseLeave() {
-                        this.isMouseDown = false;
-                    }
-                }" @mousedown="onMouseDown($event)" @mousemove="onMouseMove($event)" @mouseup="onMouseUp()"
+                        isMouseDown: false,
+                        startX: 0,
+                        scrollLeft: 0,
+                        onMouseDown(e) {
+                            if (e.button !== 0) return;
+                            if (e.target.closest('button, input, select, a, [data-lead-id]')) return;
+                            this.isMouseDown = true;
+                            this.startX = e.pageX - $el.offsetLeft;
+                            this.scrollLeft = $el.scrollLeft;
+                        },
+                        onMouseMove(e) {
+                            if (!this.isMouseDown) return;
+                            e.preventDefault();
+                            const x = e.pageX - $el.offsetLeft;
+                            const walk = (x - this.startX) * 1.5;
+                            $el.scrollLeft = this.scrollLeft - walk;
+                        },
+                        onMouseUp() {
+                            this.isMouseDown = false;
+                        },
+                        onMouseLeave() {
+                            this.isMouseDown = false;
+                        }
+                    }" @mousedown="onMouseDown($event)" @mousemove="onMouseMove($event)" @mouseup="onMouseUp()"
             @mouseleave="onMouseLeave()" :class="isMouseDown ? 'cursor-grabbing select-none' : 'cursor-grab'"
             class="w-full overflow-x-auto overflow-y-hidden pb-6">
             <div class="flex items-start space-x-4 min-w-max">
@@ -441,19 +438,20 @@
 
                         <!-- Cards Droppable Container -->
                         <div data-stage-key="{{ $stageKey }}" x-data="{ 
-                                        initSortable() { 
-                                            new Sortable($el, { 
-                                                group: 'kanban', 
-                                                animation: 150, 
-                                                ghostClass: 'opacity-50',
-                                                onEnd: function(evt) { 
-                                                    const leadId = evt.item.getAttribute('data-lead-id'); 
-                                                    const toStage = evt.to.getAttribute('data-stage-key'); 
-                                                    $wire.updateLeadStage(leadId, toStage); 
+                                                initSortable() { 
+                                                    new Sortable($el, { 
+                                                        group: 'kanban', 
+                                                        animation: 150, 
+                                                        ghostClass: 'opacity-50',
+                                                        onEnd: function(evt) { 
+                                                            const leadId = evt.item.getAttribute('data-lead-id'); 
+                                                            const toStage = evt.to.getAttribute('data-stage-key'); 
+                                                            $wire.updateLeadStage(leadId, toStage); 
+                                                        } 
+                                                    }); 
                                                 } 
-                                            }); 
-                                        } 
-                                    }" x-init="initSortable()" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]">
+                                            }" x-init="initSortable()"
+                            class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]">
                             @forelse($stageLeads[$stageKey] ?? [] as $lead)
                                 @php
                                     $score = $lead->lead_score ?? 0;
@@ -491,13 +489,14 @@
                                                     Pending</span>
                                             @endif
 
-                                            <button 
-                                                type="button" 
+                                            <button type="button"
                                                 @click.stop="$dispatch('open-lead-journey', { id: {{ $lead->id }} })"
                                                 class="p-0.5 rounded hover:bg-canvas text-muted hover:text-primary transition cursor-pointer"
-                                                title="Show Full Lead Journey Timeline"
-                                            >
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                title="Show Full Lead Journey Timeline">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
                                             </button>
                                         </div>
                                     </div>
@@ -505,9 +504,11 @@
                                     <!-- Lead Name & City -->
                                     <div>
                                         <h4 class="text-xs font-bold text-ink group-hover:text-info transition truncate">
-                                            {{ $lead->name }}</h4>
+                                            {{ $lead->name }}
+                                        </h4>
                                         <p class="text-[11px] text-muted truncate">{{ $lead->city ?: 'Location N/A' }} •
-                                            {{ $lead->property_type ?: 'Property' }}</p>
+                                            {{ $lead->property_type ?: 'Property' }}
+                                        </p>
                                     </div>
 
                                     <!-- Budget & Source -->
@@ -517,7 +518,9 @@
                                         </span>
                                         <div class="flex items-center gap-1">
                                             @if($lead->campaign?->name)
-                                                <span class="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[90px]" title="Campaign: {{ $lead->campaign->name }}">
+                                                <span
+                                                    class="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[90px]"
+                                                    title="Campaign: {{ $lead->campaign->name }}">
                                                     {{ $lead->campaign->name }}
                                                 </span>
                                             @endif
@@ -632,7 +635,8 @@
 
     <!-- Meta Lead Ads Sync Offcanvas Drawer -->
     <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Meta Ads Sync"
-        subtitle="Pull and synchronize leads, campaigns, and ad form data directly from Meta (Facebook & Instagram Lead Ads)." maxWidth="lg">
+        subtitle="Pull and synchronize leads, campaigns, and ad form data directly from Meta (Facebook & Instagram Lead Ads)."
+        maxWidth="lg">
         <x-slot:headerIcon>
             <div class="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200">
                 <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -654,8 +658,7 @@
                 @if(empty($accOptions))
                     <div class="p-3 bg-canvas rounded-lg border border-border text-muted text-[11px] mt-1 space-y-1">
                         <p>No Meta Portal Accounts configured yet.</p>
-                        <a href="{{ route('settings.integrations') }}"
-                            class="font-bold text-primary hover:underline block">
+                        <a href="{{ route('settings.integrations') }}" class="font-bold text-primary hover:underline block">
                             &rarr; Configure Meta Page Access Token in Integrations
                         </a>
                     </div>
@@ -691,27 +694,27 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="font-bold text-ink">Assign to Project <span
-                            class="text-muted font-normal">(Optional Override)</span></label>
+                            class="text-muted font-normal"></span></label>
                     @php
                         $projOptions = ['' => 'Default / Mapped Project'];
                         foreach ($allProjects as $p) {
                             $projOptions[(string) $p->id] = $p->name;
                         }
                     @endphp
-                    <x-ui.themed-select wire:model="syncProjectId" :options="$projOptions"
-                        searchable="true" placeholder="Auto from Mapping" class="w-full mt-1" />
+                    <x-ui.themed-select wire:model="syncProjectId" :options="$projOptions" searchable="true"
+                        placeholder="Auto from Mapping" class="w-full mt-1" />
                 </div>
                 <div>
                     <label class="font-bold text-ink">Assign to Campaign <span
-                            class="text-muted font-normal">(Optional Override)</span></label>
+                            class="text-muted font-normal"></span></label>
                     @php
                         $campOptions = ['' => 'Auto from Meta Campaign'];
                         foreach ($allCampaigns as $c) {
                             $campOptions[(string) $c->id] = $c->name;
                         }
                     @endphp
-                    <x-ui.themed-select wire:model="syncCampaignId" :options="$campOptions"
-                        searchable="true" placeholder="Auto from Meta Campaign" class="w-full mt-1" />
+                    <x-ui.themed-select wire:model="syncCampaignId" :options="$campOptions" searchable="true"
+                        placeholder="Auto from Meta Campaign" class="w-full mt-1" />
                 </div>
             </div>
 

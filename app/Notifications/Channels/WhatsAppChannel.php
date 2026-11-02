@@ -23,7 +23,7 @@ class WhatsAppChannel
         }
 
         $data = $notification->toWhatsApp($notifiable);
-        $phone = $data['phone'] ?? $notifiable->phone ?? '9999999999';
+        $phone = $data['phone'] ?? $notifiable->phone ?? '';
         $message = $data['message'] ?? 'Notification from Lead Panther CRM';
 
         try {

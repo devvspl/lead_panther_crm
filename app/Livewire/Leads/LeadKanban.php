@@ -66,9 +66,9 @@ class LeadKanban extends Component
     public string $manualName = '';
     public string $manualMobile = '';
     public string $manualEmail = '';
-    public string $manualCity = 'Mumbai';
-    public string $manualBudget = '₹75.0L';
-    public string $manualPropertyType = '2 BHK';
+    public string $manualCity = '';
+    public string $manualBudget = '';
+    public string $manualPropertyType = '';
     public string $manualRequirement = '';
     public ?int $manualProjectId = null;
     public ?int $manualCampaignId = null;

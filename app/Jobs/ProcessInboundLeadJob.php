@@ -36,8 +36,8 @@ class ProcessInboundLeadJob implements ShouldQueue
         try {
             $account = $this->webhookLog->portalAccount;
             $type = strtolower($account?->type ?: 'meta');
-            $raw = is_array($this->webhookLog->payload) 
-                ? $this->webhookLog->payload 
+            $raw = is_array($this->webhookLog->payload)
+                ? $this->webhookLog->payload
                 : (json_decode($this->webhookLog->payload, true) ?: []);
 
             // If Meta webhook with leadgen_id, fetch full lead field data from Meta Graph API
@@ -118,7 +118,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 $campaignId = $campaign->id;
             }
 
-            $mobile = $mapped['mobile'] ?? '9999999999';
+            $mobile = $mapped['mobile'] ?? '';
             $email = $mapped['email'] ?? 'unknown@example.com';
 
             // 2. 90-Day Duplicate Check

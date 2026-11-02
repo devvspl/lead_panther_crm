@@ -530,6 +530,11 @@ class MetaLeadSyncService
                             );
                             $targetCampaignId = $campaign->id;
                             Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from ad payload: Campaign #{$campaign->id} ('{$campaign->name}')");
+
+                            // Automatically link form mapping to this actual Meta campaign if unassigned
+                            if ($mapping && empty($mapping->campaign_id)) {
+                                $mapping->update(['campaign_id' => $campaign->id]);
+                            }
                         }
                         if (!$targetCampaignId) {
                             $targetCampaignId = $mapping?->campaign_id ?: null;

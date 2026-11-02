@@ -751,16 +751,38 @@ class MetaIntegrationTest extends TestCase
         $project2 = Project::where('name', 'Dholers Anjali Vatika-copy (v1)')->first();
         $this->assertNotNull($project2);
 
-        // Verify Campaign name is EXACTLY identical to Meta form name (NO ' Campaign' suffix!)
-        $campaign1 = Campaign::where('name', 'Saya South X')->first();
-        $this->assertNotNull($campaign1);
-        $this->assertEquals('Saya South X', $campaign1->name);
-        $this->assertNull(Campaign::where('name', 'Saya South X Campaign')->first());
+        // Verify fake duplicate campaigns are NOT created with the form's name
+        $this->assertNull(Campaign::where('name', 'Saya South X')->first());
+        $this->assertNull(Campaign::where('name', 'Dholers Anjali Vatika-copy (v1)')->first());
 
-        $campaign2 = Campaign::where('name', 'Dholers Anjali Vatika-copy (v1)')->first();
-        $this->assertNotNull($campaign2);
-        $this->assertEquals('Dholers Anjali Vatika-copy (v1)', $campaign2->name);
-        $this->assertNull(Campaign::where('name', 'Dholers Anjali Vatika-copy (v1) Campaign')->first());
+        // Verify lead sync stores the ACTUAL Meta campaign name
+        Http::fake([
+            'https://graph.facebook.com/v19.0/1419517495829988/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'lead_actual_camp_1',
+                        'created_time' => '2026-11-02T16:00:00+0000',
+                        'campaign_name' => 'Dubai Form Harshit 01-Top Investors',
+                        'campaign_id' => 'camp_meta_dubai_99',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Harshit Mehta']],
+                            ['name' => 'phone_number', 'values' => ['+919877712345']],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $syncService = app(\App\Services\MetaLeadSyncService::class);
+        $syncService->sync($account, '1419517495829988');
+
+        // Verify the actual campaign from Meta Ads Manager is created and mapped
+        $actualCamp = Campaign::where('name', 'Dubai Form Harshit 01-Top Investors')->first();
+        $this->assertNotNull($actualCamp);
+        $this->assertEquals('Dubai Form Harshit 01-Top Investors', $actualCamp->name);
+
+        $mapping = LeadFormMapping::where('form_id', '1419517495829988')->first();
+        $this->assertEquals($actualCamp->id, $mapping->campaign_id);
     }
 
     public function test_meta_lead_mapper_cleans_modern_form_structure_choices_and_questions(): void

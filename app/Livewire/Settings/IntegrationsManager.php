@@ -757,43 +757,8 @@ class IntegrationsManager extends Component
                 ]);
             }
 
-            // 2. Resolve or Auto-create Campaign in DB matching EXACT Meta name (same as on Meta, no alteration)
-            $campaign = null;
-            if ($mapping->campaign_id) {
-                $existingCamp = Campaign::find($mapping->campaign_id);
-                if ($existingCamp) {
-                    if ($existingCamp->name === $fName . ' Campaign') {
-                        $existingCamp->update(['name' => $fName]);
-                    }
-                    if ($existingCamp->name === $fName) {
-                        $campaign = $existingCamp;
-                    }
-                }
-            }
-
-            if (!$campaign) {
-                $campaign = Campaign::where('name', $fName)->first();
-
-                if (!$campaign) {
-                    $oldCamp = Campaign::where('name', $fName . ' Campaign')->first();
-                    if ($oldCamp) {
-                        $oldCamp->update(['name' => $fName]);
-                        $campaign = $oldCamp;
-                    }
-                }
-            }
-
-            if (!$campaign) {
-                $campaign = Campaign::create([
-                    'project_id' => $project->id,
-                    'name' => $fName,
-                    'lead_source_id' => $leadSource->id,
-                    'utm_campaign' => Str::slug($fName),
-                    'status' => 'active',
-                ]);
-            } elseif ($campaign->project_id !== $project->id) {
-                $campaign->update(['project_id' => $project->id]);
-            }
+            // 2. Resolve Campaign: Preserve existing mapped campaign, or leave unassigned until mapped by user or auto-resolved from real Meta leads
+            $campaignId = $this->formCampaignMap[$fId] ?? ($mapping->campaign_id ?: null);
 
             // 3. Resolve Target Client
             $clientId = $this->formClientMap[$fId] ?? ($mapping->client_id ?: ($project->client_id ?: $defaultClientId));
@@ -802,13 +767,13 @@ class IntegrationsManager extends Component
             $mapping->update([
                 'form_name' => $fName,
                 'project_id' => $project->id,
-                'campaign_id' => $campaign->id,
+                'campaign_id' => $campaignId,
                 'client_id' => $clientId,
                 'status' => $fStatus,
             ]);
 
             $this->formProjectMap[$fId] = $project->id;
-            $this->formCampaignMap[$fId] = $campaign->id;
+            $this->formCampaignMap[$fId] = $campaignId;
             $this->formClientMap[$fId] = $clientId;
         }
 

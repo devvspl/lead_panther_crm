@@ -86,7 +86,10 @@ class MetaLeadSyncService
         $pageId = $account->getCredential('page_id');
         $accessToken = $customAccessToken ?: $account->getCredential('access_token');
 
+        Log::info("[MetaLeadSyncService] [Step 1: Init] Sync initiated for PortalAccount #{$account->id} ('{$account->name}'). Page ID: " . ($pageId ?: 'N/A') . ", Form Filter: " . ($formId ?: 'ALL') . ", Lead Limit: {$limit}, Override Project ID: " . ($overrideProjectId ?: 'None') . ", Override Campaign ID: " . ($overrideCampaignId ?: 'None') . ", Custom Token Provided: " . ($customAccessToken ? 'Yes' : 'No'));
+
         if (empty($accessToken)) {
+            Log::warning("[MetaLeadSyncService] [Step 1: Init] Aborted: Missing Page Access Token for Account #{$account->id}.");
             return [
                 'success' => false,
                 'total_forms' => 0,
@@ -101,6 +104,7 @@ class MetaLeadSyncService
 
         // Auto-resolve genuine Page Access Token if User or System-User token was passed
         if (!empty($pageId) && !empty($accessToken)) {
+            Log::info("[MetaLeadSyncService] [Step 2: Token Probe] Probing Page endpoint for genuine Page Access Token for Page ID: {$pageId}...");
             try {
                 $probe = Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}", [
                     'fields' => 'id,name,access_token',
@@ -109,24 +113,35 @@ class MetaLeadSyncService
 
                 if ($probe->successful() && $probe->json('access_token')) {
                     $resolvedPageToken = $probe->json('access_token');
+                    $pageName = $probe->json('name') ?? 'Meta Page';
                     if (!empty($resolvedPageToken) && $resolvedPageToken !== $accessToken) {
+                        Log::info("[MetaLeadSyncService] [Step 2: Token Probe] Upgraded to dedicated Page Access Token for Page '{$pageName}' (ID: {$pageId}).");
                         $accessToken = $resolvedPageToken;
                         $account->setCredential('access_token', $resolvedPageToken);
+                    } else {
+                        Log::info("[MetaLeadSyncService] [Step 2: Token Probe] Configured token verified successfully for Page '{$pageName}' (ID: {$pageId}).");
                     }
+                } else {
+                    $probeError = $probe->json('error.message') ?? "HTTP {$probe->status()}";
+                    Log::warning("[MetaLeadSyncService] [Step 2: Token Probe] Probe returned: {$probeError}. Continuing with configured token.");
                 }
             } catch (Throwable $e) {
-                // Ignore probe failure and fallback to existing token
+                Log::warning("[MetaLeadSyncService] [Step 2: Token Probe] Token probe exception: {$e->getMessage()}. Continuing with configured token.");
             }
         }
 
         // 1. Discover Target Leadgen Form IDs
         $targetForms = []; // array of ['id' => ..., 'name' => ...]
 
+        Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Determining target leadgen forms...");
+
         if (!empty($formId)) {
+            Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Specific Form ID provided: {$formId}");
             $targetForms[] = ['id' => $formId, 'name' => "Form #{$formId}"];
         } else {
             // First try listing from Meta Graph API if pageId is present
             if (!empty($pageId)) {
+                Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Querying Meta Graph API endpoint https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms...");
                 try {
                     $endpoint = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
                     $afterCursor = null;
@@ -145,18 +160,22 @@ class MetaLeadSyncService
                             $queryParams['after'] = $afterCursor;
                         }
 
+                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Requesting forms page #{$iteration}" . ($afterCursor ? " (cursor: {$afterCursor})" : " (initial batch)"));
+
                         $formsResponse = Http::timeout(20)->get($endpoint, $queryParams);
                         if (!$formsResponse->successful()) {
                             $errorMsg = $formsResponse->json('error.message') ?? 'Failed to list lead forms from Meta API';
-                            Log::warning("MetaLeadSyncService: Could not list forms for page {$pageId} on iteration {$iteration}: {$errorMsg}");
+                            Log::warning("[MetaLeadSyncService] [Step 3: Discover Forms] Could not list forms for page {$pageId} on iteration {$iteration}: {$errorMsg}");
                             break;
                         }
 
                         $data = $formsResponse->json('data');
                         if (!is_array($data) || empty($data)) {
+                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} returned empty form data.");
                             break;
                         }
 
+                        $batchCount = count($data);
                         foreach ($data as $f) {
                             $targetForms[] = [
                                 'id' => (string) $f['id'],
@@ -164,7 +183,10 @@ class MetaLeadSyncService
                             ];
                         }
 
-                        if (count($data) < 100) {
+                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} added {$batchCount} form(s). Cumulative count: " . count($targetForms));
+
+                        if ($batchCount < 100) {
+                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] End of API pagination reached ({$batchCount} < 100).");
                             break;
                         }
 
@@ -183,32 +205,41 @@ class MetaLeadSyncService
                         }
 
                         if (!$nextCursor || in_array($nextCursor, $seenCursors, true)) {
+                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] No new cursor available or already seen. Halting API form discovery.");
                             break;
                         }
 
                         $seenCursors[] = $nextCursor;
                         $afterCursor = $nextCursor;
                     }
+
+                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Discovered " . count($targetForms) . " form(s) from Meta Graph API across {$iteration} request(s).");
                 } catch (Throwable $e) {
-                    Log::error("MetaLeadSyncService Exception listing forms: " . $e->getMessage());
+                    Log::error("[MetaLeadSyncService] [Step 3: Discover Forms] Exception listing forms: " . $e->getMessage());
                 }
             }
 
             // Also merge any mapped forms in LeadFormMapping if not already added
             if ($account->formMappings()->exists()) {
                 $existingIds = array_column($targetForms, 'id');
+                $mergedFromDbCount = 0;
                 foreach ($account->formMappings as $mapping) {
                     if (!in_array($mapping->form_id, $existingIds)) {
                         $targetForms[] = [
                             'id' => $mapping->form_id,
                             'name' => $mapping->form_name ?: "Form #{$mapping->form_id}",
                         ];
+                        $mergedFromDbCount++;
                     }
+                }
+                if ($mergedFromDbCount > 0) {
+                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Merged {$mergedFromDbCount} locally mapped form(s) from database. Total forms to sync: " . count($targetForms));
                 }
             }
         }
 
         if (empty($targetForms)) {
+            Log::warning("[MetaLeadSyncService] [Step 3: Discover Forms] No active Meta Leadgen Forms found for Page ID " . ($pageId ?: 'N/A') . ". Aborting sync.");
             return [
                 'success' => false,
                 'total_forms' => 0,
@@ -220,6 +251,8 @@ class MetaLeadSyncService
                 'forms' => [],
             ];
         }
+
+        Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Total target form(s) to process: " . count($targetForms));
 
         $totalFetched = 0;
         $totalCreated = 0;
@@ -235,17 +268,26 @@ class MetaLeadSyncService
                 'name' => $org?->name ?? 'Default Client Organization',
                 'status' => 'active',
             ]);
+            Log::info("[MetaLeadSyncService] [Step 4: Defaults] Auto-created fallback Client #{$client->id} ('{$client->name}').");
         }
         $clientId = $client->id;
         $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
         $defaultConfiguredProjectId = $account->getCredential('default_project_id');
 
+        Log::info("[MetaLeadSyncService] [Step 4: Defaults] System context prepared: Client #{$clientId} ('{$client->name}'), LeadSource 'meta' (ID: {$leadSource->id}), Account Default Project ID: " . ($defaultConfiguredProjectId ?: 'None'));
+
+        $formIndex = 0;
+        $totalFormCount = count($targetForms);
+
         foreach ($targetForms as $formInfo) {
+            $formIndex++;
             $currentFormId = $formInfo['id'];
             $formName = $formInfo['name'];
             $formFetched = 0;
             $formCreated = 0;
             $formDuplicates = 0;
+
+            Log::info("[MetaLeadSyncService] [Step 5: Form {$formIndex}/{$totalFormCount}] Processing Form #{$currentFormId} ('{$formName}')...");
 
             // Match form mapping for project & campaign assignment
             $mapping = LeadFormMapping::where('portal_account_id', $account->id)
@@ -255,17 +297,27 @@ class MetaLeadSyncService
             // Resolve valid Project for this form:
             // 1. Override Project -> 2. Form Mapping -> 3. Account Default Project -> 4. Name Match -> 5. Any Existing Project -> 6. Auto-create Project
             $project = null;
+            $projectSource = 'none';
 
             if (!empty($overrideProjectId)) {
                 $project = Project::find($overrideProjectId);
+                if ($project) {
+                    $projectSource = "Override (ID: {$overrideProjectId})";
+                }
             }
 
             if (!$project && !empty($mapping?->project_id)) {
                 $project = Project::find($mapping->project_id);
+                if ($project) {
+                    $projectSource = "LeadFormMapping (ID: {$mapping->project_id})";
+                }
             }
 
             if (!$project && !empty($defaultConfiguredProjectId)) {
                 $project = Project::find($defaultConfiguredProjectId);
+                if ($project) {
+                    $projectSource = "Account Default Project (ID: {$defaultConfiguredProjectId})";
+                }
             }
 
             if (!$project && !empty($formName)) {
@@ -273,10 +325,16 @@ class MetaLeadSyncService
                 $project = Project::where('name', $formName)
                     ->orWhere('name', 'like', "%{$cleanName}%")
                     ->first();
+                if ($project) {
+                    $projectSource = "Form Name Match ('{$project->name}')";
+                }
             }
 
             if (!$project) {
                 $project = Project::where('client_id', $clientId)->first() ?? Project::first();
+                if ($project) {
+                    $projectSource = "Client Fallback / First Existing Project";
+                }
             }
 
             // Resolve target client/organization: mapping client -> project client -> default client
@@ -288,21 +346,29 @@ class MetaLeadSyncService
                     'name' => $formName ?: 'Meta Lead Ads Project',
                     'status' => 'active',
                 ]);
+                $projectSource = "Auto-created New Project";
             } elseif ($mapping?->client_id && $project->client_id !== $mapping->client_id) {
                 // Keep project client aligned if mapped explicitly
                 $project->update(['client_id' => $mapping->client_id]);
+                Log::debug("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Updated Project #{$project->id} client_id to {$mapping->client_id}");
             }
 
             $projectId = $project->id;
             $leadClientId = $project->client_id ?: $targetClientId;
+
+            Log::info("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Routing resolved: Project #{$projectId} ('{$project->name}') via [{$projectSource}], Target Client ID: {$leadClientId}");
 
             try {
                 $maxLeadsForThisForm = ($limit > 0) ? $limit : 10000;
                 $formLeadCursor = null;
                 $formLeadsData = [];
                 $seenLeadCursors = [];
+                $leadBatchIndex = 0;
+
+                Log::info("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Fetching leads from Meta API (limit: {$maxLeadsForThisForm})...");
 
                 while (count($formLeadsData) < $maxLeadsForThisForm) {
+                    $leadBatchIndex++;
                     $batchLimit = min(100, $maxLeadsForThisForm - count($formLeadsData));
                     $leadParams = [
                         'access_token' => $accessToken,
@@ -313,25 +379,30 @@ class MetaLeadSyncService
                         $leadParams['after'] = $formLeadCursor;
                     }
 
+                    Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Requesting leads batch #{$leadBatchIndex} (batch limit: {$batchLimit})" . ($formLeadCursor ? " with cursor {$formLeadCursor}" : " (initial batch)"));
+
                     $leadsResponse = Http::timeout(20)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", $leadParams);
 
                     if (!$leadsResponse->successful()) {
+                        $errorText = $leadsResponse->json('error.message') ?? 'HTTP ' . $leadsResponse->status();
                         if (empty($formLeadsData)) {
                             $totalErrors++;
-                            $errorText = $leadsResponse->json('error.message') ?? 'HTTP ' . $leadsResponse->status();
-                            Log::warning("MetaLeadSyncService: Failed fetching leads for form {$currentFormId}: {$errorText}");
+                            Log::warning("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Failed fetching leads from Meta API: {$errorText}");
                             $formSummaries[] = [
                                 'form_id' => $currentFormId,
                                 'form_name' => $formName,
                                 'status' => 'error',
                                 'error' => $errorText,
                             ];
+                        } else {
+                            Log::warning("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Subsequent leads batch #{$leadBatchIndex} error: {$errorText}");
                         }
                         break;
                     }
 
                     $batchData = $leadsResponse->json('data') ?? [];
                     if (!is_array($batchData) || empty($batchData)) {
+                        Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Batch #{$leadBatchIndex} returned empty data.");
                         break;
                     }
 
@@ -339,7 +410,10 @@ class MetaLeadSyncService
                         $formLeadsData[] = $rawLead;
                     }
 
+                    Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Batch #{$leadBatchIndex} returned " . count($batchData) . " lead(s). Cumulative for this form: " . count($formLeadsData));
+
                     if (count($batchData) < $batchLimit) {
+                        Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Batch #{$leadBatchIndex} had fewer than {$batchLimit} leads. End of leads reached.");
                         break;
                     }
 
@@ -358,6 +432,7 @@ class MetaLeadSyncService
                     }
 
                     if (!$nextLeadCursor || in_array($nextLeadCursor, $seenLeadCursors, true)) {
+                        Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] No further lead cursor. Halting lead fetch.");
                         break;
                     }
 
@@ -369,21 +444,28 @@ class MetaLeadSyncService
                 $formFetched = count($leadsData);
                 $totalFetched += $formFetched;
 
+                Log::info("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Fetched {$formFetched} total lead record(s) from Meta.");
+
+                $leadIndex = 0;
                 foreach ($leadsData as $rawLead) {
+                    $leadIndex++;
                     try {
                         $rawLead['form_id'] = $currentFormId;
                         $rawLead['form_name'] = $formName;
                         $mapped = $metaMapper->map($rawLead);
 
-                        $mobile = $mapped['mobile'] ?: '9876543210';
-                        $email = $mapped['email'] ?: 'meta_user@example.com';
+                        $mobile = $mapped['mobile'] ?: '';
+                        $email = $mapped['email'] ?: '';
+                        $metaLeadId = $rawLead['id'] ?? 'unknown';
+
+                        Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Lead {$leadIndex}/{$formFetched} (Meta ID: {$metaLeadId}) - Name: '{$mapped['name']}', Phone: {$mobile}, Email: {$email}");
 
                         // 90-Day Deduplication Check
                         $existingLead = Lead::where('client_id', $leadClientId)
                             ->where('created_at', '>=', now()->subDays(90))
                             ->where(function ($q) use ($mobile, $email) {
                                 $q->where('mobile', $mobile);
-                                if ($email && $email !== 'meta_user@example.com') {
+                                if ($email && $email !== '') {
                                     $q->orWhere('email', $email);
                                 }
                             })
@@ -392,6 +474,8 @@ class MetaLeadSyncService
                         if ($existingLead) {
                             $formDuplicates++;
                             $totalDuplicates++;
+
+                            Log::info("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Duplicate skipped for Phone: {$mobile}. Matches existing Lead #{$existingLead->lead_code} (ID: {$existingLead->id}, Created: {$existingLead->created_at->format('Y-m-d H:i')}).");
 
                             // Record audit trace for duplicate ingestion attempt
                             LeadMetadata::firstOrCreate([
@@ -423,9 +507,13 @@ class MetaLeadSyncService
                                 ]
                             );
                             $targetCampaignId = $campaign->id;
+                            Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from ad payload: Campaign #{$campaign->id} ('{$campaign->name}')");
                         }
                         if (!$targetCampaignId) {
                             $targetCampaignId = $mapping?->campaign_id ?: null;
+                            if ($targetCampaignId) {
+                                Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from Form Mapping: Campaign #{$targetCampaignId}");
+                            }
                         }
 
                         $numericBudget = self::parseBudget($mapped['budget']);
@@ -440,15 +528,17 @@ class MetaLeadSyncService
                             'name' => $mapped['name'] ?? 'Meta Lead',
                             'mobile' => $mobile,
                             'email' => $email,
-                            'city' => $mapped['city'] ?? 'Mumbai',
+                            'city' => $mapped['city'] ?? '',
                             'location' => $mapped['location'] ?? null,
                             'budget' => $numericBudget,
-                            'property_type' => $mapped['property_type'] ?? '2 BHK',
+                            'property_type' => $mapped['property_type'] ?? '',
                             'requirement' => $mapped['requirement'] ?? "Meta Ads sync from form '{$formName}' (#{$currentFormId})",
                             'status' => 'new',
                             'current_stage' => 'new',
                             'assigned_to' => null,
                         ]);
+
+                        Log::info("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Created new Lead: {$lead->name} (#{$lead->lead_code}, ID: {$lead->id}), Mobile: {$lead->mobile}, Project ID: {$lead->project_id}, Campaign ID: " . ($lead->campaign_id ?: 'None'));
 
                         // Save Comprehensive Meta Metadata
                         if (!empty($rawLead['id'])) {
@@ -493,14 +583,17 @@ class MetaLeadSyncService
 
                         // Fire LeadCreated event to reserve credits & auto-assign
                         event(new LeadCreated($lead));
+                        Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Dispatched LeadCreated event for Lead #{$lead->lead_code}");
 
                         $formCreated++;
                         $totalCreated++;
                     } catch (Throwable $e) {
                         $totalErrors++;
-                        Log::error("MetaLeadSyncService error creating lead for form {$currentFormId}: " . $e->getMessage());
+                        Log::error("[MetaLeadSyncService] [Step 7: Ingestion] Error creating lead for Form {$currentFormId} (Meta ID: " . ($rawLead['id'] ?? 'unknown') . "): " . $e->getMessage());
                     }
                 }
+
+                Log::info("[MetaLeadSyncService] [Step 8: Summary] Finished Form #{$currentFormId} ('{$formName}'): {$formCreated} created, {$formDuplicates} duplicates, {$formFetched} fetched from Meta.");
 
                 $formSummaries[] = [
                     'form_id' => $currentFormId,
@@ -512,11 +605,13 @@ class MetaLeadSyncService
                 ];
             } catch (Throwable $e) {
                 $totalErrors++;
-                Log::error("MetaLeadSyncService exception for form {$currentFormId}: " . $e->getMessage());
+                Log::error("[MetaLeadSyncService] [Step 8: Summary] Exception for Form {$currentFormId}: " . $e->getMessage());
             }
         }
 
         $message = "Sync completed: {$totalCreated} new lead(s) ingested from " . count($targetForms) . " form(s). ({$totalDuplicates} duplicate(s) skipped).";
+
+        Log::info("[MetaLeadSyncService] [Complete] Meta Lead Ads Sync finished for Account #{$account->id} ('{$account->name}'): {$totalCreated} created, {$totalDuplicates} duplicates, {$totalFetched} fetched, {$totalErrors} errors across " . count($targetForms) . " form(s).");
 
         return [
             'success' => $totalErrors === 0 || $totalCreated > 0,

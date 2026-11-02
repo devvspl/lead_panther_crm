@@ -21,6 +21,8 @@ class MetaLeadSyncService
 {
     /**
      * Parse budget into a valid decimal amount.
+     * Supports formats like '1 Cr - 1.5 Cr', '1_cr_-_1.5_cr', '₹1.5 Cr',
+     * '50 Lakh - 1 Cr', 'under 50 lakh', '2.5 Cr+', etc.
      */
     public static function parseBudget(mixed $rawBudget): float
     {
@@ -29,23 +31,23 @@ class MetaLeadSyncService
         }
 
         if (is_string($rawBudget)) {
-            $lower = strtolower($rawBudget);
-            preg_match('/[0-9]+(\.[0-9]+)?/', str_replace(',', '', $rawBudget), $matches);
+            $normalized = strtolower(str_replace(['_', '₹', '$', ','], [' ', '', '', ''], $rawBudget));
+            preg_match('/[0-9]+(\.[0-9]+)?/', $normalized, $matches);
             if (!empty($matches[0])) {
                 $num = (float) $matches[0];
-                if (str_contains($lower, 'cr')) {
+                if (str_contains($normalized, 'cr') || str_contains($normalized, 'crore')) {
                     return $num * 10000000;
                 }
-                if (str_contains($lower, 'l') || str_contains($lower, 'lac') || str_contains($lower, 'lakh')) {
+                if (str_contains($normalized, 'l') || str_contains($normalized, 'lac') || str_contains($normalized, 'lakh')) {
                     return $num * 100000;
                 }
-                if (str_contains($lower, 'k')) {
+                if (str_contains($normalized, 'k')) {
                     return $num * 1000;
                 }
                 if ($num >= 100000) {
                     return $num;
                 }
-                if ($num < 1000) {
+                if ($num < 1000 && $num > 0) {
                     return $num * 100000;
                 }
                 return $num;
@@ -176,14 +178,22 @@ class MetaLeadSyncService
                         }
 
                         $batchCount = count($data);
+                        $activeCountInBatch = 0;
                         foreach ($data as $f) {
+                            $formStatus = strtoupper($f['status'] ?? 'ACTIVE');
+                            // Filter out ARCHIVED or INACTIVE forms during full page discovery to prevent 504 timeouts
+                            if ($formStatus !== 'ACTIVE') {
+                                continue;
+                            }
                             $targetForms[] = [
                                 'id' => (string) $f['id'],
                                 'name' => $f['name'] ?? "Form #{$f['id']}",
+                                'status' => $formStatus,
                             ];
+                            $activeCountInBatch++;
                         }
 
-                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} added {$batchCount} form(s). Cumulative count: " . count($targetForms));
+                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} added {$activeCountInBatch} active form(s) out of {$batchCount} total. Cumulative active count: " . count($targetForms));
 
                         if ($batchCount < 100) {
                             Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] End of API pagination reached ({$batchCount} < 100).");
@@ -213,27 +223,29 @@ class MetaLeadSyncService
                         $afterCursor = $nextCursor;
                     }
 
-                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Discovered " . count($targetForms) . " form(s) from Meta Graph API across {$iteration} request(s).");
+                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Discovered " . count($targetForms) . " active form(s) from Meta Graph API across {$iteration} request(s).");
                 } catch (Throwable $e) {
                     Log::error("[MetaLeadSyncService] [Step 3: Discover Forms] Exception listing forms: " . $e->getMessage());
                 }
             }
 
-            // Also merge any mapped forms in LeadFormMapping if not already added
+            // Also merge any mapped active forms in LeadFormMapping if not already added
             if ($account->formMappings()->exists()) {
                 $existingIds = array_column($targetForms, 'id');
                 $mergedFromDbCount = 0;
                 foreach ($account->formMappings as $mapping) {
-                    if (!in_array($mapping->form_id, $existingIds)) {
+                    $mStatus = strtolower($mapping->status ?? 'active');
+                    if ($mStatus === 'active' && !in_array($mapping->form_id, $existingIds)) {
                         $targetForms[] = [
                             'id' => $mapping->form_id,
                             'name' => $mapping->form_name ?: "Form #{$mapping->form_id}",
+                            'status' => 'ACTIVE',
                         ];
                         $mergedFromDbCount++;
                     }
                 }
                 if ($mergedFromDbCount > 0) {
-                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Merged {$mergedFromDbCount} locally mapped form(s) from database. Total forms to sync: " . count($targetForms));
+                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Merged {$mergedFromDbCount} locally mapped active form(s) from database. Total forms to sync: " . count($targetForms));
                 }
             }
         }
@@ -278,8 +290,18 @@ class MetaLeadSyncService
 
         $formIndex = 0;
         $totalFormCount = count($targetForms);
+        $syncStartTime = microtime(true);
+        $maxExecutionSeconds = 40; // Hostinger Nginx has a 60s gateway timeout. 40s leaves a safe 20s margin.
+        $timedOutEarly = false;
 
         foreach ($targetForms as $formInfo) {
+            // Execution time guard to prevent 504 Gateway Timeouts on web requests
+            if ((microtime(true) - $syncStartTime) > $maxExecutionSeconds) {
+                $timedOutEarly = true;
+                Log::warning("[MetaLeadSyncService] [Step 5: Safety Guard] Execution time reached {$maxExecutionSeconds}s threshold. Gracefully stopping form processing to avoid 504 Gateway Timeout. Processed {$formIndex}/{$totalFormCount} forms.");
+                break;
+            }
+
             $formIndex++;
             $currentFormId = $formInfo['id'];
             $formName = $formInfo['name'];
@@ -609,13 +631,17 @@ class MetaLeadSyncService
             }
         }
 
-        $message = "Sync completed: {$totalCreated} new lead(s) ingested from " . count($targetForms) . " form(s). ({$totalDuplicates} duplicate(s) skipped).";
+        $message = "Sync completed: {$totalCreated} new lead(s) ingested from {$formIndex} form(s). ({$totalDuplicates} duplicate(s) skipped).";
+        if ($timedOutEarly) {
+            $remainingForms = $totalFormCount - $formIndex;
+            $message .= " Note: Processing safely paused after {$formIndex} form(s) ({$remainingForms} remaining) to prevent server gateway timeout. You can select specific forms from the dropdown to sync remaining.";
+        }
 
-        Log::info("[MetaLeadSyncService] [Complete] Meta Lead Ads Sync finished for Account #{$account->id} ('{$account->name}'): {$totalCreated} created, {$totalDuplicates} duplicates, {$totalFetched} fetched, {$totalErrors} errors across " . count($targetForms) . " form(s).");
+        Log::info("[MetaLeadSyncService] [Complete] Meta Lead Ads Sync finished for Account #{$account->id} ('{$account->name}'): {$totalCreated} created, {$totalDuplicates} duplicates, {$totalFetched} fetched, {$totalErrors} errors across {$formIndex} of {$totalFormCount} form(s)." . ($timedOutEarly ? " (Paused early by timeout guard)" : ""));
 
         return [
             'success' => $totalErrors === 0 || $totalCreated > 0,
-            'total_forms' => count($targetForms),
+            'total_forms' => $formIndex,
             'total_fetched' => $totalFetched,
             'total_created' => $totalCreated,
             'total_duplicates' => $totalDuplicates,

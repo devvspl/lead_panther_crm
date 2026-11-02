@@ -670,10 +670,22 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="font-bold text-ink">Leadgen Form ID <span
-                            class="text-muted font-normal">(Optional)</span></label>
-                    <input type="text" wire:model="customFormId" placeholder="e.g. 123456789 (Leave blank for all)"
-                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
+                    <label class="font-bold text-ink">Select Lead Form</label>
+                    @php
+                        $formOptions = ['' => 'All Active Forms (Recommended)'];
+                        if (isset($activeFormMappings) && $activeFormMappings->isNotEmpty()) {
+                            foreach ($activeFormMappings as $m) {
+                                $formOptions[$m->form_id] = $m->form_name;
+                            }
+                        }
+                        $formOptions['custom'] = 'Custom Form ID...';
+                    @endphp
+                    <select wire:model.live="selectedFormOption"
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
+                        @foreach($formOptions as $val => $lbl)
+                            <option value="{{ $val }}">{{ $lbl }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="font-bold text-ink">Max Leads to Pull</label>
@@ -690,6 +702,14 @@
                     </select>
                 </div>
             </div>
+
+            @if($selectedFormOption === 'custom')
+                <div>
+                    <label class="font-bold text-ink">Custom Form ID</label>
+                    <input type="text" wire:model="customFormId" placeholder="e.g. 1144292554640400"
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono mt-1">
+                </div>
+            @endif
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

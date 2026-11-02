@@ -54,6 +54,7 @@ class LeadKanban extends Component
     public bool $showPullLeadsModal = false;
     public string $pullMode = 'meta'; // 'meta' | 'manual'
     public ?int $selectedPortalAccountId = null;
+    public string $selectedFormOption = ''; // '' for All Active Forms, or specific form_id, or 'custom'
     public string $customFormId = '';
     public string $customPageAccessToken = '';
     public int $pullLimit = 25;
@@ -560,6 +561,9 @@ class LeadKanban extends Component
         $allProjects = Project::orderBy('name')->get();
         $allCampaigns = \App\Models\Campaign::orderBy('name')->get();
         $allLeadSources = LeadSource::orderBy('name')->get();
+        $activeFormMappings = $this->selectedPortalAccountId
+            ? \App\Models\LeadFormMapping::where('portal_account_id', $this->selectedPortalAccountId)->where('status', 'active')->orderBy('form_name')->get()
+            : collect();
 
         return view('livewire.leads.lead-kanban', [
             'stageLeads' => $stageLeads,
@@ -568,6 +572,7 @@ class LeadKanban extends Component
             'analytics' => $analytics,
             'availableTeams' => $availableTeams,
             'portalAccounts' => $portalAccounts,
+            'activeFormMappings' => $activeFormMappings,
             'allProjects' => $allProjects,
             'allCampaigns' => $allCampaigns,
             'allLeadSources' => $allLeadSources,
@@ -637,6 +642,10 @@ class LeadKanban extends Component
         $this->isPulling = true;
         $this->pullSummary = null;
 
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+
         try {
             $account = null;
             if ($this->selectedPortalAccountId) {
@@ -652,10 +661,14 @@ class LeadKanban extends Component
                 return;
             }
 
+            $targetFormId = $this->selectedFormOption === 'custom'
+                ? trim($this->customFormId)
+                : ($this->selectedFormOption ?: (trim($this->customFormId) ?: null));
+
             $syncService = app(\App\Services\MetaLeadSyncService::class);
             $result = $syncService->sync(
                 $account,
-                $this->customFormId ?: null,
+                $targetFormId ?: null,
                 (int) ($this->pullLimit ?: 25),
                 $this->syncProjectId ?: null,
                 $this->syncCampaignId ?: null

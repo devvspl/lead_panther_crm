@@ -762,4 +762,114 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals('Dholers Anjali Vatika-copy (v1)', $campaign2->name);
         $this->assertNull(Campaign::where('name', 'Dholers Anjali Vatika-copy (v1) Campaign')->first());
     }
+
+    public function test_meta_lead_mapper_cleans_modern_form_structure_choices_and_questions(): void
+    {
+        $mapper = new \App\Support\LeadMappers\MetaLeadMapper();
+
+        $rawLead = [
+            'id' => 'leadgen_modern_7788',
+            'created_time' => '2026-11-02T16:00:00+0000',
+            'campaign_name' => 'Panchsheel Greens 2 Campaign',
+            'adset_name' => 'Noida Extension Adset',
+            'ad_name' => 'Green Vista 3BHK Video',
+            'form_id' => '1144292554640400',
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['Vikramaditya Rao']],
+                ['name' => 'phone_number', 'values' => ['+919812345678']],
+                ['name' => 'email', 'values' => ['vikram.rao@example.com']],
+                ['name' => 'city', 'values' => ['Greater Noida West']],
+                ['name' => 'preferred_location', 'values' => ['noida_expressway']],
+                ['name' => 'what_is_your_preferred_configuration?', 'values' => ['3_bhk_']],
+                ['name' => 'what_is_your_budget?', 'values' => ['1_cr_-_1.5_cr']],
+                ['name' => 'when_are_you_planning_to_purchase?', 'values' => ['3–6_months']],
+                ['name' => 'suitable_time_for_call', 'values' => ['☎️_12_noon_to_4pm']],
+                ['name' => 'site_visit', 'values' => ['yes,_i_want_a_site_visit']],
+                ['name' => 'whatsapp_preference', 'values' => ['only_want_details_on_whatsapp']],
+            ]
+        ];
+
+        $mapped = $mapper->map($rawLead);
+
+        $this->assertEquals('Vikramaditya Rao', $mapped['name']);
+        $this->assertEquals('919812345678', $mapped['mobile']);
+        $this->assertEquals('vikram.rao@example.com', $mapped['email']);
+        $this->assertEquals('Greater Noida West', $mapped['city']);
+        $this->assertEquals('Noida Expressway', $mapped['location']);
+        $this->assertEquals('3 BHK', $mapped['property_type']);
+        $this->assertEquals('1 Cr - 1.5 Cr', $mapped['budget']);
+
+        // Verify budget parsing handles the format
+        $budgetNum = \App\Services\MetaLeadSyncService::parseBudget($mapped['budget']);
+        $this->assertEquals(10000000.00, $budgetNum);
+
+        // Verify requirement contains clean question names and formatted answers without raw underscores
+        $req = $mapped['requirement'];
+        $this->assertStringContainsString('Property: 3 BHK', $req);
+        $this->assertStringContainsString('Budget: 1 Cr - 1.5 Cr', $req);
+        $this->assertStringContainsString('Location: Noida Expressway', $req);
+        $this->assertStringContainsString('When Are You Planning To Purchase: 3–6 Months', $req);
+        $this->assertStringContainsString('Suitable Time For Call: ☎️ 12 Noon To 4pm', $req);
+        $this->assertStringContainsString('Site Visit: Yes, I Want A Site Visit', $req);
+        $this->assertStringContainsString('Whatsapp Preference: Only Want Details On WhatsApp', $req);
+    }
+
+    public function test_sync_meta_leads_filters_archived_forms_and_prevents_504_timeout(): void
+    {
+        $org = Organization::create(['name' => 'DLF Group', 'type' => 'builder', 'status' => 'active']);
+        $admin = User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Active Only Sync Test Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'page_id',
+            'encrypted_value' => 'page_active_filter_test',
+        ]);
+        IntegrationCredential::create([
+            'portal_account_id' => $account->id,
+            'key_name' => 'access_token',
+            'encrypted_value' => 'mock_token_active_filter',
+        ]);
+
+        // Mock 1 ACTIVE form and 2 ARCHIVED forms
+        Http::fake([
+            'https://graph.facebook.com/v19.0/page_active_filter_test/leadgen_forms*' => Http::response([
+                'data' => [
+                    ['id' => 'form_active_101', 'name' => 'Active New Launch 2026', 'status' => 'ACTIVE'],
+                    ['id' => 'form_old_archived_1', 'name' => 'Burari July form-March 2022', 'status' => 'ARCHIVED'],
+                    ['id' => 'form_old_archived_2', 'name' => 'Website-10th Feb 2022', 'status' => 'ARCHIVED'],
+                ],
+                'paging' => []
+            ], 200),
+            'https://graph.facebook.com/v19.0/form_active_101/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'lead_active_1',
+                        'created_time' => '2026-11-02T16:00:00+0000',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Kavita Sharma']],
+                            ['name' => 'phone_number', 'values' => ['+919988771122']],
+                            ['name' => 'email', 'values' => ['kavita@example.com']],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $syncService = app(\App\Services\MetaLeadSyncService::class);
+        $result = $syncService->sync($account);
+
+        $this->assertTrue($result['success']);
+        // Verify only the 1 ACTIVE form was synced, archived forms were bypassed
+        $this->assertEquals(1, $result['total_forms']);
+        $this->assertEquals(1, $result['total_created']);
+        $this->assertCount(1, $result['forms']);
+        $this->assertEquals('form_active_101', $result['forms'][0]['form_id']);
+    }
 }

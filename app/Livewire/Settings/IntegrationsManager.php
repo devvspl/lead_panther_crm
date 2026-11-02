@@ -714,6 +714,8 @@ class IntegrationsManager extends Component
             if (empty($fName)) {
                 $fName = 'Lead Form #' . $fId;
             }
+            $rawStatus = (is_array($formItem) ? ($formItem['status'] ?? '') : ($formItem->status ?? '')) ?: 'active';
+            $fStatus = strtolower(trim((string) $rawStatus));
 
             $mapping = LeadFormMapping::firstOrCreate(
                 [
@@ -723,12 +725,15 @@ class IntegrationsManager extends Component
                 [
                     'form_name' => $fName,
                     'page_id' => $pageId ?? null,
-                    'status' => 'active',
+                    'status' => $fStatus,
                 ]
             );
 
-            if ($mapping->form_name !== $fName) {
-                $mapping->update(['form_name' => $fName]);
+            if ($mapping->form_name !== $fName || $mapping->status !== $fStatus) {
+                $mapping->update([
+                    'form_name' => $fName,
+                    'status' => $fStatus,
+                ]);
             }
 
             // 1. Resolve or Auto-create Project in DB matching exact Meta name
@@ -799,6 +804,7 @@ class IntegrationsManager extends Component
                 'project_id' => $project->id,
                 'campaign_id' => $campaign->id,
                 'client_id' => $clientId,
+                'status' => $fStatus,
             ]);
 
             $this->formProjectMap[$fId] = $project->id;

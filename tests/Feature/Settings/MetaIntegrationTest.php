@@ -809,7 +809,7 @@ class MetaIntegrationTest extends TestCase
         $this->assertStringContainsString('Budget: 1 Cr - 1.5 Cr', $req);
         $this->assertStringContainsString('Location: Noida Expressway', $req);
         $this->assertStringContainsString('When Are You Planning To Purchase: 3–6 Months', $req);
-        $this->assertStringContainsString('Suitable Time For Call: ☎️ 12 Noon To 4pm', $req);
+        $this->assertStringContainsString('Suitable Time For Call: ☎️ 12 Noon To 4 PM', $req);
         $this->assertStringContainsString('Site Visit: Yes, I Want A Site Visit', $req);
         $this->assertStringContainsString('Whatsapp Preference: Only Want Details On WhatsApp', $req);
     }
@@ -871,5 +871,85 @@ class MetaIntegrationTest extends TestCase
         $this->assertEquals(1, $result['total_created']);
         $this->assertCount(1, $result['forms']);
         $this->assertEquals('form_active_101', $result['forms'][0]['form_id']);
+    }
+
+    public function test_meta_lead_mapper_handles_user_exact_dholera_samples(): void
+    {
+        $mapper = new \App\Support\LeadMappers\MetaLeadMapper();
+
+        // Sample 1: Jagbir Singh Mehla with all choices, Hindi/WhatsApp, 12_noon_to_4pm, Remarks
+        $sample1 = [
+            'id' => 'lead_sample_1',
+            'created_time' => '10/31/26',
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['Jagbir Singh Mehla']],
+                ['name' => 'phone_number', 'values' => ['919878000231']],
+                ['name' => 'would_you_like_to_schedule_a_site_visit_to_dholera?', 'values' => ['only_want_details_on_whatsapp']],
+                ['name' => 'when_are_you_planning_to_purchase?', 'values' => ['immediately_(0–30_days)']],
+                ['name' => 'suitable_time_for_call_☎️_', 'values' => ['12_noon_to_4pm']],
+                ['name' => 'Remarks', 'values' => ['call not received']],
+            ]
+        ];
+
+        $mapped1 = $mapper->map($sample1);
+        $this->assertEquals('Jagbir Singh Mehla', $mapped1['name']);
+        $this->assertEquals('919878000231', $mapped1['mobile']);
+        $this->assertEquals('Dholera', $mapped1['location']);
+        $this->assertStringContainsString('Would You Like To Schedule A Site Visit To Dholera: Only Want Details On WhatsApp', $mapped1['requirement']);
+        $this->assertStringContainsString('When Are You Planning To Purchase: Immediately (0–30 Days)', $mapped1['requirement']);
+        $this->assertStringContainsString('Suitable Time For Call ☎️: 12 Noon To 4 PM', $mapped1['requirement']);
+        $this->assertStringContainsString('Remarks: Call Not Received', $mapped1['requirement']);
+
+        // Sample 2: दलवीर मुजरी दलवीरआदिवासी मुजरा (Hindi Unicode name preserved + before_9am)
+        $sample2 = [
+            'id' => 'lead_sample_2',
+            'created_time' => '10/31/26',
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['दलवीर मुजरी दलवीरआदिवासी मुजरा']],
+                ['name' => 'phone_number', 'values' => ['919664020086']],
+                ['name' => 'would_you_like_to_schedule_a_site_visit_to_dholera?', 'values' => ['yes,_i_want_a_site_visit']],
+                ['name' => 'when_are_you_planning_to_purchase?', 'values' => ['immediately_(0–30_days)']],
+                ['name' => 'suitable_time_for_call_☎️_', 'values' => ['before_9am']],
+            ]
+        ];
+
+        $mapped2 = $mapper->map($sample2);
+        $this->assertEquals('दलवीर मुजरी दलवीरआदिवासी मुजरा', $mapped2['name']);
+        $this->assertEquals('919664020086', $mapped2['mobile']);
+        $this->assertStringContainsString('Would You Like To Schedule A Site Visit To Dholera: Yes, I Want A Site Visit', $mapped2['requirement']);
+        $this->assertStringContainsString('Suitable Time For Call ☎️: Before 9 AM', $mapped2['requirement']);
+
+        // Sample 3: Yadvendra Pratap Singhll with trailing underscore in 9am_to_11am_
+        $sample3 = [
+            'id' => 'lead_sample_3',
+            'created_time' => '10/31/26',
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['Yadvendra Pratap Singhll']],
+                ['name' => 'phone_number', 'values' => ['919336774627']],
+                ['name' => 'suitable_time_for_call_☎️_', 'values' => ['9am_to_11am_']],
+            ]
+        ];
+
+        $mapped3 = $mapper->map($sample3);
+        $this->assertEquals('Yadvendra Pratap Singhll', $mapped3['name']);
+        $this->assertStringContainsString('Suitable Time For Call ☎️: 9 AM To 11 AM', $mapped3['requirement']);
+
+        // Sample 4: Purushottam Ganga with just_exploring and 4pm_to_6pm
+        $sample4 = [
+            'id' => 'lead_sample_4',
+            'created_time' => '10/31/26',
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['Purushottam Ganga']],
+                ['name' => 'phone_number', 'values' => ['917070848787']],
+                ['name' => 'when_are_you_planning_to_purchase?', 'values' => ['just_exploring']],
+                ['name' => 'suitable_time_for_call_☎️_', 'values' => ['4pm_to_6pm']],
+                ['name' => 'Remarks', 'values' => ['call him at monday']],
+            ]
+        ];
+
+        $mapped4 = $mapper->map($sample4);
+        $this->assertStringContainsString('When Are You Planning To Purchase: Just Exploring', $mapped4['requirement']);
+        $this->assertStringContainsString('Suitable Time For Call ☎️: 4 PM To 6 PM', $mapped4['requirement']);
+        $this->assertStringContainsString('Remarks: Call Him At Monday', $mapped4['requirement']);
     }
 }

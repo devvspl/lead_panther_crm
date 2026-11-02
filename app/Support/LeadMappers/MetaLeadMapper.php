@@ -42,10 +42,12 @@ class MetaLeadMapper
 
         // Normalize lowercase snake_case strings into Title Case words (e.g. 'noida_expressway' -> 'Noida Expressway')
         if (!str_contains($cleaned, '@')) {
-            if (!preg_match('/[A-Z]/', $str)) {
-                $cleaned = ucwords($cleaned);
-            } elseif (preg_match('/^[a-z]/', $cleaned)) {
-                $cleaned = ucfirst($cleaned);
+            if (preg_match('/[a-z]/', $cleaned)) {
+                if (!preg_match('/[A-Z]/', $str)) {
+                    $cleaned = ucwords($cleaned, " \t\r\n\f\v(-–_");
+                } elseif (preg_match('/^[a-z]/', $cleaned)) {
+                    $cleaned = ucfirst($cleaned);
+                }
             }
         }
 
@@ -63,6 +65,8 @@ class MetaLeadMapper
             '/\bi\b/' => 'I',
             '/\bsqft\b/i' => 'Sq. Ft.',
             '/\bsq\.ft\b/i' => 'Sq. Ft.',
+            '/\b(\d+)\s*pm\b/i' => '$1 PM',
+            '/\b(\d+)\s*am\b/i' => '$1 AM',
         ];
 
         foreach ($replacements as $pattern => $replacement) {
@@ -148,8 +152,26 @@ class MetaLeadMapper
                     } else {
                         $customQuestions[$rawKey] = $cleanVal;
                     }
+
+                    // Auto-resolve location context from question phrasing if location not explicitly set (e.g. 'schedule_a_site_visit_to_dholera')
+                    if (empty($location)) {
+                        $knownLocations = ['dholera', 'noida', 'gurugram', 'gurgaon', 'delhi', 'mumbai', 'pune', 'bangalore', 'bengaluru', 'hyderabad', 'ghaziabad', 'faridabad', 'jaipur', 'ahmedabad'];
+                        $rawKeyLower = strtolower($rawKey);
+                        foreach ($knownLocations as $cityCandidate) {
+                            if (str_contains($rawKeyLower, $cityCandidate)) {
+                                $location = ucfirst($cityCandidate);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
+        }
+
+        // Capture top-level remarks / notes if provided
+        $remarks = $leadVal['remarks'] ?? $leadVal['Remarks'] ?? $raw['remarks'] ?? $raw['Remarks'] ?? null;
+        if (!empty($remarks) && !isset($customQuestions['Remarks'])) {
+            $customQuestions['Remarks'] = self::cleanMetaValue($remarks);
         }
 
         // Combine first and last name if full_name wasn't explicitly provided
@@ -204,7 +226,7 @@ class MetaLeadMapper
         }
 
         foreach ($customQuestions as $q => $a) {
-            $cleanQ = trim($q, "?: \t\n\r\0\x0B");
+            $cleanQ = trim($q, "?:!-_ \t\n\r\0\x0B");
             $readableQ = ucwords(str_replace(['_', '-'], ' ', $cleanQ));
             $reqParts[] = "{$readableQ}: {$a}";
         }

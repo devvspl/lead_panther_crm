@@ -37,9 +37,26 @@ class Lead extends Model
         return $this->belongsTo(User::class, 'client_id');
     }
 
-    public function project(): BelongsTo
+    public function project(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
     {
-        return $this->belongsTo(Project::class);
+        return $this->hasOneThrough(Project::class, Campaign::class, 'id', 'id', 'campaign_id', 'project_id');
+    }
+
+    public function getProjectIdAttribute(): ?int
+    {
+        return $this->campaign?->project_id;
+    }
+
+    public function setProjectIdAttribute($value): void
+    {
+        if ($value && empty($this->attributes['campaign_id'])) {
+            $sourceId = $this->attributes['lead_source_id'] ?? (LeadSource::first()?->id ?? LeadSource::firstOrCreate(['name' => 'direct'])->id);
+            $campaign = Campaign::firstOrCreate(
+                ['project_id' => $value, 'name' => 'General Campaign'],
+                ['lead_source_id' => $sourceId, 'status' => 'active']
+            );
+            $this->attributes['campaign_id'] = $campaign->id;
+        }
     }
 
     public function campaign(): BelongsTo

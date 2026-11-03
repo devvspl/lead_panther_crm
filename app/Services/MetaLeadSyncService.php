@@ -266,6 +266,23 @@ class MetaLeadSyncService
 
         Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Total target form(s) to process: " . count($targetForms));
 
+        // Prioritize actively mapped forms first so active campaigns are processed immediately
+        if ($account) {
+            $mappedFormIds = LeadFormMapping::where('portal_account_id', $account->id)
+                ->whereNotNull('campaign_id')
+                ->pluck('form_id')
+                ->flip()
+                ->all();
+
+            if (!empty($mappedFormIds)) {
+                usort($targetForms, function ($a, $b) use ($mappedFormIds) {
+                    $aHas = isset($mappedFormIds[$a['id']]) ? 1 : 0;
+                    $bHas = isset($mappedFormIds[$b['id']]) ? 1 : 0;
+                    return $bHas <=> $aHas; // Mapped forms first
+                });
+            }
+        }
+
         $totalFetched = 0;
         $totalCreated = 0;
         $totalDuplicates = 0;
@@ -291,7 +308,7 @@ class MetaLeadSyncService
         $formIndex = 0;
         $totalFormCount = count($targetForms);
         $syncStartTime = microtime(true);
-        $maxExecutionSeconds = 40; // Hostinger Nginx has a 60s gateway timeout. 40s leaves a safe 20s margin.
+        $maxExecutionSeconds = 35; // Hostinger Nginx has a 60s gateway timeout. 35s guarantees zero 504 Gateway Timeouts.
         $timedOutEarly = false;
 
         foreach ($targetForms as $formInfo) {
@@ -299,6 +316,12 @@ class MetaLeadSyncService
             if ((microtime(true) - $syncStartTime) > $maxExecutionSeconds) {
                 $timedOutEarly = true;
                 Log::warning("[MetaLeadSyncService] [Step 5: Safety Guard] Execution time reached {$maxExecutionSeconds}s threshold. Gracefully stopping form processing to avoid 504 Gateway Timeout. Processed {$formIndex}/{$totalFormCount} forms.");
+                break;
+            }
+
+            // Stop if overall requested lead limit has been reached
+            if ($limit > 0 && $totalFetched >= $limit) {
+                Log::info("[MetaLeadSyncService] [Step 5: Safety Guard] Requested limit of {$limit} leads reached. Stopping sync across remaining forms.");
                 break;
             }
 
@@ -316,72 +339,32 @@ class MetaLeadSyncService
                 ->where('form_id', $currentFormId)
                 ->first();
 
-            // Resolve valid Project for this form:
-            // 1. Override Project -> 2. Form Mapping -> 3. Account Default Project -> 4. Name Match -> 5. Any Existing Project -> 6. Auto-create Project
+            // Resolve existing Project context if mapped, but DO NOT auto-create any project
             $project = null;
-            $projectSource = 'none';
-
             if (!empty($overrideProjectId)) {
                 $project = Project::find($overrideProjectId);
-                if ($project) {
-                    $projectSource = "Override (ID: {$overrideProjectId})";
-                }
             }
-
+            if (!$project && !empty($mapping?->campaign?->project_id)) {
+                $project = Project::find($mapping->campaign->project_id);
+            }
             if (!$project && !empty($mapping?->project_id)) {
                 $project = Project::find($mapping->project_id);
-                if ($project) {
-                    $projectSource = "LeadFormMapping (ID: {$mapping->project_id})";
-                }
             }
-
             if (!$project && !empty($defaultConfiguredProjectId)) {
                 $project = Project::find($defaultConfiguredProjectId);
-                if ($project) {
-                    $projectSource = "Account Default Project (ID: {$defaultConfiguredProjectId})";
-                }
             }
-
-            if (!$project && !empty($formName)) {
-                $cleanName = trim(preg_replace('/\(.*?\)/', '', $formName));
-                $project = Project::where('name', $formName)
-                    ->orWhere('name', 'like', "%{$cleanName}%")
-                    ->first();
-                if ($project) {
-                    $projectSource = "Form Name Match ('{$project->name}')";
-                }
-            }
-
             if (!$project) {
                 $project = Project::where('client_id', $clientId)->first() ?? Project::first();
-                if ($project) {
-                    $projectSource = "Client Fallback / First Existing Project";
-                }
             }
 
-            // Resolve target client/organization: mapping client -> project client -> default client
-            $targetClientId = $mapping?->client_id ?: ($project?->client_id ?: $clientId);
+            $projectId = $project?->id;
+            $leadClientId = $mapping?->client_id ?: ($project?->client_id ?: $clientId);
 
-            if (!$project) {
-                $project = Project::create([
-                    'client_id' => $targetClientId,
-                    'name' => $formName ?: 'Meta Lead Ads Project',
-                    'status' => 'active',
-                ]);
-                $projectSource = "Auto-created New Project";
-            } elseif ($mapping?->client_id && $project->client_id !== $mapping->client_id) {
-                // Keep project client aligned if mapped explicitly
-                $project->update(['client_id' => $mapping->client_id]);
-                Log::debug("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Updated Project #{$project->id} client_id to {$mapping->client_id}");
-            }
-
-            $projectId = $project->id;
-            $leadClientId = $project->client_id ?: $targetClientId;
-
-            Log::info("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Routing resolved: Project #{$projectId} ('{$project->name}') via [{$projectSource}], Target Client ID: {$leadClientId}");
+            Log::info("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Context resolved: Project ID: " . ($projectId ?: 'None') . ", Target Client ID: {$leadClientId}");
 
             try {
-                $maxLeadsForThisForm = ($limit > 0) ? $limit : 10000;
+                $remainingToFetch = ($limit > 0) ? max(1, $limit - $totalFetched) : 10000;
+                $maxLeadsForThisForm = min(100, $remainingToFetch);
                 $formLeadCursor = null;
                 $formLeadsData = [];
                 $seenLeadCursors = [];
@@ -543,13 +526,29 @@ class MetaLeadSyncService
                             }
                         }
 
+                        if (!$targetCampaignId && $projectId) {
+                            $campaignName = !empty($mapped['campaign']) ? $mapped['campaign'] : ($formName ?: 'Meta Lead Campaign');
+                            $campaign = Campaign::firstOrCreate(
+                                [
+                                    'project_id' => $projectId,
+                                    'name' => $campaignName,
+                                ],
+                                [
+                                    'lead_source_id' => $leadSource->id,
+                                    'utm_campaign' => Str::slug($campaignName),
+                                    'status' => 'active',
+                                ]
+                            );
+                            $targetCampaignId = $campaign->id;
+                            Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from Project context: Campaign #{$campaign->id} ('{$campaign->name}')");
+                        }
+
                         $numericBudget = self::parseBudget($mapped['budget']);
 
-                        // Create Lead Master Record
+                        // Create Lead Master Record (project_id removed; inherited via campaign)
                         $lead = Lead::create([
                             'lead_code' => Lead::generateUniqueLeadCode(),
                             'client_id' => $leadClientId,
-                            'project_id' => $projectId,
                             'campaign_id' => $targetCampaignId,
                             'lead_source_id' => $leadSource->id,
                             'name' => $mapped['name'] ?? 'Meta Lead',
@@ -565,7 +564,8 @@ class MetaLeadSyncService
                             'assigned_to' => null,
                         ]);
 
-                        Log::info("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Created new Lead: {$lead->name} (#{$lead->lead_code}, ID: {$lead->id}), Mobile: {$lead->mobile}, Project ID: {$lead->project_id}, Campaign ID: " . ($lead->campaign_id ?: 'None'));
+                        $leadProjectName = $lead->project?->name ?: ($projectId ? (Project::find($projectId)?->name ?: "Project #{$projectId}") : 'None');
+                        Log::info("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Created new Lead: {$lead->name} (#{$lead->lead_code}, ID: {$lead->id}), Mobile: {$lead->mobile}, Project: {$leadProjectName}, Campaign ID: " . ($lead->campaign_id ?: 'None'));
 
                         // Save Comprehensive Meta Metadata
                         if (!empty($rawLead['id'])) {

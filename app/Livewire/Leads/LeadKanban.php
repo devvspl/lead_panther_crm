@@ -349,7 +349,9 @@ class LeadKanban extends Component
         }
 
         if ($this->project) {
-            $query->where('project_id', $this->project);
+            $query->whereHas('campaign', function ($q) {
+                $q->where('project_id', $this->project);
+            });
         }
 
         if ($this->executive) {
@@ -729,11 +731,25 @@ class LeadKanban extends Component
             return;
         }
 
+        $targetCampaignId = $this->manualCampaignId ?: null;
+        if (!$targetCampaignId && $this->manualProjectId) {
+            $campaign = \App\Models\Campaign::firstOrCreate(
+                [
+                    'project_id' => $this->manualProjectId,
+                    'name' => 'General Campaign',
+                ],
+                [
+                    'lead_source_id' => $leadSourceId,
+                    'status' => 'active',
+                ]
+            );
+            $targetCampaignId = $campaign->id;
+        }
+
         $lead = Lead::create([
             'lead_code' => Lead::generateUniqueLeadCode(),
             'client_id' => $clientId,
-            'project_id' => $this->manualProjectId,
-            'campaign_id' => $this->manualCampaignId ?: null,
+            'campaign_id' => $targetCampaignId,
             'lead_source_id' => $leadSourceId,
             'name' => $this->manualName,
             'mobile' => $mobile,

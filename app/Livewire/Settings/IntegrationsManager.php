@@ -736,43 +736,21 @@ class IntegrationsManager extends Component
                 ]);
             }
 
-            // 1. Resolve or Auto-create Project in DB matching exact Meta name
-            $project = null;
-            if ($mapping->project_id) {
-                $existingProj = Project::find($mapping->project_id);
-                if ($existingProj && ($existingProj->name === $fName || stripos($existingProj->name, $fName) !== false)) {
-                    $project = $existingProj;
-                }
-            }
-
-            if (!$project) {
-                $project = Project::where('name', $fName)->first();
-            }
-
-            if (!$project) {
-                $project = Project::create([
-                    'client_id' => $this->metaDefaultClientId ?: $defaultClientId,
-                    'name' => $fName,
-                    'status' => 'active',
-                ]);
-            }
-
-            // 2. Resolve Campaign: Preserve existing mapped campaign, or leave unassigned until mapped by user or auto-resolved from real Meta leads
+            // 1. Preserve existing Project / Campaign / Client mapping (Do NOT auto-create projects from code)
+            $projectId = $mapping->project_id;
             $campaignId = $this->formCampaignMap[$fId] ?? ($mapping->campaign_id ?: null);
+            $clientId = $this->formClientMap[$fId] ?? ($mapping->client_id ?: $defaultClientId);
 
-            // 3. Resolve Target Client
-            $clientId = $this->formClientMap[$fId] ?? ($mapping->client_id ?: ($project->client_id ?: $defaultClientId));
-
-            // Keep mapping and project in sync
+            // Keep mapping in sync
             $mapping->update([
                 'form_name' => $fName,
-                'project_id' => $project->id,
+                'project_id' => $projectId,
                 'campaign_id' => $campaignId,
                 'client_id' => $clientId,
                 'status' => $fStatus,
             ]);
 
-            $this->formProjectMap[$fId] = $project->id;
+            $this->formProjectMap[$fId] = $projectId;
             $this->formCampaignMap[$fId] = $campaignId;
             $this->formClientMap[$fId] = $clientId;
         }

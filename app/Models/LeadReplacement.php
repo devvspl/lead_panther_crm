@@ -90,11 +90,10 @@ class LeadReplacement extends Model
                 ]);
             }
 
-            // 4. Create new replacement lead
+            // 4. Create new replacement lead (project_id removed; inherited via campaign)
             $newLead = Lead::create([
                 'lead_code' => Lead::generateUniqueLeadCode('LP-REP'),
                 'client_id' => $lead->client_id,
-                'project_id' => $lead->project_id,
                 'campaign_id' => $lead->campaign_id,
                 'lead_source_id' => $lead->lead_source_id,
                 'name' => 'Replacement for ' . $lead->name,

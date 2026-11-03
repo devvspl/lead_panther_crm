@@ -744,12 +744,12 @@ class MetaIntegrationTest extends TestCase
             ->test(IntegrationsManager::class)
             ->call('fetchLeadForms', $account->id);
 
-        // Verify Project name is EXACTLY identical to Meta form name
+        // Verify Projects and Campaigns are NOT auto-created simply by fetching Meta forms
         $project1 = Project::where('name', 'Saya South X')->first();
-        $this->assertNotNull($project1);
+        $this->assertNull($project1);
 
         $project2 = Project::where('name', 'Dholers Anjali Vatika-copy (v1)')->first();
-        $this->assertNotNull($project2);
+        $this->assertNull($project2);
 
         // Verify fake duplicate campaigns are NOT created with the form's name
         $this->assertNull(Campaign::where('name', 'Saya South X')->first());

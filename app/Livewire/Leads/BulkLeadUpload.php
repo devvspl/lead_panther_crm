@@ -210,7 +210,7 @@ class BulkLeadUpload extends Component
                 $formattedMobile = (strlen($cleanMobile) === 10) ? '+91' . $cleanMobile : '+' . $cleanMobile;
 
                 // 90-Day Duplicate Check Pipeline
-                $isDuplicate = Lead::where('project_id', $this->projectId)
+                $isDuplicate = Lead::whereHas('campaign', fn($q) => $q->where('project_id', $this->projectId))
                     ->where('mobile', $formattedMobile)
                     ->where('created_at', '>=', now()->subDays(90))
                     ->exists();
@@ -222,12 +222,12 @@ class BulkLeadUpload extends Component
 
                 // Create Inbound Lead
                 $effectiveSourceId = $this->leadSourceId ?? (LeadSource::first()?->id ?? LeadSource::create(['name' => 'csv_import'])->id);
+                $effectiveCampaignId = $this->campaignId ?: Campaign::where('project_id', $this->projectId)->value('id');
 
                 $lead = Lead::create([
                     'lead_code' => Lead::generateUniqueLeadCode(),
                     'client_id' => $project->client_id,
-                    'project_id' => $project->id,
-                    'campaign_id' => $this->campaignId,
+                    'campaign_id' => $effectiveCampaignId,
                     'lead_source_id' => $effectiveSourceId,
                     'name' => $rowData['name'] ?? 'CSV Imported Lead',
                     'mobile' => $formattedMobile,

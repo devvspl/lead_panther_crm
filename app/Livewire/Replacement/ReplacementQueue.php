@@ -117,7 +117,7 @@ class ReplacementQueue extends Component
         }
 
         if ($this->filterProject) {
-            $query->whereHas('lead', function ($q) {
+            $query->whereHas('lead.campaign', function ($q) {
                 $q->where('project_id', $this->filterProject);
             });
         }

@@ -80,24 +80,17 @@ class ProcessInboundLeadJob implements ShouldQueue
                     ->first();
             }
 
-            // Determine Client & Project & LeadSource
+            // Determine Client & LeadSource
             $client = Client::first();
             $defaultClientId = $client?->id ?: (\App\Models\User::first()?->id ?: 1);
-            $targetClientId = $mapping?->client_id ?: ($mapping?->project?->client_id ?: $defaultClientId);
+            $targetClientId = $mapping?->client_id ?: ($mapping?->campaign?->project?->client_id ?: $defaultClientId);
 
-            $project = $mapping?->project;
-            if (!$project) {
-                $project = Project::where('client_id', $targetClientId)->first() ?? Project::first();
-            }
-            if (!$project) {
-                $project = Project::create([
-                    'client_id' => $targetClientId,
-                    'name' => $mapped['campaign'] ?? 'Inbound Leads Project',
-                    'status' => 'active',
-                ]);
+            // Inherit project context from campaign or mapping (DO NOT auto-create Project from code)
+            $projectId = $mapping?->campaign?->project_id ?: ($mapping?->project_id ?: null);
+            if (!$projectId) {
+                $projectId = Project::where('client_id', $targetClientId)->value('id') ?: Project::value('id');
             }
 
-            $projectId = $project->id;
             $clientId = $targetClientId;
             $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
@@ -106,15 +99,18 @@ class ProcessInboundLeadJob implements ShouldQueue
             if (!empty($mapped['campaign']) && !$campaignId) {
                 $campaign = \App\Models\Campaign::firstOrCreate(
                     [
-                        'project_id' => $projectId,
                         'name' => $mapped['campaign'],
                     ],
                     [
+                        'project_id' => $projectId,
                         'lead_source_id' => $leadSource->id,
                         'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
                         'status' => 'active',
                     ]
                 );
+                if ($projectId && empty($campaign->project_id)) {
+                    $campaign->update(['project_id' => $projectId]);
+                }
                 $campaignId = $campaign->id;
             }
 
@@ -173,11 +169,10 @@ class ProcessInboundLeadJob implements ShouldQueue
             }
             $budget = $cleanBudget ?: 7500000.00;
 
-            // 3. Create New Lead Master Record
+            // 3. Create New Lead Master Record (project_id removed; inherited via campaign)
             $lead = Lead::create([
                 'lead_code' => Lead::generateUniqueLeadCode(),
                 'client_id' => $clientId,
-                'project_id' => $projectId,
                 'campaign_id' => $campaignId,
                 'lead_source_id' => $leadSource->id,
                 'name' => $mapped['name'] ?? 'Inbound Lead',

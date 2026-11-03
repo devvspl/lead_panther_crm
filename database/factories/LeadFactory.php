@@ -33,7 +33,6 @@ class LeadFactory extends Factory
         return [
             'lead_code' => 'LP-' . date('Y') . '-' . str_pad($sequence, 8, '0', STR_PAD_LEFT),
             'client_id' => null,
-            'project_id' => null,
             'campaign_id' => null,
             'lead_source_id' => null,
             'name' => fake()->name(),

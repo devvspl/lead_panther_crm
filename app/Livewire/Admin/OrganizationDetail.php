@@ -443,12 +443,18 @@ class OrganizationDetail extends Component
             ['is_active' => true]
         );
 
+        // Ensure a campaign exists for this project
+        $campaign = Campaign::firstOrCreate(
+            ['project_id' => $projectId, 'name' => "{$client->name} General Campaign"],
+            ['lead_source_id' => $leadSource->id, 'status' => 'active']
+        );
+
         $leadCode = Lead::generateUniqueLeadCode('LP');
 
         $lead = Lead::create([
             'lead_code' => $leadCode,
             'client_id' => $client->id,
-            'project_id' => $projectId,
+            'campaign_id' => $campaign->id,
             'lead_source_id' => $leadSource->id,
             'name' => $this->newLeadName,
             'mobile' => $this->newLeadMobile,

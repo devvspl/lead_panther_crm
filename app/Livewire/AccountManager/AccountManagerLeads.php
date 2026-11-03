@@ -20,7 +20,7 @@ class AccountManagerLeads extends Component
             ['key' => 'name', 'label' => 'Lead Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'mobile', 'label' => 'Masked Mobile', 'render' => fn($row) => '<span class="bg-canvas px-2 py-0.5 rounded border border-border text-[11px] font-semibold text-ink font-mono">' . e(is_array($row) ? $row['mobile'] : $row->mobile) . '</span>', 'sortable' => false, 'priority' => 1],
             ['key' => 'email', 'label' => 'Masked Email', 'render' => fn($row) => '<span class="bg-canvas px-2 py-0.5 rounded border border-border text-[11px] font-semibold text-ink font-mono">' . e(is_array($row) ? $row['email'] : $row->email) . '</span>', 'sortable' => false, 'priority' => 2],
-            ['key' => 'project_name', 'label' => 'Project', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'form_name', 'label' => 'Form', 'class' => 'text-muted text-xs', 'sortable' => false, 'priority' => 2],
             ['key' => 'source_name', 'label' => 'Campaign / Source', 'render' => fn($row) => '<div><div class="text-ink font-medium">' . e(is_array($row) ? $row['campaign_name'] : $row->campaign_name) . '</div><div class="text-[10px] text-muted">' . strtoupper(e(is_array($row) ? $row['source_name'] : $row->source_name)) . '</div></div>', 'sortable' => false, 'priority' => 2],
             ['key' => 'assigned_executive', 'label' => 'Assigned Executive', 'class' => 'font-semibold text-ink', 'sortable' => false, 'priority' => 2],
             ['key' => 'current_stage', 'label' => 'Stage', 'class' => 'px-2.5 py-0.5 text-[10px] font-bold rounded-pill uppercase bg-canvas text-ink border border-border inline-block', 'sortable' => false, 'priority' => 1],

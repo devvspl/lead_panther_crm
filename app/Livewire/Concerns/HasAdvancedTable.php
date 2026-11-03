@@ -68,7 +68,28 @@ trait HasAdvancedTable
             if ($saved) {
                 $decoded = json_decode($saved, true);
                 if (is_array($decoded) && !empty($decoded)) {
-                    $this->visibleColumns = $decoded;
+                    $validKeys = array_column($this->tableColumns(), 'key');
+                    // Filter out deprecated columns (such as removed project_name)
+                    $sanitized = array_values(array_intersect($decoded, $validKeys));
+
+                    // Ensure newly defined visible columns (e.g. campaign_name, form_name) are included
+                    foreach ($this->tableColumns() as $col) {
+                        $key = $col['key'];
+                        $defaultVisible = ($col['visible'] ?? true) !== false;
+                        if ($defaultVisible && !in_array($key, $sanitized, true)) {
+                            // Insert campaign/form right after contact name if possible
+                            if (in_array($key, ['campaign_name', 'form_name'])) {
+                                $nameIdx = array_search('name', $sanitized);
+                                if ($nameIdx !== false) {
+                                    array_splice($sanitized, $nameIdx + ($key === 'form_name' ? 2 : 1), 0, $key);
+                                    continue;
+                                }
+                            }
+                            $sanitized[] = $key;
+                        }
+                    }
+
+                    $this->visibleColumns = array_values(array_unique($sanitized));
                     return;
                 }
             }

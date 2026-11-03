@@ -146,4 +146,47 @@ class LeadKanbanTest extends TestCase
             ->assertSet('isOpen', true)
             ->assertSee('Agent Vikram');
     }
+
+    public function test_table_columns_show_campaign_and_form_and_exclude_project(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('super-admin');
+
+        $component = Livewire::actingAs($user)->test(LeadKanban::class);
+        $columns = $component->instance()->tableColumns();
+        $keys = collect($columns)->pluck('key')->all();
+
+        $this->assertNotContains('project_name', $keys);
+        $this->assertContains('campaign_name', $keys);
+        $this->assertContains('form_name', $keys);
+
+        // Verify Lead accessors
+        $org = Organization::create(['name' => 'Agency Org', 'type' => 'developer']);
+        $client = Client::create(['organization_id' => $org->id, 'name' => 'Agency Client']);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Dholera Smart City']);
+        $source = LeadSource::create(['name' => 'meta']);
+        $campaign = \App\Models\Campaign::create([
+            'project_id' => $project->id,
+            'lead_source_id' => $source->id,
+            'name' => 'Dholera Mega Campaign',
+            'status' => 'active',
+        ]);
+
+        $lead = Lead::factory()->create([
+            'client_id' => $client->id,
+            'campaign_id' => $campaign->id,
+            'lead_source_id' => $source->id,
+        ]);
+
+        \App\Models\LeadMetadata::create([
+            'lead_id' => $lead->id,
+            'key' => 'meta_form_name',
+            'value' => 'DHOLERA EMI_01 (v2)',
+        ]);
+
+        $lead->load('metadata', 'campaign');
+
+        $this->assertEquals('Dholera Mega Campaign', $lead->campaign_name);
+        $this->assertEquals('DHOLERA EMI_01 (v2)', $lead->form_name);
+    }
 }

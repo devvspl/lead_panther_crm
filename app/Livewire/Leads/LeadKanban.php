@@ -319,7 +319,7 @@ class LeadKanban extends Component
     protected function getScopedQuery()
     {
         $user = auth()->user();
-        $query = Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo.salesTeamMembers.salesTeam']);
+        $query = Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo.salesTeamMembers.salesTeam', 'metadata']);
 
         if (!$user) {
             return $query;
@@ -586,8 +586,8 @@ class LeadKanban extends Component
         return [
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 2],
-            ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2],
+            ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+            ['key' => 'form_name', 'label' => 'Form', 'type' => 'text', 'priority' => 1, 'class' => 'text-muted text-xs'],
             ['key' => 'current_stage', 'label' => 'Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                 'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
@@ -787,13 +787,14 @@ class LeadKanban extends Component
         $orgName = $user && $user->organization ? \Illuminate\Support\Str::slug($user->organization->name) : 'all';
         $filename = "leads-directory_{$orgName}_" . now()->format('Y-m-d') . ".xlsx";
 
-        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'Project', 'Source', 'Assigned Executive', 'Stage', 'Score', 'Created At'];
+        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'Campaign', 'Form', 'Source', 'Assigned Executive', 'Stage', 'Score', 'Created At'];
         $columns = [
             'lead_code',
             'name',
             'mobile',
             'email',
-            fn($l) => $l->project?->name ?: 'N/A',
+            fn($l) => $l->campaign_name,
+            fn($l) => $l->form_name,
             fn($l) => $l->leadSource?->name ?: 'Direct Ingestion',
             fn($l) => $l->assignedTo?->name ?: 'Unassigned',
             fn($l) => $l->current_stage,

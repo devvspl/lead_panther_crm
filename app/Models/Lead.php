@@ -186,7 +186,36 @@ class Lead extends Model
 
     public function getCampaignNameAttribute(): string
     {
-        return $this->campaign?->name ?: '-';
+        return $this->campaign?->name ?: ($this->getMetaAttribute('meta_campaign_name') ?: '-');
+    }
+
+    public function getFormNameAttribute(): string
+    {
+        $metaForm = $this->getMetaAttribute('meta_form_name');
+        if ($metaForm) {
+            return $metaForm;
+        }
+
+        if (!empty($this->requirement) && preg_match("/form '([^']+)'/i", $this->requirement, $matches)) {
+            return $matches[1];
+        }
+
+        $formId = $this->getMetaAttribute('meta_form_id');
+        if ($formId) {
+            $mapping = LeadFormMapping::where('form_id', $formId)->first();
+            if ($mapping?->form_name) {
+                return $mapping->form_name;
+            }
+        }
+
+        if ($this->campaign_id) {
+            $mapping = LeadFormMapping::where('campaign_id', $this->campaign_id)->first();
+            if ($mapping?->form_name) {
+                return $mapping->form_name;
+            }
+        }
+
+        return '-';
     }
 
     public function getLeadSourceNameAttribute(): string

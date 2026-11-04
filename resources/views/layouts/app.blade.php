@@ -77,6 +77,10 @@
 
         <!-- Chart.js & Safe Chart Initialization Engine -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <!-- Flatpickr Date Picker Engine & Styling -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script>
             window.__leadPantherCharts = window.__leadPantherCharts || new Map();
 

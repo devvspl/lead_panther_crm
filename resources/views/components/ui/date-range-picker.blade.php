@@ -84,50 +84,106 @@
         closeModal() {
             this.modalOpen = false;
             if (this.fpInstance) {
-                this.fpInstance.destroy();
+                try { this.fpInstance.destroy(); } catch (e) {}
                 this.fpInstance = null;
             }
         },
 
-        initFlatpickr() {
-            if (!this.$refs.calendar) return;
-            if (this.fpInstance) {
-                this.fpInstance.destroy();
-            }
-
-            let initialDates = [];
-            if (this.draftFrom && this.draftTo) {
-                initialDates = [this.draftFrom, this.draftTo];
-            } else {
-                // Default to current month
-                let now = new Date();
-                let start = new Date(now.getFullYear(), now.getMonth(), 1);
-                let end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                let startStr = start.toISOString().split('T')[0];
-                let endStr = end.toISOString().split('T')[0];
-                initialDates = [startStr, endStr];
-                this.draftFrom = startStr;
-                this.draftTo = endStr;
-            }
-
+        ensureFlatpickr(callback, attempts = 0) {
             if (typeof window.flatpickr === 'function') {
-                let isMobile = window.innerWidth < 768;
-                this.fpInstance = window.flatpickr(this.$refs.calendar, {
-                    mode: 'range',
-                    showMonths: isMobile ? 1 : 2,
-                    inline: true,
-                    dateFormat: 'Y-m-d',
-                    defaultDate: initialDates,
-                    onChange: (selectedDates, dateStr, instance) => {
-                        if (selectedDates.length === 2) {
-                            this.draftFrom = instance.formatDate(selectedDates[0], 'Y-m-d');
-                            this.draftTo = instance.formatDate(selectedDates[1], 'Y-m-d');
-                        } else if (selectedDates.length === 1) {
-                            this.draftFrom = instance.formatDate(selectedDates[0], 'Y-m-d');
-                            this.draftTo = '';
-                        }
+                callback();
+                return;
+            }
+
+            if (attempts > 40) {
+                return;
+            }
+
+            if (!document.getElementById('flatpickr-cdn-script')) {
+                if (!document.getElementById('flatpickr-cdn-css')) {
+                    const link = document.createElement('link');
+                    link.id = 'flatpickr-cdn-css';
+                    link.rel = 'stylesheet';
+                    link.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+                    document.head.appendChild(link);
+                }
+
+                const script = document.createElement('script');
+                script.id = 'flatpickr-cdn-script';
+                script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+                script.onload = () => callback();
+                document.head.appendChild(script);
+            } else {
+                setTimeout(() => this.ensureFlatpickr(callback, attempts + 1), 50);
+            }
+        },
+
+        initFlatpickr(retryCount = 0) {
+            this.ensureFlatpickr(() => {
+                const el = this.$refs.calendar;
+                if (!el) {
+                    if (retryCount < 20) {
+                        setTimeout(() => this.initFlatpickr(retryCount + 1), 50);
                     }
-                });
+                    return;
+                }
+
+                if (this.fpInstance) {
+                    try { this.fpInstance.destroy(); } catch (e) {}
+                    this.fpInstance = null;
+                }
+
+                let initialDates = [];
+                if (this.draftFrom && this.draftTo) {
+                    initialDates = [this.draftFrom, this.draftTo];
+                } else {
+                    // Default to current month
+                    let now = new Date();
+                    let start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    let startStr = start.toISOString().split('T')[0];
+                    let endStr = end.toISOString().split('T')[0];
+                    initialDates = [startStr, endStr];
+                    this.draftFrom = startStr;
+                    this.draftTo = endStr;
+                }
+
+                let isMobile = window.innerWidth < 768;
+                try {
+                    this.fpInstance = window.flatpickr(el, {
+                        mode: 'range',
+                        showMonths: isMobile ? 1 : 2,
+                        inline: true,
+                        dateFormat: 'Y-m-d',
+                        defaultDate: initialDates,
+                        onChange: (selectedDates, dateStr, instance) => {
+                            if (selectedDates.length === 2) {
+                                this.draftFrom = instance.formatDate(selectedDates[0], 'Y-m-d');
+                                this.draftTo = instance.formatDate(selectedDates[1], 'Y-m-d');
+                            } else if (selectedDates.length === 1) {
+                                this.draftFrom = instance.formatDate(selectedDates[0], 'Y-m-d');
+                                this.draftTo = '';
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error('Flatpickr init error:', err);
+                }
+            });
+        },
+
+        updateFromInputs() {
+            if (this.draftFrom && this.draftTo) {
+                if (new Date(this.draftFrom) > new Date(this.draftTo)) {
+                    let tmp = this.draftFrom;
+                    this.draftFrom = this.draftTo;
+                    this.draftTo = tmp;
+                }
+                if (this.fpInstance) {
+                    this.fpInstance.setDate([this.draftFrom, this.draftTo], true);
+                }
+            } else if (this.draftFrom && this.fpInstance) {
+                this.fpInstance.setDate([this.draftFrom], true);
             }
         },
 
@@ -379,9 +435,33 @@
                         <button type="button" @click="applyPresetInModal('year')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">This Year</button>
                     </div>
 
-                    <!-- Right: Flatpickr 2-month Calendar -->
-                    <div class="flex-1 p-3 sm:p-4 flex items-center justify-center">
-                        <div x-ref="calendar" class="w-full flex justify-center"></div>
+                    <!-- Right: Direct Inputs + Flatpickr 2-month Calendar -->
+                    <div class="flex-1 p-3 sm:p-5 flex flex-col items-center justify-center space-y-3">
+                        <!-- Direct Start/End Date Inputs Bar -->
+                        <div class="w-full flex items-center justify-center gap-2 max-w-[440px]">
+                            <div class="flex-1">
+                                <label class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">From Date</label>
+                                <input 
+                                    type="date" 
+                                    x-model="draftFrom" 
+                                    @change="updateFromInputs()"
+                                    class="w-full h-8 px-2.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-1 focus:ring-ink font-medium"
+                                >
+                            </div>
+                            <span class="text-muted text-xs mt-4">→</span>
+                            <div class="flex-1">
+                                <label class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">To Date</label>
+                                <input 
+                                    type="date" 
+                                    x-model="draftTo" 
+                                    @change="updateFromInputs()"
+                                    class="w-full h-8 px-2.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-1 focus:ring-ink font-medium"
+                                >
+                            </div>
+                        </div>
+
+                        <!-- Calendar Container -->
+                        <div x-ref="calendar" class="w-full flex justify-center min-h-[280px]"></div>
                     </div>
                 </div>
 
@@ -413,4 +493,43 @@
             </div>
         </div>
     </template>
+
+    <style>
+        .flatpickr-calendar.inline {
+            box-shadow: none !important;
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+        }
+        .flatpickr-months {
+            display: flex !important;
+            align-items: center !important;
+            margin-bottom: 0.5rem !important;
+        }
+        .flatpickr-current-month {
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+        }
+        .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
+            background: #111827 !important;
+            border-color: #111827 !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+        }
+        .flatpickr-day.inRange {
+            background: #f3f4f6 !important;
+            border-color: transparent !important;
+            color: #111827 !important;
+            box-shadow: -5px 0 0 #f3f4f6, 5px 0 0 #f3f4f6 !important;
+        }
+        .flatpickr-day:hover {
+            background: #f3f4f6 !important;
+        }
+        .flatpickr-weekday {
+            color: #6b7280 !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+        }
+    </style>
 </div>

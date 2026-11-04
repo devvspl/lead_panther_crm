@@ -133,6 +133,11 @@
                     this.fpInstance = null;
                 }
 
+                el.innerHTML = '';
+                const inputEl = document.createElement('input');
+                inputEl.type = 'hidden';
+                el.appendChild(inputEl);
+
                 let initialDates = [];
                 if (this.draftFrom && this.draftTo) {
                     initialDates = [this.draftFrom, this.draftTo];
@@ -150,10 +155,11 @@
 
                 let isMobile = window.innerWidth < 768;
                 try {
-                    this.fpInstance = window.flatpickr(el, {
+                    this.fpInstance = window.flatpickr(inputEl, {
                         mode: 'range',
                         showMonths: isMobile ? 1 : 2,
                         inline: true,
+                        appendTo: el,
                         dateFormat: 'Y-m-d',
                         defaultDate: initialDates,
                         onChange: (selectedDates, dateStr, instance) => {
@@ -376,7 +382,7 @@
         <div 
             x-show="modalOpen" 
             x-cloak
-            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            class="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 flex items-center justify-center min-h-full"
         >
             <!-- Backdrop -->
             <div 
@@ -401,10 +407,10 @@
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
                 @click.stop
-                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[820px] mx-auto overflow-hidden z-10"
+                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[760px] max-h-[92vh] flex flex-col mx-auto overflow-hidden z-10 my-auto"
             >
                 <!-- Modal Header -->
-                <div class="flex items-center justify-between px-5 py-3.5 border-b border-border bg-canvas/40">
+                <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-canvas/40 shrink-0">
                     <div>
                         <h3 class="text-sm font-bold text-ink">Select Custom Date Range</h3>
                         <p class="text-[11px] text-muted">Choose quick presets or click on calendar to select dates.</p>
@@ -421,10 +427,10 @@
                 </div>
 
                 <!-- Modal Body: 2 Columns -->
-                <div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
+                <div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border overflow-y-auto flex-1 min-h-0">
                     <!-- Left: Quick Presets Sidebar -->
                     <div class="w-full md:w-36 p-3 space-y-1 bg-canvas/20 shrink-0 text-xs">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-muted px-2 block mb-1.5">Presets</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-muted px-2 block mb-1">Presets</span>
                         <button type="button" @click="applyPresetInModal('today')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">Today</button>
                         <button type="button" @click="applyPresetInModal('yesterday')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">Yesterday</button>
                         <button type="button" @click="applyPresetInModal('week')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">This Week</button>
@@ -436,37 +442,37 @@
                     </div>
 
                     <!-- Right: Direct Inputs + Flatpickr 2-month Calendar -->
-                    <div class="flex-1 p-3 sm:p-5 flex flex-col items-center justify-center space-y-3">
+                    <div class="flex-1 p-3 sm:p-4 flex flex-col items-center">
                         <!-- Direct Start/End Date Inputs Bar -->
-                        <div class="w-full flex items-center justify-center gap-2 max-w-[440px]">
+                        <div class="w-full flex items-center justify-center gap-2 max-w-[380px] mb-2">
                             <div class="flex-1">
-                                <label class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">From Date</label>
+                                <label class="text-[9px] font-bold uppercase tracking-wider text-muted block mb-0.5">From Date</label>
                                 <input 
                                     type="date" 
                                     x-model="draftFrom" 
                                     @change="updateFromInputs()"
-                                    class="w-full h-8 px-2.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-1 focus:ring-ink font-medium"
+                                    class="w-full h-7 px-2 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-1 focus:ring-ink font-medium"
                                 >
                             </div>
-                            <span class="text-muted text-xs mt-4">→</span>
+                            <span class="text-muted text-xs mt-3">→</span>
                             <div class="flex-1">
-                                <label class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">To Date</label>
+                                <label class="text-[9px] font-bold uppercase tracking-wider text-muted block mb-0.5">To Date</label>
                                 <input 
                                     type="date" 
                                     x-model="draftTo" 
                                     @change="updateFromInputs()"
-                                    class="w-full h-8 px-2.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-1 focus:ring-ink font-medium"
+                                    class="w-full h-7 px-2 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-1 focus:ring-ink font-medium"
                                 >
                             </div>
                         </div>
 
                         <!-- Calendar Container -->
-                        <div x-ref="calendar" class="w-full flex justify-center min-h-[280px]"></div>
+                        <div x-ref="calendar" class="w-full flex justify-center"></div>
                     </div>
                 </div>
 
                 <!-- Modal Footer -->
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-border bg-canvas/40">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-border bg-canvas/40 shrink-0">
                     <div class="flex items-center gap-2 text-xs">
                         <span class="text-muted font-medium">Selected Range:</span>
                         <span class="font-bold text-ink" x-text="draftLabel"></span>
@@ -476,7 +482,7 @@
                         <button 
                             type="button" 
                             @click="closeModal()" 
-                            class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
+                            class="px-4 py-1.5 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
                         >
                             Cancel
                         </button>
@@ -484,7 +490,7 @@
                             type="button" 
                             @click="applyCustomRange()" 
                             :disabled="!draftFrom || !draftTo"
-                            class="px-4 py-2 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                            class="px-4 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                         >
                             Apply Range
                         </button>

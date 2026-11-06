@@ -135,7 +135,8 @@
 
                 el.innerHTML = '';
                 const inputEl = document.createElement('input');
-                inputEl.type = 'hidden';
+                inputEl.type = 'text';
+                inputEl.style.cssText = 'display: none !important; visibility: hidden; width: 0; height: 0; position: absolute; pointer-events: none; opacity: 0;';
                 el.appendChild(inputEl);
 
                 let initialDates = [];
@@ -407,7 +408,7 @@
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
                 @click.stop
-                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[760px] max-h-[92vh] flex flex-col mx-auto overflow-hidden z-10 my-auto"
+                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[830px] max-h-[92vh] flex flex-col mx-auto overflow-hidden z-10 my-auto"
             >
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-canvas/40 shrink-0">
@@ -427,9 +428,9 @@
                 </div>
 
                 <!-- Modal Body: 2 Columns -->
-                <div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border overflow-y-auto flex-1 min-h-0">
+                <div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border overflow-y-auto overflow-x-hidden flex-1 min-h-0">
                     <!-- Left: Quick Presets Sidebar -->
-                    <div class="w-full md:w-36 p-3 space-y-1 bg-canvas/20 shrink-0 text-xs">
+                    <div class="w-full md:w-32 p-3 space-y-1 bg-canvas/20 shrink-0 text-xs">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-muted px-2 block mb-1">Presets</span>
                         <button type="button" @click="applyPresetInModal('today')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">Today</button>
                         <button type="button" @click="applyPresetInModal('yesterday')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-canvas text-ink font-medium transition text-xs">Yesterday</button>
@@ -442,7 +443,7 @@
                     </div>
 
                     <!-- Right: Direct Inputs + Flatpickr 2-month Calendar -->
-                    <div class="flex-1 p-3 sm:p-4 flex flex-col items-center">
+                    <div class="flex-1 p-3 flex flex-col items-center min-w-0 overflow-x-hidden">
                         <!-- Direct Start/End Date Inputs Bar -->
                         <div class="w-full flex items-center justify-center gap-2 max-w-[380px] mb-2">
                             <div class="flex-1">
@@ -501,11 +502,15 @@
     </template>
 
     <style>
+        .flatpickr-input {
+            display: none !important;
+        }
         .flatpickr-calendar.inline {
             box-shadow: none !important;
             border: none !important;
             background: transparent !important;
             padding: 0 !important;
+            max-width: 100% !important;
         }
         .flatpickr-months {
             display: flex !important;

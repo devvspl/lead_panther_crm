@@ -408,7 +408,7 @@
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
                 @click.stop
-                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[830px] max-h-[92vh] flex flex-col mx-auto overflow-hidden z-10 my-auto"
+                class="relative bg-surface rounded-card border border-border shadow-2xl w-full max-w-[800px] max-h-[92vh] flex flex-col mx-auto overflow-hidden z-10 my-auto"
             >
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-canvas/40 shrink-0">
@@ -443,9 +443,9 @@
                     </div>
 
                     <!-- Right: Direct Inputs + Flatpickr 2-month Calendar -->
-                    <div class="flex-1 p-3 flex flex-col items-center min-w-0 overflow-x-hidden">
+                    <div class="flex-1 p-3.5 flex flex-col items-center min-w-0 overflow-x-hidden">
                         <!-- Direct Start/End Date Inputs Bar -->
-                        <div class="w-full flex items-center justify-center gap-2 max-w-[380px] mb-2">
+                        <div class="w-full flex items-center justify-center gap-2 max-w-[420px] mb-2">
                             <div class="flex-1">
                                 <label class="text-[9px] font-bold uppercase tracking-wider text-muted block mb-0.5">From Date</label>
                                 <input 
@@ -510,12 +510,73 @@
             border: none !important;
             background: transparent !important;
             padding: 0 !important;
-            max-width: 100% !important;
         }
-        .flatpickr-months {
+        /* Explicit sizing and alignment for 2-month view */
+        .flatpickr-calendar.multiMonth {
+            width: 616px !important;
+            margin: 0 auto !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-months {
+            width: 616px !important;
             display: flex !important;
             align-items: center !important;
-            margin-bottom: 0.5rem !important;
+            margin-bottom: 0.25rem !important;
+            position: relative !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-month {
+            width: 308px !important;
+            max-width: 308px !important;
+            flex: 1 1 308px !important;
+            text-align: center !important;
+            height: 34px !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-innerContainer {
+            width: 616px !important;
+            display: flex !important;
+            justify-content: center !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-rContainer {
+            width: 616px !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-weekdays {
+            width: 616px !important;
+            display: flex !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-weekdaycontainer {
+            width: 308px !important;
+            min-width: 308px !important;
+            max-width: 308px !important;
+            flex: 1 1 308px !important;
+            display: flex !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-weekday {
+            flex: 1 !important;
+            text-align: center !important;
+            color: #6b7280 !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-days {
+            width: 616px !important;
+            min-width: 616px !important;
+            display: flex !important;
+        }
+        .flatpickr-calendar.multiMonth .dayContainer {
+            width: 308px !important;
+            min-width: 308px !important;
+            max-width: 308px !important;
+            flex: 1 1 308px !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            justify-content: space-around !important;
+        }
+        .flatpickr-calendar.multiMonth .flatpickr-day {
+            flex-basis: 14.2857143% !important;
+            max-width: 39px !important;
+            width: 39px !important;
+            height: 38px !important;
+            line-height: 38px !important;
+            text-align: center !important;
         }
         .flatpickr-current-month {
             font-size: 0.875rem !important;

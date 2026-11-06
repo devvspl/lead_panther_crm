@@ -17,6 +17,39 @@ class UserManager extends Component
     public string $roleFilter = '';
     public ?int $filterOrganizationId = null;
 
+    public function updatedFilterOrganizationId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function getActiveFilterCountProperty(): int
+    {
+        $count = 0;
+        if ($this->statusFilter !== 'all') {
+            $count++;
+        }
+        if (!empty($this->filterOrganizationId)) {
+            $count++;
+        }
+        foreach ($this->columnFilters as $val) {
+            if (!empty($val) && $val !== 'all') {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function resetTableFilters(): void
+    {
+        $this->search = '';
+        $this->statusFilter = 'all';
+        $this->columnFilters = [];
+        $this->resetPage();
+        $this->selectedRows = [];
+        $this->selectAll = false;
+        $this->filterOrganizationId = null;
+    }
+
     // User Details Modal State (View & Edit Modes)
     public bool $showUserDetailsModal = false;
     public ?int $selectedUserId = null;

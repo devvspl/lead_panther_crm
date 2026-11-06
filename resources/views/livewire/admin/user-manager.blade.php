@@ -35,13 +35,14 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Filter Client</label>
-                    <select wire:model.live="filterOrganizationId"
-                        class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Clients</option>
-                        @foreach($organizations as $org)
-                            <option value="{{ $org->id }}">{{ $org->name }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select 
+                        :model="\App\Models\Organization::class" 
+                        :searchable="true"
+                        placeholder="All Clients" 
+                        wire:model.live="filterOrganizationId" 
+                        key="filter-client-user-manager" 
+                        class="w-full"
+                    />
                 </div>
             </div>
         </x-slot:filters>

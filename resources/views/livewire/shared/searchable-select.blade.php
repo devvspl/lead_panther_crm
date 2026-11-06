@@ -1,7 +1,7 @@
-<div x-data="{ open: false }" class="relative inline-block text-left text-xs {{ $class }}">
+<div x-data="{ open: false }" class="relative text-left text-xs {{ $class ?: 'inline-block' }}">
     <!-- Trigger Button -->
     <button type="button" @click="open = !open"
-        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap">
+        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap">
         <span class="truncate font-semibold {{ $value !== null && $value !== '' ? 'text-ink' : 'text-muted' }}">
             {{ $selectedLabel ?: $placeholder }}
         </span>
@@ -24,7 +24,7 @@
         x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100"
         x-transition:leave-end="transform opacity-0 scale-95" @if($searchable ?? true)
         x-effect="if (open) $nextTick(function() { if ($refs.searchInput) $refs.searchInput.focus(); })" @endif
-        class="absolute left-0 z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5">
+        class="absolute left-0 z-50 mt-1.5 min-w-full w-full max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5">
         @if($searchable ?? true)
             <!-- Search Input Header -->
             <div class="relative">
@@ -63,9 +63,9 @@
 
             @forelse($items as $item)
                 @php
-                    $itemVal = $item->{$valueColumn};
-                    $itemLabel = $item->{$displayColumn};
-                    $isSelected = ($value == $itemVal);
+                    $itemVal = is_array($item) ? ($item[$valueColumn] ?? $item['id'] ?? '') : ($item->{$valueColumn} ?? '');
+                    $itemLabel = is_array($item) ? ($item[$displayColumn] ?? $item['name'] ?? $itemVal) : ($item->{$displayColumn} ?? '');
+                    $isSelected = ($value !== null && $value !== '' && (string)$value === (string)$itemVal);
                 @endphp
                 <button type="button" wire:click="selectOption('{{ $itemVal }}')" @click="open = false"
                     class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between gap-3 {{ $isSelected ? 'bg-canvas text-ink font-bold' : 'text-ink' }}">

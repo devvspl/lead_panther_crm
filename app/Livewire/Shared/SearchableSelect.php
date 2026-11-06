@@ -21,6 +21,7 @@ class SearchableSelect extends Component
     public string $search = '';
     public int $page = 1;
     public int $perPage = 20;
+    public array $options = [];
 
     public function mount(
         string $model = '',
@@ -31,7 +32,8 @@ class SearchableSelect extends Component
         string $roleFilter = '',
         bool $searchable = true,
         string $class = '',
-        $value = null
+        $value = null,
+        $options = []
     ): void {
         $this->model = $model;
         $this->searchColumn = $searchColumn;
@@ -41,7 +43,8 @@ class SearchableSelect extends Component
         $this->roleFilter = $roleFilter;
         $this->searchable = $searchable;
         $this->class = $class;
-        $this->value = $value;
+        $this->value = ($value !== null && $value !== '') ? $value : null;
+        $this->options = is_array($options) ? $options : (is_iterable($options) ? iterator_to_array($options) : []);
     }
 
     public function updatedSearch(): void
@@ -56,7 +59,7 @@ class SearchableSelect extends Component
 
     public function selectOption($id): void
     {
-        $this->value = $id;
+        $this->value = ($id !== null && $id !== '') ? $id : null;
     }
 
     public function clearSelection(): void
@@ -128,6 +131,49 @@ class SearchableSelect extends Component
                 $selectedItem = $this->model::where($this->valueColumn, $this->value)->first();
                 if ($selectedItem) {
                     $selectedLabel = $selectedItem->{$this->displayColumn};
+                }
+            }
+        } elseif (!empty($this->options)) {
+            $normalized = collect();
+            foreach ($this->options as $k => $opt) {
+                if (is_array($opt)) {
+                    $val = (string)($opt[$this->valueColumn] ?? $opt['value'] ?? $opt['id'] ?? $k);
+                    $label = (string)($opt[$this->displayColumn] ?? $opt['label'] ?? $opt['name'] ?? $val);
+                } elseif (is_object($opt)) {
+                    $val = (string)($opt->{$this->valueColumn} ?? $opt->id ?? $k);
+                    $label = (string)($opt->{$this->displayColumn} ?? $opt->name ?? $val);
+                } else {
+                    $val = (string)$k;
+                    $label = (string)$opt;
+                }
+
+                if ($val === '' && $label === $this->placeholder) {
+                    continue;
+                }
+
+                $normalized->push((object)[
+                    $this->valueColumn => $val,
+                    $this->displayColumn => $label,
+                ]);
+            }
+
+            if ($this->search !== '') {
+                $term = mb_strtolower($this->search);
+                $normalized = $normalized->filter(function ($item) use ($term) {
+                    return str_contains(mb_strtolower($item->{$this->displayColumn}), $term);
+                });
+            }
+
+            $total = $normalized->count();
+            $items = $normalized->take($this->page * $this->perPage);
+            $hasMore = ($total > $items->count());
+
+            if ($this->value !== null && $this->value !== '') {
+                $selected = $normalized->first(function ($item) {
+                    return (string)$item->{$this->valueColumn} === (string)$this->value;
+                });
+                if ($selected) {
+                    $selectedLabel = $selected->{$this->displayColumn};
                 }
             }
         }

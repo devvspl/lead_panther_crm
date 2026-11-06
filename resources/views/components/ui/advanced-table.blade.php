@@ -92,7 +92,7 @@
                             </button>
                         </div>
 
-                        <div class="space-y-3 max-h-64 overflow-y-auto">
+                        <div class="space-y-3">
                             @if(isset($filters))
                                 {{ $filters }}
                             @endif

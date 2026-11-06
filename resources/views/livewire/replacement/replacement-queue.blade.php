@@ -36,22 +36,26 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Filter Client</label>
-                    <select wire:model.live="filterClient" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Clients</option>
-                        @foreach($clients as $c)
-                            <option value="{{ $c->id }}">{{ $c->name }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select 
+                        :model="\App\Models\Client::class" 
+                        :searchable="true"
+                        placeholder="All Clients" 
+                        wire:model.live="filterClient" 
+                        key="filter-client-replacements" 
+                        class="w-full"
+                    />
                 </div>
 
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Filter Project</label>
-                    <select wire:model.live="filterProject" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Projects</option>
-                        @foreach($projects as $p)
-                            <option value="{{ $p->id }}">{{ $p->name }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select 
+                        :model="\App\Models\Project::class" 
+                        :searchable="true"
+                        placeholder="All Projects" 
+                        wire:model.live="filterProject" 
+                        key="filter-project-replacements" 
+                        class="w-full"
+                    />
                 </div>
             </div>
         </x-slot:filters>

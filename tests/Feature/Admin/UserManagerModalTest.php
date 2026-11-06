@@ -207,4 +207,76 @@ class UserManagerModalTest extends TestCase
             ->assertSet('showCreateModal', false)
             ->assertSet('newUserName', '');
     }
+
+    public function test_user_manager_filters_by_organization_and_resets(): void
+    {
+        $admin = User::where('email', 'admin@leadpanther.com')->first();
+        if (!$admin) {
+            $admin = User::factory()->create();
+            $admin->assignRole('Super Admin');
+        }
+
+        $orgA = Organization::firstOrCreate(['name' => 'Alpha Estates', 'status' => 'active']);
+        $orgB = Organization::firstOrCreate(['name' => 'Beta Developers', 'status' => 'active']);
+
+        $userA = User::factory()->create([
+            'name' => 'Aarav Sharma',
+            'email' => 'aarav@alpha.com',
+            'organization_id' => $orgA->id,
+        ]);
+        $userB = User::factory()->create([
+            'name' => 'Bhavna Verma',
+            'email' => 'bhavna@beta.com',
+            'organization_id' => $orgB->id,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(UserManager::class)
+            ->set('filterOrganizationId', $orgA->id)
+            ->assertSee('Aarav Sharma')
+            ->assertDontSee('Bhavna Verma')
+            ->assertSet('activeFilterCount', 1)
+            ->call('resetTableFilters')
+            ->assertSet('filterOrganizationId', null)
+            ->assertSet('activeFilterCount', 0);
+    }
+
+    public function test_searchable_select_renders_and_selects_model_and_options(): void
+    {
+        $admin = User::where('email', 'admin@leadpanther.com')->first();
+        if (!$admin) {
+            $admin = User::factory()->create();
+            $admin->assignRole('Super Admin');
+        }
+
+        $org = Organization::firstOrCreate(['name' => 'Godrej Properties', 'status' => 'active']);
+
+        // Test with Model
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Shared\SearchableSelect::class, [
+                'model' => Organization::class,
+                'placeholder' => 'All Clients',
+            ])
+            ->assertSee('All Clients')
+            ->set('search', 'Godrej')
+            ->assertSee('Godrej Properties')
+            ->call('selectOption', $org->id)
+            ->assertSet('value', $org->id)
+            ->call('clearSelection')
+            ->assertSet('value', null);
+
+        // Test with static options array
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Shared\SearchableSelect::class, [
+                'options' => [
+                    'active' => 'Active Status',
+                    'suspended' => 'Suspended Status',
+                ],
+                'placeholder' => 'Select Status',
+            ])
+            ->assertSee('Select Status')
+            ->call('selectOption', 'active')
+            ->assertSet('value', 'active')
+            ->assertSee('Active Status');
+    }
 }

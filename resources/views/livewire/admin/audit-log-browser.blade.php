@@ -36,27 +36,36 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Performing User</label>
-                    <select wire:model.live="selectedUserId" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Performing Users</option>
-                        @foreach($users as $u)
-                            <option value="{{ $u->id }}">{{ $u->name }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select 
+                        :model="\App\Models\User::class" 
+                        :searchable="true"
+                        placeholder="All Performing Users" 
+                        wire:model.live="selectedUserId" 
+                        key="filter-user-audit-logs" 
+                        class="w-full"
+                    />
                 </div>
 
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Action Type</label>
-                    <select wire:model.live="actionType" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
-                        <option value="">All Action Types</option>
-                        <option value="route">Route Invocations</option>
-                        <option value="controller">Controller Actions</option>
-                        <option value="livewire">Livewire Invocations</option>
-                        <option value="auth">Auth &amp; Sessions</option>
-                        <option value="created">Model Created</option>
-                        <option value="updated">Model Updated</option>
-                        <option value="deleted">Model Deleted</option>
-                        <option value="git">Git Operations</option>
-                    </select>
+                    <livewire:shared.searchable-select 
+                        :options="[
+                            '' => 'All Action Types',
+                            'route' => 'Route Invocations',
+                            'controller' => 'Controller Actions',
+                            'livewire' => 'Livewire Invocations',
+                            'auth' => 'Auth & Sessions',
+                            'created' => 'Model Created',
+                            'updated' => 'Model Updated',
+                            'deleted' => 'Model Deleted',
+                            'git' => 'Git Operations'
+                        ]" 
+                        :searchable="true"
+                        placeholder="All Action Types" 
+                        wire:model.live="actionType" 
+                        key="filter-action-type-audit-logs" 
+                        class="w-full"
+                    />
                 </div>
 
                 <div>

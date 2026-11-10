@@ -5,6 +5,8 @@
     'activeStatus' => 'all',
     'searchPlaceholder' => 'Search records...',
     'showSearch' => true,
+    'searchModel' => 'search',
+    'sortAction' => 'sortBy',
     'showFilterDropdown' => true,
     'showConfigurations' => true,
     'showCheckboxes' => false,
@@ -23,6 +25,7 @@
 @php
     $visibleCols = !empty($visibleColumns) ? $visibleColumns : array_map(fn($c) => $c['key'], $columns);
     $activeColumns = array_filter($columns, fn($c) => in_array($c['key'], $visibleCols));
+    $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || !empty($this->filterConfig()))) || ($showConfigurations && !empty($columns)) || isset($action);
 @endphp
 
 <div class="space-y-4" x-data="{ 
@@ -31,6 +34,7 @@
     activeActionMenu: null 
 }">
     <!-- 1. TOOLBAR: Search, Filter, Column Configuration & Add Action -->
+    @if($hasToolbar)
     <div
         class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-surface p-3 sm:p-4 rounded-card border border-border shadow-2xs">
         <!-- Search Input -->
@@ -44,10 +48,10 @@
                 </div>
                 <input type="search" name="table_search_query" id="table_search_{{ $tableName }}" autocomplete="off"
                     autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
-                    data-form-type="other" wire:model.live.debounce.300ms="search" placeholder="{{ $searchPlaceholder }}"
+                    data-form-type="other" wire:model.live.debounce.300ms="{{ $searchModel }}" placeholder="{{ $searchPlaceholder }}"
                     class="w-full pl-9 pr-8 py-2 rounded-lg border border-border bg-canvas text-ink text-xs placeholder:text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
-                @if(!empty($this->search ?? ''))
-                    <button type="button" wire:click="$set('search', '')"
+                @if(!empty($this->{$searchModel} ?? ''))
+                    <button type="button" wire:click="$set('{{ $searchModel }}', '')"
                         class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted hover:text-ink cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -154,6 +158,7 @@
             @endif
         </div>
     </div>
+    @endif
 
     <!-- 2. "SHOW ONLY" QUICK-FILTER STATUS PILLS -->
     @if(!empty($quickFilters))
@@ -207,7 +212,7 @@
                             @endphp
                             <th @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['headerClass'] ?? '' }}">
                                 @if($isSortable)
-                                    <button type="button" wire:click="sortBy('{{ $colKey }}')"
+                                    <button type="button" wire:click="{{ $sortAction }}('{{ $colKey }}')"
                                         class="inline-flex items-center gap-1 hover:text-ink font-bold transition group cursor-pointer">
                                         <span>{{ $colLabel }}</span>
                                         <span class="text-muted group-hover:text-ink">

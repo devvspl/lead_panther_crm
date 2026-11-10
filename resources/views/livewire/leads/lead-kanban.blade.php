@@ -550,22 +550,33 @@
         <div class="border-t border-border pt-3">
             @php
                 $breakdownColumns = [
-                    ['key' => 'name', 'label' => 'Entity / Group Name', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
-                    ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
-                    ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => false, 'priority' => 1],
-                    ['key' => 'avg_sla_time', 'label' => 'Avg Response Time', 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+                    ['key' => 'name', 'label' => 'Entity / Group Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
+                    ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
+                    ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => true, 'priority' => 1],
+                    ['key' => 'avg_sla_time', 'label' => 'Avg Response Time', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 2],
                 ];
             @endphp
 
             <x-ui.advanced-table 
                 :columns="$breakdownColumns" 
-                :rows="$analytics['breakdownRows']"
-                :showSearch="false" 
+                :rows="$analytics['paginatedBreakdown']"
+                :showSearch="true" 
+                searchModel="breakdownSearch"
+                searchPlaceholder="Search {{ strtolower($breakdownTab) }} entities..."
+                :sortField="$breakdownSortField"
+                :sortDirection="$breakdownSortDirection"
+                sortAction="sortBreakdownBy"
                 :showFilterDropdown="false" 
                 :showConfigurations="false"
+                tableName="breakdown"
                 emptyTitle="No Breakdown Data" 
-                emptyMessage="No data recorded for this scope." 
-            />
+                emptyMessage="No entities match your search or filter criteria.">
+                <x-slot:action>
+                    <span class="text-xs text-muted font-semibold bg-canvas px-2.5 py-1 rounded-lg border border-border">
+                        {{ $analytics['totalBreakdownCount'] }} Total {{ ucfirst($breakdownTab) }}s
+                    </span>
+                </x-slot:action>
+            </x-ui.advanced-table>
         </div>
     </div>
 

@@ -59,6 +59,12 @@ class LeadKanban extends Component
     public string $breakdownTab = 'project'; // 'overview' | 'project' | 'source' | 'executive' | 'team' | 'organization'
     public string $activeKpiGroup = 'all'; // 'all' | 'intake' | 'assignment' | 'progress' | 'conversion' | 'quality'
 
+    // Breakdown Advanced Table State
+    #[Url] public string $breakdownSearch = '';
+    public string $breakdownSortField = 'total_leads';
+    public string $breakdownSortDirection = 'desc';
+    public int $breakdownPerPage = 10;
+
     public bool $otherColumnExpanded = false;
 
     // Terminal stage confirmation modal state
@@ -239,6 +245,19 @@ class LeadKanban extends Component
     public function updatedStageFilter(): void { $this->resetPage(); }
     public function updatedSlaBreached(): void { $this->resetPage(); }
     public function updatedSortBy(): void { $this->resetPage(); }
+    public function updatedBreakdownSearch(): void { $this->resetPage('breakdownPage'); }
+    public function updatedBreakdownTab(): void { $this->resetPage('breakdownPage'); }
+
+    public function sortBreakdownBy(string $field): void
+    {
+        if ($this->breakdownSortField === $field) {
+            $this->breakdownSortDirection = $this->breakdownSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->breakdownSortField = $field;
+            $this->breakdownSortDirection = in_array($field, ['total_leads', 'conversion_rate']) ? 'desc' : 'asc';
+        }
+        $this->resetPage('breakdownPage');
+    }
 
     public function resetFilters(): void
     {
@@ -972,10 +991,47 @@ class LeadKanban extends Component
             ];
         }
 
-        usort($breakdownRows, fn($a, $b) => $b['total_leads'] <=> $a['total_leads']);
+        // Top chart entities sorted descending by volume
+        $chartSorted = $breakdownRows;
+        usort($chartSorted, fn($a, $b) => $b['total_leads'] <=> $a['total_leads']);
+        $chartLabels = array_map(fn($r) => $r['name'], array_slice($chartSorted, 0, 8));
+        $chartCounts = array_map(fn($r) => $r['total_leads'], array_slice($chartSorted, 0, 8));
 
-        $chartLabels = array_map(fn($r) => $r['name'], array_slice($breakdownRows, 0, 8));
-        $chartCounts = array_map(fn($r) => $r['total_leads'], array_slice($breakdownRows, 0, 8));
+        // Filter Breakdown Table by search
+        if (!empty($this->breakdownSearch)) {
+            $term = strtolower(trim($this->breakdownSearch));
+            $breakdownRows = array_values(array_filter($breakdownRows, fn($r) => str_contains(strtolower($r['name']), $term)));
+        }
+
+        // Sort Breakdown Table
+        usort($breakdownRows, function ($a, $b) {
+            $field = $this->breakdownSortField;
+            $valA = $a[$field] ?? '';
+            $valB = $b[$field] ?? '';
+            if (is_numeric($valA) && is_numeric($valB)) {
+                return $this->breakdownSortDirection === 'asc' ? $valA <=> $valB : $valB <=> $valA;
+            }
+            return $this->breakdownSortDirection === 'asc'
+                ? strcasecmp((string)$valA, (string)$valB)
+                : strcasecmp((string)$valB, (string)$valA);
+        });
+
+        // Paginate Breakdown Table
+        $totalBreakdownCount = count($breakdownRows);
+        $page = (int) $this->getPage('breakdownPage');
+        $perPage = $this->breakdownPerPage ?: 10;
+        $slicedRows = array_slice($breakdownRows, max(0, ($page - 1) * $perPage), $perPage);
+
+        $paginatedBreakdown = new \Illuminate\Pagination\LengthAwarePaginator(
+            $slicedRows,
+            $totalBreakdownCount,
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'pageName' => 'breakdownPage',
+            ]
+        );
 
         return [
             'trendLabels' => $trendLabels,
@@ -984,6 +1040,8 @@ class LeadKanban extends Component
             'stageLabels' => $stageLabels,
             'stageCounts' => $stageCounts,
             'breakdownRows' => $breakdownRows,
+            'paginatedBreakdown' => $paginatedBreakdown,
+            'totalBreakdownCount' => $totalBreakdownCount,
             'chartLabels' => $chartLabels,
             'chartCounts' => $chartCounts,
         ];

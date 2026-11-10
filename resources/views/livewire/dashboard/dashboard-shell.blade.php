@@ -1,70 +1,58 @@
-<div wire:poll.30s class="space-y-8 pb-12">
+<div wire:poll.30s class="space-y-4 pb-8">
     @if($role === 'admin')
         <!-- ================================================================= -->
-        <!-- SUPER ADMIN MASTER COMMAND CENTRE (PREMIUM SAAS CRM)              -->
+        <!-- SUPER ADMIN DASHBOARD                                             -->
         <!-- ================================================================= -->
 
-        <!-- 1. Header & Quick Actions -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
-            <div class="space-y-1">
-                <div class="flex items-center gap-3 flex-wrap">
-                    <h1 class="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">Super Admin Command Centre</h1>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200">
-                        Lead Panther Telemetry
-                    </span>
-                    <span class="inline-flex items-center space-x-1.5 px-3 py-1 bg-surface border border-border rounded-full text-xs font-semibold text-muted shadow-2xs">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span>Live 30s Refresh</span>
-                    </span>
-                </div>
-                <p class="text-sm text-muted">Complete Lead Management Lifecycle, Distribution Telemetry & Credit Protection Engine</p>
+        <!-- 1. Header & Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">Super Admin Dashboard</h1>
+                <span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 bg-surface border border-border rounded-full text-[11px] font-medium text-muted">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Live</span>
+                </span>
             </div>
             
-            <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
                 <button type="button" wire:click="resetFilters"
-                        class="inline-flex items-center gap-2 px-3.5 py-2 bg-surface hover:bg-canvas border border-border rounded-xl text-xs font-semibold text-ink transition shadow-2xs cursor-pointer">
-                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    <span>Reset Filters</span>
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-canvas border border-border rounded-lg text-xs font-semibold text-ink transition cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Reset</span>
                 </button>
                 <button type="button" wire:click="exportDashboardReport"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-ink hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    <span>Export to Excel</span>
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span>Export Excel</span>
                 </button>
             </div>
         </div>
 
-        <!-- 2. Global Dashboard Filters Bar (Clean, Spacious Horizontal Container) -->
-        <div class="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
+        <!-- 2. Global Dashboard Filters Bar -->
+        <div class="bg-surface border border-border rounded-xl p-3 sm:p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between gap-2 border-b border-border/70 pb-2">
                 <div class="flex items-center gap-2">
-                    <div class="p-1.5 rounded-lg bg-canvas border border-border text-ink">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Global Filters</h2>
-                        <p class="text-xs text-muted">Filter cards, charts, pipelines, and performance reports</p>
-                    </div>
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Filters</span>
                 </div>
 
                 <div class="flex items-center gap-2">
                     <button type="button" wire:click="applyFilters"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        <span>Apply Filter</span>
+                            class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Apply</span>
                     </button>
                     <button type="button" wire:click="resetFilters"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-canvas border border-border text-muted hover:text-ink rounded-lg text-xs font-semibold transition cursor-pointer">
+                            class="inline-flex items-center gap-1 px-2.5 py-1 bg-surface hover:bg-canvas border border-border text-muted hover:text-ink rounded-lg text-xs font-semibold transition cursor-pointer">
                         <span>Reset</span>
                     </button>
                 </div>
             </div>
 
             <!-- Filters Grid (7 Filters) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3.5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
                 <!-- 1. Date Range -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Date Range</label>
+                    <label class="text-[11px] font-semibold text-muted">Date Range</label>
                     <x-ui.date-range-picker 
                         wire:model.live="dateRange" 
                         wire:custom-from.live="customFrom" 
@@ -75,7 +63,7 @@
 
                 <!-- 2. Organization -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Organization</label>
+                    <label class="text-[11px] font-semibold text-muted">Organization</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterOrganizationId" 
                         model="App\Models\Organization" 
@@ -86,7 +74,7 @@
 
                 <!-- 3. Project -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Project</label>
+                    <label class="text-[11px] font-semibold text-muted">Project</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterProjectId" 
                         model="App\Models\Project" 
@@ -97,7 +85,7 @@
 
                 <!-- 4. Team -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Team</label>
+                    <label class="text-[11px] font-semibold text-muted">Team</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterTeamId" 
                         model="App\Models\SalesTeam" 
@@ -108,9 +96,9 @@
 
                 <!-- 5. Lead Source -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Lead Source</label>
+                    <label class="text-[11px] font-semibold text-muted">Lead Source</label>
                     <select wire:model.live="filterLeadSourceId"
-                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-3 py-2 focus:border-ink focus:ring-0">
+                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-2.5 py-1.5 focus:border-ink focus:ring-0">
                         <option value="">All Sources</option>
                         @foreach($sourceOptions as $srcId => $srcName)
                             <option value="{{ $srcId }}">{{ $srcName }}</option>
@@ -120,7 +108,7 @@
 
                 <!-- 6. Assigned Agent -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Assigned Agent</label>
+                    <label class="text-[11px] font-semibold text-muted">Assigned Agent</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterAssignedUserId" 
                         model="App\Models\User" 
@@ -131,9 +119,9 @@
 
                 <!-- 7. Lead Status -->
                 <div class="space-y-1">
-                    <label class="text-xs font-semibold text-muted">Lead Status</label>
+                    <label class="text-[11px] font-semibold text-muted">Lead Status</label>
                     <select wire:model.live="filterStatus"
-                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-3 py-2 focus:border-ink focus:ring-0">
+                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-2.5 py-1.5 focus:border-ink focus:ring-0">
                         <option value="">All Statuses</option>
                         <option value="new">New (Uncontacted)</option>
                         <option value="assigned">Assigned</option>
@@ -157,67 +145,64 @@
                 $hasActiveFilters = $filterOrganizationId || $filterProjectId || $filterTeamId || $filterLeadSourceId || $filterAssignedUserId || $filterStatus || $filterCampaignId || $filterTransactionType || $dateRange !== '30_days';
             @endphp
             @if($hasActiveFilters)
-                <div class="flex items-center gap-2 flex-wrap pt-3 border-t border-border/80 text-xs">
-                    <span class="font-semibold text-muted">Active Scope:</span>
+                <div class="flex items-center gap-2 flex-wrap pt-2 border-t border-border/70 text-xs">
+                    <span class="font-semibold text-muted text-[11px]">Active:</span>
                     @if($dateRange !== '30_days')
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Period: {{ ucfirst(str_replace('_', ' ', $dateRange)) }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            {{ ucfirst(str_replace('_', ' ', $dateRange)) }}
                             <button type="button" wire:click="$set('dateRange', '30_days')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
                     @if($filterOrganizationId)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Org ID: {{ $filterOrganizationId }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            Org #{{ $filterOrganizationId }}
                             <button type="button" wire:click="$set('filterOrganizationId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
                     @if($filterProjectId)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Project ID: {{ $filterProjectId }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            Project #{{ $filterProjectId }}
                             <button type="button" wire:click="$set('filterProjectId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
                     @if($filterTeamId)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Team ID: {{ $filterTeamId }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            Team #{{ $filterTeamId }}
                             <button type="button" wire:click="$set('filterTeamId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
                     @if($filterLeadSourceId)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Source: {{ $sourceOptions[$filterLeadSourceId] ?? $filterLeadSourceId }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            {{ $sourceOptions[$filterLeadSourceId] ?? $filterLeadSourceId }}
                             <button type="button" wire:click="$set('filterLeadSourceId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
                     @if($filterStatus)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-border text-xs font-medium text-ink">
-                            Status: {{ ucfirst(str_replace('_', ' ', $filterStatus)) }}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                            {{ ucfirst(str_replace('_', ' ', $filterStatus)) }}
                             <button type="button" wire:click="$set('filterStatus', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
-                    <button type="button" wire:click="resetFilters" class="text-xs text-blue-600 hover:underline font-semibold ml-1 cursor-pointer">
+                    <button type="button" wire:click="resetFilters" class="text-[11px] text-blue-600 hover:underline font-semibold ml-1 cursor-pointer">
                         Clear All
                     </button>
                 </div>
             @endif
         </div>
 
-        <!-- 3. Primary Hero KPI Cards (5 Spacious Cards in Top Row) -->
-        <div class="space-y-3">
+        <!-- 3. Primary KPI Cards -->
+        <div class="space-y-2">
             <div class="flex items-center justify-between">
-                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Primary Performance Indicators</h2>
-                <span class="text-xs text-muted">Real-time database aggregation</span>
+                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Key Metrics</h2>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 @foreach($groupedKpis['hero'] as $hero)
                     <a href="{{ $hero['route'] }}" wire:navigate
-                       class="group bg-surface hover:bg-canvas border border-border hover:border-ink/40 rounded-2xl p-5 transition shadow-2xs flex flex-col justify-between cursor-pointer">
+                       class="group bg-surface hover:bg-canvas border border-border hover:border-ink/30 rounded-xl p-3.5 transition flex flex-col justify-between cursor-pointer">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="inline-flex px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-semibold text-muted group-hover:text-ink transition">
-                                {{ $hero['badge'] }}
-                            </span>
-                            <div class="p-2 rounded-xl bg-canvas border border-border text-muted group-hover:text-ink transition">
+                            <span class="text-xs font-semibold text-muted">{{ $hero['title'] }}</span>
+                            <div class="p-1.5 rounded-lg bg-canvas border border-border text-muted group-hover:text-ink transition">
                                 @if($hero['icon'] === 'users')
                                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                                 @elseif($hero['icon'] === 'trophy')
@@ -234,19 +219,18 @@
                             </div>
                         </div>
 
-                        <div class="mt-4">
-                            <span class="text-xs font-semibold text-muted block">{{ $hero['title'] }}</span>
-                            <div class="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight mt-1">
+                        <div class="mt-2">
+                            <div class="text-xl sm:text-2xl font-bold text-ink tracking-tight">
                                 {{ $hero['value'] }}
                             </div>
                         </div>
 
-                        <div class="mt-4 pt-3 border-t border-border/80 flex items-center justify-between text-xs">
+                        <div class="mt-2.5 pt-2 border-t border-border/70 flex items-center justify-between text-[11px]">
                             <span class="inline-flex items-center font-bold {{ $hero['isPositive'] ? 'text-emerald-600' : 'text-rose-600' }}">
                                 @if($hero['isPositive'])
-                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                    <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
                                 @else
-                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                                    <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
                                 @endif
                                 {{ $hero['delta'] }}
                             </span>
@@ -257,99 +241,84 @@
             </div>
         </div>
 
-        <!-- 4. Reorganized Secondary Metrics (4 Logical Group Summary Cards) -->
-        <div class="space-y-3">
+        <!-- 4. Secondary Metric Groups (4 Summary Cards) -->
+        <div class="space-y-2">
             <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Metric Breakdown by Logical Category</h2>
-                    <p class="text-xs text-muted">Structured overview of all 17 CRM lifecycle metrics without visual clutter</p>
-                </div>
+                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Summary by Category</h2>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <!-- Group 1: Lead Overview -->
-                <div class="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-ink flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                <span>{{ $groupedKpis['groups']['overview']['title'] }}</span>
-                            </h3>
-                            <p class="text-xs text-muted mt-0.5">{{ $groupedKpis['groups']['overview']['subtitle'] }}</p>
-                        </div>
+                <div class="bg-surface border border-border rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h3 class="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span>{{ $groupedKpis['groups']['overview']['title'] }}</span>
+                        </h3>
                     </div>
 
-                    <div class="space-y-2.5 text-xs">
+                    <div class="space-y-1.5 text-xs">
                         @foreach($groupedKpis['groups']['overview']['metrics'] as $m)
-                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-1 hover:bg-canvas px-1.5 rounded-lg transition group">
+                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-0.5 hover:bg-canvas px-1 rounded transition group">
                                 <span class="text-muted group-hover:text-ink font-medium">{{ $m['label'] }}</span>
-                                <span class="font-bold text-ink text-sm">{{ $m['value'] }}</span>
+                                <span class="font-bold text-ink">{{ $m['value'] }}</span>
                             </a>
                         @endforeach
                     </div>
                 </div>
 
                 <!-- Group 2: Lead Conversion -->
-                <div class="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-ink flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span>{{ $groupedKpis['groups']['conversion']['title'] }}</span>
-                            </h3>
-                            <p class="text-xs text-muted mt-0.5">{{ $groupedKpis['groups']['conversion']['subtitle'] }}</p>
-                        </div>
+                <div class="bg-surface border border-border rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h3 class="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>{{ $groupedKpis['groups']['conversion']['title'] }}</span>
+                        </h3>
                     </div>
 
-                    <div class="space-y-2.5 text-xs">
+                    <div class="space-y-1.5 text-xs">
                         @foreach($groupedKpis['groups']['conversion']['metrics'] as $m)
-                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-1 hover:bg-canvas px-1.5 rounded-lg transition group">
+                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-0.5 hover:bg-canvas px-1 rounded transition group">
                                 <span class="text-muted group-hover:text-ink font-medium">{{ $m['label'] }}</span>
-                                <span class="font-bold text-ink text-sm">{{ $m['value'] }}</span>
+                                <span class="font-bold text-ink">{{ $m['value'] }}</span>
                             </a>
                         @endforeach
                     </div>
                 </div>
 
-                <!-- Group 3: SLA & Performance -->
-                <div class="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-ink flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                <span>{{ $groupedKpis['groups']['sla']['title'] }}</span>
-                            </h3>
-                            <p class="text-xs text-muted mt-0.5">{{ $groupedKpis['groups']['sla']['subtitle'] }}</p>
-                        </div>
+                <!-- Group 3: SLA & Speed -->
+                <div class="bg-surface border border-border rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h3 class="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider">
+                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                            <span>{{ $groupedKpis['groups']['sla']['title'] }}</span>
+                        </h3>
                     </div>
 
-                    <div class="space-y-3 text-xs">
+                    <div class="space-y-2 text-xs">
                         @foreach($groupedKpis['groups']['sla']['metrics'] as $m)
-                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-1 hover:bg-canvas px-1.5 rounded-lg transition group">
+                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-0.5 hover:bg-canvas px-1 rounded transition group">
                                 <span class="text-muted group-hover:text-ink font-medium">{{ $m['label'] }}</span>
-                                <span class="font-bold text-ink text-sm">{{ $m['value'] }}</span>
+                                <span class="font-bold text-ink">{{ $m['value'] }}</span>
                             </a>
                         @endforeach
                     </div>
                 </div>
 
                 <!-- Group 4: Credit & Revenue -->
-                <div class="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-ink flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                <span>{{ $groupedKpis['groups']['credit']['title'] }}</span>
-                            </h3>
-                            <p class="text-xs text-muted mt-0.5">{{ $groupedKpis['groups']['credit']['subtitle'] }}</p>
-                        </div>
+                <div class="bg-surface border border-border rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h3 class="text-xs font-bold text-ink flex items-center gap-1.5 uppercase tracking-wider">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span>{{ $groupedKpis['groups']['credit']['title'] }}</span>
+                        </h3>
                     </div>
 
-                    <div class="space-y-2.5 text-xs">
+                    <div class="space-y-1.5 text-xs">
                         @foreach($groupedKpis['groups']['credit']['metrics'] as $m)
-                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-1 hover:bg-canvas px-1.5 rounded-lg transition group">
+                            <a href="{{ $m['route'] }}" wire:navigate class="flex items-center justify-between py-0.5 hover:bg-canvas px-1 rounded transition group">
                                 <span class="text-muted group-hover:text-ink font-medium">{{ $m['label'] }}</span>
-                                <span class="font-bold text-ink text-sm">{{ $m['value'] }}</span>
+                                <span class="font-bold text-ink">{{ $m['value'] }}</span>
                             </a>
                         @endforeach
                     </div>
@@ -357,73 +326,70 @@
             </div>
         </div>
 
-        <!-- 5. Complete Lead Journey Pipeline (Clickable Interactive Flow) -->
-        <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
-                <div>
-                    <h2 class="text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                        <span>Lead Journey Lifecycle Pipeline</span>
-                    </h2>
-                    <p class="text-xs text-muted mt-0.5">Click any stage to filter and inspect its leads in the pipeline</p>
-                </div>
-                <div class="flex items-center gap-4 text-xs font-semibold text-muted">
-                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Ingestion</span>
-                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Engagement</span>
-                    <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Conversion</span>
+        <!-- 5. Complete Lead Journey Pipeline -->
+        <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
+            <div class="flex items-center justify-between gap-2 border-b border-border/70 pb-2">
+                <h2 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <span>Lead Pipeline</span>
+                </h2>
+                <div class="flex items-center gap-3 text-[11px] font-medium text-muted">
+                    <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Ingestion</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Follow-up</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Closure</span>
                 </div>
             </div>
 
             <!-- Horizontal Responsive Interactive Pipeline -->
-            <div class="overflow-x-auto no-scrollbar pb-2 pt-1">
-                <div class="flex items-stretch gap-2.5 min-w-max">
+            <div class="overflow-x-auto no-scrollbar pb-1">
+                <div class="flex items-stretch gap-2 min-w-max">
                     @foreach($adminFunnel as $stg)
                         <a href="{{ $stg['drill_route'] }}" wire:navigate
-                           class="w-40 bg-canvas hover:bg-surface border border-border hover:border-ink/50 rounded-xl p-3.5 transition flex flex-col justify-between shrink-0 relative group shadow-2xs cursor-pointer">
+                           class="w-36 bg-canvas hover:bg-surface border border-border hover:border-ink/40 rounded-lg p-2.5 transition flex flex-col justify-between shrink-0 relative group cursor-pointer">
                             <!-- Stage Header -->
                             <div class="flex items-center justify-between gap-1">
-                                <span class="text-xs font-bold text-muted uppercase">#{{ $stg['index'] }}</span>
-                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface border border-border text-muted">
+                                <span class="text-[10px] font-bold text-muted uppercase">#{{ $stg['index'] }}</span>
+                                <span class="text-[10px] font-medium px-1.5 py-0.2 rounded bg-surface border border-border text-muted">
                                     {{ $stg['avg_time'] }}
                                 </span>
                             </div>
 
                             <!-- Stage Name -->
-                            <div class="text-xs font-bold text-ink mt-2 line-clamp-1 group-hover:text-blue-600 transition" title="{{ $stg['name'] }}">
+                            <div class="text-xs font-bold text-ink mt-1.5 truncate group-hover:text-blue-600 transition" title="{{ $stg['name'] }}">
                                 {{ $stg['name'] }}
                             </div>
 
                             <!-- Lead Count & Conversion -->
-                            <div class="mt-2.5 space-y-1">
-                                <div class="text-xl font-extrabold text-ink tracking-tight">
+                            <div class="mt-1.5 space-y-0.5">
+                                <div class="text-base font-bold text-ink tracking-tight">
                                     {{ number_format($stg['count']) }}
                                 </div>
                                 
-                                <div class="flex items-center justify-between text-xs text-muted">
+                                <div class="flex items-center justify-between text-[11px] text-muted">
                                     <span>Conv:</span>
                                     <span class="font-bold text-emerald-600">{{ $stg['conversion_pct'] }}%</span>
                                 </div>
 
                                 @if($stg['drop_off'] > 0)
-                                    <div class="flex items-center justify-between text-[11px] text-rose-600 font-medium">
+                                    <div class="flex items-center justify-between text-[10px] text-rose-600 font-medium">
                                         <span>Drop:</span>
                                         <span>-{{ number_format($stg['drop_off']) }}</span>
                                     </div>
                                 @else
-                                    <div class="text-[11px] text-muted text-right">0 drop</div>
+                                    <div class="text-[10px] text-muted text-right">0 drop</div>
                                 @endif
                             </div>
 
                             <!-- Step Progress Bar -->
-                            <div class="w-full bg-surface rounded-full h-1.5 mt-2.5 overflow-hidden border border-border">
-                                <div class="h-1.5 rounded-full {{ $stg['index'] <= 5 ? 'bg-blue-600' : ($stg['index'] <= 9 ? 'bg-amber-500' : 'bg-emerald-600') }}"
+                            <div class="w-full bg-surface rounded-full h-1 mt-1.5 overflow-hidden border border-border">
+                                <div class="h-1 rounded-full {{ $stg['index'] <= 5 ? 'bg-blue-600' : ($stg['index'] <= 9 ? 'bg-amber-500' : 'bg-emerald-600') }}"
                                      style="width: {{ max(6, $stg['conversion_pct']) }}%;"></div>
                             </div>
                         </a>
 
                         @if(!$loop->last)
                             <div class="flex items-center justify-center text-muted shrink-0">
-                                <svg class="w-4 h-4 text-border" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-border" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                             </div>
                         @endif
                     @endforeach
@@ -431,55 +397,51 @@
             </div>
         </div>
 
-        <!-- 6. Analytics Section (Balanced 2-Column & 3-Column Responsive Grid) -->
-        <div class="space-y-6">
+        <!-- 6. Analytics Section (Balanced Grid) -->
+        <div class="space-y-3">
             <!-- Row 1: Lead Trend (2 Cols) + Lead Source Donut (1 Col) -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <!-- Lead Generation Velocity (2 Cols) -->
-                <div class="lg:col-span-2 bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
-                        <div>
-                            <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Lead Generation Velocity & Conversion Trends</h2>
-                            <p class="text-xs text-muted mt-0.5">Ingested Volume vs Converted Won Deals across time</p>
-                        </div>
+                <div class="lg:col-span-2 bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-2 border-b border-border/70 pb-2">
+                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Trends</h2>
                         
-                        <div class="flex items-center gap-1 bg-canvas p-1 rounded-xl border border-border">
+                        <div class="flex items-center gap-1 bg-canvas p-0.5 rounded-lg border border-border">
                             <button type="button" wire:click="setTrendInterval('daily')"
-                                    class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer {{ $trendInterval === 'daily' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                    class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer {{ $trendInterval === 'daily' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
                                 Daily
                             </button>
                             <button type="button" wire:click="setTrendInterval('weekly')"
-                                    class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer {{ $trendInterval === 'weekly' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                    class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer {{ $trendInterval === 'weekly' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
                                 Weekly
                             </button>
                             <button type="button" wire:click="setTrendInterval('monthly')"
-                                    class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer {{ $trendInterval === 'monthly' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                    class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer {{ $trendInterval === 'monthly' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
                                 Monthly
                             </button>
                         </div>
                     </div>
 
-                    <div class="relative h-72 w-full">
+                    <div class="relative h-52 w-full">
                         <canvas id="adminLeadTrendChart"></canvas>
                     </div>
                 </div>
 
                 <!-- Lead Source Performance Donut (1 Col) -->
-                <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3">
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Lead Source Performance</h2>
-                        <p class="text-xs text-muted mt-0.5">Distribution across acquisition channels</p>
+                <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Sources</h2>
                     </div>
 
-                    <div class="relative h-56 w-full flex items-center justify-center">
+                    <div class="relative h-40 w-full flex items-center justify-center">
                         <canvas id="adminLeadSourceChart"></canvas>
                     </div>
 
-                    <div class="pt-3 border-t border-border/80 space-y-1.5 text-xs">
+                    <div class="pt-2 border-t border-border/70 space-y-1 text-xs">
                         @foreach($adminLeadAnalytics['sources']['labels'] as $idx => $label)
                             <div class="flex items-center justify-between">
-                                <span class="flex items-center gap-2 text-muted">
-                                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ $adminLeadAnalytics['sources']['colors'][$idx] ?? '#2563EB' }};"></span>
+                                <span class="flex items-center gap-1.5 text-muted">
+                                    <span class="w-2 h-2 rounded-full" style="background-color: {{ $adminLeadAnalytics['sources']['colors'][$idx] ?? '#2563EB' }};"></span>
                                     <span>{{ $label }}</span>
                                 </span>
                                 <span class="font-bold text-ink">{{ $adminLeadAnalytics['sources']['counts'][$idx] ?? 0 }} ({{ $adminLeadAnalytics['sources']['percentages'][$idx] ?? 0 }}%)</span>
@@ -490,133 +452,120 @@
             </div>
 
             <!-- Row 2: Status Distribution (1 Col) + Organization Comparison (1 Col) + Top Sales Agents (1 Col) -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 <!-- Status Distribution Chart -->
-                <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3">
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Lead Status & Stage Distribution</h2>
-                        <p class="text-xs text-muted mt-0.5">Proportion across active CRM stages</p>
+                <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2">
+                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Status</h2>
                     </div>
 
-                    <div class="relative h-52 w-full flex items-center justify-center">
+                    <div class="relative h-40 w-full flex items-center justify-center">
                         <canvas id="adminLeadStatusChart"></canvas>
                     </div>
 
-                    <div class="pt-3 border-t border-border/80 grid grid-cols-2 gap-2 text-xs">
-                        <div class="p-2 rounded-xl bg-canvas border border-border">
-                            <span class="text-muted block">Uncontacted</span>
+                    <div class="pt-2 border-t border-border/70 grid grid-cols-2 gap-2 text-xs">
+                        <div class="p-1.5 rounded-lg bg-canvas border border-border">
+                            <span class="text-muted block text-[11px]">Uncontacted</span>
                             <span class="font-bold text-ink text-sm">{{ $groupedKpis['groups']['overview']['metrics'][1]['value'] ?? '0' }}</span>
                         </div>
-                        <div class="p-2 rounded-xl bg-canvas border border-border">
-                            <span class="text-muted block">Qualified</span>
+                        <div class="p-1.5 rounded-lg bg-canvas border border-border">
+                            <span class="text-muted block text-[11px]">Qualified</span>
                             <span class="font-bold text-emerald-600 text-sm">{{ $groupedKpis['groups']['overview']['metrics'][3]['value'] ?? '0' }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Organization Comparison Chart -->
-                <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Organization Comparison</h2>
-                            <p class="text-xs text-muted mt-0.5">Top organizations by lead volume</p>
-                        </div>
+                <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2 flex items-center justify-between">
+                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Organizations</h2>
+                        <a href="{{ route('admin.organizations') }}" wire:navigate class="text-xs text-blue-600 font-semibold hover:underline">View All &rarr;</a>
                     </div>
 
-                    <div class="relative h-52 w-full">
+                    <div class="relative h-40 w-full">
                         <canvas id="adminOrgComparisonChart"></canvas>
                     </div>
 
-                    <div class="pt-3 border-t border-border/80 text-xs flex items-center justify-between text-muted">
-                        <span>Comparing Top 5 Client Portfolios</span>
-                        <a href="{{ route('admin.organizations') }}" wire:navigate class="text-blue-600 font-semibold hover:underline">All Clients &rarr;</a>
+                    <div class="pt-2 border-t border-border/70 text-[11px] text-muted text-center">
+                        Top 5 clients by lead volume & credits
                     </div>
                 </div>
 
-                <!-- Top Performing Sales Executives Leaderboard -->
-                <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4 flex flex-col justify-between">
-                    <div class="border-b border-border/80 pb-3 flex items-center justify-between">
-                        <div>
-                            <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Team Performance Ranking</h2>
-                            <p class="text-xs text-muted mt-0.5">Top sales executives by conversion</p>
-                        </div>
+                <!-- Top Sales Executives Leaderboard -->
+                <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+                    <div class="border-b border-border/70 pb-2 flex items-center justify-between">
+                        <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Top Agents</h2>
                         <a href="{{ route('admin.users') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">All &rarr;</a>
                     </div>
 
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         @forelse($adminLeadAnalytics['agents'] as $agent)
-                            <div class="p-2.5 rounded-xl bg-canvas border border-border space-y-1.5">
+                            <div class="p-2 rounded-lg bg-canvas border border-border space-y-1">
                                 <div class="flex items-center justify-between text-xs">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-surface border border-border flex items-center justify-center font-bold text-xs text-ink">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-5 h-5 rounded-full bg-surface border border-border flex items-center justify-center font-bold text-[10px] text-ink">
                                             {{ strtoupper(substr($agent['name'], 0, 1)) }}
                                         </div>
                                         <span class="font-semibold text-ink">{{ $agent['name'] }}</span>
                                     </div>
-                                    <span class="font-extrabold text-emerald-600">{{ $agent['conversion_rate'] }}% Conv</span>
+                                    <span class="font-bold text-emerald-600">{{ $agent['conversion_rate'] }}%</span>
                                 </div>
-                                <div class="flex items-center justify-between text-xs text-muted">
-                                    <span>Assigned: {{ number_format($agent['assigned']) }} &bull; Contacted: {{ number_format($agent['contacted']) }}</span>
+                                <div class="flex items-center justify-between text-[11px] text-muted">
+                                    <span>Assigned: {{ number_format($agent['assigned']) }}</span>
                                     <span class="font-semibold text-ink">Won: {{ number_format($agent['won']) }}</span>
                                 </div>
                             </div>
                         @empty
-                            <div class="py-8 text-center text-xs text-muted">
-                                No sales assignments recorded for selected filters.
+                            <div class="py-6 text-center text-xs text-muted">
+                                No sales assignments recorded.
                             </div>
                         @endforelse
                     </div>
 
-                    <div class="pt-2 text-xs text-center text-muted">
-                        Ranked by deal closure velocity & contact rate
+                    <div class="pt-1 text-[11px] text-center text-muted">
+                        Ranked by deal conversions
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 7. Organization & Project Analytics (Spacious Separate Sections) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 7. Organization & Project Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <!-- Organization Performance Table -->
-            <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between border-b border-border/80 pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Organization Performance Breakdown</h2>
-                        <p class="text-xs text-muted mt-0.5">Lead volume, credit usage, wallet balance & SLA compliance</p>
-                    </div>
-                    <a href="{{ route('admin.organizations') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Manage Orgs &rarr;</a>
+            <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-border/70 pb-2">
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Organizations</h2>
+                    <a href="{{ route('admin.organizations') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Manage &rarr;</a>
                 </div>
 
-                <div class="overflow-x-auto max-h-88 overflow-y-auto">
+                <div class="overflow-x-auto max-h-72 overflow-y-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead class="sticky top-0 bg-surface">
-                            <tr class="border-b border-border text-xs font-bold text-muted uppercase tracking-wider">
-                                <th class="py-2.5">Organization</th>
-                                <th class="py-2.5 text-right">Leads</th>
-                                <th class="py-2.5 text-right">Credits Used</th>
-                                <th class="py-2.5 text-right">Wallet Balance</th>
-                                <th class="py-2.5 text-right">SLA Breach</th>
+                            <tr class="border-b border-border text-[11px] font-bold text-muted uppercase tracking-wider">
+                                <th class="py-2">Organization</th>
+                                <th class="py-2 text-right">Leads</th>
+                                <th class="py-2 text-right">Credits</th>
+                                <th class="py-2 text-right">Wallet</th>
+                                <th class="py-2 text-right">SLA</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @forelse($adminOrgPerformance as $org)
                                 <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-3 font-semibold text-ink">
-                                        <a href="{{ route('admin.organizations') }}" wire:navigate class="hover:text-blue-600 transition block font-bold text-sm">
+                                    <td class="py-2 font-semibold text-ink">
+                                        <a href="{{ route('admin.organizations') }}" wire:navigate class="hover:text-blue-600 transition block font-bold text-xs">
                                             {{ $org['name'] }}
                                         </a>
-                                        <span class="text-xs text-muted font-normal">{{ $org['active_users'] }} active agents</span>
+                                        <span class="text-[11px] text-muted font-normal">{{ $org['active_users'] }} agents</span>
                                     </td>
-                                    <td class="py-3 text-right font-semibold text-ink text-sm">{{ number_format($org['total_leads']) }}</td>
-                                    <td class="py-3 text-right font-medium text-muted">{{ number_format($org['credits_consumed']) }} Cr</td>
-                                    <td class="py-3 text-right font-bold {{ $org['wallet_balance'] < 100 ? 'text-rose-600' : 'text-ink' }}">
+                                    <td class="py-2 text-right font-semibold text-ink">{{ number_format($org['total_leads']) }}</td>
+                                    <td class="py-2 text-right text-muted">{{ number_format($org['credits_consumed']) }} Cr</td>
+                                    <td class="py-2 text-right font-bold {{ $org['wallet_balance'] < 100 ? 'text-rose-600' : 'text-ink' }}">
                                         {{ number_format($org['wallet_balance']) }} Cr
-                                        @if($org['wallet_balance'] < 100)
-                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 ml-0.5" title="Low Balance"></span>
-                                        @endif
                                     </td>
-                                    <td class="py-3 text-right">
+                                    <td class="py-2 text-right">
                                         @if($org['sla_breaches'] > 0)
-                                            <span class="inline-flex px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                                            <span class="inline-flex px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
                                                 {{ $org['sla_breaches'] }}
                                             </span>
                                         @else
@@ -626,7 +575,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="py-8 text-center text-xs text-muted">No organization activity found.</td>
+                                    <td colspan="5" class="py-6 text-center text-xs text-muted">No organization activity found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -635,50 +584,41 @@
             </div>
 
             <!-- Project Performance Table -->
-            <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between border-b border-border/80 pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Project Performance Telemetry</h2>
-                        <p class="text-xs text-muted mt-0.5">Project leads, client mapping, and credit charge</p>
-                    </div>
-                    <a href="{{ route('leads.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">View Pipeline &rarr;</a>
+            <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-border/70 pb-2">
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Projects</h2>
+                    <a href="{{ route('leads.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">View &rarr;</a>
                 </div>
 
-                <div class="overflow-x-auto max-h-88 overflow-y-auto">
+                <div class="overflow-x-auto max-h-72 overflow-y-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead class="sticky top-0 bg-surface">
-                            <tr class="border-b border-border text-xs font-bold text-muted uppercase tracking-wider">
-                                <th class="py-2.5">Project</th>
-                                <th class="py-2.5">Client</th>
-                                <th class="py-2.5 text-right">Leads</th>
-                                <th class="py-2.5 text-right">Credits Charged</th>
-                                <th class="py-2.5 text-right">Conv Rate</th>
+                            <tr class="border-b border-border text-[11px] font-bold text-muted uppercase tracking-wider">
+                                <th class="py-2">Project</th>
+                                <th class="py-2">Client</th>
+                                <th class="py-2 text-right">Leads</th>
+                                <th class="py-2 text-right">Credits</th>
+                                <th class="py-2 text-right">Conv %</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
                             @forelse($adminProjectPerformance as $proj)
                                 <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-3 font-semibold text-ink">
-                                        <a href="{{ route('leads.index') }}" wire:navigate class="hover:text-blue-600 transition block font-bold text-sm">
+                                    <td class="py-2 font-semibold text-ink">
+                                        <a href="{{ route('leads.index') }}" wire:navigate class="hover:text-blue-600 transition block font-bold text-xs">
                                             {{ $proj['name'] }}
                                         </a>
-                                        <span class="text-xs text-muted font-normal">{{ $proj['location'] }}</span>
+                                        <span class="text-[11px] text-muted font-normal">{{ $proj['location'] }}</span>
                                     </td>
-                                    <td class="py-3 text-muted">{{ $proj['client_name'] }}</td>
-                                    <td class="py-3 text-right font-semibold text-ink text-sm">{{ number_format($proj['total_leads']) }}</td>
-                                    <td class="py-3 text-right font-medium text-muted">{{ number_format($proj['total_credits_charged']) }} Cr</td>
-                                    <td class="py-3 text-right font-bold text-emerald-600">{{ $proj['conversion_rate'] }}%</td>
+                                    <td class="py-2 text-muted truncate max-w-xs">{{ $proj['client_name'] }}</td>
+                                    <td class="py-2 text-right font-semibold text-ink">{{ number_format($proj['total_leads']) }}</td>
+                                    <td class="py-2 text-right text-muted">{{ number_format($proj['total_credits_charged']) }} Cr</td>
+                                    <td class="py-2 text-right font-bold text-emerald-600">{{ $proj['conversion_rate'] }}%</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="py-12 text-center text-xs text-muted">
-                                        <div class="flex flex-col items-center justify-center space-y-1.5">
-                                            <div class="w-10 h-10 rounded-full bg-canvas border border-border flex items-center justify-center text-muted">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                                            </div>
-                                            <span class="font-bold text-ink text-sm">No Projects In Current Scope</span>
-                                            <span class="text-xs text-muted max-w-xs">Agency leads map dynamically to client campaigns and assigned inventory.</span>
-                                        </div>
+                                    <td colspan="5" class="py-8 text-center text-xs text-muted">
+                                        No projects in current scope.
                                     </td>
                                 </tr>
                             @endforelse
@@ -688,44 +628,38 @@
             </div>
         </div>
 
-        <!-- 8. Credit & Distribution Monitoring (2 Balanced Cards) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 8. Credit & Distribution Monitoring -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <!-- Credit Protection & Wallet Engine -->
-            <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between border-b border-border/80 pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Credit Protection & Wallet Engine</h2>
-                        <p class="text-xs text-muted mt-0.5">Circulating supply, consumption ledger & recharge activity</p>
-                    </div>
-                    <a href="{{ route('admin.credits') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Credits Hub &rarr;</a>
+            <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-border/70 pb-2">
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Credits & Wallet</h2>
+                    <a href="{{ route('admin.credits') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Manage &rarr;</a>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-xs text-muted block">Platform Supply</span>
-                        <span class="text-base font-extrabold text-ink mt-0.5 block">{{ number_format($adminCreditAnalytics['global_balance'] ?? 0) }} Cr</span>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Supply</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ number_format($adminCreditAnalytics['global_balance'] ?? 0) }} Cr</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-xs text-muted block">Avg Cost / Lead</span>
-                        <span class="text-base font-extrabold text-ink mt-0.5 block">{{ $adminCreditAnalytics['cost_per_lead'] ?? 10 }} Cr</span>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Avg Cost</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ $adminCreditAnalytics['cost_per_lead'] ?? 10 }} Cr</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-xs text-muted block">Consumed</span>
-                        <span class="text-base font-extrabold text-neutral-700 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_consumed'] ?? 0) }} Cr</span>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Consumed</span>
+                        <span class="text-sm font-bold text-neutral-700 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_consumed'] ?? 0) }} Cr</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-xs text-muted block">Refunded</span>
-                        <span class="text-base font-extrabold text-emerald-600 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_refunded'] ?? 0) }} Cr</span>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Refunded</span>
+                        <span class="text-sm font-bold text-emerald-600 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_refunded'] ?? 0) }} Cr</span>
                     </div>
                 </div>
 
                 @if(($adminCreditAnalytics['pending_recharges'] ?? 0) > 0)
-                    <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
-                        <div class="flex items-center gap-2.5">
-                            <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            <span class="text-xs font-bold text-amber-900">{{ $adminCreditAnalytics['pending_recharges'] }} Wallet Recharge Requests Pending Approval</span>
-                        </div>
-                        <a href="{{ route('admin.credits') }}" wire:navigate class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition">
+                    <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-900">{{ $adminCreditAnalytics['pending_recharges'] }} recharge requests pending</span>
+                        <a href="{{ route('admin.credits') }}" wire:navigate class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold transition">
                             Review &rarr;
                         </a>
                     </div>
@@ -733,86 +667,80 @@
             </div>
 
             <!-- Distribution Engine Monitoring -->
-            <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between border-b border-border/80 pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-ink uppercase tracking-wider">Distribution Engine Health</h2>
-                        <p class="text-xs text-muted mt-0.5">Algorithm efficiency, assignment rules & hold queue</p>
-                    </div>
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-border/70 pb-2">
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Distribution</h2>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         {{ $adminDistributionMonitoring['success_rate'] ?? 100 }}% Success
                     </span>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-muted block">Round Robin</span>
-                        <span class="text-base font-extrabold text-ink mt-0.5 block">{{ number_format($adminDistributionMonitoring['round_robin'] ?? 0) }}</span>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Round Robin</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ number_format($adminDistributionMonitoring['round_robin'] ?? 0) }}</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-muted block">Manual Pool</span>
-                        <span class="text-base font-extrabold text-ink mt-0.5 block">{{ number_format($adminDistributionMonitoring['manual'] ?? 0) }}</span>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Manual</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ number_format($adminDistributionMonitoring['manual'] ?? 0) }}</span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-muted block">Unassigned</span>
-                        <span class="text-base font-extrabold {{ ($adminDistributionMonitoring['unassigned'] ?? 0) > 0 ? 'text-amber-600' : 'text-ink' }} mt-0.5 block">
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Unassigned</span>
+                        <span class="text-sm font-bold {{ ($adminDistributionMonitoring['unassigned'] ?? 0) > 0 ? 'text-amber-600' : 'text-ink' }} mt-0.5 block">
                             {{ number_format($adminDistributionMonitoring['unassigned'] ?? 0) }}
                         </span>
                     </div>
-                    <div class="p-3 rounded-xl bg-canvas border border-border">
-                        <span class="text-muted block">Failed Routings</span>
-                        <span class="text-base font-extrabold text-muted mt-0.5 block">{{ number_format($adminDistributionMonitoring['failed'] ?? 0) }}</span>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border">
+                        <span class="text-[11px] text-muted block">Failed</span>
+                        <span class="text-sm font-bold text-muted mt-0.5 block">{{ number_format($adminDistributionMonitoring['failed'] ?? 0) }}</span>
                     </div>
                 </div>
 
                 <div class="space-y-1">
-                    <div class="flex items-center justify-between text-xs text-muted">
-                        <span>Assignment Distribution Success</span>
+                    <div class="flex items-center justify-between text-[11px] text-muted">
+                        <span>Success Rate</span>
                         <span class="font-bold text-ink">{{ $adminDistributionMonitoring['success_rate'] ?? 100 }}%</span>
                     </div>
-                    <div class="w-full bg-canvas rounded-full h-2 overflow-hidden border border-border">
-                        <div class="bg-emerald-500 h-2 rounded-full" style="width: {{ $adminDistributionMonitoring['success_rate'] ?? 100 }}%;"></div>
+                    <div class="w-full bg-canvas rounded-full h-1.5 overflow-hidden border border-border">
+                        <div class="bg-emerald-500 h-1.5 rounded-full" style="width: {{ $adminDistributionMonitoring['success_rate'] ?? 100 }}%;"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 9. Recent Activity & Operations Hub (6 Clear Sections in a Modern Tabbed Container) -->
-        <div class="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
-                <div>
-                    <h2 class="text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        <span>Live Activity & Operations Stream</span>
-                    </h2>
-                    <p class="text-xs text-muted mt-0.5">Real-time telemetry across leads, SLA alerts, transactions, and multi-channel delivery</p>
-                </div>
+        <!-- 9. Recent Activity -->
+        <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/70 pb-2">
+                <h2 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span>Recent Activity</span>
+                </h2>
 
                 <!-- 6 Category Tabs -->
-                <div class="flex items-center gap-1.5 bg-canvas p-1 rounded-xl border border-border overflow-x-auto no-scrollbar">
+                <div class="flex items-center gap-1 bg-canvas p-0.5 rounded-lg border border-border overflow-x-auto no-scrollbar">
                     <button type="button" wire:click="setActiveActivityTab('leads')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'leads' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        Recent Leads
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'leads' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
+                        Leads
                     </button>
                     <button type="button" wire:click="setActiveActivityTab('followups')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'followups' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        Upcoming Follow-ups
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'followups' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
+                        Follow-ups
                     </button>
                     <button type="button" wire:click="setActiveActivityTab('sla')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'sla' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'sla' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
                         SLA Alerts
                     </button>
                     <button type="button" wire:click="setActiveActivityTab('transactions')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'transactions' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        Credit Ledger
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'transactions' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
+                        Credits
                     </button>
                     <button type="button" wire:click="setActiveActivityTab('replacements')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'replacements' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'replacements' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
                         Replacements
                     </button>
                     <button type="button" wire:click="setActiveActivityTab('notifications')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'notifications' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        Delivery Status
+                            class="px-2.5 py-1 text-xs font-semibold rounded transition cursor-pointer whitespace-nowrap {{ $activeActivityTab === 'notifications' ? 'bg-ink text-white' : 'text-muted hover:text-ink' }}">
+                        Delivery
                     </button>
                 </div>
             </div>
@@ -821,34 +749,34 @@
             @if($activeActivityTab === 'leads')
                 <div class="divide-y divide-border">
                     @forelse($adminRecentActivities['recent_leads'] as $lead)
-                        <div class="py-3 flex items-center justify-between text-xs hover:bg-canvas/50 px-2 rounded-xl transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div class="py-2 flex items-center justify-between text-xs hover:bg-canvas/50 px-1 rounded transition">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center font-bold text-[11px] shrink-0">
                                     LP
                                 </div>
                                 <div>
-                                    <div class="font-bold text-ink text-sm flex items-center gap-2">
+                                    <div class="font-bold text-ink text-xs flex items-center gap-1.5">
                                         <a href="{{ route('leads.index') }}" wire:navigate class="hover:text-blue-600 transition">
                                             #{{ $lead->lead_code }} &bull; {{ $lead->name }}
                                         </a>
-                                        <span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-canvas border border-border text-muted">
+                                        <span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-canvas border border-border text-muted">
                                             {{ ucfirst($lead->leadSource?->name ?: 'Direct') }}
                                         </span>
                                     </div>
-                                    <div class="text-xs text-muted mt-0.5">
-                                        Org: {{ $lead->client?->organization?->name ?: 'Platform HQ' }} &bull; Phone: {{ substr($lead->mobile, 0, 4) . '***' . substr($lead->mobile, -3) }}
+                                    <div class="text-[11px] text-muted">
+                                        {{ $lead->client?->organization?->name ?: 'HQ' }} &bull; {{ substr($lead->mobile, 0, 4) . '***' . substr($lead->mobile, -3) }}
                                     </div>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <div class="text-xs font-semibold text-ink">{{ $lead->created_at ? $lead->created_at->diffForHumans() : 'Recently' }}</div>
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold mt-1 {{ $lead->assigned_to ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
-                                    {{ $lead->assigned_to ? 'Assigned' : 'Unassigned Pool' }}
+                                <div class="text-[11px] font-medium text-ink">{{ $lead->created_at ? $lead->created_at->diffForHumans() : 'Recently' }}</div>
+                                <span class="inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold mt-0.5 {{ $lead->assigned_to ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
+                                    {{ $lead->assigned_to ? 'Assigned' : 'Unassigned' }}
                                 </span>
                             </div>
                         </div>
                     @empty
-                        <div class="py-8 text-center text-xs text-muted">No recent leads found.</div>
+                        <div class="py-6 text-center text-xs text-muted">No recent leads found.</div>
                     @endforelse
                 </div>
 
@@ -856,29 +784,29 @@
             @elseif($activeActivityTab === 'followups')
                 <div class="divide-y divide-border">
                     @forelse($adminRecentActivities['upcoming_followups'] as $event)
-                        <div class="py-3 flex items-center justify-between text-xs hover:bg-canvas/50 px-2 rounded-xl transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-8 h-8 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <div class="py-2 flex items-center justify-between text-xs hover:bg-canvas/50 px-1 rounded transition">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-[11px] shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 </div>
                                 <div>
-                                    <div class="font-bold text-ink text-sm">
-                                        Follow-up: {{ $event->lead?->name ?? 'Lead Client' }}
+                                    <div class="font-bold text-ink text-xs">
+                                        {{ $event->lead?->name ?? 'Lead' }}
                                     </div>
-                                    <div class="text-xs text-muted mt-0.5">
-                                        {{ $event->note ?? 'Scheduled follow-up & discovery call' }} &bull; Assigned: {{ $event->lead?->assignedTo?->name ?? 'Sales Team' }}
+                                    <div class="text-[11px] text-muted">
+                                        {{ $event->note ?? 'Follow-up' }} &bull; {{ $event->lead?->assignedTo?->name ?? 'Agent' }}
                                     </div>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <div class="text-xs font-bold text-ink">{{ $event->due_at ? \Carbon\Carbon::parse($event->due_at)->diffForHumans() : 'Upcoming' }}</div>
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-canvas border border-border text-muted mt-1">
+                                <div class="text-[11px] font-medium text-ink">{{ $event->due_at ? \Carbon\Carbon::parse($event->due_at)->diffForHumans() : 'Upcoming' }}</div>
+                                <span class="inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-canvas border border-border text-muted mt-0.5">
                                     {{ ucfirst(str_replace('_', ' ', $event->status ?? 'Active')) }}
                                 </span>
                             </div>
                         </div>
                     @empty
-                        <div class="py-8 text-center text-xs text-muted">No upcoming follow-ups scheduled.</div>
+                        <div class="py-6 text-center text-xs text-muted">No upcoming follow-ups scheduled.</div>
                     @endforelse
                 </div>
 
@@ -886,38 +814,35 @@
             @elseif($activeActivityTab === 'sla')
                 <div class="divide-y divide-border">
                     @forelse($adminRecentActivities['sla_breached'] as $lead)
-                        <div class="py-3 flex items-center justify-between text-xs hover:bg-canvas/50 px-2 rounded-xl transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-8 h-8 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div class="py-2 flex items-center justify-between text-xs hover:bg-canvas/50 px-1 rounded transition">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center font-bold text-xs shrink-0">
                                     !
                                 </div>
                                 <div>
-                                    <div class="font-bold text-ink text-sm flex items-center gap-2">
+                                    <div class="font-bold text-ink text-xs flex items-center gap-1.5">
                                         <a href="{{ route('leads.index') }}" wire:navigate class="hover:text-rose-600 transition">
                                             #{{ $lead->lead_code }} &bull; {{ $lead->name }}
                                         </a>
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                            SLA Breached (>30m)
+                                        <span class="inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                            >30m
                                         </span>
                                     </div>
-                                    <div class="text-xs text-muted mt-0.5">
-                                        Assigned To: {{ $lead->assignedTo?->name ?: 'Unassigned' }} &bull; Ingested: {{ $lead->created_at ? $lead->created_at->diffForHumans() : 'Earlier' }}
+                                    <div class="text-[11px] text-muted">
+                                        {{ $lead->assignedTo?->name ?: 'Unassigned' }} &bull; {{ $lead->created_at ? $lead->created_at->diffForHumans() : 'Earlier' }}
                                     </div>
                                 </div>
                             </div>
                             <div class="text-right">
                                 <a href="{{ route('leads.index') }}" wire:navigate
-                                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition">
+                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition">
                                     Respond &rarr;
                                 </a>
                             </div>
                         </div>
                     @empty
-                        <div class="py-10 text-center text-xs text-muted">
-                            <div class="flex flex-col items-center justify-center space-y-1">
-                                <span class="font-bold text-emerald-600 text-sm">&check; Zero Active SLA Breaches</span>
-                                <span class="text-xs text-muted">All leads have been responded to within the target response speed.</span>
-                            </div>
+                        <div class="py-6 text-center text-xs text-muted">
+                            <span class="font-bold text-emerald-600 text-xs">&check; Zero Active SLA Breaches</span>
                         </div>
                     @endforelse
                 </div>
@@ -926,29 +851,29 @@
             @elseif($activeActivityTab === 'transactions')
                 <div class="divide-y divide-border">
                     @forelse($adminRecentActivities['transactions'] as $tx)
-                        <div class="py-3 flex items-center justify-between text-xs hover:bg-canvas/50 px-2 rounded-xl transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-8 h-8 rounded-full {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-canvas border-border text-muted' }} border flex items-center justify-center font-bold text-xs shrink-0">
+                        <div class="py-2 flex items-center justify-between text-xs hover:bg-canvas/50 px-1 rounded transition">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-canvas border-border text-muted' }} border flex items-center justify-center font-bold text-xs shrink-0">
                                     {{ strtoupper(substr($tx->transaction_type, 0, 1)) }}
                                 </div>
                                 <div>
-                                    <div class="font-bold text-ink text-sm flex items-center gap-2">
-                                        <span>Tx #{{ $tx->id }} &bull; {{ ucfirst($tx->transaction_type) }}</span>
-                                        <span class="inline-flex px-2 py-0.5 rounded-md text-xs font-bold {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
-                                            {{ $tx->credit_used }} Credits
+                                    <div class="font-bold text-ink text-xs flex items-center gap-1.5">
+                                        <span>#{{ $tx->id }} &bull; {{ ucfirst($tx->transaction_type) }}</span>
+                                        <span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-bold {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
+                                            {{ $tx->credit_used }} Cr
                                         </span>
                                     </div>
-                                    <div class="text-xs text-muted mt-0.5">
-                                        Client: {{ $tx->client?->name ?: 'Client' }} &bull; Balance After: {{ $tx->credit_after }} Cr
+                                    <div class="text-[11px] text-muted">
+                                        {{ $tx->client?->name ?: 'Client' }} &bull; Bal: {{ $tx->credit_after }} Cr
                                     </div>
                                 </div>
                             </div>
-                            <div class="text-right text-xs text-muted">
+                            <div class="text-right text-[11px] text-muted">
                                 {{ $tx->created_at ? $tx->created_at->diffForHumans() : 'Recent' }}
                             </div>
                         </div>
                     @empty
-                        <div class="py-8 text-center text-xs text-muted">No recent credit transactions found.</div>
+                        <div class="py-6 text-center text-xs text-muted">No recent credit transactions found.</div>
                     @endforelse
                 </div>
 
@@ -956,53 +881,50 @@
             @elseif($activeActivityTab === 'replacements')
                 <div class="divide-y divide-border">
                     @forelse($adminRecentActivities['replacements'] as $claim)
-                        <div class="py-3 flex items-center justify-between text-xs hover:bg-canvas/50 px-2 rounded-xl transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-8 h-8 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div class="py-2 flex items-center justify-between text-xs hover:bg-canvas/50 px-1 rounded transition">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs shrink-0">
                                     R
                                 </div>
                                 <div>
-                                    <div class="font-bold text-ink text-sm flex items-center gap-2">
-                                        <span>Claim #{{ $claim->id }} &bull; Lead #{{ $claim->lead?->lead_code ?: $claim->lead_id }}</span>
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <div class="font-bold text-ink text-xs flex items-center gap-1.5">
+                                        <span>#{{ $claim->id }} &bull; Lead #{{ $claim->lead?->lead_code ?: $claim->lead_id }}</span>
+                                        <span class="inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                             {{ ucfirst($claim->status) }}
                                         </span>
                                     </div>
-                                    <div class="text-xs text-muted mt-0.5">
-                                        Requested by: {{ $claim->requester?->name ?: 'Agent' }} &bull; Reason: {{ $claim->reason?->name ?: 'Invalid Contact' }}
+                                    <div class="text-[11px] text-muted">
+                                        {{ $claim->requester?->name ?: 'Agent' }} &bull; {{ $claim->reason?->name ?: 'Invalid Contact' }}
                                     </div>
                                 </div>
                             </div>
                             <div class="text-right">
                                 <a href="{{ route('replacements.queue') }}" wire:navigate
-                                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-canvas border border-border text-ink text-xs font-bold transition">
+                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface hover:bg-canvas border border-border text-ink text-xs font-bold transition">
                                     Review &rarr;
                                 </a>
                             </div>
                         </div>
                     @empty
-                        <div class="py-10 text-center text-xs text-muted">
-                            <div class="flex flex-col items-center justify-center space-y-1">
-                                <span class="font-bold text-ink text-sm">No Pending Replacement Claims</span>
-                                <span class="text-xs text-muted">All client lead replacement claims have been reviewed.</span>
-                            </div>
+                        <div class="py-6 text-center text-xs text-muted">
+                            <span class="font-bold text-ink text-xs">No Pending Replacement Claims</span>
                         </div>
                     @endforelse
                 </div>
 
             <!-- Tab 6: Multi-Channel Delivery Status -->
             @elseif($activeActivityTab === 'notifications')
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
                     @foreach($adminNotificationMonitoring['channels'] as $chan)
-                        <div class="p-4 rounded-xl bg-canvas border border-border space-y-2">
+                        <div class="p-3 rounded-lg bg-canvas border border-border space-y-1.5">
                             <div class="flex items-center justify-between">
-                                <span class="font-bold text-ink text-sm">{{ $chan['name'] }}</span>
-                                <span class="font-extrabold text-emerald-600 text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">{{ $chan['success_rate'] }}%</span>
+                                <span class="font-bold text-ink text-xs">{{ $chan['name'] }}</span>
+                                <span class="font-bold text-emerald-600 text-[11px] px-1.5 py-0.2 rounded bg-emerald-50 border border-emerald-200">{{ $chan['success_rate'] }}%</span>
                             </div>
-                            <div class="flex items-center justify-between text-xs text-muted pt-1 border-t border-border/80">
+                            <div class="flex items-center justify-between text-[11px] text-muted pt-1 border-t border-border/70">
                                 <span>Sent: {{ number_format($chan['sent']) }}</span>
-                                <span>Delivered: {{ number_format($chan['delivered']) }}</span>
-                                <span class="{{ $chan['failed'] > 0 ? 'text-rose-600 font-bold' : '' }}">Failed: {{ $chan['failed'] }}</span>
+                                <span>Del: {{ number_format($chan['delivered']) }}</span>
+                                <span class="{{ $chan['failed'] > 0 ? 'text-rose-600 font-bold' : '' }}">Fail: {{ $chan['failed'] }}</span>
                             </div>
                         </div>
                     @endforeach
@@ -1024,25 +946,25 @@
                             labels: trend.labels || [],
                             datasets: [
                                 {
-                                    label: 'Leads Ingested',
+                                    label: 'Leads',
                                     data: trend.leads || [],
                                     borderColor: '#0F172A',
                                     backgroundColor: 'rgba(15, 23, 42, 0.04)',
-                                    borderWidth: 2.5,
+                                    borderWidth: 2,
                                     fill: true,
                                     tension: 0.35,
-                                    pointRadius: 3,
+                                    pointRadius: 2.5,
                                     pointBackgroundColor: '#0F172A',
                                 },
                                 {
-                                    label: 'Deals Won / Converted',
+                                    label: 'Won',
                                     data: trend.won || [],
                                     borderColor: '#10B981',
                                     borderWidth: 2,
-                                    borderDash: [4, 4],
+                                    borderDash: [3, 3],
                                     fill: false,
                                     tension: 0.35,
-                                    pointRadius: 3,
+                                    pointRadius: 2.5,
                                     pointBackgroundColor: '#10B981',
                                 }
                             ]
@@ -1054,12 +976,12 @@
                                 legend: {
                                     display: true,
                                     position: 'top',
-                                    labels: { font: { family: 'Inter', size: 12, weight: 'bold' }, color: '#475569', boxWidth: 12 }
+                                    labels: { font: { family: 'Inter', size: 11, weight: 'bold' }, color: '#475569', boxWidth: 10 }
                                 }
                             },
                             scales: {
-                                x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
-                                y: { grid: { color: '#E2E8F0' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, beginAtZero: true }
+                                x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' } },
+                                y: { grid: { color: '#E2E8F0' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' }, beginAtZero: true }
                             }
                         }
                     });
@@ -1075,7 +997,7 @@
                             datasets: [{
                                 data: sources.counts && sources.counts.length ? sources.counts : [1],
                                 backgroundColor: sources.colors || ['#2563EB', '#10B981', '#F59E0B'],
-                                borderWidth: 3,
+                                borderWidth: 2,
                                 borderColor: '#FFFFFF',
                             }]
                         },
@@ -1087,7 +1009,7 @@
                                     display: false
                                 }
                             },
-                            cutout: '68%'
+                            cutout: '70%'
                         }
                     });
                 }
@@ -1102,7 +1024,7 @@
                             datasets: [{
                                 data: statuses.counts && statuses.counts.length ? statuses.counts : [1, 0, 0],
                                 backgroundColor: statuses.colors || ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
-                                borderWidth: 2.5,
+                                borderWidth: 2,
                                 borderColor: '#FFFFFF',
                             }]
                         },
@@ -1113,10 +1035,10 @@
                                 legend: {
                                     display: true,
                                     position: 'right',
-                                    labels: { font: { family: 'Inter', size: 11 }, color: '#475569', boxWidth: 10 }
+                                    labels: { font: { family: 'Inter', size: 10 }, color: '#475569', boxWidth: 8 }
                                 }
                             },
-                            cutout: '65%'
+                            cutout: '68%'
                         }
                     });
                 }
@@ -1130,17 +1052,17 @@
                             labels: orgComp.labels || [],
                             datasets: [
                                 {
-                                    label: 'Leads Received',
+                                    label: 'Leads',
                                     data: orgComp.leads || [],
                                     backgroundColor: '#2563EB',
-                                    borderRadius: 4,
+                                    borderRadius: 3,
                                     barPercentage: 0.6,
                                 },
                                 {
-                                    label: 'Credits Used',
+                                    label: 'Credits',
                                     data: orgComp.credits || [],
                                     backgroundColor: '#64748B',
-                                    borderRadius: 4,
+                                    borderRadius: 3,
                                     barPercentage: 0.6,
                                 }
                             ]
@@ -1153,12 +1075,12 @@
                                 legend: {
                                     display: true,
                                     position: 'top',
-                                    labels: { font: { family: 'Inter', size: 11 }, color: '#475569', boxWidth: 10 }
+                                    labels: { font: { family: 'Inter', size: 10 }, color: '#475569', boxWidth: 8 }
                                 }
                             },
                             scales: {
                                 x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' }, beginAtZero: true },
-                                y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#334155' } }
+                                y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#334155' } }
                             }
                         }
                     });

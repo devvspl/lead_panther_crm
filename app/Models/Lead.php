@@ -94,6 +94,31 @@ class Lead extends Model
         return $this->hasMany(SiteVisit::class);
     }
 
+    public function followups(): HasMany
+    {
+        return $this->hasMany(Followup::class);
+    }
+
+    public function replacements(): HasMany
+    {
+        return $this->hasMany(LeadReplacement::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(LeadAssignment::class);
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(LeadStatusHistory::class);
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class);
+    }
+
     public function metadata(): HasMany
     {
         return $this->hasMany(LeadMetadata::class);
@@ -242,5 +267,33 @@ class Lead extends Model
             return 'SLA Breached';
         }
         return 'SLA Pending';
+    }
+
+    public function getOrganizationNameAttribute(): string
+    {
+        return $this->client?->organization?->name ?: ($this->assignedTo?->organization?->name ?: '-');
+    }
+
+    public function getTeamNameAttribute(): string
+    {
+        $tm = $this->assignedTo?->salesTeamMembers?->first();
+        return $tm?->salesTeam?->name ?: '-';
+    }
+
+    public function getLastActivityAttribute(): string
+    {
+        if ($this->first_response_at) {
+            return 'Response ' . $this->first_response_at->diffForHumans();
+        }
+        return 'Created ' . ($this->created_at ? $this->created_at->diffForHumans() : '-');
+    }
+
+    public function getNextFollowupAttribute(): string
+    {
+        $f = $this->followups->where('due_at', '>=', now())->sortBy('due_at')->first();
+        if ($f && $f->due_at) {
+            return Carbon::parse($f->due_at)->format('M d, H:i');
+        }
+        return '-';
     }
 }

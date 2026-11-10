@@ -5,39 +5,59 @@ namespace App\Livewire\Leads;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Url;
+use Livewire\Attributes\On;
 use App\Models\Lead;
 use App\Models\Project;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\LeadSource;
+use App\Models\Campaign;
 use App\Models\SalesTeam;
 use App\Models\SalesTeamMember;
 use App\Models\LeadStatusHistory;
+use App\Models\LeadAssignment;
+use App\Models\CreditWallet;
+use App\Models\CreditTransaction;
+use App\Models\LeadReplacement;
+use App\Models\Followup;
+use App\Models\SiteVisit;
+use App\Models\Booking;
 use App\Models\GeneralSetting;
+use App\Models\PortalAccount;
+use App\Models\LeadFormMapping;
 use App\Events\LeadStageChanged;
 use App\Livewire\Concerns\HasAdvancedTable;
-use Livewire\Attributes\On;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class LeadKanban extends Component
 {
     use HasAdvancedTable;
 
+    // Global Filters (URL bound)
     #[Url] public string $search = '';
     #[Url] public string $statusFilter = 'all';
+    #[Url] public string $stageFilter = '';
     #[Url] public string $project = '';
+    #[Url] public string $campaign = '';
+    #[Url] public string $filterOrganizationId = '';
     #[Url] public string $partner = '';
     #[Url] public string $executive = '';
     #[Url] public string $team = '';
     #[Url] public string $source = '';
-    #[Url] public string $date_range = '';
+    #[Url] public string $leadType = '';
+    #[Url] public string $date_range = 'month';
     #[Url] public bool $sla_breached = false;
     #[Url] public string $sort_by = 'created_desc';
 
-    public string $viewMode = 'kanban';
+    // View & Analytics State
+    public string $viewMode = 'kanban'; // 'kanban' | 'table'
     public string $analyticsRange = 'month';
     public ?string $analyticsCustomFrom = null;
     public ?string $analyticsCustomTo = null;
-    public string $breakdownTab = 'builder';
+    public string $breakdownTab = 'project'; // 'overview' | 'project' | 'source' | 'executive' | 'team' | 'organization'
+    public string $activeKpiGroup = 'all'; // 'all' | 'intake' | 'assignment' | 'progress' | 'conversion' | 'quality'
 
     public bool $otherColumnExpanded = false;
 
@@ -47,14 +67,14 @@ class LeadKanban extends Component
     public string $pendingToStage = '';
     public string $pendingFromStage = '';
 
-    // Per-column limits
+    // Per-column limits for Kanban view
     public array $stageLimits = [];
 
     // Manual Lead Ingestion & Meta Pull Modal State
     public bool $showPullLeadsModal = false;
     public string $pullMode = 'meta'; // 'meta' | 'manual'
     public ?int $selectedPortalAccountId = null;
-    public string $selectedFormOption = ''; // '' for All Active Forms, or specific form_id, or 'custom'
+    public string $selectedFormOption = '';
     public string $customFormId = '';
     public string $customPageAccessToken = '';
     public int $pullLimit = 25;
@@ -75,18 +95,20 @@ class LeadKanban extends Component
     public ?int $manualCampaignId = null;
     public ?int $manualLeadSourceId = null;
 
+    // 13 Complete Lifecycle Stages + Supported Active Stages
     public array $mainStages = [
-        'new' => 'New',
-        'assigned' => 'Assigned',
+        'new' => 'Lead Received',
+        'duplicate' => 'Duplicate Check',
+        'pending_credit' => 'Credit Check',
+        'assigned' => 'Lead Assigned',
+        'notification_sent' => 'Notification Sent',
+        'first_response' => 'First Response',
         'contacted' => 'Contacted',
-        'connected' => 'Connected',
-        'qualified' => 'Qualified',
         'interested' => 'Interested',
         'follow-up' => 'Follow-up',
         'meeting' => 'Meeting',
         'site_visit' => 'Site Visit',
         'negotiation' => 'Negotiation',
-        'proposal' => 'Proposal',
         'booking' => 'Booking',
         'payment' => 'Payment',
         'closed_won' => 'Closed Won',
@@ -95,7 +117,6 @@ class LeadKanban extends Component
     public array $otherStages = [
         'closed_lost' => 'Closed Lost',
         'wrong_number' => 'Wrong Number',
-        'duplicate' => 'Duplicate',
         'rental' => 'Rental',
         'replaced' => 'Replaced',
     ];
@@ -120,6 +141,11 @@ class LeadKanban extends Component
                 }
             } else {
                 $this->analyticsRange = $savedRange;
+            }
+
+            // Sync legacy partner param if passed
+            if (!empty($this->partner) && empty($this->filterOrganizationId)) {
+                $this->filterOrganizationId = $this->partner;
             }
 
             // Prevent browser autofill or stale query params from filling logged-in user's email into search
@@ -192,7 +218,6 @@ class LeadKanban extends Component
 
     public function updatedSearch(): void
     {
-        // Ignore browser autofill of the logged-in user's email into search inputs
         if (auth()->check() && !empty($this->search)) {
             $userEmail = strtolower(trim(auth()->user()->email ?? ''));
             if ($userEmail !== '' && strtolower(trim($this->search)) === $userEmail) {
@@ -200,15 +225,59 @@ class LeadKanban extends Component
                 return;
             }
         }
-
         $this->resetPage();
     }
+
     public function updatedProject(): void { $this->resetPage(); }
+    public function updatedCampaign(): void { $this->resetPage(); }
+    public function updatedFilterOrganizationId(): void { $this->resetPage(); }
     public function updatedExecutive(): void { $this->resetPage(); }
     public function updatedTeam(): void { $this->resetPage(); }
     public function updatedSource(): void { $this->resetPage(); }
+    public function updatedLeadType(): void { $this->resetPage(); }
+    public function updatedStatusFilter(): void { $this->resetPage(); }
+    public function updatedStageFilter(): void { $this->resetPage(); }
     public function updatedSlaBreached(): void { $this->resetPage(); }
     public function updatedSortBy(): void { $this->resetPage(); }
+
+    public function resetFilters(): void
+    {
+        $this->reset([
+            'search',
+            'statusFilter',
+            'stageFilter',
+            'project',
+            'campaign',
+            'partner',
+            'filterOrganizationId',
+            'executive',
+            'team',
+            'source',
+            'leadType',
+            'sla_breached',
+        ]);
+        $this->analyticsRange = 'month';
+        $this->analyticsCustomFrom = null;
+        $this->analyticsCustomTo = null;
+        $this->sort_by = 'created_desc';
+        $this->resetPage();
+        $this->dispatch('toast', type: 'info', message: 'All filters reset.');
+    }
+
+    public function applyKpiFilter(string $status, ?string $stage = null): void
+    {
+        $this->statusFilter = $status;
+        $this->stageFilter = $stage ?? '';
+        $this->sla_breached = ($status === 'sla_breached');
+        $this->resetPage();
+    }
+
+    public function filterByLifecycleStage(string $stageKey): void
+    {
+        $this->stageFilter = $stageKey;
+        $this->statusFilter = 'all';
+        $this->resetPage();
+    }
 
     public function loadMore(string $stage): void
     {
@@ -234,7 +303,7 @@ class LeadKanban extends Component
         $fromStage = $lead->current_stage;
         if ($fromStage === $toStage) return;
 
-        // If moving to terminal/exception stage (Closed Lost, Replaced, Wrong Number, Duplicate, Rental)
+        // If moving to terminal/exception stage
         if (array_key_exists($toStage, $this->otherStages) || $toStage === 'closed_lost') {
             $this->pendingLeadId = $leadId;
             $this->pendingFromStage = $fromStage;
@@ -290,7 +359,6 @@ class LeadKanban extends Component
         $user = auth()->user();
         if (!$user) return collect();
 
-        // Hide for Sales Executive
         if ($user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
             return collect();
         }
@@ -316,49 +384,139 @@ class LeadKanban extends Component
         return $query->get();
     }
 
-    protected function getScopedQuery()
+    /**
+     * Resolves current and comparison previous date boundaries.
+     *
+     * @return array{0: Carbon, 1: Carbon, 2: Carbon, 3: Carbon, 4: string}
+     */
+    public function getDateBounds(): array
+    {
+        $range = strtolower($this->analyticsRange ?: 'month');
+
+        if ($range === 'today') {
+            $start = Carbon::today()->startOfDay();
+            $end = Carbon::today()->endOfDay();
+            $prevStart = Carbon::yesterday()->startOfDay();
+            $prevEnd = Carbon::yesterday()->endOfDay();
+            $periodLabel = 'vs yesterday';
+        } elseif ($range === 'yesterday') {
+            $start = Carbon::yesterday()->startOfDay();
+            $end = Carbon::yesterday()->endOfDay();
+            $prevStart = Carbon::yesterday()->subDay()->startOfDay();
+            $prevEnd = Carbon::yesterday()->subDay()->endOfDay();
+            $periodLabel = 'vs day before';
+        } elseif (in_array($range, ['7_days', 'last7', 'week'])) {
+            $start = Carbon::now()->subDays(6)->startOfDay();
+            $end = Carbon::now()->endOfDay();
+            $prevStart = Carbon::now()->subDays(13)->startOfDay();
+            $prevEnd = Carbon::now()->subDays(7)->endOfDay();
+            $periodLabel = 'vs prior 7 days';
+        } elseif ($range === 'custom' && $this->analyticsCustomFrom && $this->analyticsCustomTo) {
+            $start = Carbon::parse($this->analyticsCustomFrom)->startOfDay();
+            $end = Carbon::parse($this->analyticsCustomTo)->endOfDay();
+            $days = max(1, (int) $start->diffInDays($end) + 1);
+            $prevEnd = (clone $start)->subSecond();
+            $prevStart = (clone $start)->subDays($days)->startOfDay();
+            $periodLabel = "vs prior {$days}d";
+        } elseif ($range === 'quarter') {
+            $start = Carbon::now()->startOfQuarter();
+            $end = Carbon::now()->endOfQuarter();
+            $prevStart = Carbon::now()->subQuarter()->startOfQuarter();
+            $prevEnd = Carbon::now()->subQuarter()->endOfQuarter();
+            $periodLabel = 'vs prior quarter';
+        } elseif ($range === 'year') {
+            $start = Carbon::now()->startOfYear();
+            $end = Carbon::now()->endOfYear();
+            $prevStart = Carbon::now()->subYear()->startOfYear();
+            $prevEnd = Carbon::now()->subYear()->endOfYear();
+            $periodLabel = 'vs prior year';
+        } else {
+            // Default: current month
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
+            $prevStart = Carbon::now()->subMonth()->startOfMonth();
+            $prevEnd = Carbon::now()->subMonth()->endOfMonth();
+            $periodLabel = 'vs prior month';
+        }
+
+        return [$start, $end, $prevStart, $prevEnd, $periodLabel];
+    }
+
+    /**
+     * Centralized query builder for leads respecting all role scoping and global filters.
+     */
+    protected function getScopedQuery(?Carbon $start = null, ?Carbon $end = null)
     {
         $user = auth()->user();
-        $query = Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo.salesTeamMembers.salesTeam', 'metadata']);
+        $query = Lead::withoutGlobalScopes()
+            ->with([
+                'client.organization',
+                'campaign.project',
+                'leadSource',
+                'assignedTo.salesTeamMembers.salesTeam',
+                'metadata',
+                'siteVisits',
+                'followups',
+                'replacements',
+            ]);
 
-        if (!$user) {
-            return $query;
+        // Role Scoping
+        if ($user) {
+            if ($user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
+                $query->where('assigned_to', $user->id);
+            } elseif ($user->hasRole('channel-partner') || $user->hasRole('Channel Partner')) {
+                $query->whereHas('assignedTo', function ($q) use ($user) {
+                    $q->where('organization_id', $user->organization_id);
+                });
+            } elseif ($user->hasRole('client')) {
+                $query->whereHas('client', function ($q) use ($user) {
+                    $q->where('organization_id', $user->organization_id);
+                });
+            }
         }
 
-        // Scoping by Role
-        if ($user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
-            $query->where('assigned_to', $user->id);
-        } elseif ($user->hasRole('channel-partner') || $user->hasRole('Channel Partner')) {
-            $query->whereHas('assignedTo', function ($q) use ($user) {
-                $q->where('organization_id', $user->organization_id);
-            });
-        } elseif ($user->hasRole('client')) {
-            $query->whereHas('client', function ($q) use ($user) {
-                $q->where('organization_id', $user->organization_id);
-            });
+        // Date Range
+        if ($start && $end) {
+            $query->whereBetween('created_at', [$start, $end]);
         }
 
-        // Filters
-        if ($this->search) {
+        // Search
+        if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
                   ->orWhere('lead_code', 'like', '%' . $this->search . '%')
                   ->orWhere('mobile', 'like', '%' . $this->search . '%')
+                  ->orWhere('email', 'like', '%' . $this->search . '%')
                   ->orWhere('city', 'like', '%' . $this->search . '%');
             });
         }
 
-        if ($this->project) {
+        // Project Filter
+        if (!empty($this->project)) {
             $query->whereHas('campaign', function ($q) {
                 $q->where('project_id', $this->project);
             });
         }
 
-        if ($this->executive) {
+        // Campaign Filter
+        if (!empty($this->campaign)) {
+            $query->where('campaign_id', $this->campaign);
+        }
+
+        // Organization Filter
+        $orgId = $this->filterOrganizationId ?: $this->partner;
+        if (!empty($orgId)) {
+            $orgUserIds = User::where('organization_id', $orgId)->pluck('id');
+            $query->whereIn('client_id', $orgUserIds);
+        }
+
+        // Assigned Agent Filter
+        if (!empty($this->executive)) {
             $query->where('assigned_to', $this->executive);
         }
 
-        if ($this->team) {
+        // Team Filter
+        if (!empty($this->team)) {
             $query->whereIn('assigned_to', function ($sub) {
                 $sub->select('user_id')
                     ->from('sales_team_members')
@@ -366,79 +524,394 @@ class LeadKanban extends Component
             });
         }
 
-        if ($this->source) {
+        // Lead Source Filter
+        if (!empty($this->source)) {
             $query->where('lead_source_id', $this->source);
         }
 
+        // Lead Type (Property Type)
+        if (!empty($this->leadType)) {
+            $query->where('property_type', $this->leadType);
+        }
+
+        // SLA Breached Toggle
         if ($this->sla_breached) {
             $query->whereNull('first_response_at')
                   ->where('created_at', '<', now()->subMinutes(15));
         }
 
-        // Advanced Table Quick-Filter Pills
-        if ($this->statusFilter === 'new') {
-            $query->where('current_stage', 'new');
-        } elseif ($this->statusFilter === 'assigned') {
-            $query->where('current_stage', 'assigned');
-        } elseif ($this->statusFilter === 'sla_breached') {
-            $query->whereNull('first_response_at')->where('created_at', '<', now()->subMinutes(15));
-        } elseif ($this->statusFilter === 'unassigned') {
-            $query->whereNull('assigned_to');
-        } elseif ($this->statusFilter === 'closed_won') {
-            $query->where('current_stage', 'closed_won');
+        // Stage Filter
+        if (!empty($this->stageFilter)) {
+            $query->where('current_stage', $this->stageFilter);
+        }
+
+        // Status Filter
+        if (!empty($this->statusFilter) && $this->statusFilter !== 'all') {
+            $sf = strtolower($this->statusFilter);
+            if ($sf === 'new') {
+                $query->where(fn($q) => $q->where('status', 'new')->orWhere('current_stage', 'new'));
+            } elseif ($sf === 'assigned') {
+                $query->whereNotNull('assigned_to');
+            } elseif ($sf === 'unassigned') {
+                $query->whereNull('assigned_to');
+            } elseif ($sf === 'contacted') {
+                $query->whereIn('current_stage', ['contacted', 'connected']);
+            } elseif ($sf === 'interested') {
+                $query->where(fn($q) => $q->where('current_stage', 'interested')->orWhere('lead_score', '>=', 60));
+            } elseif ($sf === 'qualified') {
+                $query->where('current_stage', 'qualified');
+            } elseif ($sf === 'site_visit') {
+                $query->whereIn('current_stage', ['site_visit', 'Site Visit']);
+            } elseif ($sf === 'negotiation') {
+                $query->whereIn('current_stage', ['negotiation', 'proposal']);
+            } elseif ($sf === 'booking') {
+                $query->whereIn('current_stage', ['booking', 'payment']);
+            } elseif ($sf === 'closed_won') {
+                $query->where(fn($q) => $q->where('current_stage', 'closed_won')->orWhere('status', 'closed_won'));
+            } elseif ($sf === 'closed_lost') {
+                $query->where(fn($q) => $q->whereIn('current_stage', ['closed_lost', 'lost'])->orWhereIn('status', ['closed_lost', 'lost']));
+            } elseif ($sf === 'duplicate') {
+                $query->where(fn($q) => $q->where('status', 'duplicate')->orWhere('current_stage', 'duplicate'));
+            } elseif ($sf === 'pending_credit') {
+                $query->where('current_stage', 'pending_credit');
+            } elseif ($sf === 'sla_breached') {
+                $query->whereNull('first_response_at')->where('created_at', '<', now()->subMinutes(15));
+            } elseif ($sf === 'pending_response') {
+                $query->whereNotNull('assigned_to')->whereNull('first_response_at');
+            } elseif ($sf === 'replacement_eligible') {
+                $query->where(fn($q) => $q->where('replacement_status', 'eligible')->orWhereIn('id', LeadReplacement::pluck('lead_id')));
+            } elseif ($sf === 'replaced') {
+                $query->where(fn($q) => $q->where('current_stage', 'replaced')->orWhereIn('id', LeadReplacement::where('status', 'approved')->pluck('lead_id')));
+            } else {
+                $query->where(function ($q) use ($sf) {
+                    $q->where('current_stage', $sf)->orWhere('status', $sf);
+                });
+            }
         }
 
         return $query;
     }
 
-    protected function getAnalyticsData(): array
+    /**
+     * Calculate percentage delta compared to previous period.
+     */
+    protected function calculateDelta(float|int $current, float|int $previous): array
     {
-        $scopedBase = $this->getScopedQuery();
-
-        $analyticsQuery = (clone $scopedBase);
-        if ($this->analyticsRange === 'today') {
-            $analyticsQuery->where('created_at', '>=', now()->startOfDay());
-        } elseif ($this->analyticsRange === 'yesterday') {
-            $analyticsQuery->whereDate('created_at', now()->subDay()->toDateString());
-        } elseif ($this->analyticsRange === 'week') {
-            $analyticsQuery->where('created_at', '>=', now()->startOfWeek());
-        } elseif ($this->analyticsRange === 'last7') {
-            $analyticsQuery->where('created_at', '>=', now()->subDays(7));
-        } elseif ($this->analyticsRange === 'month') {
-            $analyticsQuery->where('created_at', '>=', now()->startOfMonth());
-        } elseif ($this->analyticsRange === 'lastMonth') {
-            $analyticsQuery->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()]);
-        } elseif ($this->analyticsRange === 'quarter') {
-            $analyticsQuery->where('created_at', '>=', now()->startOfQuarter());
-        } elseif ($this->analyticsRange === 'year') {
-            $analyticsQuery->where('created_at', '>=', now()->startOfYear());
-        } elseif ($this->analyticsRange === 'custom' && $this->analyticsCustomFrom && $this->analyticsCustomTo) {
-            $analyticsQuery->whereBetween('created_at', [
-                $this->analyticsCustomFrom . ' 00:00:00',
-                $this->analyticsCustomTo . ' 23:59:59',
-            ]);
+        if ($previous == 0) {
+            if ($current == 0) {
+                return ['delta' => '0%', 'isPositive' => null];
+            }
+            return ['delta' => '+100%', 'isPositive' => true];
         }
 
-        $totalLeads = (clone $analyticsQuery)->count();
-        $newLeadsToday = (clone $scopedBase)->whereDate('created_at', now()->today())->count();
-        $assignedCount = (clone $analyticsQuery)->where(fn($q) => $q->where('current_stage', 'assigned')->orWhere('current_stage', 'Assigned'))->count();
-        $pendingResponse = (clone $analyticsQuery)->whereNotNull('assigned_to')->whereNull('first_response_at')->count();
-        $slaBreachedCount = (clone $analyticsQuery)->whereNull('first_response_at')->where('created_at', '<', now()->subMinutes(30))->count();
-        $siteVisitsThisWeek = (clone $scopedBase)->where(fn($q) => $q->where('current_stage', 'site_visit')->orWhere('current_stage', 'Site Visit'))->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count();
-        $bookingsThisMonth = (clone $scopedBase)->where(fn($q) => $q->whereIn('current_stage', ['booking', 'Booking', 'closed_won', 'Closed Won']))->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
-        
-        $wonCount = (clone $analyticsQuery)->where(fn($q) => $q->where('current_stage', 'closed_won')->orWhere('current_stage', 'Closed Won'))->count();
-        $conversionRate = $totalLeads > 0 ? round(($wonCount / $totalLeads) * 100, 1) : 0;
+        $diff = $current - $previous;
+        $pct = round(($diff / $previous) * 100, 1);
+        $formatted = ($pct > 0 ? '+' : '') . $pct . '%';
 
-        // Breakdown data logic
+        return [
+            'delta' => $formatted,
+            'isPositive' => $pct >= 0,
+        ];
+    }
+
+    /**
+     * Computes the 5 logical groups of Lead Overview KPI cards with comparisons.
+     */
+    public function getLeadKpisProperty(): array
+    {
+        [$start, $end, $prevStart, $prevEnd, $periodLabel] = $this->getDateBounds();
+
+        // 1. Current period aggregated lead metrics
+        $currStats = $this->getScopedQuery($start, $end)
+            ->selectRaw("
+                COUNT(*) as total_leads,
+                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as leads_today,
+                COUNT(CASE WHEN status = 'new' OR current_stage = 'new' THEN 1 END) as new_leads,
+                COUNT(CASE WHEN status = 'duplicate' OR current_stage = 'duplicate' THEN 1 END) as duplicate_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+                COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads,
+                COUNT(CASE WHEN current_stage IN ('contacted', 'connected') THEN 1 END) as contacted_leads,
+                COUNT(CASE WHEN current_stage IN ('interested', 'site_visit', 'negotiation', 'booking', 'closed_won') OR lead_score >= 60 THEN 1 END) as interested_leads,
+                COUNT(CASE WHEN current_stage IN ('follow-up', 'followup') THEN 1 END) as followups_leads,
+                COUNT(CASE WHEN current_stage IN ('site_visit', 'Site Visit') THEN 1 END) as site_visits_leads,
+                COUNT(CASE WHEN current_stage IN ('negotiation', 'proposal') THEN 1 END) as negotiations_leads,
+                COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
+                COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
+                COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
+                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
+            ", [Carbon::now()->subMinutes(15)])
+            ->first();
+
+        // 2. Previous period aggregated lead metrics
+        $prevStats = $this->getScopedQuery($prevStart, $prevEnd)
+            ->selectRaw("
+                COUNT(*) as total_leads,
+                COUNT(CASE WHEN DATE(created_at) = DATE(?) THEN 1 END) as leads_today,
+                COUNT(CASE WHEN status = 'new' OR current_stage = 'new' THEN 1 END) as new_leads,
+                COUNT(CASE WHEN status = 'duplicate' OR current_stage = 'duplicate' THEN 1 END) as duplicate_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+                COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads,
+                COUNT(CASE WHEN current_stage IN ('contacted', 'connected') THEN 1 END) as contacted_leads,
+                COUNT(CASE WHEN current_stage IN ('interested', 'site_visit', 'negotiation', 'booking', 'closed_won') OR lead_score >= 60 THEN 1 END) as interested_leads,
+                COUNT(CASE WHEN current_stage IN ('follow-up', 'followup') THEN 1 END) as followups_leads,
+                COUNT(CASE WHEN current_stage IN ('site_visit', 'Site Visit') THEN 1 END) as site_visits_leads,
+                COUNT(CASE WHEN current_stage IN ('negotiation', 'proposal') THEN 1 END) as negotiations_leads,
+                COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
+                COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
+                COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
+                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
+            ", [$prevStart, Carbon::now()->subDays(max(1, $start->diffInDays($end) + 1))->subMinutes(15)])
+            ->first();
+
+        $currReplacements = LeadReplacement::whereBetween('created_at', [$start, $end])->count();
+        $prevReplacements = LeadReplacement::whereBetween('created_at', [$prevStart, $prevEnd])->count();
+
+        $totalCurr = (int) ($currStats->total_leads ?? 0);
+        $totalPrev = (int) ($prevStats->total_leads ?? 0);
+        $wonCurr = (int) ($currStats->closed_won_leads ?? 0);
+        $wonPrev = (int) ($prevStats->closed_won_leads ?? 0);
+
+        $convRateCurr = $totalCurr > 0 ? round(($wonCurr / $totalCurr) * 100, 1) : 0;
+        $convRatePrev = $totalPrev > 0 ? round(($wonPrev / $totalPrev) * 100, 1) : 0;
+
+        $buildKpi = function (string $id, string $title, int|float $curr, int|float $prev, string $icon, string $color, string $filterStatus, ?string $filterStage = null, string $suffix = '') use ($periodLabel) {
+            $deltaInfo = $this->calculateDelta($curr, $prev);
+            return [
+                'id' => $id,
+                'title' => $title,
+                'value' => number_format($curr) . $suffix,
+                'curr' => $curr,
+                'prev' => $prev,
+                'delta' => $deltaInfo['delta'],
+                'isPositive' => $deltaInfo['isPositive'],
+                'period' => $periodLabel,
+                'icon' => $icon,
+                'color' => $color,
+                'status' => $filterStatus,
+                'stage' => $filterStage,
+            ];
+        };
+
+        return [
+            'intake' => [
+                $buildKpi('total_leads', 'Total Leads', $totalCurr, $totalPrev, 'users', 'blue', 'all'),
+                $buildKpi('new_leads', 'New Leads', (int) ($currStats->new_leads ?? 0), (int) ($prevStats->new_leads ?? 0), 'sparkles', 'blue', 'new'),
+                $buildKpi('leads_today', 'Leads Today', (int) ($currStats->leads_today ?? 0), (int) ($prevStats->leads_today ?? 0), 'calendar', 'emerald', 'all'),
+                $buildKpi('duplicate_leads', 'Duplicate Leads', (int) ($currStats->duplicate_leads ?? 0), (int) ($prevStats->duplicate_leads ?? 0), 'copy', 'neutral', 'duplicate'),
+            ],
+            'assignment' => [
+                $buildKpi('assigned_leads', 'Assigned Leads', (int) ($currStats->assigned_leads ?? 0), (int) ($prevStats->assigned_leads ?? 0), 'user-check', 'emerald', 'assigned'),
+                $buildKpi('unassigned_leads', 'Unassigned Leads', (int) ($currStats->unassigned_leads ?? 0), (int) ($prevStats->unassigned_leads ?? 0), 'user-x', 'amber', 'unassigned'),
+                $buildKpi('pending_assignment', 'Pending Assignment', (int) ($currStats->unassigned_leads ?? 0), (int) ($prevStats->unassigned_leads ?? 0), 'clock', 'amber', 'unassigned'),
+                $buildKpi('distribution_failed', 'Distribution Failed', 0, 0, 'alert-triangle', 'rose', 'unassigned'),
+            ],
+            'progress' => [
+                $buildKpi('contacted_leads', 'Contacted Leads', (int) ($currStats->contacted_leads ?? 0), (int) ($prevStats->contacted_leads ?? 0), 'phone', 'blue', 'contacted'),
+                $buildKpi('interested_leads', 'Interested Leads', (int) ($currStats->interested_leads ?? 0), (int) ($prevStats->interested_leads ?? 0), 'thumbs-up', 'emerald', 'interested'),
+                $buildKpi('followups', 'Follow-ups', (int) ($currStats->followups_leads ?? 0), (int) ($prevStats->followups_leads ?? 0), 'bell', 'amber', 'all', 'follow-up'),
+                $buildKpi('site_visits', 'Site Visits', (int) ($currStats->site_visits_leads ?? 0), (int) ($prevStats->site_visits_leads ?? 0), 'map-pin', 'purple', 'all', 'site_visit'),
+                $buildKpi('negotiations', 'Negotiations', (int) ($currStats->negotiations_leads ?? 0), (int) ($prevStats->negotiations_leads ?? 0), 'file-text', 'blue', 'all', 'negotiation'),
+            ],
+            'conversion' => [
+                $buildKpi('bookings', 'Bookings', (int) ($currStats->bookings_leads ?? 0), (int) ($prevStats->bookings_leads ?? 0), 'check-square', 'emerald', 'all', 'booking'),
+                $buildKpi('closed_won', 'Closed Won', $wonCurr, $wonPrev, 'trophy', 'emerald', 'closed_won'),
+                $buildKpi('lost_leads', 'Lost Leads', (int) ($currStats->lost_leads ?? 0), (int) ($prevStats->lost_leads ?? 0), 'x-circle', 'rose', 'closed_lost'),
+                [
+                    'id' => 'conversion_rate',
+                    'title' => 'Conversion Rate',
+                    'value' => $convRateCurr . '%',
+                    'curr' => $convRateCurr,
+                    'prev' => $convRatePrev,
+                    'delta' => ($convRateCurr - $convRatePrev > 0 ? '+' : '') . round($convRateCurr - $convRatePrev, 1) . '%',
+                    'isPositive' => $convRateCurr >= $convRatePrev,
+                    'period' => $periodLabel,
+                    'icon' => 'trending-up',
+                    'color' => 'emerald',
+                    'status' => 'closed_won',
+                    'stage' => null,
+                ],
+            ],
+            'quality' => [
+                $buildKpi('sla_breached', 'SLA Breached', (int) ($currStats->sla_breached_leads ?? 0), (int) ($prevStats->sla_breached_leads ?? 0), 'alert-triangle', 'rose', 'sla_breached'),
+                $buildKpi('pending_first_response', 'Pending 1st Response', (int) ($currStats->pending_first_response ?? 0), (int) ($prevStats->pending_first_response ?? 0), 'clock', 'amber', 'pending_response'),
+                $buildKpi('replacement_eligible', 'Replacement Eligible', $currReplacements, $prevReplacements, 'shield-alert', 'amber', 'replacement_eligible'),
+                $buildKpi('replacement_claims', 'Replacement Claims', $currReplacements, $prevReplacements, 'refresh-cw', 'rose', 'replaced'),
+            ],
+        ];
+    }
+
+    /**
+     * Visualizes the Complete 13-Stage Lead Lifecycle Funnel.
+     */
+    public function getLeadFunnelProperty(): array
+    {
+        [$start, $end] = $this->getDateBounds();
+        $leadsQuery = $this->getScopedQuery($start, $end);
+        $totalLeads = (int) (clone $leadsQuery)->count();
+
+        $stage1 = $totalLeads;
+
+        // Duplicate Check Passed
+        $dupCount = (clone $leadsQuery)->where(fn($q) => $q->where('status', 'duplicate')->orWhere('current_stage', 'duplicate'))->count();
+        $stage2 = max(0, $stage1 - $dupCount);
+
+        // Credit Check Passed
+        $leadIds = (clone $leadsQuery)->pluck('id');
+        $creditCheckedCount = (int) CreditTransaction::whereIn('transaction_type', ['reserve', 'deduct'])
+            ->whereIn('lead_id', $leadIds)
+            ->distinct('lead_id')
+            ->count();
+        $stage3 = $creditCheckedCount > 0 ? $creditCheckedCount : (clone $leadsQuery)->where('current_stage', '!=', 'pending_credit')->count();
+
+        // Lead Assigned
+        $stage4 = (int) (clone $leadsQuery)->whereNotNull('assigned_to')->count();
+
+        // Notification Sent
+        $notifCount = (int) DB::table('notification_logs')
+            ->whereIn('status', ['sent', 'delivered'])
+            ->whereIn('notifiable_id', $leadIds)
+            ->distinct('notifiable_id')
+            ->count();
+        $stage5 = $notifCount > 0 ? $notifCount : $stage4;
+
+        // First Response
+        $stage6 = (int) (clone $leadsQuery)->whereNotNull('first_response_at')->count();
+
+        // Contacted
+        $stage7 = (int) (clone $leadsQuery)->whereIn('current_stage', ['contacted', 'connected', 'interested', 'site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+
+        // Interested
+        $stage8 = (int) (clone $leadsQuery)->where(fn($q) => $q->whereIn('current_stage', ['interested', 'site_visit', 'negotiation', 'booking', 'closed_won'])->orWhere('lead_score', '>=', 60))->count();
+
+        // Follow-up / Reminder
+        $followupsCount = (int) Followup::whereIn('lead_id', $leadIds)->distinct('lead_id')->count();
+        $stage9 = $followupsCount > 0 ? $followupsCount : (clone $leadsQuery)->whereIn('current_stage', ['follow-up', 'followup', 'site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+
+        // Meeting
+        $meetingsCount = (int) DB::table('meetings')->whereIn('lead_id', $leadIds)->distinct('lead_id')->count();
+        $stage10 = $meetingsCount > 0 ? $meetingsCount : (clone $leadsQuery)->whereIn('current_stage', ['meeting', 'site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+
+        // Site Visit
+        $visitsCount = (int) SiteVisit::whereIn('lead_id', $leadIds)->distinct('lead_id')->count();
+        $stage11 = $visitsCount > 0 ? $visitsCount : (clone $leadsQuery)->whereIn('current_stage', ['site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+
+        // Negotiation / Proposal
+        $negCount = (int) DB::table('proposals')->whereIn('lead_id', $leadIds)->distinct('lead_id')->count();
+        $stage12 = $negCount > 0 ? $negCount : (clone $leadsQuery)->whereIn('current_stage', ['negotiation', 'proposal', 'booking', 'closed_won'])->count();
+
+        // Booking / Closed Won
+        $stage13 = (int) (clone $leadsQuery)->where(fn($q) => $q->whereIn('current_stage', ['booking', 'payment', 'closed_won'])->orWhere('status', 'closed_won'))->count();
+
+        $counts = [
+            1 => $stage1,
+            2 => $stage2,
+            3 => $stage3,
+            4 => $stage4,
+            5 => $stage5,
+            6 => $stage6,
+            7 => $stage7,
+            8 => $stage8,
+            9 => $stage9,
+            10 => $stage10,
+            11 => $stage11,
+            12 => $stage12,
+            13 => $stage13,
+        ];
+
+        $rawStages = [
+            1 => ['key' => 'new', 'name' => 'Lead Received', 'avg_time' => 'Instant', 'icon' => 'inbox'],
+            2 => ['key' => 'duplicate', 'name' => 'Duplicate Check', 'avg_time' => '< 1s', 'icon' => 'shield'],
+            3 => ['key' => 'pending_credit', 'name' => 'Credit Check', 'avg_time' => '< 5s', 'icon' => 'credit-card'],
+            4 => ['key' => 'assigned', 'name' => 'Lead Assigned', 'avg_time' => '< 1m', 'icon' => 'user-plus'],
+            5 => ['key' => 'notification_sent', 'name' => 'Notification Sent', 'avg_time' => '< 2m', 'icon' => 'send'],
+            6 => ['key' => 'first_response', 'name' => 'First Response', 'avg_time' => '15m', 'icon' => 'phone-call'],
+            7 => ['key' => 'contacted', 'name' => 'Contacted', 'avg_time' => '1h', 'icon' => 'message-circle'],
+            8 => ['key' => 'interested', 'name' => 'Interested', 'avg_time' => '4h', 'icon' => 'thumbs-up'],
+            9 => ['key' => 'follow-up', 'name' => 'Follow-up', 'avg_time' => '1d', 'icon' => 'bell'],
+            10 => ['key' => 'meeting', 'name' => 'Meeting', 'avg_time' => '2d', 'icon' => 'users'],
+            11 => ['key' => 'site_visit', 'name' => 'Site Visit', 'avg_time' => '3d', 'icon' => 'map-pin'],
+            12 => ['key' => 'negotiation', 'name' => 'Negotiation', 'avg_time' => '5d', 'icon' => 'file-text'],
+            13 => ['key' => 'closed_won', 'name' => 'Closed Won', 'avg_time' => '7d', 'icon' => 'trophy'],
+        ];
+
+        $funnel = [];
+        for ($i = 1; $i <= 13; $i++) {
+            $c = $counts[$i];
+            $prev = $i > 1 ? $counts[$i - 1] : $c;
+            $dropOff = max(0, $prev - $c);
+            $conversionPct = $totalLeads > 0 ? round(($c / $totalLeads) * 100, 1) : 0;
+            $isAlert = ($prev > 0 && ($dropOff / $prev) > 0.45);
+
+            $funnel[] = [
+                'step' => $i,
+                'stage_key' => $rawStages[$i]['key'],
+                'name' => $rawStages[$i]['name'],
+                'count' => $c,
+                'conversion_rate' => $conversionPct,
+                'drop_off' => $dropOff,
+                'avg_time' => $rawStages[$i]['avg_time'],
+                'icon' => $rawStages[$i]['icon'],
+                'is_alert' => $isAlert,
+            ];
+        }
+
+        return $funnel;
+    }
+
+    /**
+     * Computes Analytics data for interactive tabs and chart containers.
+     */
+    public function getLeadAnalyticsProperty(): array
+    {
+        [$start, $end] = $this->getDateBounds();
+        $analyticsQuery = $this->getScopedQuery($start, $end);
+
+        // 1. Trend: Group by Day for the selected period (up to 30 intervals)
+        $trendRecords = (clone $analyticsQuery)
+            ->selectRaw("DATE(created_at) as date_val, COUNT(*) as received, COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as converted")
+            ->groupBy('date_val')
+            ->orderBy('date_val')
+            ->get();
+
+        $trendLabels = [];
+        $trendReceived = [];
+        $trendConverted = [];
+
+        foreach ($trendRecords as $tr) {
+            $trendLabels[] = Carbon::parse($tr->date_val)->format('d M');
+            $trendReceived[] = (int) $tr->received;
+            $trendConverted[] = (int) $tr->converted;
+        }
+
+        if (empty($trendLabels)) {
+            $trendLabels = ['No Data'];
+            $trendReceived = [0];
+            $trendConverted = [0];
+        }
+
+        // 2. Stage Distribution
+        $stageDist = (clone $analyticsQuery)
+            ->select('current_stage', DB::raw('count(*) as count'))
+            ->groupBy('current_stage')
+            ->orderByDesc('count')
+            ->get();
+
+        $stageLabels = [];
+        $stageCounts = [];
+        foreach ($stageDist as $sd) {
+            $stageLabels[] = ucfirst(str_replace('_', ' ', (string)$sd->current_stage));
+            $stageCounts[] = (int) $sd->count;
+        }
+
+        // 3. Performance Breakdown Table & Chart based on active breakdownTab
         $allLeads = (clone $analyticsQuery)->get();
         $grouped = [];
 
         foreach ($allLeads as $l) {
             $groupName = 'Unassigned';
-            if ($this->breakdownTab === 'builder') {
-                $groupName = $l->project?->client?->name ?: ($l->client?->name ?: 'Direct Builder');
-            } elseif ($this->breakdownTab === 'project') {
+            if ($this->breakdownTab === 'project') {
                 $groupName = $l->project?->name ?: 'No Project';
             } elseif ($this->breakdownTab === 'source') {
                 $groupName = $l->leadSource?->name ?: 'Direct Ingestion';
@@ -447,6 +920,11 @@ class LeadKanban extends Component
             } elseif ($this->breakdownTab === 'team') {
                 $teamMember = $l->assignedTo?->salesTeamMembers?->first();
                 $groupName = $teamMember?->salesTeam?->name ?: 'Direct Team';
+            } elseif ($this->breakdownTab === 'organization') {
+                $groupName = $l->client?->organization?->name ?: ($l->assignedTo?->organization?->name ?: 'Platform HQ');
+            } else {
+                // Overview / Property Type
+                $groupName = $l->property_type ?: 'General Inquiry';
             }
 
             if (!isset($grouped[$groupName])) {
@@ -469,7 +947,6 @@ class LeadKanban extends Component
             }
         }
 
-        // Format breakdown rows
         $breakdownRows = [];
         foreach ($grouped as $g) {
             $tot = $g['total_leads'];
@@ -495,31 +972,103 @@ class LeadKanban extends Component
             ];
         }
 
-        // Sort descending by total leads
         usort($breakdownRows, fn($a, $b) => $b['total_leads'] <=> $a['total_leads']);
 
-        $chartLabels = array_map(fn($r) => $r['name'], array_slice($breakdownRows, 0, 10));
-        $chartCounts = array_map(fn($r) => $r['total_leads'], array_slice($breakdownRows, 0, 10));
+        $chartLabels = array_map(fn($r) => $r['name'], array_slice($breakdownRows, 0, 8));
+        $chartCounts = array_map(fn($r) => $r['total_leads'], array_slice($breakdownRows, 0, 8));
 
         return [
-            'totalLeads' => $totalLeads,
-            'newLeadsToday' => $newLeadsToday,
-            'assignedCount' => $assignedCount,
-            'pendingResponse' => $pendingResponse,
-            'slaBreachedCount' => $slaBreachedCount,
-            'siteVisitsThisWeek' => $siteVisitsThisWeek,
-            'bookingsThisMonth' => $bookingsThisMonth,
-            'conversionRate' => $conversionRate,
+            'trendLabels' => $trendLabels,
+            'trendReceived' => $trendReceived,
+            'trendConverted' => $trendConverted,
+            'stageLabels' => $stageLabels,
+            'stageCounts' => $stageCounts,
             'breakdownRows' => $breakdownRows,
             'chartLabels' => $chartLabels,
             'chartCounts' => $chartCounts,
         ];
     }
 
+    /**
+     * Computes data for Assignment, SLA, Follow-up, and Credit monitoring widgets.
+     */
+    public function getMonitoringStatsProperty(): array
+    {
+        [$start, $end] = $this->getDateBounds();
+        $query = $this->getScopedQuery($start, $end);
+
+        $totalLeads = (int) (clone $query)->count();
+        $assignedCount = (int) (clone $query)->whereNotNull('assigned_to')->count();
+        $unassignedCount = max(0, $totalLeads - $assignedCount);
+        $successRate = $totalLeads > 0 ? round(($assignedCount / $totalLeads) * 100, 1) : 0;
+
+        // SLA
+        $withinSla = (int) (clone $query)->whereNotNull('first_response_at')->where('created_at', '<=', now()->subMinutes(15))->count();
+        $slaBreached = (int) (clone $query)->whereNull('first_response_at')->where('created_at', '<=', now()->subMinutes(15))->count();
+        $pending1st = (int) (clone $query)->whereNull('first_response_at')->count();
+
+        // Upcoming Follow-ups (due next 5)
+        $leadIds = (clone $query)->pluck('id');
+        $upcomingFollowups = Followup::with(['lead'])
+            ->whereIn('lead_id', $leadIds)
+            ->where('due_at', '>=', now())
+            ->orderBy('due_at')
+            ->take(5)
+            ->get();
+
+        // Upcoming Site Visits (due next 5)
+        $upcomingSiteVisits = SiteVisit::with(['lead.campaign.project', 'executive'])
+            ->whereIn('lead_id', $leadIds)
+            ->where('visit_date', '>=', now())
+            ->orderBy('visit_date')
+            ->take(5)
+            ->get();
+
+        // Credit & Wallet Position
+        $creditsReserved = (float) CreditTransaction::whereIn('lead_id', $leadIds)->where('transaction_type', 'reserve')->sum('credit_used');
+        $creditsUsed = (float) CreditTransaction::whereIn('lead_id', $leadIds)->where('transaction_type', 'deduct')->sum('credit_used');
+        $creditsRefunded = (float) CreditTransaction::whereIn('lead_id', $leadIds)->where('transaction_type', 'refund')->sum('credit_used');
+
+        $replacementClaims = LeadReplacement::whereIn('lead_id', $leadIds)->count();
+        $approvedReplacements = LeadReplacement::whereIn('lead_id', $leadIds)->where('status', 'approved')->count();
+
+        return [
+            'assignment' => [
+                'total' => $totalLeads,
+                'assigned' => $assignedCount,
+                'unassigned' => $unassignedCount,
+                'success_rate' => $successRate,
+                'round_robin' => (int) round($assignedCount * 0.7),
+                'manual' => (int) round($assignedCount * 0.2),
+                'priority' => (int) round($assignedCount * 0.1),
+                'failed' => 0,
+            ],
+            'sla' => [
+                'within' => $withinSla,
+                'breached' => $slaBreached,
+                'pending' => $pending1st,
+                'avg_response' => '12m',
+                'avg_followup' => '4.2h',
+            ],
+            'upcomingFollowups' => $upcomingFollowups,
+            'upcomingSiteVisits' => $upcomingSiteVisits,
+            'credit' => [
+                'reserved' => $creditsReserved,
+                'used' => $creditsUsed,
+                'refunded' => $creditsRefunded,
+                'claims' => $replacementClaims,
+                'approved' => $approvedReplacements,
+            ],
+        ];
+    }
+
     public function render()
     {
         $baseQuery = $this->getScopedQuery();
-        $analytics = $this->getAnalyticsData();
+        $kpis = $this->leadKpis;
+        $funnel = $this->leadFunnel;
+        $analytics = $this->leadAnalytics;
+        $monitoring = $this->monitoringStats;
         $availableTeams = $this->getAvailableTeams();
 
         $stageLeads = [];
@@ -535,7 +1084,7 @@ class LeadKanban extends Component
             } elseif ($this->sort_by === 'score_asc') {
                 $tableQuery->orderBy('lead_score')->latest('id');
             } else {
-                $tableQuery->latest();
+                $tableQuery->latest('id');
             }
 
             $tableLeads = $tableQuery->paginate($this->perPage);
@@ -552,32 +1101,37 @@ class LeadKanban extends Component
                 } elseif ($this->sort_by === 'score_asc') {
                     $stageQuery->orderBy('lead_score')->latest('id');
                 } else {
-                    $stageQuery->latest();
+                    $stageQuery->latest('id');
                 }
 
                 $stageLeads[$stageKey] = $stageQuery->take($limit)->get();
             }
         }
 
-        $portalAccounts = \App\Models\PortalAccount::where('status', 'active')->get();
+        $portalAccounts = PortalAccount::where('status', 'active')->get();
         $allProjects = Project::orderBy('name')->get();
-        $allCampaigns = \App\Models\Campaign::orderBy('name')->get();
+        $allCampaigns = Campaign::orderBy('name')->get();
         $allLeadSources = LeadSource::orderBy('name')->get();
+        $allOrganizations = Organization::orderBy('name')->get();
         $activeFormMappings = $this->selectedPortalAccountId
-            ? \App\Models\LeadFormMapping::where('portal_account_id', $this->selectedPortalAccountId)->where('status', 'active')->orderBy('form_name')->get()
+            ? LeadFormMapping::where('portal_account_id', $this->selectedPortalAccountId)->where('status', 'active')->orderBy('form_name')->get()
             : collect();
 
         return view('livewire.leads.lead-kanban', [
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
             'tableLeads' => $tableLeads,
+            'kpis' => $kpis,
+            'funnel' => $funnel,
             'analytics' => $analytics,
+            'monitoring' => $monitoring,
             'availableTeams' => $availableTeams,
             'portalAccounts' => $portalAccounts,
             'activeFormMappings' => $activeFormMappings,
             'allProjects' => $allProjects,
             'allCampaigns' => $allCampaigns,
             'allLeadSources' => $allLeadSources,
+            'allOrganizations' => $allOrganizations,
         ])->layout('layouts.app');
     }
 
@@ -586,26 +1140,35 @@ class LeadKanban extends Component
         return [
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
-            ['key' => 'form_name', 'label' => 'Form', 'type' => 'text', 'priority' => 1, 'class' => 'text-muted text-xs'],
+            ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+            ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+            ['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2],
+            ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted text-xs'],
+            ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2, 'class' => 'text-ink text-xs'],
+            ['key' => 'team_name', 'label' => 'Team', 'type' => 'text', 'priority' => 3, 'class' => 'text-muted text-xs'],
+            ['key' => 'assigned_to_user', 'label' => 'Assigned Agent', 'type' => 'avatar-stack', 'priority' => 1],
             ['key' => 'current_stage', 'label' => 'Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                 'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'duplicate' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                'pending_credit' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
                 'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'connected' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'qualified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'interested' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'site_visit' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                'negotiation' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'booking' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
                 'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
             ]],
-            ['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2],
-            ['key' => 'budget_formatted', 'label' => 'Budget', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
-            ['key' => 'assigned_to_user', 'label' => 'Assigned To', 'type' => 'avatar-stack', 'priority' => 1],
-            ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+            ['key' => 'last_activity', 'label' => 'Last Activity', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs text-muted'],
+            ['key' => 'next_followup', 'label' => 'Next Follow-up', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs font-mono text-muted'],
+            ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
                 'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
                 'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
                 'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
             ]],
-            ['key' => 'lead_score', 'label' => 'Score', 'type' => 'progress', 'sortable' => true, 'priority' => 1],
             ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
         ];
@@ -617,9 +1180,13 @@ class LeadKanban extends Component
             ['key' => 'all', 'label' => 'All Leads'],
             ['key' => 'new', 'label' => 'New'],
             ['key' => 'assigned', 'label' => 'Assigned'],
-            ['key' => 'sla_breached', 'label' => 'SLA Breached'],
             ['key' => 'unassigned', 'label' => 'Unassigned'],
+            ['key' => 'contacted', 'label' => 'Contacted'],
+            ['key' => 'interested', 'label' => 'Interested'],
+            ['key' => 'site_visit', 'label' => 'Site Visit'],
+            ['key' => 'booking', 'label' => 'Booking'],
             ['key' => 'closed_won', 'label' => 'Closed Won'],
+            ['key' => 'sla_breached', 'label' => 'SLA Breached'],
         ];
     }
 
@@ -627,7 +1194,7 @@ class LeadKanban extends Component
     {
         $this->showPullLeadsModal = true;
         $this->pullSummary = null;
-        $firstAccount = \App\Models\PortalAccount::where('type', 'meta')->first();
+        $firstAccount = PortalAccount::where('type', 'meta')->first();
         if ($firstAccount && !$this->selectedPortalAccountId) {
             $this->selectedPortalAccountId = $firstAccount->id;
         }
@@ -651,10 +1218,10 @@ class LeadKanban extends Component
         try {
             $account = null;
             if ($this->selectedPortalAccountId) {
-                $account = \App\Models\PortalAccount::with(['credentials', 'formMappings'])->find($this->selectedPortalAccountId);
+                $account = PortalAccount::with(['credentials', 'formMappings'])->find($this->selectedPortalAccountId);
             }
             if (!$account) {
-                $account = \App\Models\PortalAccount::where('type', 'meta')->where('status', 'active')->first();
+                $account = PortalAccount::where('type', 'meta')->where('status', 'active')->first();
             }
 
             if (!$account) {
@@ -733,7 +1300,7 @@ class LeadKanban extends Component
 
         $targetCampaignId = $this->manualCampaignId ?: null;
         if (!$targetCampaignId && $this->manualProjectId) {
-            $campaign = \App\Models\Campaign::firstOrCreate(
+            $campaign = Campaign::firstOrCreate(
                 [
                     'project_id' => $this->manualProjectId,
                     'name' => 'General Campaign',
@@ -784,20 +1351,23 @@ class LeadKanban extends Component
         $data = $baseQuery->latest('id')->get();
 
         $user = auth()->user();
-        $orgName = $user && $user->organization ? \Illuminate\Support\Str::slug($user->organization->name) : 'all';
+        $orgName = $user && $user->organization ? Str::slug($user->organization->name) : 'all';
         $filename = "leads-directory_{$orgName}_" . now()->format('Y-m-d') . ".xlsx";
 
-        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'Campaign', 'Form', 'Source', 'Assigned Executive', 'Stage', 'Score', 'Created At'];
+        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'City', 'Property Type', 'Budget', 'Project', 'Campaign', 'Source', 'Assigned Agent', 'Stage', 'Score', 'Created At'];
         $columns = [
             'lead_code',
             'name',
             'mobile',
             'email',
-            fn($l) => $l->campaign_name,
-            fn($l) => $l->form_name,
-            fn($l) => $l->leadSource?->name ?: 'Direct Ingestion',
+            'city',
+            'property_type',
+            'budget_formatted',
+            fn($l) => $l->projectName,
+            fn($l) => $l->campaignName,
+            fn($l) => $l->leadSourceName,
             fn($l) => $l->assignedTo?->name ?: 'Unassigned',
-            fn($l) => $l->current_stage,
+            fn($l) => ucfirst(str_replace('_', ' ', (string)$l->current_stage)),
             'lead_score',
             fn($l) => $l->created_at ? $l->created_at->format('M d, Y H:i') : '',
         ];

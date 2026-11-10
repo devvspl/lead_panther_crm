@@ -43,7 +43,8 @@ class DashboardShell extends Component
 
     // View Controls
     public string $trendInterval = 'daily'; // 'daily', 'weekly', 'monthly'
-    public string $activeActivityTab = 'leads'; // 'leads', 'sla', 'assignments', 'credit', 'audit'
+    public string $activeActivityTab = 'leads'; // 'leads', 'followups', 'sla', 'transactions', 'replacements', 'notifications'
+    public string $activeKpiGroup = 'overview'; // 'overview', 'conversion', 'sla', 'credit'
 
     public function mount(?string $role = null): void
     {
@@ -60,6 +61,12 @@ class DashboardShell extends Component
 
         $user = auth()->user();
         $this->role = NavigationConfig::getRoleKey($user);
+    }
+
+    public function applyFilters(): void
+    {
+        // Triggers reactive query re-evaluation in Livewire
+        $this->dispatch('$refresh');
     }
 
     public function resetFilters(): void
@@ -87,6 +94,11 @@ class DashboardShell extends Component
     public function setActiveActivityTab(string $tab): void
     {
         $this->activeActivityTab = $tab;
+    }
+
+    public function setActiveKpiGroup(string $group): void
+    {
+        $this->activeKpiGroup = $group;
     }
 
     /**
@@ -491,6 +503,152 @@ class DashboardShell extends Component
     }
 
     /**
+     * Groups KPIs into 5 Hero Headlines and 4 Logical Summary Categories
+     * (Lead Overview, Lead Conversion, SLA & Performance, Credit & Revenue).
+     */
+    public function getGroupedKpisProperty(): array
+    {
+        $kpis = collect($this->adminKpis)->keyBy('id');
+        [$start, $end] = $this->getDateBounds();
+
+        // Calculate Average First Response Time
+        $avgResponseMin = Lead::withoutGlobalScopes()
+            ->whereBetween('created_at', [$start, $end])
+            ->whereNotNull('first_response_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, first_response_at)) as avg_min')
+            ->value('avg_min');
+
+        $avgResponseFormatted = $avgResponseMin !== null
+            ? ($avgResponseMin < 60 ? round($avgResponseMin) . ' min' : round($avgResponseMin / 60, 1) . ' hrs')
+            : '< 15 min';
+
+        // Conversion Rate %
+        $totalLeads = $kpis['total_leads']['raw_value'] ?? 0;
+        $closedWon = $kpis['closed_won']['raw_value'] ?? 0;
+        $converted = $kpis['converted_leads']['raw_value'] ?? 0;
+        $conversionRate = $totalLeads > 0 ? round((($closedWon + $converted) / $totalLeads) * 100, 1) : 0.0;
+
+        // 1. Five Primary Hero KPI Cards
+        $hero = [
+            [
+                'id' => 'total_inbound',
+                'title' => 'Total Inbound Leads',
+                'value' => $kpis['total_leads']['value'] ?? '0',
+                'delta' => $kpis['total_leads']['delta'] ?? '0%',
+                'isPositive' => $kpis['total_leads']['isPositive'] ?? true,
+                'period' => $kpis['total_leads']['period'] ?? 'vs prior period',
+                'subtext' => ($kpis['leads_today']['value'] ?? '0') . ' received today',
+                'icon' => 'users',
+                'route' => route('leads.index'),
+                'badge' => 'Intake Flow',
+            ],
+            [
+                'id' => 'closed_deals',
+                'title' => 'Converted & Won Deals',
+                'value' => $kpis['closed_won']['value'] ?? '0',
+                'delta' => $conversionRate . '% rate',
+                'isPositive' => $conversionRate > 0,
+                'period' => 'conversion rate',
+                'subtext' => ($kpis['in_progress_leads']['value'] ?? '0') . ' active in progress',
+                'icon' => 'trophy',
+                'route' => route('leads.index'),
+                'badge' => 'Conversions',
+            ],
+            [
+                'id' => 'sla_speed',
+                'title' => 'SLA Breached Leads',
+                'value' => $kpis['sla_breached']['value'] ?? '0',
+                'delta' => $kpis['sla_breached']['delta'] ?? '0%',
+                'isPositive' => ($kpis['sla_breached']['raw_value'] ?? 0) === 0,
+                'period' => 'over 30m response',
+                'subtext' => 'Avg Response: ' . $avgResponseFormatted,
+                'icon' => 'alert-triangle',
+                'route' => route('leads.index'),
+                'badge' => 'Response Health',
+            ],
+            [
+                'id' => 'credit_supply',
+                'title' => 'Available Credit Pool',
+                'value' => $kpis['credits_available']['value'] ?? '0 Cr',
+                'delta' => '-' . ($kpis['credits_consumed']['value'] ?? '0 Cr'),
+                'isPositive' => true,
+                'period' => 'consumed in period',
+                'subtext' => 'Refunded: ' . ($kpis['credits_refunded']['value'] ?? '0 Cr'),
+                'icon' => 'wallet',
+                'route' => route('admin.credits'),
+                'badge' => 'Wallet Engine',
+            ],
+            [
+                'id' => 'platform_revenue',
+                'title' => 'Closed Won Revenue',
+                'value' => $kpis['total_revenue']['value'] ?? '₹0.00',
+                'delta' => $kpis['total_revenue']['delta'] ?? '0%',
+                'isPositive' => $kpis['total_revenue']['isPositive'] ?? true,
+                'period' => $kpis['total_revenue']['period'] ?? 'vs prior period',
+                'subtext' => 'Bookings & Wallet Purchases',
+                'icon' => 'dollar-sign',
+                'route' => route('reports.index'),
+                'badge' => 'Financials',
+            ],
+        ];
+
+        // 2. The Four Logical Metric Groups
+        $groups = [
+            'overview' => [
+                'title' => 'Lead Overview',
+                'subtitle' => 'Intake volume, duplicate protection and assignment status',
+                'icon' => 'users',
+                'metrics' => [
+                    ['label' => 'Total Leads Ingested', 'value' => $kpis['total_leads']['value'] ?? '0', 'delta' => $kpis['total_leads']['delta'] ?? '0%', 'isPositive' => $kpis['total_leads']['isPositive'] ?? true, 'route' => route('leads.index')],
+                    ['label' => 'New (Uncontacted)', 'value' => $kpis['new_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => null, 'route' => route('leads.index', ['status' => 'new'])],
+                    ['label' => 'Duplicate Protected', 'value' => $kpis['duplicate_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => null, 'route' => route('leads.index')],
+                    ['label' => 'High Intent Qualified', 'value' => $kpis['qualified_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => true, 'route' => route('leads.index')],
+                    ['label' => 'Assigned to Agents', 'value' => $kpis['assigned_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => true, 'route' => route('leads.index')],
+                    ['label' => 'Unassigned Hold Pool', 'value' => $kpis['unassigned_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => ($kpis['unassigned_leads']['raw_value'] ?? 0) === 0, 'route' => route('leads.index')],
+                ],
+            ],
+            'conversion' => [
+                'title' => 'Lead Conversion',
+                'subtitle' => 'Pipeline progression, deals closed and replacement claims',
+                'icon' => 'trending-up',
+                'metrics' => [
+                    ['label' => 'In Progress Leads', 'value' => $kpis['in_progress_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => null, 'route' => route('leads.index')],
+                    ['label' => 'Converted Stage', 'value' => $kpis['converted_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => true, 'route' => route('leads.index')],
+                    ['label' => 'Closed Won Deals', 'value' => $kpis['closed_won']['value'] ?? '0', 'delta' => $kpis['closed_won']['delta'] ?? '0%', 'isPositive' => $kpis['closed_won']['isPositive'] ?? true, 'route' => route('leads.index')],
+                    ['label' => 'Closed Lost / Dead', 'value' => $kpis['lost_leads']['value'] ?? '0', 'delta' => null, 'isPositive' => false, 'route' => route('leads.index')],
+                    ['label' => 'Replacement Claims', 'value' => $kpis['replacement_claims']['value'] ?? '0', 'delta' => null, 'isPositive' => ($kpis['replacement_claims']['raw_value'] ?? 0) === 0, 'route' => route('replacements.queue')],
+                ],
+            ],
+            'sla' => [
+                'title' => 'SLA & Performance',
+                'subtitle' => 'Response speed compliance and deal conversion rates',
+                'icon' => 'clock',
+                'metrics' => [
+                    ['label' => 'SLA Breached (>30m)', 'value' => $kpis['sla_breached']['value'] ?? '0', 'delta' => $kpis['sla_breached']['delta'] ?? '0%', 'isPositive' => ($kpis['sla_breached']['raw_value'] ?? 0) === 0, 'route' => route('leads.index')],
+                    ['label' => 'Avg First Response Speed', 'value' => $avgResponseFormatted, 'delta' => '< 15m target', 'isPositive' => true, 'route' => route('leads.index')],
+                    ['label' => 'Platform Conversion Rate', 'value' => $conversionRate . '%', 'delta' => $conversionRate > 0 ? 'Active' : '0.0%', 'isPositive' => $conversionRate > 0, 'route' => route('reports.index')],
+                ],
+            ],
+            'credit' => [
+                'title' => 'Credit & Revenue',
+                'subtitle' => 'Platform credit supply, consumption ledger and revenue',
+                'icon' => 'dollar-sign',
+                'metrics' => [
+                    ['label' => 'Active Available Credits', 'value' => $kpis['credits_available']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
+                    ['label' => 'Credits Consumed', 'value' => $kpis['credits_consumed']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => null, 'route' => route('admin.credits')],
+                    ['label' => 'Credits Refunded', 'value' => $kpis['credits_refunded']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
+                    ['label' => 'Total Platform Revenue', 'value' => $kpis['total_revenue']['value'] ?? '₹0.00', 'delta' => $kpis['total_revenue']['delta'] ?? '0%', 'isPositive' => true, 'route' => route('reports.index')],
+                ],
+            ],
+        ];
+
+        return [
+            'hero' => $hero,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
      * Visualizes the Complete 13-Stage Lead Journey Funnel with counts, conversion %, drop-offs, and avg time.
      */
     public function getAdminFunnelProperty(): array
@@ -514,7 +672,6 @@ class DashboardShell extends Component
             ->whereIn('lead_id', (clone $leadsQuery)->pluck('id'))
             ->distinct('lead_id')
             ->count();
-        // If no transactions yet, count leads with non-null lead_cost or stage != pending_credit
         $stage3 = $creditCheckedCount > 0 ? $creditCheckedCount : (clone $leadsQuery)->where('current_stage', '!=', 'pending_credit')->count();
 
         // Stage 4: Lead Assigned
@@ -566,12 +723,12 @@ class DashboardShell extends Component
         })->count();
 
         $rawStages = [
-            ['key' => 'received', 'name' => 'Lead Received', 'count' => $stage1, 'avg_time' => 'Instant', 'icon' => 'inbox'],
-            ['key' => 'duplicate_check', 'name' => 'Duplicate Check', 'count' => $stage2, 'avg_time' => '< 1 sec', 'icon' => 'shield'],
-            ['key' => 'credit_check', 'name' => 'Credit Check', 'count' => $stage3, 'avg_time' => '< 5 sec', 'icon' => 'credit-card'],
+            ['key' => 'all', 'name' => 'Lead Received', 'count' => $stage1, 'avg_time' => 'Instant', 'icon' => 'inbox'],
+            ['key' => 'duplicate', 'name' => 'Duplicate Check', 'count' => $stage2, 'avg_time' => '< 1 sec', 'icon' => 'shield'],
+            ['key' => 'pending_credit', 'name' => 'Credit Check', 'count' => $stage3, 'avg_time' => '< 5 sec', 'icon' => 'credit-card'],
             ['key' => 'assigned', 'name' => 'Lead Assigned', 'count' => $stage4, 'avg_time' => '< 1 min', 'icon' => 'user-plus'],
-            ['key' => 'notified', 'name' => 'Notification Sent', 'count' => $stage5, 'avg_time' => '< 2 min', 'icon' => 'send'],
-            ['key' => 'first_response', 'name' => 'First Response', 'count' => $stage6, 'avg_time' => '15 min', 'icon' => 'phone-call'],
+            ['key' => 'assigned', 'name' => 'Notification Sent', 'count' => $stage5, 'avg_time' => '< 2 min', 'icon' => 'send'],
+            ['key' => 'contacted', 'name' => 'First Response', 'count' => $stage6, 'avg_time' => '15 min', 'icon' => 'phone-call'],
             ['key' => 'followup', 'name' => 'Follow-up', 'count' => $stage7, 'avg_time' => '4 hrs', 'icon' => 'calendar'],
             ['key' => 'interested', 'name' => 'Interested', 'count' => $stage8, 'avg_time' => '1 day', 'icon' => 'thumbs-up'],
             ['key' => 'site_visit', 'name' => 'Site Visit', 'count' => $stage9, 'avg_time' => '2 days', 'icon' => 'map-pin'],
@@ -603,6 +760,7 @@ class DashboardShell extends Component
                 'drop_off_pct' => $dropOffPct,
                 'avg_time' => $stg['avg_time'],
                 'icon' => $stg['icon'],
+                'drill_route' => route('leads.index', ['statusFilter' => $stg['key']]),
             ];
 
             $prevCount = $c;
@@ -657,18 +815,22 @@ class DashboardShell extends Component
             }
         }
 
-        // 2. Lead Source Performance
+        // 2. Lead Source Performance (with percentages for Donut chart)
         $sources = LeadSource::all();
         $sourceLabels = [];
         $sourceCounts = [];
         $sourceWon = [];
+        $sourcePercentages = [];
         $sourceColors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#64748B'];
+
+        $totalFilteredLeads = max(1, (int) $this->getFilteredLeadsQuery($start, $end)->count());
 
         foreach ($sources as $idx => $src) {
             $cnt = (int) $this->getFilteredLeadsQuery($start, $end)->where('lead_source_id', $src->id)->count();
             if ($cnt > 0 || $sources->count() <= 6) {
                 $sourceLabels[] = ucfirst($src->name);
                 $sourceCounts[] = $cnt;
+                $sourcePercentages[] = round(($cnt / $totalFilteredLeads) * 100, 1);
                 $won = (int) $this->getFilteredLeadsQuery($start, $end)
                     ->where('lead_source_id', $src->id)
                     ->where(fn($q) => $q->where('current_stage', 'closed_won')->orWhere('status', 'closed_won'))
@@ -705,7 +867,7 @@ class DashboardShell extends Component
             $statusData[] = (int) $c;
         }
 
-        // 4. Team & Sales Executive Performance (Top 5 agents)
+        // 4. Team & Sales Executive Performance (Top agents)
         $topAgents = User::whereHas('roles', function ($q) {
             $q->whereIn('name', ['sales-executive', 'Sales Executive', 'broker', 'partner']);
         })->orWhereHas('salesTeamMembers')->take(6)->get()->map(function ($agent) use ($start, $end) {
@@ -717,6 +879,7 @@ class DashboardShell extends Component
 
             return [
                 'name' => $agent->name,
+                'email' => $agent->email,
                 'assigned' => $totalAssigned,
                 'contacted' => $contacted,
                 'won' => $won,
@@ -724,7 +887,14 @@ class DashboardShell extends Component
             ];
         })->filter(fn($a) => $a['assigned'] > 0)->values()->toArray();
 
-        // 5. Distribution Method Performance
+        // 5. Organization Performance Comparison Chart Data (Top 5 orgs)
+        $topOrgsList = collect($this->adminOrgPerformance)->take(5);
+        $orgCompLabels = $topOrgsList->pluck('name')->toArray();
+        $orgCompLeads = $topOrgsList->pluck('total_leads')->toArray();
+        $orgCompCredits = $topOrgsList->pluck('credits_consumed')->toArray();
+        $orgCompConv = $topOrgsList->pluck('conversion_rate')->toArray();
+
+        // 6. Distribution Method Performance
         $distributionStats = [
             'round_robin' => 0,
             'manual' => 0,
@@ -751,12 +921,19 @@ class DashboardShell extends Component
                 'labels' => $sourceLabels,
                 'counts' => $sourceCounts,
                 'won' => $sourceWon,
+                'percentages' => $sourcePercentages,
                 'colors' => array_slice($sourceColors, 0, count($sourceLabels)),
             ],
             'statuses' => [
                 'labels' => $statusLabels,
                 'counts' => $statusData,
                 'colors' => array_values(array_slice($statusColorPalette, 0, count($statusLabels))),
+            ],
+            'org_comparison' => [
+                'labels' => $orgCompLabels,
+                'leads' => $orgCompLeads,
+                'credits' => $orgCompCredits,
+                'conversion' => $orgCompConv,
             ],
             'agents' => $topAgents,
             'distribution' => $distributionStats,
@@ -994,7 +1171,7 @@ class DashboardShell extends Component
     }
 
     /**
-     * Recent Activities, SLA Breaches & Alerts stream.
+     * Recent Activities, SLA Breaches & Alerts stream across 6 distinct categories.
      */
     public function getAdminRecentActivitiesProperty(): array
     {
@@ -1005,7 +1182,31 @@ class DashboardShell extends Component
             ->take(8)
             ->get();
 
-        // 2. SLA Breached Leads
+        // 2. Upcoming Follow-ups (Real follow-up / site visit queue)
+        $upcomingFollowups = Followup::with(['lead.project', 'lead.assignedTo', 'lead.client'])
+            ->latest('due_at')
+            ->take(8)
+            ->get();
+
+        if ($upcomingFollowups->isEmpty()) {
+            $upcomingFollowups = Lead::withoutGlobalScopes()
+                ->with(['client.organization', 'assignedTo'])
+                ->whereIn('current_stage', ['site_visit', 'meeting', 'contacted', 'in_progress', 'followup'])
+                ->latest('updated_at')
+                ->take(8)
+                ->get()
+                ->map(function ($lead) {
+                    return (object) [
+                        'id' => $lead->id,
+                        'lead' => $lead,
+                        'due_at' => $lead->updated_at,
+                        'note' => 'Client call and project discovery scheduled',
+                        'status' => $lead->current_stage,
+                    ];
+                });
+        }
+
+        // 3. SLA Breached Leads
         $slaBreached = Lead::withoutGlobalScopes()
             ->with(['client', 'assignedTo'])
             ->whereNull('first_response_at')
@@ -1014,22 +1215,22 @@ class DashboardShell extends Component
             ->take(8)
             ->get();
 
-        // 3. Recent Credit Transactions
+        // 4. Recent Credit Transactions
         $recentTransactions = CreditTransaction::with(['client.organization', 'lead'])
             ->latest('id')
             ->take(8)
             ->get();
 
-        // 4. Replacement Claims
+        // 5. Replacement Claims
         $replacementClaims = LeadReplacement::with(['lead', 'requester'])
             ->latest()
             ->take(8)
             ->get();
 
-        // 5. System Audit Logs
+        // 6. System Audit Logs
         $auditLogs = AuditLog::with('user')->latest()->take(8)->get();
 
-        // 6. Low Balance Organizations
+        // 7. Low Balance Organizations
         $lowBalanceOrgs = Organization::with('users')->get()->filter(function ($org) {
             $bal = DB::table('client_wallets')->whereIn('client_id', $org->users->pluck('id'))->sum('balance');
             return $bal < 100;
@@ -1037,6 +1238,7 @@ class DashboardShell extends Component
 
         return [
             'recent_leads' => $recentLeads,
+            'upcoming_followups' => $upcomingFollowups,
             'sla_breached' => $slaBreached,
             'transactions' => $recentTransactions,
             'replacements' => $replacementClaims,
@@ -1414,6 +1616,7 @@ class DashboardShell extends Component
 
             // Super Admin Command Centre Data
             'adminKpis' => $this->role === 'admin' ? $this->adminKpis : [],
+            'groupedKpis' => $this->role === 'admin' ? $this->groupedKpis : [],
             'adminFunnel' => $this->role === 'admin' ? $this->adminFunnel : [],
             'adminLeadAnalytics' => $this->role === 'admin' ? $this->adminLeadAnalytics : [],
             'adminOrgPerformance' => $this->role === 'admin' ? $this->adminOrgPerformance : [],

@@ -44,6 +44,24 @@
                 </div>
             </div>
 
+            @php
+                $leadStatusOptions = [
+                    'new' => 'New (Uncontacted)',
+                    'assigned' => 'Assigned',
+                    'contacted' => 'Contacted',
+                    'in_progress' => 'In Progress',
+                    'qualified' => 'Qualified',
+                    'site_visit' => 'Site Visit',
+                    'negotiation' => 'Negotiation',
+                    'booking' => 'Booking',
+                    'closed_won' => 'Closed Won',
+                    'lost' => 'Lost',
+                    'duplicate' => 'Duplicate',
+                    'unassigned' => 'Unassigned',
+                    'sla_breached' => 'SLA Breached (>30m)',
+                ];
+            @endphp
+
             <!-- Filters Grid (7 Filters) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 items-start">
                 <!-- 1. Date Range -->
@@ -96,13 +114,13 @@
                 <!-- 5. Lead Source -->
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
-                    <select wire:model.live="filterLeadSourceId"
-                            class="w-full h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:border-ink focus:ring-0 focus:outline-none">
-                        <option value="">All Sources</option>
-                        @foreach($sourceOptions as $srcId => $srcName)
-                            <option value="{{ $srcId }}">{{ $srcName }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="filterLeadSourceId" 
+                        model="App\Models\LeadSource" 
+                        placeholder="All Sources" 
+                        class="w-full"
+                        :key="'dash-filter-src-'.($filterLeadSourceId ?? 'none')" 
+                    />
                 </div>
 
                 <!-- 6. Assigned Agent -->
@@ -120,23 +138,13 @@
                 <!-- 7. Lead Status -->
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
-                    <select wire:model.live="filterStatus"
-                            class="w-full h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:border-ink focus:ring-0 focus:outline-none">
-                        <option value="">All Statuses</option>
-                        <option value="new">New (Uncontacted)</option>
-                        <option value="assigned">Assigned</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="site_visit">Site Visit</option>
-                        <option value="negotiation">Negotiation</option>
-                        <option value="booking">Booking</option>
-                        <option value="closed_won">Closed Won</option>
-                        <option value="lost">Lost</option>
-                        <option value="duplicate">Duplicate</option>
-                        <option value="unassigned">Unassigned</option>
-                        <option value="sla_breached">SLA Breached (>30m)</option>
-                    </select>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="filterStatus" 
+                        :options="$leadStatusOptions" 
+                        placeholder="All Statuses" 
+                        class="w-full"
+                        :key="'dash-filter-status-'.($filterStatus ?? 'none')" 
+                    />
                 </div>
             </div>
 

@@ -284,7 +284,7 @@
     <button 
         type="button" 
         @click="open = !open" 
-        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition min-w-[140px] whitespace-nowrap shadow-xs font-semibold"
+        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap shadow-xs font-semibold"
     >
         <div class="flex items-center gap-1.5 truncate">
             <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

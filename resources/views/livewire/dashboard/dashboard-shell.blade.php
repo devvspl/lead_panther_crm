@@ -45,10 +45,10 @@
             </div>
 
             <!-- Filters Grid (7 Filters) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 items-start">
                 <!-- 1. Date Range -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Date Range</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Date Range</label>
                     <x-ui.date-range-picker 
                         wire:model.live="dateRange" 
                         wire:custom-from.live="customFrom" 
@@ -58,43 +58,46 @@
                 </div>
 
                 <!-- 2. Organization -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Organization</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Organization</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterOrganizationId" 
                         model="App\Models\Organization" 
                         placeholder="All Organizations" 
+                        class="w-full"
                         :key="'dash-filter-org-'.($filterOrganizationId ?? 'none')" 
                     />
                 </div>
 
                 <!-- 3. Project -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Project</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Project</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterProjectId" 
                         model="App\Models\Project" 
                         placeholder="All Projects" 
+                        class="w-full"
                         :key="'dash-filter-project-'.($filterProjectId ?? 'none')" 
                     />
                 </div>
 
                 <!-- 4. Team -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Team</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Team</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterTeamId" 
                         model="App\Models\SalesTeam" 
                         placeholder="All Teams" 
+                        class="w-full"
                         :key="'dash-filter-team-'.($filterTeamId ?? 'none')" 
                     />
                 </div>
 
                 <!-- 5. Lead Source -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Lead Source</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
                     <select wire:model.live="filterLeadSourceId"
-                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-2.5 py-1.5 focus:border-ink focus:ring-0">
+                            class="w-full h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:border-ink focus:ring-0 focus:outline-none">
                         <option value="">All Sources</option>
                         @foreach($sourceOptions as $srcId => $srcName)
                             <option value="{{ $srcId }}">{{ $srcName }}</option>
@@ -103,21 +106,22 @@
                 </div>
 
                 <!-- 6. Assigned Agent -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Assigned Agent</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Assigned Agent</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterAssignedUserId" 
                         model="App\Models\User" 
                         placeholder="All Agents" 
+                        class="w-full"
                         :key="'dash-filter-user-'.($filterAssignedUserId ?? 'none')" 
                     />
                 </div>
 
                 <!-- 7. Lead Status -->
-                <div class="space-y-1">
-                    <label class="text-[11px] font-semibold text-muted">Lead Status</label>
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
                     <select wire:model.live="filterStatus"
-                            class="w-full text-xs rounded-lg border border-border bg-surface text-ink px-2.5 py-1.5 focus:border-ink focus:ring-0">
+                            class="w-full h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:border-ink focus:ring-0 focus:outline-none">
                         <option value="">All Statuses</option>
                         <option value="new">New (Uncontacted)</option>
                         <option value="assigned">Assigned</option>

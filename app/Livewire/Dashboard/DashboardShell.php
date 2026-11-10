@@ -23,6 +23,8 @@ use App\Support\NavigationConfig;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\DashboardReportExport;
 
 class DashboardShell extends Component
 {
@@ -1239,67 +1241,41 @@ class DashboardShell extends Component
     }
 
     /**
-     * Export Complete Dashboard Performance Report to Excel / CSV.
+     * Export Complete Dashboard Performance Report to Excel using BaseStyledExport.
      */
-    public function exportDashboardReport(): StreamedResponse
+    public function exportExcel()
+    {
+        return $this->exportDashboardReport();
+    }
+
+    /**
+     * Export Complete Dashboard Performance Report using existing Excel export component.
+     */
+    public function exportDashboardReport()
     {
         [$start, $end] = $this->getDateBounds();
-        $filename = 'LeadPanther_Admin_Dashboard_Report_' . Carbon::now()->format('Ymd_His') . '.csv';
+        $filename = 'LeadPanther_Dashboard_Report_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+        $periodString = $start->format('d M Y') . ' to ' . $end->format('d M Y');
 
-        return response()->streamDownload(function () use ($start, $end) {
-            $output = fopen('php://output', 'w');
-            fputcsv($output, ['LEAD PANTHER CRM - SUPER ADMIN MASTER TELEMETRY REPORT']);
-            fputcsv($output, ['Generated At', Carbon::now()->toDateTimeString()]);
-            fputcsv($output, ['Reporting Period', $start->toDateString() . ' to ' . $end->toDateString()]);
-            fputcsv($output, []);
+        $leads = $this->getFilteredLeadsQuery($start, $end)
+            ->with(['client', 'project', 'leadSource', 'assignedTo'])
+            ->latest()
+            ->limit(1000)
+            ->get();
 
-            // 1. KPI Summary
-            fputcsv($output, ['=== EXECUTIVE KPI METRICS ===']);
-            fputcsv($output, ['Metric Name', 'Current Value', 'Previous Period Delta']);
-            foreach ($this->adminKpis as $kpi) {
-                fputcsv($output, [$kpi['title'], $kpi['value'], $kpi['delta'] . ' ' . $kpi['period']]);
-            }
-            fputcsv($output, []);
+        $this->dispatch('toast', type: 'success', message: 'Dashboard Excel report generated — downloading now.');
 
-            // 2. Lead Journey Funnel
-            fputcsv($output, ['=== LEAD JOURNEY FUNNEL BREAKDOWN ===']);
-            fputcsv($output, ['Stage #', 'Stage Name', 'Leads Count', 'Conversion % vs Ingestion', 'Step Conversion %', 'Drop-offs', 'Avg Duration']);
-            foreach ($this->adminFunnel as $stg) {
-                fputcsv($output, [
-                    $stg['index'],
-                    $stg['name'],
-                    $stg['count'],
-                    $stg['conversion_pct'] . '%',
-                    $stg['step_pct'] . '%',
-                    $stg['drop_off'],
-                    $stg['avg_time'],
-                ]);
-            }
-            fputcsv($output, []);
-
-            // 3. Organization Performance
-            fputcsv($output, ['=== ORGANIZATION PERFORMANCE ===']);
-            fputcsv($output, ['Organization Name', 'Status', 'Total Leads', 'Assigned', 'Unassigned', 'Converted', 'Conversion Rate %', 'Credits Consumed', 'Wallet Balance', 'SLA Breaches']);
-            foreach ($this->adminOrgPerformance as $org) {
-                fputcsv($output, [
-                    $org['name'],
-                    $org['status'],
-                    $org['total_leads'],
-                    $org['assigned_leads'],
-                    $org['unassigned_leads'],
-                    $org['converted_leads'],
-                    $org['conversion_rate'] . '%',
-                    $org['credits_consumed'],
-                    $org['wallet_balance'],
-                    $org['sla_breaches'],
-                ]);
-            }
-
-            fclose($output);
-        }, $filename, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        return Excel::download(
+            new DashboardReportExport(
+                kpis: $this->adminKpis,
+                funnel: $this->adminFunnel,
+                orgs: $this->adminOrgPerformance,
+                projects: $this->adminProjectPerformance,
+                leads: $leads,
+                periodString: $periodString
+            ),
+            $filename
+        );
     }
 
     // =========================================================================

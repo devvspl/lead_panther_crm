@@ -44,7 +44,7 @@ class FollowupPerformance extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                hasTotals: true
+                hasTotals: false
             ),
             $filename
         );
@@ -52,9 +52,7 @@ class FollowupPerformance extends Component
 
     protected function getFollowupData(): array
     {
-        $cacheKey = 'report_followup_perf_' . auth()->id();
-
-        return Cache::remember($cacheKey, 300, function () {
+        $buildReport = function () {
             $user = auth()->user();
             $execsQuery = User::role('sales-executive');
 
@@ -69,17 +67,17 @@ class FollowupPerformance extends Component
             $data = [];
 
             foreach ($execs as $exec) {
-                $totalComms = LeadCommunication::where('user_id', $exec->id)->count();
-                $onTime = (int) round($totalComms * 0.85);
-                $overdue = $totalComms - $onTime;
-                $rate = $totalComms > 0 ? round(($onTime / $totalComms) * 100, 1) : 100.0;
-
-                if (Lead::usesSalesPanel()) {
-                    $followups = Followup::whereIn('lead_id', Lead::panelQuery()->where('assigned_to', $exec->id)->select('id'))->get();
-                    $onTime = $followups->filter(fn ($f) => $f->status === 'completed' && $f->updated_at <= $f->due_at)->count();
-                    $overdue = $followups->filter(fn ($f) => $f->status === 'completed' ? $f->updated_at > $f->due_at : $f->due_at < now())->count();
-                    $rate = ($onTime + $overdue) > 0 ? round($onTime / ($onTime + $overdue) * 100, 1) : 0;
+                $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id)->select('id');
+                $followups=Followup::whereIn('lead_id',$leadIds)->get();
+                $onTime=0; $overdue=0;
+                foreach($followups as $followup) {
+                    if($followup->status==='completed') {
+                        // Legacy rows have no completed_at column; updated_at is the recorded completion proxy.
+                        $completedAt=$followup->updated_at;
+                        $completedAt <= $followup->due_at ? $onTime++ : $overdue++;
+                    } elseif($followup->status==='pending' && $followup->due_at < now()) $overdue++;
                 }
+                $rate=($onTime+$overdue)>0 ? round($onTime/($onTime+$overdue)*100,1) : 0;
                 $data[] = [
                     'executive_name' => $exec->name,
                     'on_time' => $onTime,
@@ -88,14 +86,11 @@ class FollowupPerformance extends Component
                 ];
             }
 
-            if (empty($data) && ! Lead::usesSalesPanel()) {
-                $data[] = ['executive_name' => 'Rahul Sharma', 'on_time' => 38, 'overdue' => 4, 'on_time_rate' => 90.5];
-                $data[] = ['executive_name' => 'Priya Patel', 'on_time' => 31, 'overdue' => 2, 'on_time_rate' => 93.9];
-                $data[] = ['executive_name' => 'Amit Kumar', 'on_time' => 24, 'overdue' => 6, 'on_time_rate' => 80.0];
-            }
 
             return $data;
-        });
+        };
+
+        return $buildReport();
     }
 
     public function render()

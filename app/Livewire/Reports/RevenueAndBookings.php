@@ -21,35 +21,35 @@ class RevenueAndBookings extends Component
     public function tableColumns(): array
     {
         return [
-            ['key' => 'client_name', 'label' => 'Client Organization', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
-            ['key' => 'credits_spent', 'label' => 'Credits Consumed', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 2],
-            ['key' => 'credits_spent_amount', 'label' => Lead::usesSalesPanel() ? 'Credits Consumed' : 'Cost Equivalent', 'prefix' => Lead::usesSalesPanel() ? '' : '₹', 'formatter' => fn ($v) => number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
-            ['key' => 'bookings_closed', 'label' => 'Bookings Closed', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'revenue', 'label' => Lead::usesSalesPanel() ? 'Payments Received' : 'Closed Sales Volume', 'formatter' => fn ($v) => '₹'.number_format(((float) $v) / 100000, 1).' Lakhs', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
-            ['key' => 'roi_ratio', 'label' => 'ROI Ratio', 'suffix' => 'x', 'formatter' => fn($v) => number_format((float)$v, 1), 'class' => 'font-mono font-bold text-purple-700', 'sortable' => false, 'priority' => 1],
+            ['key'=>'client_name','label'=>'Lead Owner','priority'=>1],
+            ['key'=>'credits_spent','label'=>'Credits Consumed','priority'=>1,'formatter'=>fn($v)=>number_format((float)$v,2)],
+            ['key'=>'bookings_closed','label'=>'Confirmed Bookings','priority'=>1],
+            ['key'=>'booking_value','label'=>'Booked Amount','priority'=>1,'formatter'=>fn($v)=>'₹'.number_format((float)$v,2)],
+            ['key'=>'revenue','label'=>'Payments Received','priority'=>1,'formatter'=>fn($v)=>'₹'.number_format((float)$v,2)],
+            ['key'=>'outstanding','label'=>'Outstanding','priority'=>1,'formatter'=>fn($v)=>'₹'.number_format((float)$v,2)],
         ];
     }
 
     public function exportExcel()
     {
         $rows = collect($this->getClientRoiData());
-        $headings = Lead::usesSalesPanel() ? ['Client Name', 'Credits Consumed', 'Bookings', 'Payments Received', 'Payments per Credit'] : ['Client Name', 'Credits Spent (Amount)', 'Bookings Closed', 'Total Revenue Generated', 'ROI Multiplier'];
-        $columns = ['client_name', 'credits_spent_amount', 'bookings_closed', 'revenue', fn($r) => $r['roi_ratio'] . 'x'];
+        $headings=['Lead Owner','Credits Consumed','Confirmed Bookings','Booked Amount','Payments Received','Outstanding'];
+        $columns=['client_name','credits_spent','bookings_closed','booking_value','revenue','outstanding'];
 
         $filename = 'revenue-and-bookings-roi-report_'.now()->format('Y-m-d').'.xlsx';
-        $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Client ROI & Revenue Summary';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Actual Bookings & Payments';
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
             new BaseStyledExport(
                 data: $rows,
-                title: 'Revenue & Bookings ROI Report',
+                title: 'Revenue & Bookings Report',
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                currencyColumns: ['credits_spent_amount', 'revenue'],
-                hasTotals: true
+                currencyColumns: ['booking_value','revenue','outstanding'],
+                hasTotals: false
             ),
             $filename
         );
@@ -57,11 +57,9 @@ class RevenueAndBookings extends Component
 
     protected function getClientRoiData(): array
     {
-        $cacheKey = 'report_client_roi_' . auth()->id();
-
-        return Cache::remember($cacheKey, 300, function () {
+        $buildReport = function () {
             $user = auth()->user();
-            $clientsQuery = Client::query();
+            $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
 
             if (Lead::usesSalesPanel()) {
                 if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
@@ -78,24 +76,14 @@ class RevenueAndBookings extends Component
             $data = [];
 
             foreach ($clients as $client) {
-                $creditsUsed = (Lead::usesSalesPanel() ? CreditTransaction::withoutGlobalScopes() : CreditTransaction::query())->where('client_id', $client->id)
-                    ->when(Lead::usesSalesPanel(), fn ($q) => $q->whereIn('lead_id', Lead::panelQuery()->select('id')))
-                    ->whereIn('transaction_type', Lead::usesSalesPanel() ? ['reserve', 'deduct', 'lead_consumption'] : ['reserve'])
-                    ->sum('credit_used');
-
-                $bookingsCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id', $client->id)
-                    ->whereIn('current_stage', ['booking', 'payment', 'closed_won'])
-                    ->count();
-
-                $revenue = $bookingsCount * 7500000.00; // Estimated project booking value
-                if (Lead::usesSalesPanel()) {
-                    $bookings = Booking::whereIn('lead_id', Lead::panelQuery()->where('client_id', $client->id)->select('id'))->get();
-                    $bookingsCount = $bookings->count();
-                    $revenue = PaymentReceived::whereIn('booking_id', $bookings->pluck('id'))->where('status', 'completed')->sum('amount');
-                }
-                $spentAmount = Lead::usesSalesPanel() ? $creditsUsed : $creditsUsed * 10.00; // ₹10 per credit cost value
-                $roiRatio = $spentAmount > 0 ? round($revenue / $spentAmount, 1) : 0.0;
-
+                $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id',$client->id)->select('id');
+                $creditsUsed=CreditTransaction::withoutGlobalScopes()->whereIn('lead_id',clone $leadIds)->whereIn('transaction_type',['reserve','deduct','lead_consumption'])->sum('credit_used');
+                $bookings=Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->get();
+                $bookingsCount=$bookings->count();
+                $bookedValue=(float)$bookings->sum('booking_amount');
+                $revenue=(float)PaymentReceived::whereIn('booking_id',$bookings->pluck('id'))->where('status','completed')->sum('amount');
+                $spentAmount=(float)$creditsUsed;
+                $roiRatio=null;
                 $data[] = [
                     'client_name' => $client->name,
                     'credits_spent' => $creditsUsed,
@@ -103,28 +91,28 @@ class RevenueAndBookings extends Component
                     'bookings_closed' => $bookingsCount,
                     'revenue' => $revenue,
                     'roi_ratio' => $roiRatio,
+                    'booking_value'=>$bookedValue,
+                    'outstanding'=>max(0,$bookedValue-$revenue),
                 ];
             }
 
-            if (empty($data) && ! Lead::usesSalesPanel()) {
-                $data[] = ['client_name' => 'Godrej Properties Client', 'credits_spent' => 450, 'credits_spent_amount' => 4500.00, 'bookings_closed' => 8, 'revenue' => 60000000.00, 'roi_ratio' => 13333.3];
-                $data[] = ['client_name' => 'Lodha Developers Client', 'credits_spent' => 320, 'credits_spent_amount' => 3200.00, 'bookings_closed' => 5, 'revenue' => 37500000.00, 'roi_ratio' => 11718.8];
-            }
 
             return $data;
-        });
+        };
+
+        return $buildReport();
     }
 
     protected function getMonthlyRevenueChart(): array
     {
-        if (Lead::usesSalesPanel()) {
+        {
             $labels = [];
             $counts = [];
             $revenues = [];
             foreach (range(5, 0) as $offset) {
                 $month = now()->subMonthsNoOverflow($offset);
                 $labels[] = $month->format('M Y');
-                $bookings = Booking::whereIn('lead_id', Lead::panelQuery()->select('id'));
+                $bookings = Booking::whereIn('lead_id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('id'))->where('status','confirmed');
                 $counts[] = (clone $bookings)->whereYear('booked_at', $month->year)->whereMonth('booked_at', $month->month)->count();
                 $revenues[] = (float) PaymentReceived::whereIn('booking_id', $bookings->select('id'))->where('status', 'completed')->whereYear('paid_at', $month->year)->whereMonth('paid_at', $month->month)->sum('amount') / 10000000;
             }
@@ -132,11 +120,6 @@ class RevenueAndBookings extends Component
             return ['labels' => $labels, 'bookings' => $counts, 'revenues' => $revenues];
         }
 
-        return [
-            'labels' => ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
-            'bookings' => [4, 7, 9, 12, 15, 18],
-            'revenues' => [3.0, 5.25, 6.75, 9.0, 11.25, 13.5], // Cr ₹
-        ];
     }
 
     public function render()

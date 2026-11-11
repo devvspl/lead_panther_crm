@@ -49,7 +49,7 @@ class SlaDashboard extends Component
                 headings: $headings,
                 columns: $columns,
                 statusColumns: ['status_label'],
-                hasTotals: true
+                hasTotals: false
             ),
             $filename
         );
@@ -76,32 +76,12 @@ class SlaDashboard extends Component
         $acceptable = 0;
         $breached = 0;
 
-        foreach ($leads as $l) {
-            if (!$l->first_response_at) {
-                $wait = Carbon::parse($l->created_at)->diffInMinutes(now());
-                if ($wait > 30) {
-                    $breached++;
-                } elseif ($wait > 15) {
-                    $acceptable++;
-                } else {
-                    $excellent++;
-                }
+        foreach($leads as $lead) {
+            if(!$lead->first_response_at) {
+                $lead->created_at->diffInMinutes(now())>15 ? $breached++ : $acceptable++;
             } else {
-                $diff = Carbon::parse($l->created_at)->diffInMinutes(Carbon::parse($l->first_response_at));
-                if ($diff <= 15) {
-                    $excellent++;
-                } elseif ($diff <= 30) {
-                    $acceptable++;
-                } else {
-                    $breached++;
-                }
+                $lead->created_at->diffInMinutes($lead->first_response_at)<=15 ? $excellent++ : $breached++;
             }
-        }
-
-        if (! Lead::usesSalesPanel() && $excellent == 0 && $acceptable == 0 && $breached == 0) {
-            $excellent = 18;
-            $acceptable = 7;
-            $breached = 3;
         }
 
         return [

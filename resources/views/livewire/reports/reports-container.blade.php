@@ -2,11 +2,11 @@
     <!-- Main Header -->
     <div>
         <h1 class="text-xl font-bold tracking-tight text-ink">Analytics & Reporting Hub</h1>
-        <p class="text-xs text-muted">Real-time SLA monitoring, source performance, replacement dispute tracking, and sales executive leaderboards.</p>
+        <p class="text-xs text-muted">Reports calculated from stored lead, follow-up, replacement, booking, and payment records.</p>
     </div>
 
     <!-- Navigation Tabs -->
-    <div class="border-b border-border flex items-center space-x-2 overflow-x-auto pb-1">
+    <div class="border-b border-border flex flex-wrap items-center gap-2 pb-1">
         <button 
             wire:click="setTab('source')" 
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap {{ $activeTab === 'source' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"
@@ -18,7 +18,7 @@
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap flex items-center space-x-1.5 {{ $activeTab === 'sla' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"
         >
             <span>SLA Response</span>
-            <span class="w-2 h-2 rounded-full bg-green-500 animate-ping"></span>
+            
         </button>
         <button 
             wire:click="setTab('replacement')" 
@@ -49,17 +49,17 @@
     <!-- Tab Contents -->
     <div>
         @if($activeTab === 'source')
-            <livewire:reports.source-performance />
+            <livewire:reports.source-performance key="reports-source-performance" />
         @elseif($activeTab === 'sla')
-            <livewire:reports.sla-dashboard />
+            <livewire:reports.sla-dashboard key="reports-sla-dashboard" />
         @elseif($activeTab === 'replacement')
-            <livewire:reports.replacement-rate />
+            <livewire:reports.replacement-rate key="reports-replacement-rate" />
         @elseif($activeTab === 'followup')
-            <livewire:reports.followup-performance />
+            <livewire:reports.followup-performance key="reports-followup-performance" />
         @elseif($activeTab === 'revenue')
-            <livewire:reports.revenue-and-bookings />
+            <livewire:reports.revenue-and-bookings key="reports-revenue-and-bookings" />
         @elseif($activeTab === 'executive')
-            <livewire:reports.sales-executive-performance />
+            <livewire:reports.sales-executive-performance key="reports-sales-executive-performance" />
         @endif
     </div>
 </div>

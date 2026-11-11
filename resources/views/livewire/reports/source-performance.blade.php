@@ -1,10 +1,10 @@
 <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-            <h2 class="text-lg font-bold text-ink">Lead Source & Campaign Performance</h2>
-            <p class="text-xs text-muted">Ingestion volume, cost per lead, and closed won conversion metrics.</p>
+            <h2 class="text-lg font-bold text-ink">Lead Source Performance</h2>
+            <p class="text-xs text-muted">Actual lead counts, recorded credit charges, and closed-won conversion rates for the selected period.</p>
         </div>
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
             <x-ui.themed-select 
                 wire:model.live="days"
                 :options="['7' => 'Last 7 Days', '30' => 'Last 30 Days', '90' => 'Last 90 Days']"
@@ -15,13 +15,15 @@
         </div>
     </div>
 
+    @if(count($chartReportData)>0)
     <!-- Chart Card -->
     <div class="bg-surface rounded-card border border-border p-6 shadow-sm">
         <h3 class="text-xs font-bold uppercase text-muted tracking-wider mb-4">Leads Ingested by Source</h3>
         <div 
+            wire:key="source-performance-chart-{{ md5(json_encode($chartReportData)) }}"
             x-data="{
                 renderChart() {
-                    const data = @json($chartReportData) || [];
+                    const data = @js($chartReportData) || [];
                     window.initSafeChart('sourcePerfChart', {
                         type: 'bar',
                         data: {
@@ -51,6 +53,8 @@
             <canvas id="sourcePerfChart"></canvas>
         </div>
     </div>
+
+    @endif
 
     <!-- Data Table Component -->
     <div class="space-y-2">

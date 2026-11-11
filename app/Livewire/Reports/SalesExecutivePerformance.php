@@ -33,6 +33,7 @@ class SalesExecutivePerformance extends Component
 
     public function sortBy(string $field): void
     {
+        abort_unless(in_array($field,['executive_name','assigned_leads','sla_contacted_rate','site_visits','bookings_closed']),422);
         if ($this->sortField === $field) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -59,7 +60,7 @@ class SalesExecutivePerformance extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                hasTotals: true
+                hasTotals: false
             ),
             $filename
         );
@@ -67,9 +68,7 @@ class SalesExecutivePerformance extends Component
 
     protected function getExecutiveData(): array
     {
-        $cacheKey = 'report_sales_exec_leaderboard_' . auth()->id() . '_' . $this->sortField . '_' . $this->sortDirection;
-
-        return Cache::remember($cacheKey, 300, function () {
+        $buildReport = function () {
             $user = auth()->user();
             $execsQuery = User::role('sales-executive');
 
@@ -85,20 +84,13 @@ class SalesExecutivePerformance extends Component
 
             foreach ($execs as $exec) {
                 $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
-                $slaRate = 88.5;
-                if (Lead::usesSalesPanel()) {
-                    $assigned = Lead::panelQuery()->where('assigned_to', $exec->id)->get();
-                    $met = $assigned->filter(fn ($lead) => $lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at) <= 15)->count();
-                    $slaRate = $assigned->count() ? round($met / $assigned->count() * 100, 1) : 0;
-                }
-                $siteVisits = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->whereIn('current_stage', ['site_visit', 'negotiation', 'proposal', 'booking', 'closed_won'])->count();
-                $bookingsClosed = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->whereIn('current_stage', ['booking', 'payment', 'closed_won'])->count();
-
-                if (Lead::usesSalesPanel()) {
-                    $leadIds = Lead::panelQuery()->where('assigned_to', $exec->id)->select('id');
-                    $siteVisits = SiteVisit::whereIn('lead_id', clone $leadIds)->count();
-                    $bookingsClosed = Booking::whereIn('lead_id', clone $leadIds)->count();
-                }
+                $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id);
+                $assigned = (clone $query)->get();
+                $met = $assigned->filter(fn($lead)=>$lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at)<=15)->count();
+                $slaRate = $assignedCount ? round($met/$assignedCount*100,1) : 0;
+                $leadIds = (clone $query)->select('id');
+                $siteVisits = SiteVisit::whereIn('lead_id',clone $leadIds)->where('attendance','attended')->count();
+                $bookingsClosed = Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->count();
                 $data[] = [
                     'executive_name' => $exec->name,
                     'assigned_leads' => $assignedCount,
@@ -108,11 +100,6 @@ class SalesExecutivePerformance extends Component
                 ];
             }
 
-            if (empty($data) && ! Lead::usesSalesPanel()) {
-                $data[] = ['executive_name' => 'Rahul Sharma', 'assigned_leads' => 45, 'sla_contacted_rate' => 92.5, 'site_visits' => 14, 'bookings_closed' => 5];
-                $data[] = ['executive_name' => 'Priya Patel', 'assigned_leads' => 38, 'sla_contacted_rate' => 94.7, 'site_visits' => 12, 'bookings_closed' => 4];
-                $data[] = ['executive_name' => 'Amit Kumar', 'assigned_leads' => 30, 'sla_contacted_rate' => 86.0, 'site_visits' => 8, 'bookings_closed' => 2];
-            }
 
             // Sort data by active column
             usort($data, function ($a, $b) {
@@ -133,7 +120,9 @@ class SalesExecutivePerformance extends Component
             });
 
             return $data;
-        });
+        };
+
+        return $buildReport();
     }
 
     public function render()

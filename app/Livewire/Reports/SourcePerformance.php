@@ -26,7 +26,7 @@ class SourcePerformance extends Component
         return [
             ['key' => 'source_name', 'label' => 'Lead Source', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'cost_per_lead', 'label' => Lead::usesSalesPanel() ? 'Credits Per Lead' : 'Est. Cost Per Lead', 'prefix' => Lead::usesSalesPanel() ? '' : '₹', 'formatter' => fn ($v) => number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'cost_per_lead', 'label' => 'Average Lead Cost (Credits)', 'prefix' => '', 'formatter' => fn ($v) => $v === null ? '—' : number_format((float)$v,2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
             ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
@@ -40,7 +40,7 @@ class SourcePerformance extends Component
     public function exportExcel()
     {
         $rows = collect($this->getReportData());
-        $headings = ['Lead Source', 'Total Leads', Lead::usesSalesPanel() ? 'Credits Per Lead' : 'Est. Cost Per Lead', 'Closed Won', 'Conversion Rate (%)'];
+        $headings = ['Lead Source', 'Total Leads', 'Average Lead Cost (Credits)', 'Closed Won', 'Conversion Rate (%)'];
         $columns = ['source_name', 'total_leads', 'cost_per_lead', 'closed_won', fn($r) => $r['conversion_rate'] . '%'];
 
         $filename = 'source-performance-report_'.now()->format('Y-m-d').'.xlsx';
@@ -55,8 +55,7 @@ class SourcePerformance extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                currencyColumns: ['cost_per_lead'],
-                hasTotals: true
+                hasTotals: false
             ),
             $filename
         );
@@ -64,9 +63,8 @@ class SourcePerformance extends Component
 
     protected function getReportData(): array
     {
-        $cacheKey = 'report_source_perf_' . auth()->id() . '_' . $this->days;
-
-        return Cache::remember($cacheKey, 300, function () {
+        $this->validate(['days'=>'required|integer|in:7,30,90']);
+        $buildReport = function () {
             $user = auth()->user();
             $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('created_at', '>=', now()->subDays($this->days));
 
@@ -84,8 +82,8 @@ class SourcePerformance extends Component
             $results = $query->select(
                 'lead_source_id',
                 DB::raw('count(*) as total_leads'),
-                DB::raw('AVG(COALESCE(lead_cost,0)) as actual_cost'),
-                DB::raw("sum(case when current_stage = 'closed_won' or status = 'closed_won' then 1 else 0 end) as closed_won")
+                DB::raw('AVG(lead_cost) as actual_cost'),
+                DB::raw("sum(case when LOWER(REPLACE(current_stage, ' ', '_')) IN ('closed_won','won') or status = 'closed_won' then 1 else 0 end) as closed_won")
             )->groupBy('lead_source_id')->with('leadSource')->get();
 
             $data = [];
@@ -93,7 +91,7 @@ class SourcePerformance extends Component
                 $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
                 $total = $row->total_leads ?: 1;
                 $won = $row->closed_won ?: 0;
-                $costPerLead = Lead::usesSalesPanel() ? round((float) $row->actual_cost, 2) : 150.00; // Estimated budget avg
+                $costPerLead = $row->actual_cost !== null ? round((float)$row->actual_cost,2) : null; // Stored credit charge; unknown costs remain empty.
                 $conversionRate = round(($won / $total) * 100, 1);
 
                 $data[] = [
@@ -105,14 +103,11 @@ class SourcePerformance extends Component
                 ];
             }
 
-            if (empty($data) && ! Lead::usesSalesPanel()) {
-                $data[] = ['source_name' => 'Meta Ads', 'total_leads' => 45, 'cost_per_lead' => 120.00, 'closed_won' => 12, 'conversion_rate' => 26.7];
-                $data[] = ['source_name' => 'Google Ads', 'total_leads' => 30, 'cost_per_lead' => 180.00, 'closed_won' => 9, 'conversion_rate' => 30.0];
-                $data[] = ['source_name' => 'Housing Portal', 'total_leads' => 25, 'cost_per_lead' => 95.00, 'closed_won' => 5, 'conversion_rate' => 20.0];
-            }
 
             return $data;
-        });
+        };
+
+        return $buildReport();
     }
 
     public function render()

@@ -2,7 +2,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-bold text-ink">Follow-up Execution Performance</h2>
-            <p class="text-xs text-muted">Lead follow-ups completed on time versus overdue by Sales Executive.</p>
+            <p class="text-xs text-muted">Actual follow-up records by assigned executive. Completion time uses the recorded last update; pending overdue tasks count as delayed.</p>
         </div>
         <x-ui.export-button target="exportExcel" />
     </div>
@@ -11,9 +11,10 @@
     <div class="bg-surface rounded-card border border-border p-6 shadow-sm">
         <h3 class="text-xs font-bold uppercase text-muted tracking-wider mb-4">On-Time vs Overdue Leaderboard</h3>
         <div 
+            wire:key="followup-performance-chart-{{ md5(json_encode($followupData)) }}"
             x-data="{
                 renderChart() {
-                    const data = @json($followupData) || [];
+                    const data = @js($followupData) || [];
                     window.initSafeChart('followupChart', {
                         type: 'bar',
                         data: {

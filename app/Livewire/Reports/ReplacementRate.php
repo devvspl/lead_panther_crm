@@ -45,7 +45,7 @@ class ReplacementRate extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                hasTotals: true
+                hasTotals: false
             ),
             $filename
         );
@@ -53,11 +53,9 @@ class ReplacementRate extends Component
 
     protected function getReplacementRatesData(): array
     {
-        $cacheKey = 'report_replacement_rates_' . auth()->id();
-
-        return Cache::remember($cacheKey, 300, function () {
+        $buildReport = function () {
             $user = auth()->user();
-            $clientsQuery = Client::query();
+            $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
 
             if (Lead::usesSalesPanel()) {
                 if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
@@ -95,24 +93,22 @@ class ReplacementRate extends Component
                 ];
             }
 
-            if (empty($data) && ! Lead::usesSalesPanel()) {
-                $data[] = ['client_name' => 'Godrej Properties Client', 'total_leads' => 120, 'total_claims' => 8, 'approved_claims' => 6, 'replacement_rate' => 5.0];
-                $data[] = ['client_name' => 'Lodha Developers Client', 'total_leads' => 95, 'total_claims' => 5, 'approved_claims' => 4, 'replacement_rate' => 4.2];
-            }
 
             return $data;
-        });
+        };
+
+        return $buildReport();
     }
 
     protected function getMonthlyTrend(): array
     {
-        if (Lead::usesSalesPanel()) {
+        {
             $labels = [];
             $rates = [];
             foreach (range(5, 0) as $offset) {
                 $month = now()->subMonthsNoOverflow($offset);
                 $labels[] = $month->format('M Y');
-                $leads = Lead::panelQuery()->whereYear('created_at', $month->year)->whereMonth('created_at', $month->month);
+                $leads = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->whereYear('created_at', $month->year)->whereMonth('created_at', $month->month);
                 $total = (clone $leads)->count();
                 $approved = LeadReplacement::whereIn('lead_id', $leads->select('id'))->where('status', 'approved')->count();
                 $rates[] = $total ? round($approved / $total * 100, 1) : 0;
@@ -121,10 +117,6 @@ class ReplacementRate extends Component
             return ['labels' => $labels, 'rates' => $rates];
         }
 
-        return [
-            'labels' => ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
-            'rates' => [3.2, 4.1, 3.8, 5.0, 4.5, 4.2],
-        ];
     }
 
     public function render()

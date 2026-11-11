@@ -2,7 +2,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-bold text-ink">Lead Replacement Rate & Dispute Prevention</h2>
-            <p class="text-xs text-muted">Percentage of replaced leads per client & project with 6-month historical trend line.</p>
+            <p class="text-xs text-muted">Approved replacement claims divided by leads received. Monthly trends group leads by their received month.</p>
         </div>
         <x-ui.export-button target="exportExcel" />
     </div>
@@ -11,9 +11,10 @@
     <div class="bg-surface rounded-card border border-border p-6 shadow-sm">
         <h3 class="text-xs font-bold uppercase text-muted tracking-wider mb-4">6-Month Historical Replacement Rate Trend (%)</h3>
         <div 
+            wire:key="replacement-rate-chart-{{ md5(json_encode($monthlyTrend)) }}"
             x-data="{
                 renderChart() {
-                    const trend = @json($monthlyTrend) || { labels: [], rates: [] };
+                    const trend = @js($monthlyTrend) || { labels: [], rates: [] };
                     window.initSafeChart('replacementTrendChart', {
                         type: 'line',
                         data: {

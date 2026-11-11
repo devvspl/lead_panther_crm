@@ -627,7 +627,7 @@
 
                 @if($loading || $showSkeleton)
                 <tbody class="divide-y divide-border" 
-                    @if(!$loading) wire:loading @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+                    @if(!$loading) wire:loading.table-row-group @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
                     @for($i = 0; $i < (int) $skeletonRows; $i++)
                         @php
                             $widths = ['w-24', 'w-32', 'w-20', 'w-28', 'w-16', 'w-36'];
@@ -1000,8 +1000,10 @@
     @endif
 
     @if($loading || $showSkeleton)
-    <div class="block md:hidden space-y-3" 
-        @if(!$loading) wire:loading @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+    {{-- Keep responsive visibility outside Livewire's inline display changes. --}}
+    <div class="block md:hidden">
+    <div class="space-y-3"
+        @if(!$loading) wire:loading.block @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
         @for($i = 0; $i < (int) min($skeletonRows, 4); $i++)
             <div class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 animate-pulse">
                 <div class="flex items-center justify-between pb-2 border-b border-border">
@@ -1034,6 +1036,7 @@
                 </div>
             </div>
         @endfor
+    </div>
     </div>
     @endif
 

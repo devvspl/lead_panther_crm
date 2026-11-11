@@ -589,4 +589,35 @@ class RoleBasedLeadManagementTest extends TestCase
         $this->assertDatabaseHas('audit_logs',['subject_id'=>$lead->id,'action'=>'lead.payment_proof_uploaded']);
         $this->assertSame('payment_received',$lead->fresh()->current_stage);
     }
+
+    public function test_missing_followup_route_does_not_break_role_navigation(): void
+    {
+        $routes = new \Illuminate\Routing\RouteCollection;
+        foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
+            if ($route->getName() !== 'followups.index') {
+                $routes->add($route);
+            }
+        }
+        app('router')->setRoutes($routes);
+        app('url')->setRoutes($routes);
+
+        foreach ([$this->builderUser, $this->exec1] as $user) {
+            $items = NavigationConfig::getNavItemsForUser($user);
+            $keys = array_column($items['primary'], 'key');
+            $this->assertContains('dashboard', $keys);
+            $this->assertContains('leads', $keys);
+            $this->assertNotContains('followups', $keys);
+        }
+    }
+
+    public function test_followup_route_is_registered_and_used_by_executive_navigation(): void
+    {
+        $route = \Illuminate\Support\Facades\Route::getRoutes()->getByName('followups.index');
+        $this->assertNotNull($route);
+        $this->assertSame('followups', $route->uri());
+        $this->assertContains('auth', $route->middleware());
+        $items = collect(NavigationConfig::getNavItemsForUser($this->exec1)['primary'])->keyBy('key');
+        $this->assertSame(route('followups.index'), $items['followups']['url']);
+        $this->get('/followups')->assertRedirect(route('login'));
+    }
 }

@@ -626,8 +626,9 @@
                 @endif
 
                 @if($loading || $showSkeleton)
-                <tbody class="divide-y divide-border" 
-                    @if(!$loading) wire:loading.table-row-group @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+                {{-- Toggle visibility without overriding tbody's native table-row-group display. --}}
+                <tbody class="divide-y divide-border {{ !$loading ? 'hidden' : '' }}"
+                    @if(!$loading) wire:loading.class.remove="hidden" @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
                     @for($i = 0; $i < (int) $skeletonRows; $i++)
                         @php
                             $widths = ['w-24', 'w-32', 'w-20', 'w-28', 'w-16', 'w-36'];

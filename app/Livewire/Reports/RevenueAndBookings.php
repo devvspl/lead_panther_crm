@@ -5,9 +5,7 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
 use App\Models\Client;
 use App\Models\CreditTransaction;
 use App\Models\Lead;
@@ -57,69 +55,63 @@ class RevenueAndBookings extends Component
 
     protected function getClientRoiData(): array
     {
-        $buildReport = function () {
-            $user = auth()->user();
-            $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
+        $user = auth()->user();
+        $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
 
-            if (Lead::usesSalesPanel()) {
-                if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
-                    $clientsQuery->whereIn('id', Lead::panelQuery()->select('client_id'));
-                } else {
-                    $clientsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
-                }
+        if (Lead::usesSalesPanel()) {
+            if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
+                $clientsQuery->whereIn('id', Lead::panelQuery()->select('client_id'));
+            } else {
+                $clientsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
             }
-            if (! Lead::usesSalesPanel() && $user && $user->hasRole('Client')) {
-                $clientsQuery->where('organization_id', $user->organization_id);
-            }
+        }
+        if (! Lead::usesSalesPanel() && $user && $user->hasRole('Client')) {
+            $clientsQuery->where('organization_id', $user->organization_id);
+        }
 
-            $clients = $clientsQuery->get();
-            $data = [];
+        $clients = $clientsQuery->get();
+        $data = [];
 
-            foreach ($clients as $client) {
-                $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id',$client->id)->select('id');
-                $creditsUsed=CreditTransaction::withoutGlobalScopes()->whereIn('lead_id',clone $leadIds)->whereIn('transaction_type',['reserve','deduct','lead_consumption'])->sum('credit_used');
-                $bookings=Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->get();
-                $bookingsCount=$bookings->count();
-                $bookedValue=(float)$bookings->sum('booking_amount');
-                $revenue=(float)PaymentReceived::whereIn('booking_id',$bookings->pluck('id'))->where('status','completed')->sum('amount');
-                $spentAmount=(float)$creditsUsed;
-                $roiRatio=null;
-                $data[] = [
-                    'client_name' => $client->name,
-                    'credits_spent' => $creditsUsed,
-                    'credits_spent_amount' => $spentAmount,
-                    'bookings_closed' => $bookingsCount,
-                    'revenue' => $revenue,
-                    'roi_ratio' => $roiRatio,
-                    'booking_value'=>$bookedValue,
-                    'outstanding'=>max(0,$bookedValue-$revenue),
-                ];
-            }
+        foreach ($clients as $client) {
+            $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id',$client->id)->select('id');
+            $creditsUsed=CreditTransaction::withoutGlobalScopes()->whereIn('lead_id',clone $leadIds)->whereIn('transaction_type',['reserve','deduct','lead_consumption'])->sum('credit_used');
+            $bookings=Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->get();
+            $bookingsCount=$bookings->count();
+            $bookedValue=(float)$bookings->sum('booking_amount');
+            $revenue=(float)PaymentReceived::whereIn('booking_id',$bookings->pluck('id'))->where('status','completed')->sum('amount');
+            $spentAmount=(float)$creditsUsed;
+            $roiRatio=null;
+            $data[] = [
+                'client_name' => $client->name,
+                'credits_spent' => $creditsUsed,
+                'credits_spent_amount' => $spentAmount,
+                'bookings_closed' => $bookingsCount,
+                'revenue' => $revenue,
+                'roi_ratio' => $roiRatio,
+                'booking_value'=>$bookedValue,
+                'outstanding'=>max(0,$bookedValue-$revenue),
+            ];
+        }
 
 
-            return $data;
-        };
+        return $data;
 
-        return $buildReport();
     }
 
     protected function getMonthlyRevenueChart(): array
     {
-        {
-            $labels = [];
-            $counts = [];
-            $revenues = [];
-            foreach (range(5, 0) as $offset) {
-                $month = now()->subMonthsNoOverflow($offset);
-                $labels[] = $month->format('M Y');
-                $bookings = Booking::whereIn('lead_id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('id'))->where('status','confirmed');
-                $counts[] = (clone $bookings)->whereYear('booked_at', $month->year)->whereMonth('booked_at', $month->month)->count();
-                $revenues[] = (float) PaymentReceived::whereIn('booking_id', $bookings->select('id'))->where('status', 'completed')->whereYear('paid_at', $month->year)->whereMonth('paid_at', $month->month)->sum('amount') / 10000000;
-            }
-
-            return ['labels' => $labels, 'bookings' => $counts, 'revenues' => $revenues];
+        $labels = [];
+        $counts = [];
+        $revenues = [];
+        foreach (range(5, 0) as $offset) {
+            $month = now()->subMonthsNoOverflow($offset);
+            $labels[] = $month->format('M Y');
+            $bookings = Booking::whereIn('lead_id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('id'))->where('status','confirmed');
+            $counts[] = (clone $bookings)->whereYear('booked_at', $month->year)->whereMonth('booked_at', $month->month)->count();
+            $revenues[] = (float) PaymentReceived::whereIn('booking_id', $bookings->select('id'))->where('status', 'completed')->whereYear('paid_at', $month->year)->whereMonth('paid_at', $month->month)->sum('amount') / 10000000;
         }
 
+        return ['labels' => $labels, 'bookings' => $counts, 'revenues' => $revenues];
     }
 
     public function render()

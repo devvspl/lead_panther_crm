@@ -5,9 +5,7 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
 use App\Models\User;
 use App\Models\Lead;
 use App\Exports\BaseStyledExport;
@@ -68,61 +66,58 @@ class SalesExecutivePerformance extends Component
 
     protected function getExecutiveData(): array
     {
-        $buildReport = function () {
-            $user = auth()->user();
-            $execsQuery = User::role('sales-executive');
+        $user = auth()->user();
+        $execsQuery = User::role('sales-executive');
 
-            if ($user && $user->hasRole('Sales Executive')) {
-                $execsQuery->where('id', $user->id);
+        if ($user && $user->hasRole('Sales Executive')) {
+            $execsQuery->where('id', $user->id);
+        }
+
+        if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
+            $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+        }
+        $execs = $execsQuery->get();
+        $data = [];
+
+        foreach ($execs as $exec) {
+            $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
+            $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id);
+            $assigned = (clone $query)->get();
+            $met = $assigned->filter(fn($lead)=>$lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at)<=15)->count();
+            $slaRate = $assignedCount ? round($met/$assignedCount*100,1) : 0;
+            $leadIds = (clone $query)->select('id');
+            $siteVisits = SiteVisit::whereIn('lead_id',clone $leadIds)->where('attendance','attended')->count();
+            $bookingsClosed = Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->count();
+            $data[] = [
+                'executive_name' => $exec->name,
+                'assigned_leads' => $assignedCount,
+                'sla_contacted_rate' => $slaRate,
+                'site_visits' => $siteVisits,
+                'bookings_closed' => $bookingsClosed,
+            ];
+        }
+
+
+        // Sort data by active column
+        usort($data, function ($a, $b) {
+            $field = $this->sortField;
+            if (! isset($a[$field])) {
+                return 0;
             }
-
-            if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
-                $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+            $valA = $a[$field];
+            $valB = $b[$field];
+            if ($valA == $valB) {
+                return 0;
             }
-            $execs = $execsQuery->get();
-            $data = [];
-
-            foreach ($execs as $exec) {
-                $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
-                $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id);
-                $assigned = (clone $query)->get();
-                $met = $assigned->filter(fn($lead)=>$lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at)<=15)->count();
-                $slaRate = $assignedCount ? round($met/$assignedCount*100,1) : 0;
-                $leadIds = (clone $query)->select('id');
-                $siteVisits = SiteVisit::whereIn('lead_id',clone $leadIds)->where('attendance','attended')->count();
-                $bookingsClosed = Booking::whereIn('lead_id',clone $leadIds)->where('status','confirmed')->count();
-                $data[] = [
-                    'executive_name' => $exec->name,
-                    'assigned_leads' => $assignedCount,
-                    'sla_contacted_rate' => $slaRate,
-                    'site_visits' => $siteVisits,
-                    'bookings_closed' => $bookingsClosed,
-                ];
+            if ($this->sortDirection === 'asc') {
+                return ($valA < $valB) ? -1 : 1;
+            } else {
+                return ($valA > $valB) ? -1 : 1;
             }
+        });
 
+        return $data;
 
-            // Sort data by active column
-            usort($data, function ($a, $b) {
-                $field = $this->sortField;
-                if (! isset($a[$field])) {
-                    return 0;
-                }
-                $valA = $a[$field];
-                $valB = $b[$field];
-                if ($valA == $valB) {
-                    return 0;
-                }
-                if ($this->sortDirection === 'asc') {
-                    return ($valA < $valB) ? -1 : 1;
-                } else {
-                    return ($valA > $valB) ? -1 : 1;
-                }
-            });
-
-            return $data;
-        };
-
-        return $buildReport();
     }
 
     public function render()

@@ -5,11 +5,8 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
 use App\Models\User;
-use App\Models\LeadCommunication;
 use App\Exports\BaseStyledExport;
 use App\Models\Followup;
 use App\Models\Lead;
@@ -52,45 +49,42 @@ class FollowupPerformance extends Component
 
     protected function getFollowupData(): array
     {
-        $buildReport = function () {
-            $user = auth()->user();
-            $execsQuery = User::role('sales-executive');
+        $user = auth()->user();
+        $execsQuery = User::role('sales-executive');
 
-            if ($user && $user->hasRole('Sales Executive')) {
-                $execsQuery->where('id', $user->id);
+        if ($user && $user->hasRole('Sales Executive')) {
+            $execsQuery->where('id', $user->id);
+        }
+
+        if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
+            $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+        }
+        $execs = $execsQuery->get();
+        $data = [];
+
+        foreach ($execs as $exec) {
+            $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id)->select('id');
+            $followups=Followup::whereIn('lead_id',$leadIds)->get();
+            $onTime=0; $overdue=0;
+            foreach($followups as $followup) {
+                if($followup->status==='completed') {
+                    // Legacy rows have no completed_at column; updated_at is the recorded completion proxy.
+                    $completedAt=$followup->updated_at;
+                    $completedAt <= $followup->due_at ? $onTime++ : $overdue++;
+                } elseif($followup->status==='pending' && $followup->due_at < now()) $overdue++;
             }
-
-            if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
-                $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
-            }
-            $execs = $execsQuery->get();
-            $data = [];
-
-            foreach ($execs as $exec) {
-                $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id)->select('id');
-                $followups=Followup::whereIn('lead_id',$leadIds)->get();
-                $onTime=0; $overdue=0;
-                foreach($followups as $followup) {
-                    if($followup->status==='completed') {
-                        // Legacy rows have no completed_at column; updated_at is the recorded completion proxy.
-                        $completedAt=$followup->updated_at;
-                        $completedAt <= $followup->due_at ? $onTime++ : $overdue++;
-                    } elseif($followup->status==='pending' && $followup->due_at < now()) $overdue++;
-                }
-                $rate=($onTime+$overdue)>0 ? round($onTime/($onTime+$overdue)*100,1) : 0;
-                $data[] = [
-                    'executive_name' => $exec->name,
-                    'on_time' => $onTime,
-                    'overdue' => $overdue,
-                    'on_time_rate' => $rate,
-                ];
-            }
+            $rate=($onTime+$overdue)>0 ? round($onTime/($onTime+$overdue)*100,1) : 0;
+            $data[] = [
+                'executive_name' => $exec->name,
+                'on_time' => $onTime,
+                'overdue' => $overdue,
+                'on_time_rate' => $rate,
+            ];
+        }
 
 
-            return $data;
-        };
+        return $data;
 
-        return $buildReport();
     }
 
     public function render()

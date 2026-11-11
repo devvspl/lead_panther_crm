@@ -5,9 +5,7 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
 use App\Models\Client;
 use App\Models\Lead;
 use App\Models\LeadReplacement;
@@ -53,70 +51,64 @@ class ReplacementRate extends Component
 
     protected function getReplacementRatesData(): array
     {
-        $buildReport = function () {
-            $user = auth()->user();
-            $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
+        $user = auth()->user();
+        $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
 
-            if (Lead::usesSalesPanel()) {
-                if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
-                    $clientsQuery->whereIn('id', Lead::panelQuery()->select('client_id'));
-                } else {
-                    $clientsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+        if (Lead::usesSalesPanel()) {
+            if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
+                $clientsQuery->whereIn('id', Lead::panelQuery()->select('client_id'));
+            } else {
+                $clientsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+            }
+        }
+        if (! Lead::usesSalesPanel() && $user && $user->hasRole('Client')) {
+            $clientsQuery->where('organization_id', $user->organization_id);
+        }
+
+        $clients = $clientsQuery->get();
+        $data = [];
+
+        foreach ($clients as $client) {
+            $totalLeads = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id', $client->id)->count();
+            $claims = LeadReplacement::whereHas('lead', function ($q) use ($client) {
+                $q->withoutGlobalScopes()->where('client_id', $client->id);
+                if (Lead::usesSalesPanel()) {
+                    $q->whereIn('id', Lead::panelQuery()->select('id'));
                 }
-            }
-            if (! Lead::usesSalesPanel() && $user && $user->hasRole('Client')) {
-                $clientsQuery->where('organization_id', $user->organization_id);
-            }
+            })->get();
 
-            $clients = $clientsQuery->get();
-            $data = [];
+            $totalClaims = $claims->count();
+            $approvedClaims = $claims->where('status', 'approved')->count();
+            $rate = $totalLeads > 0 ? round(($approvedClaims / $totalLeads) * 100, 1) : 0.0;
 
-            foreach ($clients as $client) {
-                $totalLeads = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id', $client->id)->count();
-                $claims = LeadReplacement::whereHas('lead', function ($q) use ($client) {
-                    $q->withoutGlobalScopes()->where('client_id', $client->id);
-                    if (Lead::usesSalesPanel()) {
-                        $q->whereIn('id', Lead::panelQuery()->select('id'));
-                    }
-                })->get();
-
-                $totalClaims = $claims->count();
-                $approvedClaims = $claims->where('status', 'approved')->count();
-                $rate = $totalLeads > 0 ? round(($approvedClaims / $totalLeads) * 100, 1) : 0.0;
-
-                $data[] = [
-                    'client_name' => $client->name,
-                    'total_leads' => $totalLeads,
-                    'total_claims' => $totalClaims,
-                    'approved_claims' => $approvedClaims,
-                    'replacement_rate' => $rate,
-                ];
-            }
+            $data[] = [
+                'client_name' => $client->name,
+                'total_leads' => $totalLeads,
+                'total_claims' => $totalClaims,
+                'approved_claims' => $approvedClaims,
+                'replacement_rate' => $rate,
+            ];
+        }
 
 
-            return $data;
-        };
+        return $data;
 
-        return $buildReport();
     }
 
     protected function getMonthlyTrend(): array
     {
-        {
-            $labels = [];
-            $rates = [];
-            foreach (range(5, 0) as $offset) {
-                $month = now()->subMonthsNoOverflow($offset);
-                $labels[] = $month->format('M Y');
-                $leads = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->whereYear('created_at', $month->year)->whereMonth('created_at', $month->month);
-                $total = (clone $leads)->count();
-                $approved = LeadReplacement::whereIn('lead_id', $leads->select('id'))->where('status', 'approved')->count();
-                $rates[] = $total ? round($approved / $total * 100, 1) : 0;
-            }
-
-            return ['labels' => $labels, 'rates' => $rates];
+        $labels = [];
+        $rates = [];
+        foreach (range(5, 0) as $offset) {
+            $month = now()->subMonthsNoOverflow($offset);
+            $labels[] = $month->format('M Y');
+            $leads = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->whereYear('created_at', $month->year)->whereMonth('created_at', $month->month);
+            $total = (clone $leads)->count();
+            $approved = LeadReplacement::whereIn('lead_id', $leads->select('id'))->where('status', 'approved')->count();
+            $rates[] = $total ? round($approved / $total * 100, 1) : 0;
         }
 
+        return ['labels' => $labels, 'rates' => $rates];
     }
 
     public function render()

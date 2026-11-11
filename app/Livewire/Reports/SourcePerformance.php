@@ -5,10 +5,8 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
 use App\Models\Lead;
 use App\Models\Client;
 use Livewire\WithPagination;
@@ -34,7 +32,7 @@ class SourcePerformance extends Component
 
     public function updatingDays(): void
     {
-        $this->resetPage();
+        $this->resetPage('sourceReportPage');
     }
 
     public function exportExcel()
@@ -64,56 +62,53 @@ class SourcePerformance extends Component
     protected function getReportData(): array
     {
         $this->validate(['days'=>'required|integer|in:7,30,90']);
-        $buildReport = function () {
-            $user = auth()->user();
-            $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('created_at', '>=', now()->subDays($this->days));
+        $user = auth()->user();
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('created_at', '>=', now()->subDays($this->days));
 
-            if ($user && ! Lead::usesSalesPanel()) {
-                if ($user->hasRole('Client')) {
-                    $client = Client::where('organization_id', $user->organization_id)->first();
-                    if ($client) {
-                        $query->where('client_id', $client->id);
-                    }
-                } elseif ($user->hasRole('Sales Executive') || $user->hasRole('Executive')) {
-                    $query->where('assigned_to', $user->id);
+        if ($user && ! Lead::usesSalesPanel()) {
+            if ($user->hasRole('Client')) {
+                $client = Client::where('organization_id', $user->organization_id)->first();
+                if ($client) {
+                    $query->where('client_id', $client->id);
                 }
+            } elseif ($user->hasRole('Sales Executive') || $user->hasRole('Executive')) {
+                $query->where('assigned_to', $user->id);
             }
+        }
 
-            $results = $query->select(
-                'lead_source_id',
-                DB::raw('count(*) as total_leads'),
-                DB::raw('AVG(lead_cost) as actual_cost'),
-                DB::raw("sum(case when LOWER(REPLACE(current_stage, ' ', '_')) IN ('closed_won','won') or status = 'closed_won' then 1 else 0 end) as closed_won")
-            )->groupBy('lead_source_id')->with('leadSource')->get();
+        $results = $query->select(
+            'lead_source_id',
+            DB::raw('count(*) as total_leads'),
+            DB::raw('AVG(lead_cost) as actual_cost'),
+            DB::raw("sum(case when LOWER(REPLACE(current_stage, ' ', '_')) IN ('closed_won','won') or status = 'closed_won' then 1 else 0 end) as closed_won")
+        )->groupBy('lead_source_id')->with('leadSource')->get();
 
-            $data = [];
-            foreach ($results as $row) {
-                $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
-                $total = $row->total_leads ?: 1;
-                $won = $row->closed_won ?: 0;
-                $costPerLead = $row->actual_cost !== null ? round((float)$row->actual_cost,2) : null; // Stored credit charge; unknown costs remain empty.
-                $conversionRate = round(($won / $total) * 100, 1);
+        $data = [];
+        foreach ($results as $row) {
+            $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
+            $total = $row->total_leads ?: 1;
+            $won = $row->closed_won ?: 0;
+            $costPerLead = $row->actual_cost !== null ? round((float)$row->actual_cost,2) : null; // Stored credit charge; unknown costs remain empty.
+            $conversionRate = round(($won / $total) * 100, 1);
 
-                $data[] = [
-                    'source_name' => ucfirst($sourceName),
-                    'total_leads' => $total,
-                    'cost_per_lead' => $costPerLead,
-                    'closed_won' => $won,
-                    'conversion_rate' => $conversionRate,
-                ];
-            }
+            $data[] = [
+                'source_name' => ucfirst($sourceName),
+                'total_leads' => $total,
+                'cost_per_lead' => $costPerLead,
+                'closed_won' => $won,
+                'conversion_rate' => $conversionRate,
+            ];
+        }
 
 
-            return $data;
-        };
+        return $data;
 
-        return $buildReport();
     }
 
     public function render()
     {
         $allData = collect($this->getReportData());
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = LengthAwarePaginator::resolveCurrentPage('sourceReportPage');
         $perPage = 15;
         $currentPageItems = $allData->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
@@ -122,7 +117,7 @@ class SourcePerformance extends Component
             $allData->count(),
             $perPage,
             $currentPage,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName'=>'sourceReportPage']
         );
 
         return view('livewire.reports.source-performance', [

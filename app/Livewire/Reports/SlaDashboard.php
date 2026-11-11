@@ -136,7 +136,7 @@ class SlaDashboard extends Component
     public function render()
     {
         $allBreached = collect($this->getBreachedLeadsData());
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $currentPage = LengthAwarePaginator::resolveCurrentPage('slaReportPage');
         $perPage = 15;
         $currentPageItems = $allBreached->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
@@ -145,7 +145,7 @@ class SlaDashboard extends Component
             $allBreached->count(),
             $perPage,
             $currentPage,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName'=>'slaReportPage']
         );
 
         return view('livewire.reports.sla-dashboard', [

@@ -4,13 +4,13 @@
 
 namespace App\Livewire\Reports;
 
-use Livewire\Component;
-use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\BaseStyledExport;
 use App\Models\Client;
 use App\Models\Lead;
 use App\Models\LeadReplacement;
-use App\Exports\BaseStyledExport;
 use App\Support\NavigationConfig;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReplacementRate extends Component
 {
@@ -18,9 +18,9 @@ class ReplacementRate extends Component
     {
         return [
             ['key' => 'client_name', 'label' => 'Client Organization', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
-            ['key' => 'total_leads', 'label' => 'Total Ingested Leads', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'total_claims', 'label' => 'Replacement Claims', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 2],
-            ['key' => 'approved_claims', 'label' => 'Approved Replacements', 'class' => 'font-mono font-bold text-purple-700', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_leads', 'label' => 'Total Ingested Leads', 'class' => 'font-mono', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_claims', 'label' => 'Replacement Claims', 'class' => 'font-mono', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 2],
+            ['key' => 'approved_claims', 'label' => 'Approved Replacements', 'class' => 'font-mono font-bold text-purple-700', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
             ['key' => 'replacement_rate', 'label' => 'Effective Replacement Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
     }
@@ -29,7 +29,7 @@ class ReplacementRate extends Component
     {
         $rows = collect($this->getReplacementRatesData());
         $headings = ['Client Name', 'Total Leads Assigned', 'Total Claims Submitted', 'Approved Claims', 'Replacement Rate (%)'];
-        $columns = ['client_name', 'total_leads', 'total_claims', 'approved_claims', fn($r) => $r['replacement_rate'] . '%'];
+        $columns = ['client_name', 'total_leads', 'total_claims', 'approved_claims', fn ($r) => $r['replacement_rate'].'%'];
 
         $filename = 'replacement-rate-report_'.now()->format('Y-m-d').'.xlsx';
         $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Client Replacement Quality Analysis';
@@ -52,7 +52,7 @@ class ReplacementRate extends Component
     protected function getReplacementRatesData(): array
     {
         $user = auth()->user();
-        $clientsQuery = Client::query()->whereIn('id',(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
+        $clientsQuery = Client::query()->whereIn('id', (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('client_id'));
 
         if (Lead::usesSalesPanel()) {
             if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
@@ -89,7 +89,6 @@ class ReplacementRate extends Component
                 'replacement_rate' => $rate,
             ];
         }
-
 
         return $data;
 

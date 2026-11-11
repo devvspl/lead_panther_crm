@@ -4,14 +4,14 @@
 
 namespace App\Livewire\Reports;
 
-use Livewire\Component;
-use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Models\Lead;
-use App\Models\Client;
-use Livewire\WithPagination;
-use Illuminate\Pagination\LengthAwarePaginator;
 use App\Exports\BaseStyledExport;
+use App\Models\Client;
+use App\Models\Lead;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SourcePerformance extends Component
 {
@@ -23,9 +23,9 @@ class SourcePerformance extends Component
     {
         return [
             ['key' => 'source_name', 'label' => 'Lead Source', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
-            ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'cost_per_lead', 'label' => 'Average Lead Cost (Credits)', 'prefix' => '', 'formatter' => fn ($v) => $v === null ? '—' : number_format((float)$v,2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
-            ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'cost_per_lead', 'label' => 'Average Lead Cost (Credits)', 'prefix' => '', 'formatter' => fn ($v) => $v === null ? '—' : number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
             ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
     }
@@ -39,7 +39,7 @@ class SourcePerformance extends Component
     {
         $rows = collect($this->getReportData());
         $headings = ['Lead Source', 'Total Leads', 'Average Lead Cost (Credits)', 'Closed Won', 'Conversion Rate (%)'];
-        $columns = ['source_name', 'total_leads', 'cost_per_lead', 'closed_won', fn($r) => $r['conversion_rate'] . '%'];
+        $columns = ['source_name', 'total_leads', 'cost_per_lead', 'closed_won', fn ($r) => $r['conversion_rate'].'%'];
 
         $filename = 'source-performance-report_'.now()->format('Y-m-d').'.xlsx';
         $subtitle = 'Exported '.now()->format('d M Y, H:i T')." | Timeframe: Last {$this->days} Days";
@@ -61,7 +61,7 @@ class SourcePerformance extends Component
 
     protected function getReportData(): array
     {
-        $this->validate(['days'=>'required|integer|in:7,30,90']);
+        $this->validate(['days' => 'required|integer|in:7,30,90']);
         $user = auth()->user();
         $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('created_at', '>=', now()->subDays($this->days));
 
@@ -88,7 +88,7 @@ class SourcePerformance extends Component
             $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
             $total = $row->total_leads ?: 1;
             $won = $row->closed_won ?: 0;
-            $costPerLead = $row->actual_cost !== null ? round((float)$row->actual_cost,2) : null; // Stored credit charge; unknown costs remain empty.
+            $costPerLead = $row->actual_cost !== null ? round((float) $row->actual_cost, 2) : null; // Stored credit charge; unknown costs remain empty.
             $conversionRate = round(($won / $total) * 100, 1);
 
             $data[] = [
@@ -99,7 +99,6 @@ class SourcePerformance extends Component
                 'conversion_rate' => $conversionRate,
             ];
         }
-
 
         return $data;
 
@@ -117,7 +116,7 @@ class SourcePerformance extends Component
             $allData->count(),
             $perPage,
             $currentPage,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName'=>'sourceReportPage']
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName' => 'sourceReportPage']
         );
 
         return view('livewire.reports.source-performance', [

@@ -4,15 +4,14 @@
 
 namespace App\Livewire\Reports;
 
-use Livewire\Component;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportExport;
-use App\Models\Lead;
-use App\Models\Client;
-use Carbon\Carbon;
-use Livewire\WithPagination;
-use Illuminate\Pagination\LengthAwarePaginator;
 use App\Exports\BaseStyledExport;
+use App\Models\Client;
+use App\Models\Lead;
+use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SlaDashboard extends Component
 {
@@ -26,7 +25,7 @@ class SlaDashboard extends Component
             ['key' => 'assigned_name', 'label' => 'Assigned To', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'created_at', 'label' => 'Ingested At', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
             ['key' => 'minutes_over', 'label' => 'Minutes Over Target', 'prefix' => '+', 'suffix' => ' mins', 'class' => 'font-mono font-bold text-danger', 'sortable' => false, 'priority' => 1],
-            ['key' => 'status_label', 'label' => 'Current SLA Status', 'type' => 'badge', 'badgeStyle' => fn($val, $row) => (!empty($row['is_unresponded']) ? 'bg-red-100 text-red-800 animate-pulse border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'), 'sortable' => false, 'priority' => 1],
+            ['key' => 'status_label', 'label' => 'Current SLA Status', 'type' => 'badge', 'badgeStyle' => fn ($val, $row) => (! empty($row['is_unresponded']) ? 'bg-red-100 text-red-800 animate-pulse border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'), 'sortable' => false, 'priority' => 1],
         ];
     }
 
@@ -76,11 +75,11 @@ class SlaDashboard extends Component
         $acceptable = 0;
         $breached = 0;
 
-        foreach($leads as $lead) {
-            if(!$lead->first_response_at) {
-                $lead->created_at->diffInMinutes(now())>15 ? $breached++ : $acceptable++;
+        foreach ($leads as $lead) {
+            if (! $lead->first_response_at) {
+                $lead->created_at->diffInMinutes(now()) > 15 ? $breached++ : $acceptable++;
             } else {
-                $lead->created_at->diffInMinutes($lead->first_response_at)<=15 ? $excellent++ : $breached++;
+                $lead->created_at->diffInMinutes($lead->first_response_at) <= 15 ? $excellent++ : $breached++;
             }
         }
 
@@ -125,7 +124,7 @@ class SlaDashboard extends Component
                     'first_response_at' => $l->first_response_at ? Carbon::parse($l->first_response_at)->format('M d, H:i') : 'None',
                     'minutes_over' => max(0, $mins - 15),
                     'status_label' => $l->first_response_at ? 'Responded Late' : 'Unresponded',
-                    'is_unresponded' => !$l->first_response_at,
+                    'is_unresponded' => ! $l->first_response_at,
                 ];
             }
         }
@@ -145,7 +144,7 @@ class SlaDashboard extends Component
             $allBreached->count(),
             $perPage,
             $currentPage,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName'=>'slaReportPage']
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName' => 'slaReportPage']
         );
 
         return view('livewire.reports.sla-dashboard', [

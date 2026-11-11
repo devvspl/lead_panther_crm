@@ -4,12 +4,12 @@
 
 namespace App\Livewire\Reports;
 
-use Livewire\Component;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Models\User;
 use App\Exports\BaseStyledExport;
 use App\Models\Followup;
 use App\Models\Lead;
+use App\Models\User;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class FollowupPerformance extends Component
 {
@@ -17,8 +17,8 @@ class FollowupPerformance extends Component
     {
         return [
             ['key' => 'executive_name', 'label' => 'Sales Executive', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
-            ['key' => 'on_time', 'label' => 'Completed On Time', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'overdue', 'label' => 'Overdue / Delayed', 'class' => 'font-mono font-bold text-danger', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'on_time', 'label' => 'Completed On Time', 'class' => 'font-mono font-bold text-success', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
+            ['key' => 'overdue', 'label' => 'Overdue / Delayed', 'class' => 'font-mono font-bold text-danger', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
             ['key' => 'on_time_rate', 'label' => 'On-Time Execution Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
     }
@@ -27,7 +27,7 @@ class FollowupPerformance extends Component
     {
         $rows = collect($this->getFollowupData());
         $headings = ['Sales Executive', 'Completed On Time', 'Overdue / Delayed', 'On-Time Completion Rate (%)'];
-        $columns = ['executive_name', 'on_time', 'overdue', fn($r) => $r['on_time_rate'] . '%'];
+        $columns = ['executive_name', 'on_time', 'overdue', fn ($r) => $r['on_time_rate'].'%'];
 
         $filename = 'followup-performance-report_'.now()->format('Y-m-d').'.xlsx';
         $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Followup Compliance Audit';
@@ -63,17 +63,20 @@ class FollowupPerformance extends Component
         $data = [];
 
         foreach ($execs as $exec) {
-            $leadIds=(Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to',$exec->id)->select('id');
-            $followups=Followup::whereIn('lead_id',$leadIds)->get();
-            $onTime=0; $overdue=0;
-            foreach($followups as $followup) {
-                if($followup->status==='completed') {
+            $leadIds = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->select('id');
+            $followups = Followup::whereIn('lead_id', $leadIds)->get();
+            $onTime = 0;
+            $overdue = 0;
+            foreach ($followups as $followup) {
+                if ($followup->status === 'completed') {
                     // Legacy rows have no completed_at column; updated_at is the recorded completion proxy.
-                    $completedAt=$followup->updated_at;
+                    $completedAt = $followup->updated_at;
                     $completedAt <= $followup->due_at ? $onTime++ : $overdue++;
-                } elseif($followup->status==='pending' && $followup->due_at < now()) $overdue++;
+                } elseif ($followup->status === 'pending' && $followup->due_at < now()) {
+                    $overdue++;
+                }
             }
-            $rate=($onTime+$overdue)>0 ? round($onTime/($onTime+$overdue)*100,1) : 0;
+            $rate = ($onTime + $overdue) > 0 ? round($onTime / ($onTime + $overdue) * 100, 1) : 0;
             $data[] = [
                 'executive_name' => $exec->name,
                 'on_time' => $onTime,
@@ -81,7 +84,6 @@ class FollowupPerformance extends Component
                 'on_time_rate' => $rate,
             ];
         }
-
 
         return $data;
 

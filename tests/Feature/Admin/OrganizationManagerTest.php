@@ -758,6 +758,33 @@ class OrganizationManagerTest extends TestCase
             ->call('setTab', 'credits')
             ->assertSet('activeTab', 'credits');
     }
+
+    public function test_organization_detail_validation_keeps_field_errors_and_dispatches_a_toast(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+        $org = Organization::create(['name' => 'Toast Validation Organization', 'status' => 'active']);
+
+        Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org])
+            ->call('startEditing')
+            ->set('editName', '')
+            ->call('updateOrganization')
+            ->assertHasErrors(['editName' => 'required'])
+            ->assertDispatched('toast', type: 'error', title: 'Please check the form');
+
+        $this->assertSame('Toast Validation Organization', $org->fresh()->name);
+    }
+
+    public function test_organization_detail_tab_export_dispatches_a_toast(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+        $org = Organization::create(['name' => 'Toast Export Organization', 'status' => 'active']);
+
+        Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org])
+            ->call('exportTabExcel', 'team')
+            ->assertDispatched('toast', type: 'success', message: 'Preparing the selected tab for Excel download...');
+    }
 }
 
 

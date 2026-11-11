@@ -4,7 +4,8 @@
     wire:persist="toast-container"
     x-data="{
         toasts: [],
-        add(toast) {
+        add(toast = {}) {
+            toast = Array.isArray(toast) ? (toast[0] || {}) : (toast || {});
             let id = Date.now() + Math.random();
             let type = toast.type || 'success';
             let title = toast.title || (type === 'success' ? 'Success' : (type === 'error' ? 'Error' : (type === 'warning' ? 'Warning' : 'Notice')));
@@ -22,6 +23,7 @@
         }
     }"
     x-on:toast.window="add($event.detail)"
+    x-on:toast-alert.window="add($event.detail)"
     x-on:livewire:navigating.window="toasts = []"
     x-init="
         @if(session()->has('success'))
@@ -37,7 +39,11 @@
             add({ type: 'info', message: @json(session('info')) });
         @endif
     "
-    class="fixed top-20 right-4 sm:right-6 z-40 flex flex-col gap-3 pointer-events-none"
+    role="status"
+    aria-live="polite"
+    aria-atomic="false"
+    style="z-index: 10000; max-width: calc(100vw - 2rem);"
+    class="fixed top-20 right-4 sm:right-6 flex flex-col gap-3 pointer-events-none"
 >
     <template x-for="toast in toasts" :key="toast.id">
         <div 
@@ -47,7 +53,7 @@
             x-transition:leave="transition ease-in duration-200 transform"
             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
             x-transition:leave-end="opacity-0 translate-y-[-10px] scale-95"
-            class="pointer-events-auto bg-surface border border-border rounded-card shadow-lg px-4 py-3 flex items-start gap-3 min-w-[320px] max-w-[420px] relative overflow-hidden"
+            class="pointer-events-auto bg-surface border border-border rounded-card shadow-lg px-4 py-3 flex items-start gap-3 w-full sm:min-w-[320px] max-w-[420px] relative overflow-hidden"
         >
             <!-- Type Icon Badge -->
             <div class="flex-shrink-0 mt-0.5">
@@ -78,13 +84,14 @@
                 <template x-if="toast.title">
                     <div class="text-xs font-bold text-ink tracking-tight mb-0.5" x-text="toast.title"></div>
                 </template>
-                <div class="text-xs font-medium text-ink leading-relaxed" x-text="toast.message"></div>
+                <div class="text-xs font-medium text-ink leading-relaxed break-words" x-text="toast.message"></div>
             </div>
 
             <!-- Manual Close Button -->
             <button 
                 x-on:click="remove(toast.id)" 
                 type="button" 
+                aria-label="Dismiss notification"
                 class="flex-shrink-0 text-muted hover:text-ink transition p-1 -mr-1 rounded-lg focus:outline-none"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

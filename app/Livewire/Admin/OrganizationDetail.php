@@ -105,6 +105,13 @@ class OrganizationDetail extends Component
         }
     }
 
+    public function exception($e, $stopPropagation): void
+    {
+        if ($e instanceof \Illuminate\Validation\ValidationException) {
+            $this->dispatch('toast', type: 'error', title: 'Please check the form', message: $e->validator->errors()->first());
+        }
+    }
+
     public function updateOrgLeadCost(): void
     {
         $this->validate([
@@ -600,6 +607,9 @@ class OrganizationDetail extends Component
 
     public function exportTabExcel(string $tab)
     {
+        if (in_array($tab, ['team', 'clients', 'leads', 'credits', 'activity'], true)) {
+            $this->dispatch('toast', type: 'success', message: 'Preparing the selected tab for Excel download...');
+        }
         $org = $this->organization;
         $slug = Str::slug($org->name);
         $date = now()->format('Y-m-d');

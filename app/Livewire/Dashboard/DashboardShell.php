@@ -1964,6 +1964,59 @@ class DashboardShell extends Component
         ];
     }
 
+    public function getSalesDashboardDataProperty(): array
+    {
+        $user = auth()->user();
+        $userId = $user?->id;
+
+        $leadsQuery = Lead::withoutGlobalScopes()->where('assigned_to', $userId);
+
+        $totalLeads = (clone $leadsQuery)->count();
+        $newLeads = (clone $leadsQuery)->whereIn('current_stage', ['new', 'contacted', 'connected'])->count();
+        $inProgress = (clone $leadsQuery)->whereIn('current_stage', ['interested', 'follow_up', 'meeting_scheduled', 'meeting', 'site_visit', 'negotiation', 'booking'])->count();
+
+        $followupsDue = Followup::where('status', 'pending')
+            ->where(function ($q) use ($userId) {
+                $q->where('created_by', $userId)
+                  ->orWhereHas('lead', fn($lq) => $lq->where('assigned_to', $userId));
+            })
+            ->where('due_at', '<=', now()->endOfDay())
+            ->count();
+
+        $closedWon = (clone $leadsQuery)->where('current_stage', 'closed_won')->count();
+        $lostLeads = (clone $leadsQuery)->whereIn('current_stage', ['lost', 'closed_lost', 'invalid', 'unreachable'])->count();
+
+        $todayFollowups = Followup::where('status', 'pending')
+            ->where(function ($q) use ($userId) {
+                $q->where('created_by', $userId)
+                  ->orWhereHas('lead', fn($lq) => $lq->where('assigned_to', $userId));
+            })
+            ->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])
+            ->with(['lead.project'])
+            ->orderBy('due_at', 'asc')
+            ->take(10)
+            ->get();
+
+        $recentLeads = (clone $leadsQuery)
+            ->with(['project', 'leadSource'])
+            ->latest('updated_at')
+            ->take(8)
+            ->get();
+
+        return [
+            'kpis' => [
+                'total' => $totalLeads,
+                'new' => $newLeads,
+                'in_progress' => $inProgress,
+                'followups_due' => $followupsDue,
+                'closed_won' => $closedWon,
+                'lost' => $lostLeads,
+            ],
+            'today_followups' => $todayFollowups,
+            'recent_leads' => $recentLeads,
+        ];
+    }
+
     public function render()
     {
         $sourceOptions = LeadSource::pluck('name', 'id')->map(fn($name) => ucfirst($name))->toArray();
@@ -2023,6 +2076,9 @@ class DashboardShell extends Component
             'builderProjects' => $builderProjects,
             'builderTeams' => $builderTeams,
             'builderTeamMembers' => $builderTeamMembers,
+
+            // Sales Executive Dashboard Data
+            'salesData' => $this->role === 'sales' ? $this->salesDashboardData : [],
         ]);
     }
 }

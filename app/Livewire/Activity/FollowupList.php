@@ -54,30 +54,43 @@ class FollowupList extends Component
     {
         $userId = auth()->id() ?? 1;
 
-        $myOverdue = Followup::where('created_by', $userId)
+        $baseQuery = Followup::query()->with(['lead.project']);
+
+        // Scope to user's created follow-ups or follow-ups for leads assigned to this user
+        $baseQuery->where(function ($q) use ($userId) {
+            $q->where('created_by', $userId)
+              ->orWhereHas('lead', fn($lq) => $lq->where('assigned_to', $userId));
+        });
+
+        $myOverdue = (clone $baseQuery)
             ->where('status', 'pending')
             ->where('due_at', '<', now()->startOfDay())
+            ->orderBy('due_at', 'asc')
             ->get();
 
-        $myToday = Followup::where('created_by', $userId)
+        $myToday = (clone $baseQuery)
             ->where('status', 'pending')
             ->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])
+            ->orderBy('due_at', 'asc')
             ->get();
 
-        $myUpcoming = Followup::where('created_by', $userId)
+        $myUpcoming = (clone $baseQuery)
             ->where('status', 'pending')
             ->where('due_at', '>', now()->endOfDay())
+            ->orderBy('due_at', 'asc')
             ->get();
 
         $leadFollowups = $this->lead 
-            ? Followup::where('lead_id', $this->lead->id)->latest('due_at')->get() 
+            ? Followup::where('lead_id', $this->lead->id)->with('lead.project')->latest('due_at')->get() 
             : collect();
 
-        return view('livewire.activity.followup-list', [
+        $view = view('livewire.activity.followup-list', [
             'myOverdue' => $myOverdue,
             'myToday' => $myToday,
             'myUpcoming' => $myUpcoming,
             'leadFollowups' => $leadFollowups,
         ]);
+
+        return $this->lead ? $view : $view->layout('layouts.app');
     }
 }

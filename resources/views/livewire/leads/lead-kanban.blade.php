@@ -3,13 +3,13 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
         <div>
             <div class="flex items-center gap-2">
-                <h1 class="text-lg font-bold tracking-tight text-ink">{{ $isBuilder ? 'My Leads' : 'Leads' }}</h1>
+                <h1 class="text-lg font-bold tracking-tight text-ink">{{ ($isBuilder || $isSalesExecutive) ? 'My Leads' : 'Leads' }}</h1>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    {{ $isBuilder ? 'Organization Pipeline' : 'Live Pipeline' }}
+                    {{ $isSalesExecutive ? 'My Assigned Pipeline' : ($isBuilder ? 'Organization Pipeline' : 'Live Pipeline') }}
                 </span>
             </div>
             <p class="text-xs text-muted mt-0.5">
-                {{ $isBuilder ? 'Manage organization leads, team assignments, follow-ups and replacement claims.' : 'Manage leads, assignments, follow-ups and conversions.' }}
+                {{ $isSalesExecutive ? 'Track customer interactions, schedule follow-ups and complete deal lifecycle.' : ($isBuilder ? 'Manage organization leads, team assignments, follow-ups and replacement claims.' : 'Manage leads, assignments, follow-ups and conversions.') }}
             </p>
         </div>
 
@@ -23,7 +23,7 @@
 
             <x-ui.export-button target="exportExcel" label="Export Excel" />
 
-            @if(!$isBuilder)
+            @if(!$isBuilder && !$isSalesExecutive)
                 <button type="button" wire:click="openPullLeadsModal"
                     class="inline-flex items-center gap-1.5 px-3.5 h-8 bg-ink hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -819,11 +819,14 @@
                 </div>
 
                 <!-- Sort Dropdown -->
-                <select wire:model.live="sort_by" class="h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:outline-none">
-                    <option value="created_desc">Latest Created</option>
-                    <option value="score_desc">Priority Score: High to Low</option>
-                    <option value="score_asc">Priority Score: Low to High</option>
-                </select>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="text-xs text-muted font-medium">Sort By:</span>
+                    <select wire:model.live="sort_by" class="h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:outline-none">
+                        <option value="created_desc">Latest Created</option>
+                        <option value="score_desc">Priority Score: High to Low</option>
+                        <option value="score_asc">Priority Score: Low to High</option>
+                    </select>
+                </div>
 
                 <!-- SLA Quick Toggle -->
                 <label class="flex items-center space-x-1.5 h-8 text-xs text-ink cursor-pointer bg-canvas px-3 rounded-lg border border-border select-none">
@@ -870,21 +873,23 @@
                 emptyMessage="No leads matched your search and filter criteria.">
                 <x-slot:action>
                     <div class="flex items-center gap-2">
-                        @if(!empty($selectedRows))
-                            <button type="button" wire:click="openBulkAssignModal"
-                                class="px-3 h-8 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-                                <span>Assign Selected ({{ count($selectedRows) }})</span>
+                        @if(!$isSalesExecutive)
+                            @if(!empty($selectedRows))
+                                <button type="button" wire:click="openBulkAssignModal"
+                                    class="px-3 h-8 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                    <span>Assign Selected ({{ count($selectedRows) }})</span>
+                                </button>
+                            @endif
+                            <button type="button" wire:click="autoDistributeUnassignedLeads"
+                                class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                title="Distribute unassigned leads using the Super Admin configured distribution rule">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                <span>Auto-Assign</span>
                             </button>
                         @endif
-                        <button type="button" wire:click="autoDistributeUnassignedLeads"
-                            class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                            title="Distribute unassigned leads using the Super Admin configured distribution rule">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                            <span>Auto-Assign</span>
-                        </button>
                         <x-ui.export-button target="exportExcel" class="text-xs" />
-                        @if(!$isBuilder)
+                        @if(!$isBuilder && !$isSalesExecutive)
                             <button type="button" wire:click="openPullLeadsModal"
                                 class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1430,6 +1435,26 @@
                     </select>
                     @error('assignUserId') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
                 </div>
+
+                @if(count($selectedLeadIds) === 1)
+                    @php
+                        $singleLead = \App\Models\Lead::find($selectedLeadIds[0]);
+                        $assignHistory = $singleLead ? \App\Models\LeadAssignment::where('lead_id', $singleLead->id)->with(['assignee', 'assigner'])->latest('assigned_at')->take(5)->get() : collect();
+                    @endphp
+                    @if($assignHistory->isNotEmpty())
+                        <div class="p-3 rounded-lg bg-canvas border border-border space-y-1.5 text-xs">
+                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Lead Assignment History</span>
+                            <div class="space-y-1 max-h-28 overflow-y-auto">
+                                @foreach($assignHistory as $ah)
+                                    <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-border/50 last:border-0">
+                                        <span class="font-medium text-ink">{{ $ah->assignee?->name ?? 'User #'.$ah->assigned_to }}</span>
+                                        <span class="text-muted text-[10px] font-mono">{{ \Carbon\Carbon::parse($ah->assigned_at)->format('M d, H:i') }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                @endif
 
                 <div class="p-3 rounded-lg bg-canvas border border-border text-[11px] text-muted space-y-1">
                     <div class="flex items-center gap-1.5 font-semibold text-ink">

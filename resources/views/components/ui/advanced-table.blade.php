@@ -357,9 +357,14 @@
                                                 {{ $val ? \Carbon\Carbon::parse($val)->format($col['format'] ?? 'M d, Y H:i') : '—' }}
                                             </span>
                                         @elseif($type === 'lead_actions')
+                                            @php
+                                                $actionLeadId = is_object($row) ? $row->id : $row['id'];
+                                                $actionUser = auth()->user();
+                                                $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
+                                            @endphp
                                             <div class="flex items-center justify-end gap-1">
                                                 <button type="button"
-                                                    @click="$dispatch('open-lead-detail', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
+                                                    @click="$dispatch('open-lead-detail', { id: {{ $actionLeadId }} })"
                                                     class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
                                                     title="View Lead Details">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,7 +375,7 @@
                                                     </svg>
                                                 </button>
                                                 <button type="button"
-                                                    @click.stop="$dispatch('open-lead-journey', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
+                                                    @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadId }} })"
                                                     class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
                                                     title="Show Full Lead Journey Timeline">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,22 +383,24 @@
                                                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                 </button>
-                                                <button type="button"
-                                                    @click.stop="$dispatch('open-lead-assign', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
-                                                    class="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
-                                                    title="Assign Lead to Team Member">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                                    </svg>
-                                                </button>
-                                                <button type="button"
-                                                    @click.stop="$dispatch('open-return-lead', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
-                                                    class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                                                    title="Return Lead to Super Admin (Replacement Request)">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
-                                                    </svg>
-                                                </button>
+                                                @if(!$isSalesUser)
+                                                    <button type="button"
+                                                        @click.stop="$dispatch('open-lead-assign', { id: {{ $actionLeadId }} })"
+                                                        class="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                                                        title="Assign Lead to Team Member">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button type="button"
+                                                        @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadId }} })"
+                                                        class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                                                        title="Return Lead to Super Admin (Replacement Request)">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
+                                                        </svg>
+                                                    </button>
+                                                @endif
                                             </div>
                                         @elseif($type === 'user_name')
                                             @php
@@ -751,9 +758,14 @@
                                         <span
                                             class="font-mono text-muted text-[11px]">{{ $val ? \Carbon\Carbon::parse($val)->format('M d, Y') : '—' }}</span>
                                     @elseif($type === 'lead_actions')
+                                        @php
+                                            $actionLeadIdMob = is_object($row) ? $row->id : $row['id'];
+                                            $actionUserMob = auth()->user();
+                                            $isSalesUserMob = $actionUserMob && (\App\Support\NavigationConfig::getRoleKey($actionUserMob) === 'sales-executive' || $actionUserMob->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
+                                        @endphp
                                         <div class="flex items-center justify-end gap-1">
                                             <button type="button"
-                                                @click="$dispatch('open-lead-detail', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
+                                                @click="$dispatch('open-lead-detail', { id: {{ $actionLeadIdMob }} })"
                                                 class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
                                                 title="View Lead Details">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -764,7 +776,7 @@
                                                 </svg>
                                             </button>
                                             <button type="button"
-                                                @click.stop="$dispatch('open-lead-journey', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
+                                                @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadIdMob }} })"
                                                 class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
                                                 title="Show Full Lead Journey Timeline">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -772,14 +784,16 @@
                                                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </button>
-                                            <button type="button"
-                                                @click.stop="$dispatch('open-return-lead', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
-                                                class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                                                title="Return Lead to Super Admin">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
-                                                </svg>
-                                            </button>
+                                            @if(!$isSalesUserMob)
+                                                <button type="button"
+                                                    @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadIdMob }} })"
+                                                    class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                                                    title="Return Lead to Super Admin">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
+                                                    </svg>
+                                                </button>
+                                            @endif
                                         </div>
                                     @elseif($type === 'user_name')
                                         @php

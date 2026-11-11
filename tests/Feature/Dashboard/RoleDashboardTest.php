@@ -134,21 +134,23 @@ class RoleDashboardTest extends TestCase
 
         Livewire::actingAs($sales)
             ->test(DashboardShell::class, ['role' => 'sales'])
-            ->assertSee('Sales Executive Workspace')
-            ->assertSee('Assigned Leads Today')
-            ->assertSee('Follow-ups Pending')
-            ->assertSee('SLA Critical Leads');
+            ->assertSee('Sales Executive Dashboard')
+            ->assertSee('My Total Leads')
+            ->assertSee('New Leads')
+            ->assertSee('In Progress')
+            ->assertSee('Follow-ups Due')
+            ->assertSee('Closed Won')
+            ->assertSee('Lost Leads');
 
         $this->actingAs($sales)
             ->get('/sales/dashboard')
             ->assertOk()
-            ->assertSee('Sales Executive Workspace');
+            ->assertSee('Sales Executive Dashboard');
 
         $this->assertEquals('sales-executive', NavigationConfig::getRoleKey($sales));
         $allowed = NavigationConfig::getAllowedItemKeys($sales);
-        $this->assertContains('dashboard', $allowed);
-        $this->assertContains('leads', $allowed);
-        $this->assertContains('distribution', $allowed);
+        $this->assertEquals(['dashboard', 'leads', 'followups', 'reports'], $allowed);
+        $this->assertNotContains('distribution', $allowed);
         $this->assertNotContains('organizations', $allowed);
     }
 }

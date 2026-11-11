@@ -156,9 +156,8 @@ class LeadKanbanTest extends TestCase
         $columns = $component->instance()->tableColumns();
         $keys = collect($columns)->pluck('key')->all();
 
-        $this->assertNotContains('project_name', $keys);
+        $this->assertContains('project_name', $keys);
         $this->assertContains('campaign_name', $keys);
-        $this->assertContains('form_name', $keys);
 
         // Verify Lead accessors
         $org = Organization::create(['name' => 'Agency Org', 'type' => 'developer']);

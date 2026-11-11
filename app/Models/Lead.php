@@ -99,6 +99,16 @@ class Lead extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function meetings(): HasMany
+    {
+        return $this->hasMany(Meeting::class);
+    }
+
+    public function negotiations(): HasMany
+    {
+        return $this->hasMany(Negotiation::class);
+    }
+
     public function followups(): HasMany
     {
         return $this->hasMany(Followup::class);

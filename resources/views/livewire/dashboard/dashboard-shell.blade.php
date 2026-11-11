@@ -1516,10 +1516,199 @@
             document.addEventListener('livewire:initialized', renderBuilderCharts);
             document.addEventListener('livewire:updated', renderBuilderCharts);
         </script>
+    @elseif($role === 'sales')
+        <!-- ================================================================= -->
+        <!-- SALES EXECUTIVE WORKSPACE                                        -->
+        <!-- Focused on My Assigned Leads & Today's Follow-up Actions         -->
+        <!-- ================================================================= -->
+        <div class="space-y-4">
+            <!-- 1. Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-border">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">Sales Executive Dashboard</h1>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            {{ auth()->user()->name }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-muted mt-0.5">My assigned leads, scheduled calls &amp; daily follow-up queue</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-surface border border-border rounded-full text-[11px] font-semibold text-ink shadow-2xs">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Live Queue</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- 2. Quick Actions -->
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 text-xs">
+                <span class="text-[10px] font-bold text-muted uppercase tracking-wider shrink-0 mr-1">Quick Actions:</span>
+                <a href="{{ route('leads.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold bg-ink text-white hover:bg-neutral-800 transition shadow-2xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span>My Leads</span>
+                </a>
+                <a href="{{ route('followups.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold bg-surface border border-border text-ink hover:bg-canvas transition shadow-2xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>My Follow-ups</span>
+                </a>
+                <a href="{{ route('reports.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold bg-surface border border-border text-ink hover:bg-canvas transition shadow-2xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    <span>My Reports</span>
+                </a>
+            </div>
+
+            <!-- 3. KPI Cards (Exactly 6 compact cards) -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                <!-- 1. My Total Leads -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">My Total Leads</span>
+                    <span class="text-xl font-bold text-ink block">{{ number_format($salesData['kpis']['total'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">All assigned</span>
+                </div>
+
+                <!-- 2. New Leads -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">New Leads</span>
+                    <span class="text-xl font-bold text-blue-600 block">{{ number_format($salesData['kpis']['new'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">Awaiting first call</span>
+                </div>
+
+                <!-- 3. In Progress -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">In Progress</span>
+                    <span class="text-xl font-bold text-amber-600 block">{{ number_format($salesData['kpis']['in_progress'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">Active pipeline</span>
+                </div>
+
+                <!-- 4. Follow-ups Due -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Follow-ups Due</span>
+                    <span class="text-xl font-bold text-rose-600 block">{{ number_format($salesData['kpis']['followups_due'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">Due today / overdue</span>
+                </div>
+
+                <!-- 5. Closed Won -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Closed Won</span>
+                    <span class="text-xl font-bold text-emerald-600 block">{{ number_format($salesData['kpis']['closed_won'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">Bookings closed</span>
+                </div>
+
+                <!-- 6. Lost Leads -->
+                <div class="p-3 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold text-neutral-600 uppercase tracking-wider block">Lost Leads</span>
+                    <span class="text-xl font-bold text-neutral-700 block">{{ number_format($salesData['kpis']['lost'] ?? 0) }}</span>
+                    <span class="text-[10px] text-muted">Lost / Unreachable</span>
+                </div>
+            </div>
+
+            <!-- 4. Main Two Sections: Today's Follow-ups & Recently Assigned Leads -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Section A: Today's Follow-ups -->
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-ink uppercase tracking-wider">Today's Follow-ups</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                {{ count($salesData['today_followups'] ?? []) }} Scheduled
+                            </span>
+                        </div>
+                        <a href="{{ route('followups.index') }}" wire:navigate class="text-xs font-semibold text-primary hover:underline">View All &rarr;</a>
+                    </div>
+
+                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                        @forelse($salesData['today_followups'] ?? [] as $fu)
+                            <div class="p-3 rounded-lg bg-canvas border border-border flex items-center justify-between gap-2 text-xs">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <a href="{{ route('leads.index') }}?search={{ $fu->lead?->lead_code ?: $fu->lead_id }}" wire:navigate class="font-bold text-ink hover:text-primary hover:underline truncate">
+                                            {{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}
+                                        </a>
+                                        @if($fu->lead?->mobile)
+                                            <span class="font-mono text-[10px] text-muted">{{ $fu->lead->mobile }}</span>
+                                        @endif
+                                    </div>
+                                    <p class="text-[11px] text-muted truncate mt-0.5">
+                                        {{ $fu->lead?->project?->name ? $fu->lead->project->name.' • ' : '' }}{{ $fu->note ?: 'Scheduled customer follow-up call' }}
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="font-mono text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                                        {{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('H:i') : 'Today' }}
+                                    </span>
+                                    <a href="{{ route('leads.index') }}?search={{ $fu->lead?->lead_code ?: $fu->lead_id }}" wire:navigate
+                                       class="px-2 py-1 rounded bg-surface border border-border text-primary hover:bg-canvas font-semibold text-[11px] transition">
+                                        Open &rarr;
+                                    </a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-xs text-muted">
+                                <svg class="w-8 h-8 mx-auto text-muted/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span>No follow-ups due today. Great job!</span>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <!-- Section B: Recently Assigned Leads -->
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-ink uppercase tracking-wider">Recently Assigned Leads</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                Fresh Inbound
+                            </span>
+                        </div>
+                        <a href="{{ route('leads.index') }}" wire:navigate class="text-xs font-semibold text-primary hover:underline">View My Leads &rarr;</a>
+                    </div>
+
+                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                        @forelse($salesData['recent_leads'] ?? [] as $lead)
+                            <div class="p-3 rounded-lg bg-canvas border border-border flex items-center justify-between gap-2 text-xs">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <a href="{{ route('leads.index') }}?search={{ $lead->lead_code }}" wire:navigate class="font-bold text-ink hover:text-primary hover:underline truncate">
+                                            {{ $lead->name }}
+                                        </a>
+                                        <span class="font-mono text-[10px] text-muted">{{ $lead->lead_code }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[10px] text-muted mt-0.5">
+                                        <span class="font-medium text-ink">{{ $lead->project?->name ?: 'Direct' }}</span>
+                                        <span>&bull;</span>
+                                        <span>{{ $lead->mobile }}</span>
+                                        <span>&bull;</span>
+                                        <span class="font-mono">{{ $lead->created_at?->diffForHumans() }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <x-ui.badge status="{{ $lead->current_stage }}">
+                                        {{ ucfirst(str_replace('_', ' ', $lead->current_stage)) }}
+                                    </x-ui.badge>
+                                    <a href="{{ route('leads.index') }}?search={{ $lead->lead_code }}" wire:navigate
+                                       class="px-2 py-1 rounded bg-surface border border-border text-primary hover:bg-canvas font-semibold text-[11px] transition">
+                                        Action &rarr;
+                                    </a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-xs text-muted">
+                                <svg class="w-8 h-8 mx-auto text-muted/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <span>No leads assigned yet.</span>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
     @else
         <!-- ================================================================= -->
         <!-- TAILORED DASHBOARD VIEW FOR NON-ADMIN ROLES                       -->
-        <!-- (Builder, Broker, Channel Partner, Sales Executive, Client)       -->
+        <!-- (Broker, Channel Partner, Client, etc.)                           -->
         <!-- ================================================================= -->
         <!-- Role-Tailored Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border">

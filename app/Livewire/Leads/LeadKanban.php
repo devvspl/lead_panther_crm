@@ -490,6 +490,20 @@ class LeadKanban extends Component
             || $user->hasRole('builder-admin');
     }
 
+    public function getIsSalesExecutiveProperty(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return \App\Support\NavigationConfig::getRoleKey($user) === 'sales-executive'
+            || $user->hasRole('sales-executive')
+            || $user->hasRole('Sales Executive')
+            || $user->hasRole('Executive')
+            || $user->hasRole('sales');
+    }
+
     public function getBuilderLeadKpisProperty(): array
     {
         $query = $this->getScopedQuery();
@@ -540,7 +554,7 @@ class LeadKanban extends Component
 
         // Role Scoping
         if ($user) {
-            if ($user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
+            if ($this->isSalesExecutive) {
                 $query->where('assigned_to', $user->id);
             } elseif ($user->hasRole('channel-partner') || $user->hasRole('Channel Partner')) {
                 $query->whereHas('assignedTo', function ($q) use ($user) {
@@ -1296,6 +1310,7 @@ class LeadKanban extends Component
 
         return view('livewire.leads.lead-kanban', [
             'isBuilder' => $this->isBuilder,
+            'isSalesExecutive' => $this->isSalesExecutive,
             'builderKpis' => $this->builderLeadKpis,
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
@@ -1330,6 +1345,31 @@ class LeadKanban extends Component
     #[On('open-lead-assign')]
     public function openAssignModalForSingleLead(int $id): void
     {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot assign leads.');
+            return;
+        }
+
+        $user = auth()->user();
+        $lead = Lead::find($id);
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+            return;
+        }
+
+        if ($this->isBuilder && $user?->organization_id) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+                return;
+            }
+        }
+
         $this->selectedLeadIds = [$id];
         $this->assignTeamId = null;
         $this->assignUserId = null;
@@ -1470,6 +1510,11 @@ class LeadKanban extends Component
 
     public function autoDistributeUnassignedLeads(): void
     {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot trigger lead distribution.');
+            return;
+        }
+
         $user = auth()->user();
         $query = Lead::withoutGlobalScopes()
             ->whereNull('assigned_to');
@@ -1508,6 +1553,11 @@ class LeadKanban extends Component
 
     public function openBulkAssignModal(): void
     {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot assign leads.');
+            return;
+        }
+
         if (empty($this->selectedRows)) {
             $this->dispatch('toast', type: 'warning', message: 'Please select at least one lead from the table to assign.');
             return;
@@ -1528,6 +1578,11 @@ class LeadKanban extends Component
 
     public function executeAssignment(): void
     {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot assign leads.');
+            return;
+        }
+
         $this->validate([
             'selectedLeadIds' => 'required|array|min:1',
             'assignUserId' => 'required|exists:users,id',
@@ -1535,10 +1590,31 @@ class LeadKanban extends Component
 
         $user = auth()->user();
         $targetUser = User::findOrFail($this->assignUserId);
+
+        // Verify organization boundary for builder
+        if ($this->isBuilder && $user?->organization_id) {
+            if ($targetUser->organization_id !== $user->organization_id) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Cannot assign leads to a user outside your organization.');
+                return;
+            }
+        }
+
         $leads = Lead::whereIn('id', $this->selectedLeadIds)->get();
 
         $assignedCount = 0;
         foreach ($leads as $lead) {
+            if ($this->isBuilder && $user?->organization_id) {
+                $orgId = $user->organization_id;
+                $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                    || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                    || ($lead->client_id === $user->id)
+                    || ($lead->assigned_to === $user->id);
+
+                if (!$hasOrgAccess) {
+                    continue; // Skip any lead outside the org boundary
+                }
+            }
+
             $lead->update([
                 'assigned_to' => $targetUser->id,
                 'current_stage' => in_array($lead->current_stage, ['new', 'pending_credit', 'assigned']) ? 'assigned' : $lead->current_stage,
@@ -1559,6 +1635,18 @@ class LeadKanban extends Component
                 'changed_at' => now(),
             ]);
 
+            \App\Models\AuditLog::create([
+                'user_id' => $user->id,
+                'action' => 'lead.assigned',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'from_value' => json_encode(['assigned_to' => $lead->getOriginal('assigned_to')]),
+                'to_value' => json_encode(['assigned_to' => $targetUser->id, 'assignee_name' => $targetUser->name]),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+                'created_at' => now(),
+            ]);
+
             $assignedCount++;
         }
 
@@ -1570,6 +1658,43 @@ class LeadKanban extends Component
 
     public function tableColumns(): array
     {
+        if ($this->isSalesExecutive) {
+            return [
+                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+                ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+                ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+                ['key' => 'current_stage', 'label' => 'Current Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                    'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'connected' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'qualified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'interested' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'follow_up' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'meeting_scheduled' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'meeting' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'site_visit' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'negotiation' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'booking' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
+                    'lost' => 'bg-red-50 text-red-700 border border-red-200',
+                    'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
+                    'invalid' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                    'unreachable' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                ]],
+                ['key' => 'status', 'label' => 'Lead Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+                    'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'assigned' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'in_progress' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
+                    'closed' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                ]],
+                ['key' => 'next_followup', 'label' => 'Next Follow-up', 'type' => 'text', 'priority' => 1, 'class' => 'text-xs font-mono text-muted'],
+                ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
+            ];
+        }
+
         if ($this->isBuilder) {
             return [
                 ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],

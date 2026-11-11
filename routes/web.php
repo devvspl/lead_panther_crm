@@ -109,6 +109,9 @@ Route::get('/replacements', ReplacementQueue::class)->middleware(['auth', 'role:
 
 Route::get('/client/replacements', ClientReplacementHistory::class)->middleware(['auth'])->name('replacements.client');
 
+// Follow-ups Hub Route
+Route::get('/followups', \App\Livewire\Activity\FollowupList::class)->middleware(['auth'])->name('followups.index');
+
 // Reports Hub Route
 Route::get('/reports', ReportsContainer::class)->middleware(['auth'])->name('reports.index');
 

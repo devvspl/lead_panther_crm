@@ -20,12 +20,17 @@
     'filterCount' => 0,
     'tableName' => 'table',
     'tableClass' => '',
+    'showSkeleton' => true,
+    'skeletonRows' => 5,
+    'loading' => false,
+    'loadingTarget' => null,
 ])
 
 @php
     $visibleCols = !empty($visibleColumns) ? $visibleColumns : array_map(fn($c) => $c['key'], $columns);
     $activeColumns = array_filter($columns, fn($c) => in_array($c['key'], $visibleCols));
-    $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || !empty($this->filterConfig()))) || ($showConfigurations && !empty($columns)) || isset($action);
+    $hasFilterConfig = isset($this) && method_exists($this, 'filterConfig') && !empty($this->filterConfig());
+    $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || $hasFilterConfig)) || ($showConfigurations && !empty($columns)) || isset($action);
 @endphp
 
 <div class="space-y-4" x-data="{ 
@@ -50,7 +55,7 @@
                     autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"
                     data-form-type="other" wire:model.live.debounce.300ms="{{ $searchModel }}" placeholder="{{ $searchPlaceholder }}"
                     class="w-full pl-9 pr-8 py-2 rounded-lg border border-border bg-canvas text-ink text-xs placeholder:text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
-                @if(!empty($this->{$searchModel} ?? ''))
+                @if(isset($this) && !empty($this->{$searchModel} ?? ''))
                     <button type="button" wire:click="$set('{{ $searchModel }}', '')"
                         class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted hover:text-ink cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,7 +69,7 @@
         <!-- Action Controls Group -->
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <!-- Filter Dropdown Button & Popover -->
-            @if($showFilterDropdown && (isset($filters) || !empty($this->filterConfig())))
+            @if($showFilterDropdown && (isset($filters) || $hasFilterConfig))
                 <div class="relative">
                     <button type="button" @click="filterOpen = !filterOpen; configOpen = false"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition shadow-2xs cursor-pointer">
@@ -251,7 +256,8 @@
                     </tr>
                 </thead>
 
-                <tbody class="divide-y divide-border">
+                @if(!$loading)
+                <tbody class="divide-y divide-border" @if($showSkeleton) wire:loading.remove @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
                     @if(!empty($rows) && count($rows) > 0)
                         @foreach($rows as $row)
                             @php
@@ -590,12 +596,75 @@
                         </tr>
                     @endif
                 </tbody>
+                @endif
+
+                @if($loading || $showSkeleton)
+                <tbody class="divide-y divide-border" 
+                    @if(!$loading) wire:loading @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+                    @for($i = 0; $i < (int) $skeletonRows; $i++)
+                        @php
+                            $widths = ['w-24', 'w-32', 'w-20', 'w-28', 'w-16', 'w-36'];
+                        @endphp
+                        <tr class="hover:bg-canvas/30 transition animate-pulse">
+                            @if($showCheckboxes)
+                                <td class="py-3.5 px-3.5 text-center">
+                                    <div class="w-3.5 h-3.5 mx-auto bg-slate-200 rounded"></div>
+                                </td>
+                            @endif
+
+                            @foreach($activeColumns as $colIndex => $col)
+                                @php
+                                    $colKey = $col['key'];
+                                    $type = $col['type'] ?? 'text';
+                                    $priority = $col['priority'] ?? 1;
+                                    $priorityClass = $priority === 2 ? 'hidden lg:table-cell' : ($priority === 3 ? 'hidden xl:table-cell' : '');
+                                    $alignClass = ($col['align'] ?? 'left') === 'right' ? 'text-right' : (($col['align'] ?? 'left') === 'center' ? 'text-center' : 'text-left');
+                                    $colWidth = $col['width'] ?? null;
+                                    $widthStyle = $colWidth ? "width: {$colWidth};" : '';
+                                    $itemWidth = $widths[($i + $colIndex) % count($widths)];
+                                @endphp
+                                <td @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3.5 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }}">
+                                    @if($type === 'badge')
+                                        <div class="inline-block h-5 w-16 bg-slate-200 rounded-pill"></div>
+                                    @elseif($type === 'avatar-stack')
+                                        <div class="flex items-center gap-2 {{ ($col['align'] ?? 'left') === 'center' ? 'justify-center' : (($col['align'] ?? 'left') === 'right' ? 'justify-end' : '') }}">
+                                            <div class="w-6 h-6 rounded-full bg-slate-200 flex-shrink-0"></div>
+                                            <div class="h-3.5 w-20 bg-slate-200 rounded"></div>
+                                        </div>
+                                    @elseif($type === 'progress')
+                                        <div class="flex items-center gap-2 max-w-[120px] {{ ($col['align'] ?? 'left') === 'center' ? 'mx-auto' : (($col['align'] ?? 'left') === 'right' ? 'ml-auto' : '') }}">
+                                            <div class="h-2 flex-1 bg-slate-200 rounded-full"></div>
+                                            <div class="h-2.5 w-6 bg-slate-200 rounded"></div>
+                                        </div>
+                                    @elseif(in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions', 'audit_actions']))
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <div class="w-6 h-6 rounded-lg bg-slate-200"></div>
+                                            <div class="w-6 h-6 rounded-lg bg-slate-200"></div>
+                                        </div>
+                                    @elseif($type === 'date')
+                                        <div class="inline-block h-3.5 w-20 bg-slate-200 rounded"></div>
+                                    @else
+                                        <div class="inline-block h-3.5 {{ $itemWidth }} bg-slate-200 rounded"></div>
+                                    @endif
+                                </td>
+                            @endforeach
+
+                            @if(isset($rowActions))
+                                <td class="py-3.5 px-3.5 text-right">
+                                    <div class="inline-block w-5 h-5 bg-slate-200 rounded"></div>
+                                </td>
+                            @endif
+                        </tr>
+                    @endfor
+                </tbody>
+                @endif
             </table>
         </div>
     </div>
 
     <!-- 4. MOBILE RESPONSIVE CARD STACK (Reflow on < md) -->
-    <div class="block md:hidden space-y-3">
+    @if(!$loading)
+    <div class="block md:hidden space-y-3" @if($showSkeleton) wire:loading.remove @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
         @if(!empty($rows) && count($rows) > 0)
             @foreach($rows as $row)
                 @php
@@ -886,6 +955,45 @@
             </div>
         @endif
     </div>
+    @endif
+
+    @if($loading || $showSkeleton)
+    <div class="block md:hidden space-y-3" 
+        @if(!$loading) wire:loading @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+        @for($i = 0; $i < (int) min($skeletonRows, 4); $i++)
+            <div class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 animate-pulse">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        @if($showCheckboxes)
+                            <div class="w-4 h-4 bg-slate-200 rounded"></div>
+                        @endif
+                        <div class="h-4 w-32 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="h-5 w-16 bg-slate-200 rounded-pill"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5 text-xs">
+                    <div class="space-y-1">
+                        <div class="h-2.5 w-12 bg-slate-200/60 rounded"></div>
+                        <div class="h-3.5 w-24 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="h-2.5 w-14 bg-slate-200/60 rounded"></div>
+                        <div class="h-3.5 w-20 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="h-2.5 w-10 bg-slate-200/60 rounded"></div>
+                        <div class="h-3.5 w-28 bg-slate-200 rounded"></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="h-2.5 w-16 bg-slate-200/60 rounded"></div>
+                        <div class="h-3.5 w-16 bg-slate-200 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        @endfor
+    </div>
+    @endif
 
     <!-- 5. PAGINATION FOOTER -->
     @if($rows instanceof \Illuminate\Pagination\LengthAwarePaginator || $rows instanceof \Illuminate\Pagination\Paginator)

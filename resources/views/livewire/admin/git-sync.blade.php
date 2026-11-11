@@ -235,8 +235,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            <svg wire:loading wire:target="startPull" class="animate-spin h-3.5 w-3.5 text-white" fill="none"
-                                viewBox="0 0 24 24">
+                            <svg wire:loading wire:target="startPull" class="animate-spin h-3.5 w-3.5 text-white"
+                                fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                                 </circle>
                                 <path class="opacity-75" fill="currentColor"
@@ -250,42 +250,42 @@
                 </div>
 
                 <!-- Status & Action Box -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 space-y-4">
-                        <div class="p-4 bg-canvas rounded-xl border border-border space-y-3 text-xs">
-                            <div class="flex items-center justify-between">
-                                <span class="font-bold text-ink uppercase text-[10px] tracking-wider">Latest Local
-                                    Commit</span>
-                                <span
-                                    class="font-mono bg-surface px-2 py-0.5 rounded border border-border text-[11px] font-bold text-ink">{{ $repoStatus['short_commit'] ?? 'unknown' }}</span>
-                            </div>
-                            <p
-                                class="text-muted leading-relaxed font-mono text-[11px] bg-surface p-2.5 rounded-lg border border-border">
-                                {{ $repoStatus['last_commit_info'] ?: 'No commit information available' }}
-                            </p>
+
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="p-4 bg-canvas rounded-xl border border-border space-y-3 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-ink uppercase text-[10px] tracking-wider">Latest Local
+                                Commit</span>
+                            <span
+                                class="font-mono bg-surface px-2 py-0.5 rounded border border-border text-[11px] font-bold text-ink">{{ $repoStatus['short_commit'] ?? 'unknown' }}</span>
                         </div>
-
-                        <!-- Recent Commits Table Component -->
-                        @if(!empty($repoStatus['recent_commits']))
-                            <div class="space-y-2">
-                                <div class="text-xs font-bold text-ink">Recent Local Commit History</div>
-
-                                @php
-                                    $localCommitCols = [
-                                        ['key' => 'hash', 'label' => 'Hash', 'class' => 'font-mono font-bold text-primary', 'sortable' => false, 'priority' => 1],
-                                        ['key' => 'message', 'label' => 'Message', 'render' => fn($row) => '<span class="font-medium text-ink truncate max-w-xs block" title="' . e(is_array($row) ? $row['message'] : $row->message) . '">' . e(is_array($row) ? $row['message'] : $row->message) . '</span>', 'sortable' => false, 'priority' => 1],
-                                        ['key' => 'author', 'label' => 'Author', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
-                                        ['key' => 'date', 'label' => 'Date', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
-                                    ];
-                                @endphp
-
-                                <x-ui.advanced-table :columns="$localCommitCols" :rows="$repoStatus['recent_commits']"
-                                    :showSearch="false" :showFilterDropdown="false" :showConfigurations="false"
-                                    emptyTitle="No Recent Commits" emptyMessage="No recent local commits found." />
-                            </div>
-                        @endif
+                        <p
+                            class="text-muted leading-relaxed font-mono text-[11px] bg-surface p-2.5 rounded-lg border border-border">
+                            {{ $repoStatus['last_commit_info'] ?: 'No commit information available' }}
+                        </p>
                     </div>
+
+                    <!-- Recent Commits Table Component -->
+                    @if(!empty($repoStatus['recent_commits']))
+                        <div class="space-y-2">
+                            <div class="text-xs font-bold text-ink">Recent Local Commit History</div>
+
+                            @php
+                                $localCommitCols = [
+                                    ['key' => 'hash', 'label' => 'Hash', 'class' => 'font-mono font-bold text-primary', 'sortable' => false, 'priority' => 1],
+                                    ['key' => 'message', 'label' => 'Message', 'render' => fn($row) => '<span class="font-medium text-ink truncate max-w-xs block" title="' . e(is_array($row) ? $row['message'] : $row->message) . '">' . e(is_array($row) ? $row['message'] : $row->message) . '</span>', 'sortable' => false, 'priority' => 1],
+                                    ['key' => 'author', 'label' => 'Author', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
+                                    ['key' => 'date', 'label' => 'Date', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
+                                ];
+                            @endphp
+
+                            <x-ui.advanced-table :columns="$localCommitCols" :rows="$repoStatus['recent_commits']"
+                                :showSearch="false" :showFilterDropdown="false" :showConfigurations="false"
+                                emptyTitle="No Recent Commits" emptyMessage="No recent local commits found." />
+                        </div>
+                    @endif
                 </div>
+
 
                 <!-- Last Pull Output Console -->
                 @if($lastJobResult && ($lastJobResult['action'] ?? '') === 'pull')
@@ -510,7 +510,8 @@
                         <button type="button" wire:click="$set('dbManagerTab', 'tests')"
                             class="px-3.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer {{ $dbManagerTab === 'tests' ? 'bg-surface text-ink font-bold shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
                             <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span>3. Tests</span>
                             <span
@@ -579,7 +580,8 @@
                             <!-- Folder Filter Dropdown -->
                             <div class="flex items-center gap-1.5">
                                 <span class="text-muted text-[11px] font-semibold hidden md:inline">Folder:</span>
-                                <select wire:model.live="testFolderFilter" class="py-1 px-2.5 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-1 focus:ring-primary cursor-pointer">
+                                <select wire:model.live="testFolderFilter"
+                                    class="py-1 px-2.5 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-1 focus:ring-primary cursor-pointer">
                                     @foreach($testFolders as $f)
                                         <option value="{{ $f['folder'] }}">{{ $f['label'] }} ({{ $f['count'] }})</option>
                                     @endforeach
@@ -610,33 +612,43 @@
                             <button type="button" wire:click="openGenerateTestModal"
                                 class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface hover:bg-canvas text-ink border border-border transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
                                 title="Generate a new Unit or Feature test file">
-                                <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
                                 <span>Generate Test</span>
                             </button>
 
                             <!-- Folder Wise Run Button (if folder selected) -->
                             @if($testFolderFilter !== 'all')
-                                <button type="button" wire:click="runFolderTests"
-                                    wire:loading.attr="disabled"
+                                <button type="button" wire:click="runFolderTests" wire:loading.attr="disabled"
                                     class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-300 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
                                     title="Run all tests in current selected folder">
-                                    <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                                    <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                    </svg>
                                     <span>Run Folder ({{ count($tests) }})</span>
                                 </button>
                             @endif
 
                             <!-- Run All Tests Button -->
-                            <button type="button" wire:click="runAllTests"
-                                wire:loading.attr="disabled"
+                            <button type="button" wire:click="runAllTests" wire:loading.attr="disabled"
                                 class="px-3 py-1 rounded-lg text-xs font-bold bg-primary hover:bg-primary-dark text-white transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
                                 title="Execute php artisan test across all test suites">
-                                <svg wire:loading.remove wire:target="runAllTests" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <svg wire:loading.remove wire:target="runAllTests" class="w-3.5 h-3.5" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <svg wire:loading wire:target="runAllTests" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <svg wire:loading wire:target="runAllTests" class="w-3.5 h-3.5 animate-spin" fill="none"
+                                    viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                                    </circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
                                 </svg>
                                 <span wire:loading.remove wire:target="runAllTests">Run All Tests</span>
                                 <span wire:loading wire:target="runAllTests">Testing All...</span>
@@ -850,17 +862,26 @@
                 @if($dbManagerTab === 'tests')
                     <!-- Test Execution Console Output (Live or Last Run) -->
                     @if($lastTestResult)
-                        <div class="rounded-xl border {{ $lastTestResult['successful'] ? 'border-emerald-300 dark:border-emerald-800' : 'border-rose-300 dark:border-rose-800' }} bg-canvas p-4 space-y-2.5 transition shadow-2xs">
+                        <div
+                            class="rounded-xl border {{ $lastTestResult['successful'] ? 'border-emerald-300 dark:border-emerald-800' : 'border-rose-300 dark:border-rose-800' }} bg-canvas p-4 space-y-2.5 transition shadow-2xs">
                             <div class="flex items-center justify-between text-xs">
                                 <div class="flex items-center gap-2">
                                     @if($lastTestResult['successful'])
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
-                                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <span
+                                            class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7" />
+                                            </svg>
                                             <span>PASSED</span>
                                         </span>
                                     @else
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
-                                            <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        <span
+                                            class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
                                             <span>FAILED</span>
                                         </span>
                                     @endif
@@ -869,17 +890,20 @@
                                         <span class="text-muted font-mono text-[11px]">({{ $lastTestResult['duration'] }})</span>
                                     @endif
                                     @if(!empty($lastTestResult['summary']))
-                                        <span class="text-[11px] font-semibold text-ink hidden md:inline">• {{ $lastTestResult['summary'] }}</span>
+                                        <span class="text-[11px] font-semibold text-ink hidden md:inline">•
+                                            {{ $lastTestResult['summary'] }}</span>
                                     @endif
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button type="button" wire:click="clearTestConsole" class="text-muted hover:text-ink text-[11px] font-semibold cursor-pointer">
+                                    <button type="button" wire:click="clearTestConsole"
+                                        class="text-muted hover:text-ink text-[11px] font-semibold cursor-pointer">
                                         Clear Console
                                     </button>
                                 </div>
                             </div>
 
-                            <pre class="bg-gray-900 text-gray-100 font-mono text-xs p-3.5 rounded-lg overflow-x-auto max-h-56 overflow-y-auto leading-relaxed border border-gray-800 whitespace-pre-wrap select-all">{{ $lastTestResult['stdout'] ?: ($lastTestResult['stderr'] ?: 'Command finished with no output recorded.') }}</pre>
+                            <pre
+                                class="bg-gray-900 text-gray-100 font-mono text-xs p-3.5 rounded-lg overflow-x-auto max-h-56 overflow-y-auto leading-relaxed border border-gray-800 whitespace-pre-wrap select-all">{{ $lastTestResult['stdout'] ?: ($lastTestResult['stderr'] ?: 'Command finished with no output recorded.') }}</pre>
                         </div>
                     @endif
 
@@ -903,11 +927,13 @@
                                             <td class="py-2.5 px-3.5">
                                                 <div class="flex items-center gap-2">
                                                     <span class="font-mono font-bold text-ink">{{ $t['class'] }}</span>
-                                                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold {{ $t['suite_type'] === 'Unit' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200' }}">
+                                                    <span
+                                                        class="px-1.5 py-0.2 rounded text-[9px] font-bold {{ $t['suite_type'] === 'Unit' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200' }}">
                                                         {{ $t['suite_type'] }}
                                                     </span>
                                                 </div>
-                                                <div class="font-mono text-[11px] text-muted truncate max-w-md" title="{{ $t['path'] }}">
+                                                <div class="font-mono text-[11px] text-muted truncate max-w-md"
+                                                    title="{{ $t['path'] }}">
                                                     {{ $t['path'] }}
                                                 </div>
                                             </td>
@@ -919,7 +945,8 @@
                                                 </button>
                                             </td>
                                             <td class="py-2.5 px-3.5 text-center font-mono">
-                                                <span class="px-2 py-0.5 rounded-full bg-surface text-ink border border-border text-[10px] font-semibold">
+                                                <span
+                                                    class="px-2 py-0.5 rounded-full bg-surface text-ink border border-border text-[10px] font-semibold">
                                                     {{ $t['methods_count'] }} {{ Str::plural('test', $t['methods_count']) }}
                                                 </span>
                                             </td>
@@ -940,42 +967,59 @@
                                             </td>
                                             <td class="py-2.5 px-3.5">
                                                 @if($executingTestTarget === 'file:' . $t['path'])
-                                                    <span class="px-2 py-0.5 rounded-pill bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold inline-flex items-center gap-1 animate-pulse">
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-pill bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold inline-flex items-center gap-1 animate-pulse">
                                                         <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                                         <span>Running...</span>
                                                     </span>
                                                 @elseif($t['status'] === 'passed')
-                                                    <span class="px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold inline-flex items-center gap-1">
-                                                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M5 13l4 4L19 7" />
+                                                        </svg>
                                                         <span>Passed</span>
                                                     </span>
                                                 @elseif($t['status'] === 'failed')
-                                                    <span class="px-2 py-0.5 rounded-pill bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold inline-flex items-center gap-1">
-                                                        <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-pill bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
                                                         <span>Failed</span>
                                                     </span>
                                                 @else
-                                                    <span class="px-2 py-0.5 rounded-pill bg-canvas text-muted border border-border text-[10px] font-semibold">
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-pill bg-canvas text-muted border border-border text-[10px] font-semibold">
                                                         Untested
                                                     </span>
                                                 @endif
                                             </td>
                                             <td class="py-2.5 px-3.5 text-right">
-                                                <button 
-                                                    type="button" 
-                                                    wire:click="runSingleTest('{{ $t['path'] }}')"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="runSingleTest('{{ $t['path'] }}')"
+                                                <button type="button" wire:click="runSingleTest('{{ $t['path'] }}')"
+                                                    wire:loading.attr="disabled" wire:target="runSingleTest('{{ $t['path'] }}')"
                                                     class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
-                                                    title="Run php artisan test {{ $t['path'] }}"
-                                                >
-                                                    <svg wire:loading.remove wire:target="runSingleTest('{{ $t['path'] }}')" class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    title="Run php artisan test {{ $t['path'] }}">
+                                                    <svg wire:loading.remove wire:target="runSingleTest('{{ $t['path'] }}')"
+                                                        class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
-                                                    <svg wire:loading wire:target="runSingleTest('{{ $t['path'] }}')" class="w-3.5 h-3.5 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
-                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    <svg wire:loading wire:target="runSingleTest('{{ $t['path'] }}')"
+                                                        class="w-3.5 h-3.5 animate-spin text-emerald-600" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                            stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
                                                     </svg>
                                                     <span wire:loading.remove wire:target="runSingleTest('{{ $t['path'] }}')">
                                                         Run Test
@@ -1210,13 +1254,13 @@
                                 </div>
 
                                 <button type="button" @click="$dispatch('confirm-action', {
-                                                                title: 'Restore Backup Snapshot?',
-                                                                message: 'Are you sure you want to restore the codebase to backup snapshot \'{{ $backup['name'] }}\'? Local files will be replaced with this snapshot.',
-                                                                confirmText: 'Yes, Restore Backup',
-                                                                cancelText: 'Cancel',
-                                                                variant: 'warning',
-                                                                onConfirm: function() { return $wire.restoreBackup('{{ $backup['name'] }}'); }
-                                                            })"
+                                                                                        title: 'Restore Backup Snapshot?',
+                                                                                        message: 'Are you sure you want to restore the codebase to backup snapshot \'{{ $backup['name'] }}\'? Local files will be replaced with this snapshot.',
+                                                                                        confirmText: 'Yes, Restore Backup',
+                                                                                        cancelText: 'Cancel',
+                                                                                        variant: 'warning',
+                                                                                        onConfirm: function() { return $wire.restoreBackup('{{ $backup['name'] }}'); }
+                                                                                    })"
                                     class="px-3 py-1.5 rounded-lg border border-border bg-surface text-ink text-xs font-semibold hover:border-ink transition shadow-2xs flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
                                     <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1571,22 +1615,29 @@
     <!-- GENERATE NEW TEST MODAL -->
     @if($showGenerateTestModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div class="bg-surface rounded-card border border-border max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div
+                class="bg-surface rounded-card border border-border max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
                 <!-- Modal Header -->
                 <div class="flex items-start justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-200">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                             </svg>
                         </div>
                         <div>
                             <h3 class="text-sm font-bold text-ink">Generate Test File</h3>
-                            <p class="text-xs text-muted">Scaffold a new automated test using Laravel's Artisan generator.</p>
+                            <p class="text-xs text-muted">Scaffold a new automated test using Laravel's Artisan generator.
+                            </p>
                         </div>
                     </div>
-                    <button type="button" wire:click="closeGenerateTestModal" class="text-muted hover:text-ink cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <button type="button" wire:click="closeGenerateTestModal"
+                        class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
 
@@ -1594,14 +1645,12 @@
                 <div class="space-y-4">
                     <!-- Test Name -->
                     <div>
-                        <label class="block text-xs font-bold text-ink mb-1">Test Name <span class="text-danger">*</span></label>
-                        <input 
-                            type="text" 
-                            wire:model.live="newTestName" 
-                            placeholder="e.g. LeadWorkflowTest"
-                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary"
-                        />
-                        <p class="text-[11px] text-muted mt-1">If omitted, 'Test' will be automatically appended to the file name.</p>
+                        <label class="block text-xs font-bold text-ink mb-1">Test Name <span
+                                class="text-danger">*</span></label>
+                        <input type="text" wire:model.live="newTestName" placeholder="e.g. LeadWorkflowTest"
+                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary" />
+                        <p class="text-[11px] text-muted mt-1">If omitted, 'Test' will be automatically appended to the file
+                            name.</p>
                         @error('newTestName') <span class="text-xs text-danger font-medium">{{ $message }}</span> @enderror
                     </div>
 
@@ -1609,15 +1658,19 @@
                     <div>
                         <label class="block text-xs font-bold text-ink mb-1.5">Test Suite Type</label>
                         <div class="grid grid-cols-2 gap-3">
-                            <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition {{ $newTestType === 'Feature' ? 'border-primary bg-primary/5 text-ink' : 'border-border bg-canvas text-muted hover:border-primary/50' }}">
-                                <input type="radio" wire:model.live="newTestType" value="Feature" class="text-primary focus:ring-primary" />
+                            <label
+                                class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition {{ $newTestType === 'Feature' ? 'border-primary bg-primary/5 text-ink' : 'border-border bg-canvas text-muted hover:border-primary/50' }}">
+                                <input type="radio" wire:model.live="newTestType" value="Feature"
+                                    class="text-primary focus:ring-primary" />
                                 <div>
                                     <div class="text-xs font-bold text-ink">Feature Test</div>
                                     <div class="text-[10px] text-muted">HTTP, Livewire, Integration</div>
                                 </div>
                             </label>
-                            <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition {{ $newTestType === 'Unit' ? 'border-primary bg-primary/5 text-ink' : 'border-border bg-canvas text-muted hover:border-primary/50' }}">
-                                <input type="radio" wire:model.live="newTestType" value="Unit" class="text-primary focus:ring-primary" />
+                            <label
+                                class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition {{ $newTestType === 'Unit' ? 'border-primary bg-primary/5 text-ink' : 'border-border bg-canvas text-muted hover:border-primary/50' }}">
+                                <input type="radio" wire:model.live="newTestType" value="Unit"
+                                    class="text-primary focus:ring-primary" />
                                 <div>
                                     <div class="text-xs font-bold text-ink">Unit Test</div>
                                     <div class="text-[10px] text-muted">Isolated classes, helpers</div>
@@ -1629,13 +1682,9 @@
                     <!-- Subfolder -->
                     <div>
                         <label class="block text-xs font-bold text-ink mb-1">Subfolder / Module (Optional)</label>
-                        <input 
-                            type="text" 
-                            wire:model.live="newTestFolder" 
-                            placeholder="e.g. Admin, Leads, Settings, Shared"
+                        <input type="text" wire:model.live="newTestFolder" placeholder="e.g. Admin, Leads, Settings, Shared"
                             list="folder-suggestions"
-                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary"
-                        />
+                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary" />
                         <datalist id="folder-suggestions">
                             <option value="Admin">
                             <option value="Leads">
@@ -1650,7 +1699,8 @@
                             <option value="Shared">
                             <option value="Storage">
                         </datalist>
-                        <p class="text-[11px] text-muted mt-1">Leave empty to place directly in the root tests/{{ $newTestType }} folder.</p>
+                        <p class="text-[11px] text-muted mt-1">Leave empty to place directly in the root
+                            tests/{{ $newTestType }} folder.</p>
                     </div>
 
                     <!-- File Preview Card -->
@@ -1670,9 +1720,13 @@
                     </button>
                     <button type="button" wire:click="createTestFile" wire:loading.attr="disabled"
                         class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
-                        <svg wire:loading wire:target="createTestFile" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <svg wire:loading wire:target="createTestFile" class="w-3.5 h-3.5 animate-spin" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
                         </svg>
                         <span wire:loading.remove wire:target="createTestFile">Generate Test File</span>
                         <span wire:loading wire:target="createTestFile">Generating...</span>

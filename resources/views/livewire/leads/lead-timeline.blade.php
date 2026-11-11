@@ -4,11 +4,11 @@
         <div class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity" wire:click="close"></div>
 
         <!-- Full Journey Modal Container -->
-        <div class="fixed inset-y-0 right-0 max-w-3xl w-full bg-surface shadow-2xl z-50 overflow-y-auto flex flex-col justify-between border-l border-border">
+        <div class="fixed inset-y-0 right-0 max-w-3xl w-full bg-surface shadow-2xl z-50 overflow-hidden flex flex-col border-l border-border" role="dialog" aria-modal="true" aria-label="Full lead journey timeline">
             <!-- Modal Header -->
-            <div class="p-6 border-b border-border bg-canvas flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-10">
-                <div>
-                    <div class="flex items-center space-x-2">
+            <div class="p-4 sm:p-6 shrink-0 border-b border-border bg-canvas flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span class="px-2.5 py-0.5 text-xs font-bold font-mono rounded-pill bg-ink text-white shadow-2xs">
                             {{ $journey['summary']['lead_code'] }}
                         </span>
@@ -19,30 +19,30 @@
                             {{ $journey['summary']['sla_badge'] }}
                         </span>
                     </div>
-                    <h2 class="text-xl font-extrabold text-ink mt-1.5 flex items-center space-x-2">
-                        <span>{{ $journey['summary']['name'] }}</span>
+                    <h2 class="text-xl font-extrabold text-ink mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 break-words">
+                        <span class="min-w-0 break-words">{{ $journey['summary']['name'] }}</span>
                         <span class="text-xs font-normal text-muted">— Full Lead Journey Timeline</span>
                     </h2>
-                    <p class="text-xs text-muted mt-0.5">
+                    <p class="text-xs text-muted mt-1 leading-relaxed break-words">
                         Project: <span class="font-bold text-ink">{{ $journey['summary']['project_name'] }}</span> • 
                         Assigned To: <span class="font-bold text-ink">{{ $journey['summary']['assigned_to'] }}</span> • 
                         Cost: <span class="font-bold text-primary font-mono">{{ $journey['summary']['lead_cost'] }}</span>
                     </p>
                 </div>
 
-                <div class="flex items-center space-x-2">
+                <div class="flex shrink-0 items-center gap-2">
                     <button wire:click="toggleSort" class="p-2 rounded-lg border border-border bg-surface text-ink hover:bg-canvas text-xs font-bold flex items-center space-x-1 cursor-pointer" title="Toggle Chronological Order">
                         <svg class="w-4 h-4 {{ $sortOrder === 'asc' ? 'rotate-180' : '' }} transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
                         <span>{{ $sortOrder === 'desc' ? 'Newest First' : 'Oldest First' }}</span>
                     </button>
-                    <button wire:click="close" class="p-2 text-muted hover:text-ink rounded-lg hover:bg-surface border border-transparent hover:border-border cursor-pointer">
+                    <button wire:click="close" aria-label="Close journey" class="p-2 text-muted hover:text-ink rounded-lg hover:bg-surface border border-transparent hover:border-border cursor-pointer">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
             </div>
 
             <!-- Filter Chips Bar -->
-            <div class="px-6 py-3 bg-surface border-b border-border flex items-center gap-1.5 overflow-x-auto text-xs">
+            <div class="px-4 sm:px-6 py-3 shrink-0 bg-surface border-b border-border flex flex-wrap items-center gap-2 text-xs">
                 <span class="font-bold text-muted mr-1">Milestones:</span>
                 @php
                     $filters = [
@@ -59,7 +59,7 @@
                 @foreach($filters as $key => $label)
                     <button 
                         wire:click="setFilter('{{ $key }}')" 
-                        class="px-2.5 py-1 rounded-full font-bold text-xs whitespace-nowrap transition cursor-pointer {{ $filterType === $key ? 'bg-ink text-white shadow-2xs' : 'bg-canvas text-muted hover:text-ink border border-border' }}"
+                        class="px-2.5 py-1.5 rounded-full font-bold text-xs whitespace-nowrap transition cursor-pointer {{ $filterType === $key ? 'bg-ink text-white shadow-2xs' : 'bg-canvas text-ink hover:bg-surface border border-border' }}"
                     >
                         {{ $label }}
                     </button>
@@ -67,7 +67,7 @@
             </div>
 
             <!-- Timeline Body -->
-            <div class="p-6 flex-1 space-y-6 bg-canvas">
+            <div class="p-4 sm:p-6 min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-6 bg-canvas">
                 @if(empty($journey['events']))
                     <div class="text-center py-12 bg-surface rounded-card border border-border p-6 text-muted space-y-2">
                         <svg class="w-10 h-10 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -84,32 +84,32 @@
                                 </div>
 
                                 <!-- Card -->
-                                <div class="p-4 bg-surface rounded-xl border border-border shadow-2xs space-y-2 hover:border-gray-400 transition">
-                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border {{ $event['color'] }}">
+                                <div class="min-w-0 p-4 bg-surface rounded-xl border border-border shadow-2xs space-y-2 hover:border-gray-400 transition">
+                                    <div class="flex flex-col gap-2 border-b border-border/60 pb-2">
+                                        <div class="min-w-0 flex flex-wrap items-center gap-2">
+                                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded border break-words {{ $event['color'] }}">
                                                 {{ $event['badge'] }}
                                             </span>
-                                            <span class="text-xs font-bold text-ink">{{ $event['title'] }}</span>
+                                            <span class="min-w-0 text-sm font-bold text-ink break-words">{{ $event['title'] }}</span>
                                         </div>
-                                        <div class="text-[11px] font-mono text-muted flex items-center space-x-1.5">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <div class="text-[11px] font-mono text-muted flex flex-wrap items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                             <span>{{ $event['timestamp']->format('d M Y, h:i A') }}</span>
                                             <span class="text-gray-300">•</span>
                                             <span>{{ $event['timestamp']->diffForHumans() }}</span>
                                         </div>
                                     </div>
 
-                                    <p class="text-xs text-muted leading-relaxed">
+                                    <p class="text-sm text-ink leading-relaxed break-words [overflow-wrap:anywhere]">
                                         {{ $event['details'] }}
                                     </p>
 
-                                    <div class="flex items-center justify-between pt-1 text-[11px] text-muted">
-                                        <div class="flex items-center space-x-1">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted">
+                                        <div class="min-w-0 flex flex-wrap items-center gap-1 break-words">
                                             <span class="font-semibold text-gray-500">Source:</span>
                                             <span class="font-medium text-ink">{{ $event['actor'] ?? 'System' }}</span>
                                         </div>
-                                        <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                        <div class="text-[11px] font-semibold uppercase tracking-wide text-muted break-words">
                                             {{ $event['category'] }}
                                         </div>
                                     </div>
@@ -121,7 +121,7 @@
             </div>
 
             <!-- Footer -->
-            <div class="p-4 bg-canvas border-t border-border flex items-center justify-between text-xs text-muted">
+            <div class="p-4 shrink-0 bg-canvas border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
                 <div>
                     Displaying <span class="font-bold text-ink">{{ count($journey['events']) }}</span> journey milestone(s).
                 </div>

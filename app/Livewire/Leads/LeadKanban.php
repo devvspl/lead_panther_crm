@@ -476,6 +476,50 @@ class LeadKanban extends Component
         return [$start, $end, $prevStart, $prevEnd, $periodLabel];
     }
 
+    public function getIsBuilderProperty(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return \App\Support\NavigationConfig::getRoleKey($user) === 'builder'
+            || $user->hasRole('builder')
+            || $user->hasRole('Builder')
+            || $user->hasRole('Builder/Developer')
+            || $user->hasRole('builder-admin');
+    }
+
+    public function getBuilderLeadKpisProperty(): array
+    {
+        $query = $this->getScopedQuery();
+        $total = (clone $query)->count();
+        $new = (clone $query)->whereIn('current_stage', ['new', 'lead_received'])->count();
+        $assigned = (clone $query)->whereNotNull('assigned_to')->count();
+        $unassigned = (clone $query)->whereNull('assigned_to')->count();
+        $inProgress = (clone $query)->whereIn('current_stage', ['contacted', 'connected', 'interested', 'qualified', 'site_visit', 'negotiation'])->count();
+
+        $allOrgLeadIds = (clone $query)->pluck('id')->toArray();
+        $followupsDue = Followup::whereIn('lead_id', $allOrgLeadIds)
+            ->where('due_at', '<=', now()->endOfDay())
+            ->where('status', '!=', 'completed')
+            ->count();
+
+        $closedWon = (clone $query)->whereIn('current_stage', ['closed_won', 'booking'])->count();
+        $lost = (clone $query)->whereIn('current_stage', ['closed_lost', 'lost', 'wrong_number'])->count();
+
+        return [
+            'total_leads' => ['label' => 'Total Leads', 'value' => $total, 'icon' => 'users', 'color' => 'blue', 'filter' => 'all'],
+            'new_leads' => ['label' => 'New Leads', 'value' => $new, 'icon' => 'sparkles', 'color' => 'emerald', 'filter' => 'new'],
+            'assigned_leads' => ['label' => 'Assigned Leads', 'value' => $assigned, 'icon' => 'user-check', 'color' => 'indigo', 'filter' => 'assigned'],
+            'unassigned_leads' => ['label' => 'Unassigned Leads', 'value' => $unassigned, 'icon' => 'clock', 'color' => 'amber', 'filter' => 'unassigned'],
+            'in_progress_leads' => ['label' => 'In Progress', 'value' => $inProgress, 'icon' => 'trending-up', 'color' => 'purple', 'filter' => 'in_progress'],
+            'followups_due' => ['label' => 'Follow-ups Due', 'value' => $followupsDue, 'icon' => 'calendar', 'color' => 'amber', 'filter' => 'followups'],
+            'closed_won' => ['label' => 'Closed Won', 'value' => $closedWon, 'icon' => 'trophy', 'color' => 'green', 'filter' => 'closed_won'],
+            'lost_leads' => ['label' => 'Lost Leads', 'value' => $lost, 'icon' => 'x-circle', 'color' => 'rose', 'filter' => 'lost'],
+        ];
+    }
+
     /**
      * Centralized query builder for leads respecting all role scoping and global filters.
      */
@@ -506,15 +550,22 @@ class LeadKanban extends Component
                 $query->whereHas('client', function ($q) use ($user) {
                     $q->where('organization_id', $user->organization_id);
                 });
-            } elseif ($user->hasRole('builder') || $user->hasRole('Builder') || $user->hasRole('Builder/Developer') || $user->hasRole('builder-admin')) {
+            } elseif ($this->isBuilder) {
                 if ($user->organization_id) {
                     $orgId = $user->organization_id;
-                    $query->where(function ($q) use ($orgId) {
+                    $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
+                    $query->where(function ($q) use ($orgId, $orgUserIds) {
                         $q->whereHas('client', function ($sq) use ($orgId) {
                             $sq->where('organization_id', $orgId);
                         })->orWhereHas('assignedTo', function ($sq) use ($orgId) {
                             $sq->where('organization_id', $orgId);
-                        });
+                        })->orWhereIn('client_id', $orgUserIds)
+                          ->orWhereIn('assigned_to', $orgUserIds);
+                    });
+                } else {
+                    $query->where(function ($q) use ($user) {
+                        $q->where('client_id', $user->id)
+                          ->orWhere('assigned_to', $user->id);
                     });
                 }
             }
@@ -665,12 +716,13 @@ class LeadKanban extends Component
     public function getLeadKpisProperty(): array
     {
         [$start, $end, $prevStart, $prevEnd, $periodLabel] = $this->getDateBounds();
+        $todayStr = now()->toDateString();
 
         // 1. Current period aggregated lead metrics
         $currStats = $this->getScopedQuery($start, $end)
             ->selectRaw("
                 COUNT(*) as total_leads,
-                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as leads_today,
+                COUNT(CASE WHEN DATE(created_at) = '{$todayStr}' THEN 1 END) as leads_today,
                 COUNT(CASE WHEN status = 'new' OR current_stage = 'new' THEN 1 END) as new_leads,
                 COUNT(CASE WHEN status = 'duplicate' OR current_stage = 'duplicate' THEN 1 END) as duplicate_leads,
                 COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
@@ -1204,6 +1256,23 @@ class LeadKanban extends Component
         $user = auth()->user();
         $orgId = $user?->organization_id;
 
+        if ($this->isBuilder && $orgId) {
+            $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
+            $orgProjectIds = DB::table('leads')
+                ->join('campaigns', 'leads.campaign_id', '=', 'campaigns.id')
+                ->where(function ($q) use ($orgUserIds) {
+                    $q->whereIn('leads.client_id', $orgUserIds)
+                      ->orWhereIn('leads.assigned_to', $orgUserIds);
+                })
+                ->pluck('campaigns.project_id')
+                ->unique()
+                ->filter();
+
+            if ($orgProjectIds->isNotEmpty()) {
+                $allProjects = Project::whereIn('id', $orgProjectIds)->orderBy('name')->get();
+            }
+        }
+
         $assignTeams = SalesTeam::query()
             ->when($orgId && !$user->hasRole('Super Admin'), function ($q) use ($orgId, $user) {
                 $q->where(function ($sq) use ($orgId, $user) {
@@ -1226,6 +1295,8 @@ class LeadKanban extends Component
             ->get(['id', 'name', 'email']);
 
         return view('livewire.leads.lead-kanban', [
+            'isBuilder' => $this->isBuilder,
+            'builderKpis' => $this->builderLeadKpis,
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
             'tableLeads' => $tableLeads,
@@ -1499,6 +1570,46 @@ class LeadKanban extends Component
 
     public function tableColumns(): array
     {
+        if ($this->isBuilder) {
+            return [
+                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+                ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+                ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+                ['key' => 'lead_source_name', 'label' => 'Lead Source', 'type' => 'text', 'priority' => 2],
+                ['key' => 'created_at', 'label' => 'Received Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+                ['key' => 'assigned_to_user', 'label' => 'Assigned Team Member', 'type' => 'avatar-stack', 'priority' => 1],
+                ['key' => 'current_stage', 'label' => 'Current Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                    'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'duplicate' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                    'pending_credit' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                    'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'connected' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'qualified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'interested' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'site_visit' => 'bg-purple-50 text-purple-700 border border-purple-200',
+                    'negotiation' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'booking' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
+                    'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
+                    'wrong_number' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                ]],
+                ['key' => 'status', 'label' => 'Lead Status', 'type' => 'badge', 'priority' => 2, 'badgeMap' => [
+                    'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    'assigned' => 'bg-blue-50 text-blue-700 border border-blue-200',
+                    'pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                    'closed' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
+                ]],
+                ['key' => 'sla_badge', 'label' => 'First Response SLA', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
+                    'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
+                    'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
+                    'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                ]],
+                ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
+            ];
+        }
+
         return [
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
@@ -1538,6 +1649,22 @@ class LeadKanban extends Component
 
     public function quickFilters(): array
     {
+        if ($this->isBuilder) {
+            return [
+                ['key' => 'all', 'label' => 'All Leads'],
+                ['key' => 'new', 'label' => 'New'],
+                ['key' => 'assigned', 'label' => 'Assigned'],
+                ['key' => 'unassigned', 'label' => 'Unassigned'],
+                ['key' => 'in_progress', 'label' => 'In Progress'],
+                ['key' => 'contacted', 'label' => 'Contacted'],
+                ['key' => 'interested', 'label' => 'Interested'],
+                ['key' => 'site_visit', 'label' => 'Site Visit'],
+                ['key' => 'booking', 'label' => 'Booking'],
+                ['key' => 'closed_won', 'label' => 'Closed Won'],
+                ['key' => 'lost', 'label' => 'Lost Leads'],
+            ];
+        }
+
         return [
             ['key' => 'all', 'label' => 'All Leads'],
             ['key' => 'new', 'label' => 'New'],

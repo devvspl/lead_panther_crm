@@ -3,12 +3,14 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
         <div>
             <div class="flex items-center gap-2">
-                <h1 class="text-lg font-bold tracking-tight text-ink">Leads</h1>
+                <h1 class="text-lg font-bold tracking-tight text-ink">{{ $isBuilder ? 'My Leads' : 'Leads' }}</h1>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    Live Pipeline
+                    {{ $isBuilder ? 'Organization Pipeline' : 'Live Pipeline' }}
                 </span>
             </div>
-            <p class="text-xs text-muted mt-0.5">Manage leads, assignments, follow-ups and conversions.</p>
+            <p class="text-xs text-muted mt-0.5">
+                {{ $isBuilder ? 'Manage organization leads, team assignments, follow-ups and replacement claims.' : 'Manage leads, assignments, follow-ups and conversions.' }}
+            </p>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
@@ -21,13 +23,15 @@
 
             <x-ui.export-button target="exportExcel" label="Export Excel" />
 
-            <button type="button" wire:click="openPullLeadsModal"
-                class="inline-flex items-center gap-1.5 px-3.5 h-8 bg-ink hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                <span>Add / Ingest Lead</span>
-            </button>
+            @if(!$isBuilder)
+                <button type="button" wire:click="openPullLeadsModal"
+                    class="inline-flex items-center gap-1.5 px-3.5 h-8 bg-ink hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold transition shadow-2xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add / Ingest Lead</span>
+                </button>
+            @endif
         </div>
     </div>
 
@@ -87,6 +91,81 @@
             $stageOptions = array_merge(['' => 'All Stages'], $mainStages);
         @endphp
 
+        @if($isBuilder)
+            <!-- 6 Compact Filters for Builder / Developer -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 items-start">
+                <!-- 1. Date Range -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Date Range</label>
+                    <x-ui.date-range-picker 
+                        wire:model.live="analyticsRange" 
+                        wire:custom-from="analyticsCustomFrom"
+                        wire:custom-to="analyticsCustomTo" 
+                        class="w-full"
+                    />
+                </div>
+
+                <!-- 2. Project -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Project</label>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="project" 
+                        :options="$allProjects->pluck('name', 'id')->toArray()" 
+                        placeholder="All Projects" 
+                        class="w-full"
+                        :key="'b-leads-proj-'.($project ?? 'none')" 
+                    />
+                </div>
+
+                <!-- 3. Lead Source -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="source" 
+                        model="App\Models\LeadSource" 
+                        placeholder="All Sources" 
+                        class="w-full"
+                        :key="'b-leads-src-'.($source ?? 'none')" 
+                    />
+                </div>
+
+                <!-- 4. Team Member / Assigned -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Team Member</label>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="executive" 
+                        :options="$eligibleAssignees->pluck('name', 'id')->toArray()" 
+                        placeholder="All Members" 
+                        class="w-full"
+                        :key="'b-leads-exec-'.($executive ?? 'none')" 
+                    />
+                </div>
+
+                <!-- 5. Lead Status -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="statusFilter" 
+                        :options="$statusOptions" 
+                        placeholder="All Statuses" 
+                        class="w-full"
+                        :key="'b-leads-status-'.($statusFilter ?? 'none')" 
+                    />
+                </div>
+
+                <!-- 6. Lifecycle Stage -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Stage</label>
+                    <livewire:shared.searchable-select 
+                        wire:model.live="stageFilter" 
+                        :options="$stageOptions" 
+                        placeholder="All Stages" 
+                        class="w-full"
+                        :key="'b-leads-stage-'.($stageFilter ?? 'none')" 
+                    />
+                </div>
+            </div>
+        @else
         <!-- 10 Filters Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 items-start">
             <!-- 1. Organization -->
@@ -207,6 +286,8 @@
             </div>
         </div>
 
+        @endif
+
         <!-- Active Filters Bar -->
         @php
             $hasActiveFilters = $filterOrganizationId || $project || $campaign || $team || $source || $executive || $leadType || ($statusFilter !== 'all') || $stageFilter || $sla_breached || ($analyticsRange !== 'month');
@@ -263,6 +344,29 @@
         @endif
     </div>
 
+    @if($isBuilder)
+        <!-- 3. BUILDER COMPACT 8 OPERATIONAL KPI CARDS -->
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Overview Metrics</h2>
+                <span class="text-[11px] text-muted">Click any metric card to filter leads</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+                @foreach($builderKpis as $kpiKey => $kpi)
+                    <button type="button" wire:click="$set('statusFilter', '{{ $kpi['filter'] }}')"
+                        class="bg-surface hover:bg-canvas border {{ $statusFilter === $kpi['filter'] ? 'border-primary ring-1 ring-primary' : 'border-border' }} rounded-xl p-3 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between">
+                        <div class="flex items-center justify-between gap-1 text-[10px] font-bold text-muted uppercase tracking-wider">
+                            <span class="truncate">{{ $kpi['label'] }}</span>
+                            <span class="w-2 h-2 rounded-full {{ $statusFilter === $kpi['filter'] ? 'bg-primary' : 'bg-neutral-300' }}"></span>
+                        </div>
+                        <div class="text-xl font-bold font-mono text-ink mt-1.5">
+                            {{ number_format($kpi['value']) }}
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    @else
     <!-- 3. LEAD OVERVIEW KPI CARDS -->
     <div class="space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -354,6 +458,9 @@
         </div>
     </div>
 
+    @endif
+
+    @if(!$isBuilder)
     <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
     <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
@@ -693,6 +800,8 @@
         </div>
     </div>
 
+    @endif
+
     <!-- 7. LEAD DIRECTORY (TOOLBAR + KANBAN / ADVANCED TABLE) -->
     <div class="space-y-3">
         <!-- Toolbar with Search, Quick Filters & View Toggle -->
@@ -775,13 +884,15 @@
                             <span>Auto-Assign</span>
                         </button>
                         <x-ui.export-button target="exportExcel" class="text-xs" />
-                        <button type="button" wire:click="openPullLeadsModal"
-                            class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            <span>Add / Ingest Lead</span>
-                        </button>
+                        @if(!$isBuilder)
+                            <button type="button" wire:click="openPullLeadsModal"
+                                class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>Add / Ingest Lead</span>
+                            </button>
+                        @endif
                     </div>
                 </x-slot:action>
             </x-ui.advanced-table>

@@ -1270,762 +1270,607 @@
             @endif
         </div>
 
-        <!-- 4. Main Operational KPI Cards (11 Real Metrics) -->
-        <!-- Primary Headline Row (4 Cards) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 4. Performance Cards (10 Required Operational Cards) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <!-- 1. Total Leads Received -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                    <span>Total Leads Received</span>
-                    <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Total Received</span>
+                    <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                 </div>
-                <div class="text-2xl font-bold font-mono text-ink">
+                <div class="text-xl font-bold font-mono text-ink">
                     {{ number_format($builderData['kpis']['total_leads']['value'] ?? 0) }}
                 </div>
                 <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="inline-flex items-center gap-1 {{ ($builderData['kpis']['total_leads']['delta']['isPositive'] ?? true) ? 'text-emerald-600 font-bold' : 'text-neutral-500' }}">
-                        {{ $builderData['kpis']['total_leads']['delta']['delta'] ?? '0%' }} vs prior
+                    <span class="inline-flex items-center gap-0.5 {{ ($builderData['kpis']['total_leads']['delta']['isPositive'] ?? true) ? 'text-emerald-600 font-bold' : 'text-neutral-500' }}">
+                        {{ $builderData['kpis']['total_leads']['delta']['delta'] ?? '0%' }}
                     </span>
-                    <span class="text-muted font-mono font-medium">Inbound portfolio</span>
+                    <span class="text-muted text-[9px]">vs prior</span>
                 </div>
             </div>
 
             <!-- 2. New Leads -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>New Leads</span>
-                    <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     </div>
                 </div>
-                <div class="text-2xl font-bold font-mono text-emerald-600">
+                <div class="text-xl font-bold font-mono text-emerald-600">
                     {{ number_format($builderData['kpis']['new_leads']['value'] ?? 0) }}
                 </div>
                 <div class="text-[10px] text-muted flex items-center justify-between">
                     <span class="text-emerald-700 font-bold">
-                        {{ $builderData['kpis']['new_leads']['delta']['delta'] ?? '0%' }} vs prior
+                        {{ $builderData['kpis']['new_leads']['delta']['delta'] ?? '0%' }}
                     </span>
-                    <span class="text-muted font-mono font-medium">Fresh inbound</span>
+                    <span class="text-muted text-[9px]">Fresh inbound</span>
                 </div>
             </div>
 
             <!-- 3. Unassigned Leads -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                    <span>Unassigned Leads</span>
-                    <div class="w-7 h-7 rounded-lg {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600' }} flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Unassigned</span>
+                    <div class="w-6 h-6 rounded-lg {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600' }} flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                 </div>
-                <div class="text-2xl font-bold font-mono {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600' : 'text-ink' }}">
+                <div class="text-xl font-bold font-mono {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600' : 'text-ink' }}">
                     {{ number_format($builderData['kpis']['unassigned_leads']['value'] ?? 0) }}
                 </div>
                 <div class="text-[10px] text-muted flex items-center justify-between">
                     <span class="{{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600 font-bold' : 'text-muted' }}">
-                        {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'Needs assignment' : 'All assigned' }}
+                        {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'Needs assign' : 'All assigned' }}
                     </span>
-                    <button type="button" wire:click="autoDistributeBuilderLeads" class="text-primary hover:underline font-semibold cursor-pointer">
-                        Distribute &rarr;
-                    </button>
+                    @if(($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0)
+                        <button type="button" wire:click="autoDistributeBuilderLeads" class="text-primary hover:underline font-semibold text-[9px] cursor-pointer">
+                            Distribute &rarr;
+                        </button>
+                    @endif
                 </div>
             </div>
 
             <!-- 4. Assigned Leads -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>Assigned Leads</span>
-                    <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <div class="text-2xl font-bold font-mono text-ink">
+                <div class="text-xl font-bold font-mono text-ink">
                     {{ number_format($builderData['kpis']['assigned_leads']['value'] ?? 0) }}
                 </div>
                 <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-emerald-600 font-bold">
-                        {{ $builderData['kpis']['assigned_leads']['delta']['delta'] ?? '0%' }} allocated
+                    <span class="text-indigo-600 font-bold">
+                        {{ $builderData['kpis']['assigned_leads']['delta']['delta'] ?? '0%' }}
                     </span>
-                    <span class="text-muted font-mono font-medium">Distributed to reps</span>
+                    <span class="text-muted text-[9px]">With team</span>
                 </div>
             </div>
-        </div>
 
-        <!-- Secondary Compact Metric Grid (7 Operational Metrics) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <!-- 5. Leads in Progress -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">In Progress</span>
-                <div class="text-lg font-bold font-mono text-amber-600">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>In Progress</span>
+                    <div class="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-amber-600">
                     {{ number_format($builderData['kpis']['in_progress_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Active conversations</div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-amber-700 font-bold">
+                        {{ $builderData['kpis']['in_progress_leads']['delta']['delta'] ?? '0%' }}
+                    </span>
+                    <span class="text-muted text-[9px]">Active pipeline</span>
+                </div>
             </div>
 
             <!-- 6. Follow-ups Due -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Follow-ups Due</span>
-                <div class="text-lg font-bold font-mono text-blue-600">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Follow-ups Due</span>
+                    <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-blue-600">
                     {{ number_format($builderData['kpis']['followups_due']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Scheduled client calls</div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-blue-700 font-medium">Scheduled</span>
+                    <span class="text-muted text-[9px]">Tasks</span>
+                </div>
             </div>
 
             <!-- 7. Site Visits -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Site Visits</span>
-                <div class="text-lg font-bold font-mono text-purple-600">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Site Visits</span>
+                    <div class="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-purple-600">
                     {{ number_format($builderData['kpis']['site_visits']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Property inspections</div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-purple-700 font-medium">Inspections</span>
+                    <span class="text-muted text-[9px]">Property tours</span>
+                </div>
             </div>
 
             <!-- 8. Bookings -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Bookings</span>
-                <div class="text-lg font-bold font-mono text-emerald-600">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Bookings</span>
+                    <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-emerald-600">
                     {{ number_format($builderData['kpis']['bookings']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Tokens &amp; units booked</div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-emerald-700 font-medium">Tokens</span>
+                    <span class="text-muted text-[9px]">Units booked</span>
+                </div>
             </div>
 
             <!-- 9. Closed Won -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Closed Won</span>
-                <div class="text-lg font-bold font-mono text-green-700">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Closed Won</span>
+                    <div class="w-6 h-6 rounded-lg bg-green-50 text-green-700 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-green-700">
                     {{ number_format($builderData['kpis']['closed_won']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Deals successfully closed</div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-green-800 font-bold">
+                        {{ $builderData['kpis']['closed_won']['delta']['delta'] ?? '0%' }}
+                    </span>
+                    <span class="text-muted text-[9px]">Deals won</span>
+                </div>
             </div>
 
             <!-- 10. Replacement Requests -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Replacements</span>
-                <div class="text-lg font-bold font-mono text-rose-600">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
+                    <span>Replacements</span>
+                    <div class="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </div>
+                </div>
+                <div class="text-xl font-bold font-mono text-rose-600">
                     {{ number_format($builderData['kpis']['replacement_requests']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Claims submitted</div>
-            </div>
-
-            <!-- 11. Approved Replacements -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Approved Repl.</span>
-                <div class="text-lg font-bold font-mono text-emerald-600">
-                    {{ number_format($builderData['kpis']['approved_replacements']['value'] ?? 0) }}
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="text-rose-700 font-medium">Claims</span>
+                    <a href="{{ route('replacements.client') }}" wire:navigate class="text-primary hover:underline text-[9px] font-semibold">
+                        View Log &rarr;
+                    </a>
                 </div>
-                <div class="text-[9px] text-muted">Credits refunded</div>
             </div>
         </div>
 
-        <!-- 5. Two Hero Operational Panels (Team Assignment & Lead Replacements) -->
+        <!-- 5. Credit Summary (Read-Only) -->
+        <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Credit Summary</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                Read-Only
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-muted">Organization lead allocation balance &amp; credit ledger (managed by Super Admin)</p>
+                    </div>
+                </div>
+                <div class="text-[11px] text-muted bg-canvas px-3 py-1.5 rounded-lg border border-border">
+                    Pricing &amp; balance managed exclusively by Super Admin
+                </div>
+            </div>
+
+            <!-- 3 Stat Badges -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Available Credits</span>
+                        <div class="text-2xl font-bold font-mono text-emerald-600 mt-0.5">
+                            {{ number_format($builderData['credits']['available_credits'] ?? 0, 2) }}
+                        </div>
+                        <span class="text-[10px] text-muted">Spendable allocation balance</span>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+                        Cr
+                    </div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Credits Consumed</span>
+                        <div class="text-2xl font-bold font-mono text-ink mt-0.5">
+                            {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 2) }}
+                        </div>
+                        <span class="text-[10px] text-muted">Deducted for delivered leads</span>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                        &darr;
+                    </div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Total Leads Received</span>
+                        <div class="text-2xl font-bold font-mono text-ink mt-0.5">
+                            {{ number_format($builderData['credits']['total_leads_received'] ?? 0) }}
+                        </div>
+                        <span class="text-[10px] text-muted">All-time delivered leads</span>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                        #
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Credit Transactions Table -->
+            <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-muted uppercase tracking-wider">Recent Credit Ledger Entries</span>
+                    <span class="text-[10px] text-muted">Showing latest 8 transactions</span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-border">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-canvas text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border">
+                            <tr>
+                                <th class="py-2 px-3">Date</th>
+                                <th class="py-2 px-3">Lead / Reference</th>
+                                <th class="py-2 px-3">Type</th>
+                                <th class="py-2 px-3 text-right">Credit Used</th>
+                                <th class="py-2 px-3 text-right">Balance After</th>
+                                <th class="py-2 px-3">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border/60">
+                            @forelse($builderData['credits']['history'] ?? [] as $tx)
+                                <tr class="hover:bg-canvas/50 transition">
+                                    <td class="py-2 px-3 font-mono text-[11px] text-muted">
+                                        {{ $tx->created_at ? $tx->created_at->format('M d, H:i') : '—' }}
+                                    </td>
+                                    <td class="py-2 px-3 font-mono font-bold text-ink">
+                                        @if($tx->lead)
+                                            <a href="{{ route('leads.show', $tx->lead_id) }}" wire:navigate class="hover:underline text-primary">
+                                                #{{ $tx->lead->lead_code ?: $tx->lead_id }}
+                                            </a>
+                                        @elseif($tx->lead_id)
+                                            #{{ $tx->lead_id }}
+                                        @else
+                                            <span class="text-muted font-normal">System</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2 px-3">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
+                                            {{ ucwords(str_replace('_', ' ', $tx->transaction_type ?? 'consumption')) }}
+                                        </span>
+                                    </td>
+                                    <td class="py-2 px-3 font-mono font-bold text-right {{ (float)$tx->credit_used > 0 ? 'text-rose-600' : 'text-emerald-600' }}">
+                                        {{ (float)$tx->credit_used > 0 ? '-' : '+' }}{{ number_format(abs((float) $tx->credit_used), 2) }}
+                                    </td>
+                                    <td class="py-2 px-3 font-mono font-bold text-ink text-right">
+                                        {{ number_format((float) ($tx->credit_after ?? 0), 2) }}
+                                    </td>
+                                    <td class="py-2 px-3 text-muted text-[11px] truncate max-w-xs">
+                                        {{ $tx->description ?: 'Lead delivery deduction' }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="py-6 text-center text-xs text-muted">
+                                        No credit transactions recorded yet.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Team Performance Table & Lead Performance Chart (2 Columns) -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Panel A: Team Assignment & Lead Distribution -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-border">
+            <!-- Left Column: Team Performance Table -->
+            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3 flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Team Assignment Engine</h3>
-                            <p class="text-[11px] text-muted">Internal sales distribution &amp; representative capacity</p>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Team Performance</h3>
+                            <p class="text-[10px] text-muted">Representative activity across lifecycle</p>
                         </div>
                     </div>
                     <a href="{{ route('builder.team') }}" wire:navigate
-                        class="px-3 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface text-ink text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                        <span>Team Management</span>
-                    </a>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Super Admin Configured Distribution Rule (Read-Only) -->
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-1.5">
-                        <span class="text-[10px] text-muted font-bold uppercase tracking-wider block">Active Distribution Rule</span>
-                        <div class="flex items-center gap-1.5">
-                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                {{ ucwords(str_replace('_', ' ', $builderData['distribution_summary']['distribution_method'] ?? 'round_robin')) }}
-                            </span>
-                            <span class="text-[10px] text-muted font-medium">(Super Admin Configured)</span>
-                        </div>
-                        <p class="text-[10px] text-muted">
-                            Leads are automatically routed to your sales executives using this policy.
-                        </p>
-                    </div>
-
-                    <!-- Auto-Assignment Status -->
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-1.5">
-                        <span class="text-[10px] text-muted font-bold uppercase tracking-wider block">Auto-Assignment Status</span>
-                        <div>
-                            @if($builderData['distribution_summary']['auto_assign_enabled'] ?? true)
-                                <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span>Active Engine</span>
-                                </span>
-                            @else
-                                <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    Paused by Super Admin
-                                </span>
-                            @endif
-                        </div>
-                        <p class="text-[10px] text-muted">
-                            New inbound leads are automatically dispatched to active sales reps upon delivery.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Unassigned Queue Alert & Action -->
-                @if(($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0)
-                    <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between gap-2 text-xs">
-                        <div class="flex items-center gap-2 text-blue-900">
-                            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                            <span><strong>{{ $builderData['kpis']['unassigned_leads']['value'] }}</strong> leads waiting in unassigned queue.</span>
-                        </div>
-                        <button type="button" wire:click="autoDistributeBuilderLeads"
-                            class="px-3 py-1 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs cursor-pointer shrink-0">
-                            Distribute Unassigned Leads
-                        </button>
-                    </div>
-                @endif
-
-                <!-- Team Workload Preview -->
-                @if(!empty($builderData['distribution_summary']['team_distribution']) && count($builderData['distribution_summary']['team_distribution']) > 0)
-                    <div class="space-y-1.5 pt-1">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Team Workload Distribution</span>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            @foreach($builderData['distribution_summary']['team_distribution']->take(4) as $member)
-                                <div class="p-2 rounded-lg bg-canvas border border-border/80 flex items-center justify-between text-xs">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center">
-                                            {{ strtoupper(substr($member->name, 0, 1)) }}
-                                        </div>
-                                        <span class="font-medium text-ink truncate max-w-[120px]">{{ $member->name }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 font-mono text-[11px]">
-                                        <span class="text-primary font-bold" title="Active Leads">{{ $member->active_leads_count }} act</span>
-                                        <span class="text-emerald-600 font-bold" title="Won Leads">{{ $member->converted_leads_count }} won</span>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-            </div>
-
-            <!-- Panel B: Lead Replacements & Quality Operations -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-border">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1"/></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Replacement Operations</h3>
-                            <p class="text-[11px] text-muted">Super Admin review queue &amp; credit refund tracking</p>
-                        </div>
-                    </div>
-                    <a href="{{ route('replacements.client') }}" wire:navigate
-                        class="px-3 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface text-ink text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        <span>Replacement Requests</span>
-                    </a>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Pending Claims</span>
-                        <div class="text-xl font-bold font-mono text-amber-600">
-                            {{ max(0, ($builderData['kpis']['replacement_requests']['value'] ?? 0) - ($builderData['kpis']['approved_replacements']['value'] ?? 0)) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Awaiting Super Admin review</span>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Approved Replacements</span>
-                        <div class="text-xl font-bold font-mono text-emerald-600">
-                            {{ number_format($builderData['kpis']['approved_replacements']['value'] ?? 0) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Refunded &amp; replaced</span>
-                    </div>
-                </div>
-
-                <div class="p-3 rounded-xl bg-canvas border border-border space-y-2 text-xs">
-                    <div class="flex items-center gap-2 font-bold text-ink">
-                        <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>How Lead Returns Work</span>
-                    </div>
-                    <p class="text-muted text-[11px] leading-relaxed">
-                        If a lead has an invalid mobile number, duplicate contact details, or is unreachable within policy limits, click <strong>Return Lead</strong> on your leads table to submit a claim. Super Admin exclusively evaluates and approves claims to process credit refunds.
-                    </p>
-                </div>
-
-                <div class="flex items-center justify-between pt-1 text-xs">
-                    <a href="{{ route('leads.index') }}" wire:navigate class="text-primary font-bold hover:underline flex items-center gap-1 text-[11px]">
-                        <span>Open My Leads to Return Unsuitable Leads</span>
+                        class="text-primary hover:underline text-[11px] font-semibold flex items-center gap-1">
+                        <span>Manage Team</span>
                         <span>&rarr;</span>
                     </a>
-                    <a href="{{ route('replacements.client') }}" wire:navigate class="text-muted hover:text-ink text-[11px] font-medium">
-                        View Claims Log &rarr;
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- 6. Six Interactive Analytics Charts Grid -->
-        <div class="space-y-4">
-            <!-- Charts Row 1: Generation Trend & Received vs Assigned -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Chart 1: Inbound Lead Generation Trend -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Inbound Lead Generation Trend</h3>
-                            <p class="text-[11px] text-muted">Daily, weekly, or monthly lead inflow</p>
-                        </div>
-                        <div class="flex items-center gap-1 bg-canvas p-0.5 rounded-lg border border-border">
-                            <button type="button" wire:click="$set('trendInterval', 'daily')"
-                                class="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer {{ $trendInterval === 'daily' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink' }}">
-                                Daily
-                            </button>
-                            <button type="button" wire:click="$set('trendInterval', 'weekly')"
-                                class="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer {{ $trendInterval === 'weekly' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink' }}">
-                                Weekly
-                            </button>
-                            <button type="button" wire:click="$set('trendInterval', 'monthly')"
-                                class="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer {{ $trendInterval === 'monthly' ? 'bg-surface text-ink shadow-2xs' : 'text-muted hover:text-ink' }}">
-                                Monthly
-                            </button>
-                        </div>
-                    </div>
-                    <div class="relative h-64 w-full">
-                        <canvas id="builderTrendChart"></canvas>
-                    </div>
                 </div>
 
-                <!-- Chart 2: Leads Received vs Assigned -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Leads Received vs Assigned</h3>
-                            <p class="text-[11px] text-muted">Comparing total delivered vs assigned over time</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-muted uppercase">Distribution velocity</span>
-                    </div>
-                    <div class="relative h-64 w-full">
-                        <canvas id="builderReceivedVsAssignedChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts Row 2: Status Distribution & Credits Consumed -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Chart 3: Lead Status Distribution (Doughnut) -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Status Distribution</h3>
-                            <p class="text-[11px] text-muted">Breakdown of portfolio lifecycle stages</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-muted uppercase">Current stages</span>
-                    </div>
-                    <div class="relative h-64 w-full">
-                        <canvas id="builderStatusChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Chart 4: Credits Consumed Trend -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Credits Consumed Trend</h3>
-                            <p class="text-[11px] text-muted">Credit spend deducted per delivery period</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-muted uppercase">Deduction history</span>
-                    </div>
-                    <div class="relative h-64 w-full">
-                        <canvas id="builderCreditsChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts Row 3: Team Performance & Lead Conversion Funnel -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Chart 5: Team Member Performance Ranking -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Team Member Performance</h3>
-                            <p class="text-[11px] text-muted">Active lead volume vs closed won deals per rep</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-muted uppercase">Agent rankings</span>
-                    </div>
-                    <div class="relative h-64 w-full">
-                        <canvas id="builderTeamChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Chart 6: Lead Conversion Funnel Progression -->
-                <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-border">
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Conversion Funnel</h3>
-                            <p class="text-[11px] text-muted">Pipeline progression from intake to closed deal</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-emerald-600 font-mono">
-                            {{ $builderData['kpis']['conversion_rate']['value'] ?? 0 }}% Conversion
-                        </span>
-                    </div>
-                    
-                    <div class="space-y-2 py-2">
-                        @if(!empty($builderData['charts']['funnel']))
-                            @foreach($builderData['charts']['funnel'] as $stg)
-                                <div class="space-y-1">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="font-medium text-ink">{{ $stg['stage'] }}</span>
-                                        <span class="font-mono text-muted text-[11px]">
-                                            <strong class="text-ink">{{ number_format($stg['count']) }}</strong> leads ({{ $stg['pct'] }}%)
-                                        </span>
-                                    </div>
-                                    <div class="h-2 w-full bg-canvas rounded-full overflow-hidden border border-border/60">
-                                        <div class="h-full bg-primary rounded-full transition-all duration-500" style="width: {{ max(4, min(100, $stg['pct'])) }}%"></div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        @else
-                            <div class="py-12 text-center text-xs text-muted">No funnel records for this period.</div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 7. Recent Inbound Leads Table -->
-        <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3">
-            <div class="flex items-center justify-between pb-2 border-b border-border">
-                <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                    </div>
-                    <div>
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Recent Inbound Leads</h3>
-                        <p class="text-[11px] text-muted">Latest inquiries delivered to organization portfolio</p>
-                    </div>
-                </div>
-                <a href="{{ route('leads.index') }}" wire:navigate class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                    <span>View All Leads</span>
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                </a>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr class="border-b border-border text-[10px] uppercase font-bold text-muted bg-canvas/40">
-                            <th class="py-2.5 px-3">Lead Code</th>
-                            <th class="py-2.5 px-3">Contact</th>
-                            <th class="py-2.5 px-3">Project</th>
-                            <th class="py-2.5 px-3">Source</th>
-                            <th class="py-2.5 px-3">Stage</th>
-                            <th class="py-2.5 px-3">Assigned Agent</th>
-                            <th class="py-2.5 px-3 text-right">Received</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        @forelse($builderData['recent_leads'] ?? [] as $lead)
-                            <tr class="hover:bg-canvas/50 transition">
-                                <td class="py-2.5 px-3 font-mono font-bold text-ink">
-                                    {{ $lead->lead_code ?: ('#LEAD-' . $lead->id) }}
-                                </td>
-                                <td class="py-2.5 px-3">
-                                    <div class="font-bold text-ink">{{ $lead->name }}</div>
-                                    <div class="text-[11px] text-muted font-mono">{{ $lead->mobile }}</div>
-                                </td>
-                                <td class="py-2.5 px-3 text-ink font-medium">
-                                    {{ $lead->campaign?->project?->name ?: 'Direct' }}
-                                </td>
-                                <td class="py-2.5 px-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-canvas border border-border text-ink">
-                                        {{ $lead->leadSource?->name ?: 'Manual' }}
-                                    </span>
-                                </td>
-                                <td class="py-2.5 px-3">
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border 
-                                        {{ in_array($lead->current_stage, ['booking', 'closed_won']) ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (in_array($lead->current_stage, ['lost', 'dead']) ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-blue-50 text-blue-800 border-blue-200') }}">
-                                        {{ ucfirst(str_replace('_', ' ', $lead->current_stage ?: 'new')) }}
-                                    </span>
-                                </td>
-                                <td class="py-2.5 px-3">
-                                    @if($lead->assignedTo)
-                                        <div class="flex items-center gap-1.5 font-medium text-ink">
-                                            <div class="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold text-[9px] flex items-center justify-center">
-                                                {{ strtoupper(substr($lead->assignedTo->name, 0, 1)) }}
-                                            </div>
-                                            <span>{{ $lead->assignedTo->name }}</span>
-                                        </div>
-                                    @else
-                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                            Unassigned
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="py-2.5 px-3 font-mono text-[11px] text-muted text-right">
-                                    {{ $lead->created_at ? $lead->created_at->format('M d, H:i') : '—' }}
-                                </td>
-                            </tr>
-                        @empty
+                <div class="overflow-x-auto rounded-xl border border-border">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-canvas text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border">
                             <tr>
-                                <td colspan="7" class="py-8 text-center text-xs text-muted">
-                                    No leads received yet for this organization.
-                                </td>
+                                <th class="py-2 px-2.5">Member</th>
+                                <th class="py-2 px-2 text-center">Assigned</th>
+                                <th class="py-2 px-2 text-center">Contacted</th>
+                                <th class="py-2 px-2 text-center">Interested</th>
+                                <th class="py-2 px-2 text-center">Site Visit</th>
+                                <th class="py-2 px-2 text-center">Bookings</th>
+                                <th class="py-2 px-2 text-center">Won</th>
                             </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-border/60">
+                            @forelse($builderData['team_performance'] ?? [] as $m)
+                                <tr class="hover:bg-canvas/50 transition">
+                                    <td class="py-2 px-2.5">
+                                        <div class="font-bold text-ink truncate max-w-[130px]">{{ $m['name'] }}</div>
+                                        <div class="text-[10px] text-muted truncate max-w-[130px]">{{ $m['email'] }}</div>
+                                    </td>
+                                    <td class="py-2 px-2 text-center font-mono font-bold text-ink">{{ $m['assigned_leads'] }}</td>
+                                    <td class="py-2 px-2 text-center font-mono text-blue-600 font-semibold">{{ $m['contacted_leads'] }}</td>
+                                    <td class="py-2 px-2 text-center font-mono text-amber-600 font-semibold">{{ $m['interested_leads'] }}</td>
+                                    <td class="py-2 px-2 text-center font-mono text-purple-600 font-semibold">{{ $m['site_visits'] }}</td>
+                                    <td class="py-2 px-2 text-center font-mono text-emerald-600 font-bold">{{ $m['bookings'] }}</td>
+                                    <td class="py-2 px-2 text-center font-mono text-green-700 font-bold">{{ $m['closed_won'] }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="py-6 text-center text-xs text-muted">
+                                        No team members assigned yet.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <!-- 8. Builder Recharge Request Modal -->
-        @if($showBuilderRechargeModal)
-        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-border">
+            <!-- Right Column: Lead Performance Chart (Monthly Trend) -->
+            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3 flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-sm font-bold text-ink">Request Credit Recharge</h3>
-                            <p class="text-[11px] text-muted">Submit a recharge request to Super Admin for approval.</p>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Performance (6 Months)</h3>
+                            <p class="text-[10px] text-muted">Monthly trend: Received vs Assigned vs Converted</p>
                         </div>
-                    </div>
-                    <button type="button" wire:click="closeBuilderRechargeModal" class="text-muted hover:text-ink cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
-
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">Recharge Amount (Credits) <span class="text-red-500">*</span></label>
-                        <div class="relative">
-                            <input type="number" wire:model="builderRechargeAmount" min="10" step="10" placeholder="e.g. 500"
-                                class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
-                            <span class="absolute right-3 inset-y-0 flex items-center text-xs font-bold text-muted pointer-events-none">Credits</span>
-                        </div>
-                        @error('builderRechargeAmount') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
-                    </div>
-
-                    <!-- Quick Amount Pills -->
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-muted font-semibold">Quick select:</span>
-                        @foreach([100, 250, 500, 1000] as $preset)
-                            <button type="button" wire:click="$set('builderRechargeAmount', {{ $preset }})"
-                                class="px-2 py-0.5 rounded text-[10px] font-bold border border-border bg-canvas hover:bg-surface text-ink transition cursor-pointer">
-                                {{ $preset }} Cr
-                            </button>
-                        @endforeach
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">Reference Note (Optional)</label>
-                        <textarea wire:model="builderRechargeNote" rows="3" placeholder="e.g. Monthly campaign recharge for Q4 launch..."
-                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition"></textarea>
-                        @error('builderRechargeNote') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                    <button type="button" wire:click="closeBuilderRechargeModal"
-                        class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
-                        Cancel
-                    </button>
-                    <button type="button" wire:click="submitBuilderRechargeRequest"
-                        class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        <span>Submit Request</span>
-                    </button>
+                <div class="relative h-64 w-full">
+                    <canvas id="builderMonthlyTrendChart"></canvas>
                 </div>
             </div>
         </div>
-        @endif
 
-        <!-- 9. Chart.js Initialization for Builder Dashboard -->
+        <!-- 7. Upcoming Follow-ups Widget -->
+        <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3" x-data="{ tab: 'today' }">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Schedule &amp; Follow-ups</h3>
+                        <p class="text-[10px] text-muted">Customer callbacks, site visits, and pending negotiations</p>
+                    </div>
+                </div>
+
+                <!-- Tabs: Today / Upcoming / Overdue -->
+                <div class="flex items-center gap-1 bg-canvas p-1 rounded-lg border border-border">
+                    <button type="button" @click="tab = 'today'"
+                        :class="tab === 'today' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
+                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
+                        <span>Today's</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-mono font-bold">
+                            {{ count($builderData['followups']['today'] ?? []) }}
+                        </span>
+                    </button>
+                    <button type="button" @click="tab = 'upcoming'"
+                        :class="tab === 'upcoming' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
+                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
+                        <span>Upcoming</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-mono font-bold">
+                            {{ count($builderData['followups']['upcoming'] ?? []) }}
+                        </span>
+                    </button>
+                    <button type="button" @click="tab = 'overdue'"
+                        :class="tab === 'overdue' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
+                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
+                        <span>Overdue</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono font-bold">
+                            {{ count($builderData['followups']['overdue'] ?? []) }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Content: Today's Follow-ups -->
+            <div x-show="tab === 'today'" class="space-y-2">
+                @forelse($builderData['followups']['today'] ?? [] as $fu)
+                    <div class="p-3 rounded-xl bg-canvas border border-border flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0">
+                                ⏱
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-ink">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
+                                    <span class="text-muted text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+                                </div>
+                                <p class="text-[11px] text-muted mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Scheduled customer follow-up call' }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span class="text-[11px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                {{ $fu->due_at ? $fu->due_at->format('H:i') : 'Today' }}
+                            </span>
+                            @if($fu->lead_id)
+                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-surface border border-border text-primary hover:underline text-xs font-semibold">
+                                    Call / View &rarr;
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-8 text-center text-xs text-muted">
+                        No follow-ups scheduled for today. Great job staying on top of leads!
+                    </div>
+                @endforelse
+            </div>
+
+            <!-- Tab Content: Upcoming Follow-ups -->
+            <div x-show="tab === 'upcoming'" class="space-y-2" style="display: none;">
+                @forelse($builderData['followups']['upcoming'] ?? [] as $fu)
+                    <div class="p-3 rounded-xl bg-canvas border border-border flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center shrink-0">
+                                📅
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-ink">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
+                                    <span class="text-muted text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+                                </div>
+                                <p class="text-[11px] text-muted mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Upcoming appointment or follow-up' }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span class="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                {{ $fu->due_at ? $fu->due_at->format('M d, H:i') : 'Upcoming' }}
+                            </span>
+                            @if($fu->lead_id)
+                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-surface border border-border text-primary hover:underline text-xs font-semibold">
+                                    View &rarr;
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-8 text-center text-xs text-muted">
+                        No upcoming follow-ups scheduled for later this week.
+                    </div>
+                @endforelse
+            </div>
+
+            <!-- Tab Content: Overdue Follow-ups -->
+            <div x-show="tab === 'overdue'" class="space-y-2" style="display: none;">
+                @forelse($builderData['followups']['overdue'] ?? [] as $fu)
+                    <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-200 flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 font-bold flex items-center justify-center shrink-0">
+                                ⚠️
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-rose-900">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
+                                    <span class="text-rose-700 text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+                                </div>
+                                <p class="text-[11px] text-rose-700 mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Overdue follow-up' }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span class="text-[11px] font-mono font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
+                                {{ $fu->due_at ? $fu->due_at->format('M d') : 'Overdue' }}
+                            </span>
+                            @if($fu->lead_id)
+                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-white border border-rose-300 text-rose-800 hover:bg-rose-100 text-xs font-semibold">
+                                    Take Action &rarr;
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-8 text-center text-xs text-muted">
+                        Zero overdue follow-ups! Excellent team discipline.
+                    </div>
+                @endforelse
+            </div>
+        </div>
+
+        <!-- 8. Chart.js Initialization for Builder Dashboard -->
         <script>
             function renderBuilderCharts() {
-                const bData = @json($builderData['charts'] ?? []);
-                if (!bData || Object.keys(bData).length === 0) return;
+                const bTrend = @json($builderData['monthly_trend'] ?? []);
+                if (!bTrend || !bTrend.labels || bTrend.labels.length === 0) return;
 
-                // 1. Inbound Trend Chart
-                if (document.getElementById('builderTrendChart') && bData.trend) {
-                    window.initSafeChart('builderTrendChart', {
+                if (document.getElementById('builderMonthlyTrendChart')) {
+                    window.initSafeChart('builderMonthlyTrendChart', {
                         type: 'line',
                         data: {
-                            labels: bData.trend.labels || [],
-                            datasets: [{
-                                label: 'Inbound Leads',
-                                data: bData.trend.received || [],
-                                borderColor: '#2563EB',
-                                backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                                borderWidth: 2.5,
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 3,
-                                pointBackgroundColor: '#2563EB',
-                            }]
+                            labels: bTrend.labels,
+                            datasets: [
+                                {
+                                    label: 'Received',
+                                    data: bTrend.received || [],
+                                    borderColor: '#2563EB',
+                                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                                    borderWidth: 2.5,
+                                    fill: true,
+                                    tension: 0.3,
+                                    pointRadius: 3,
+                                    pointBackgroundColor: '#2563EB',
+                                },
+                                {
+                                    label: 'Assigned',
+                                    data: bTrend.assigned || [],
+                                    borderColor: '#6366F1',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 2,
+                                    tension: 0.3,
+                                    pointRadius: 3,
+                                    pointBackgroundColor: '#6366F1',
+                                },
+                                {
+                                    label: 'Converted',
+                                    data: bTrend.converted || [],
+                                    borderColor: '#10B981',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 2,
+                                    tension: 0.3,
+                                    pointRadius: 3,
+                                    pointBackgroundColor: '#10B981',
+                                }
+                            ]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { display: false }
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: { font: { family: 'Inter', size: 10 }, color: '#475569', boxWidth: 10 }
+                                }
                             },
                             scales: {
                                 x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' } },
                                 y: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', precision: 0 }, beginAtZero: true }
-                            }
-                        }
-                    });
-                }
-
-                // 2. Received vs Assigned Chart
-                if (document.getElementById('builderReceivedVsAssignedChart') && bData.trend) {
-                    window.initSafeChart('builderReceivedVsAssignedChart', {
-                        type: 'bar',
-                        data: {
-                            labels: bData.trend.labels || [],
-                            datasets: [
-                                {
-                                    label: 'Received',
-                                    data: bData.trend.received || [],
-                                    backgroundColor: '#2563EB',
-                                    borderRadius: 4,
-                                    barPercentage: 0.6,
-                                },
-                                {
-                                    label: 'Assigned',
-                                    data: bData.trend.assigned || [],
-                                    backgroundColor: '#10B981',
-                                    borderRadius: 4,
-                                    barPercentage: 0.6,
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: { font: { family: 'Inter', size: 10 }, color: '#475569', boxWidth: 10 }
-                                }
-                            },
-                            scales: {
-                                x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' } },
-                                y: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', precision: 0 }, beginAtZero: true }
-                            }
-                        }
-                    });
-                }
-
-                // 3. Status Distribution Doughnut Chart
-                if (document.getElementById('builderStatusChart') && bData.status_distribution) {
-                    const keys = Object.keys(bData.status_distribution);
-                    const values = Object.values(bData.status_distribution);
-                    window.initSafeChart('builderStatusChart', {
-                        type: 'doughnut',
-                        data: {
-                            labels: keys,
-                            datasets: [{
-                                data: values,
-                                backgroundColor: ['#3B82F6', '#6366F1', '#F59E0B', '#10B981', '#94A3B8'],
-                                borderWidth: 2,
-                                borderColor: '#FFFFFF',
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            cutout: '68%',
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'right',
-                                    labels: { font: { family: 'Inter', size: 10 }, color: '#334155', boxWidth: 10, padding: 8 }
-                                }
-                            }
-                        }
-                    });
-                }
-
-                // 4. Credits Consumed Trend Chart
-                if (document.getElementById('builderCreditsChart') && bData.trend) {
-                    window.initSafeChart('builderCreditsChart', {
-                        type: 'bar',
-                        data: {
-                            labels: bData.trend.labels || [],
-                            datasets: [{
-                                label: 'Credits Consumed (Cr)',
-                                data: bData.trend.credits || [],
-                                backgroundColor: '#F59E0B',
-                                borderRadius: 4,
-                                barPercentage: 0.5,
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false }
-                            },
-                            scales: {
-                                x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B' } },
-                                y: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', precision: 0 }, beginAtZero: true }
-                            }
-                        }
-                    });
-                }
-
-                // 5. Team Member Performance Ranking
-                if (document.getElementById('builderTeamChart') && bData.team_performance) {
-                    const names = bData.team_performance.map(t => t.name);
-                    const activeCounts = bData.team_performance.map(t => t.active);
-                    const convCounts = bData.team_performance.map(t => t.converted);
-                    window.initSafeChart('builderTeamChart', {
-                        type: 'bar',
-                        data: {
-                            labels: names.length > 0 ? names : ['No active members'],
-                            datasets: [
-                                {
-                                    label: 'Active Leads',
-                                    data: activeCounts.length > 0 ? activeCounts : [0],
-                                    backgroundColor: '#2563EB',
-                                    borderRadius: 3,
-                                    barPercentage: 0.6,
-                                },
-                                {
-                                    label: 'Won Deals',
-                                    data: convCounts.length > 0 ? convCounts : [0],
-                                    backgroundColor: '#10B981',
-                                    borderRadius: 3,
-                                    barPercentage: 0.6,
-                                }
-                            ]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: { font: { family: 'Inter', size: 10 }, color: '#475569', boxWidth: 10 }
-                                }
-                            },
-                            scales: {
-                                x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', precision: 0 }, beginAtZero: true },
-                                y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#334155' } }
                             }
                         }
                     });

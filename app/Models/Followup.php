@@ -9,6 +9,10 @@ class Followup extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'due_at' => 'datetime',
+    ];
+
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);

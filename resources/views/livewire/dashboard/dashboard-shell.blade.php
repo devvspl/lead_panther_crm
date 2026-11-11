@@ -1406,9 +1406,9 @@
                                     <span class="text-[10px] text-muted truncate block">{{ $fu->note ?: 'Scheduled customer follow-up' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span class="font-mono text-[10px] font-bold text-amber-700">{{ $fu->due_at ? $fu->due_at->format('H:i') : 'Today' }}</span>
+                                    <span class="font-mono text-[10px] font-bold text-amber-700">{{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('H:i') : 'Today' }}</span>
                                     @if($fu->lead_id)
-                                        <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="text-primary hover:underline font-semibold text-[11px]">View &rarr;</a>
+                                        <a href="{{ route('leads.index') }}?search={{ $fu->lead?->lead_code ?: $fu->lead_id }}" wire:navigate class="text-primary hover:underline font-semibold text-[11px]">View &rarr;</a>
                                     @endif
                                 </div>
                             </div>
@@ -1431,9 +1431,9 @@
                                     <span class="text-[10px] text-rose-700 truncate block">{{ $fu->note ?: 'Pending overdue call' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span class="font-mono text-[10px] font-bold text-rose-800">{{ $fu->due_at ? $fu->due_at->format('M d') : 'Overdue' }}</span>
+                                    <span class="font-mono text-[10px] font-bold text-rose-800">{{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('M d') : 'Overdue' }}</span>
                                     @if($fu->lead_id)
-                                        <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="text-rose-800 hover:underline font-semibold text-[11px]">Action &rarr;</a>
+                                        <a href="{{ route('leads.index') }}?search={{ $fu->lead?->lead_code ?: $fu->lead_id }}" wire:navigate class="text-rose-800 hover:underline font-semibold text-[11px]">Action &rarr;</a>
                                     @endif
                                 </div>
                             </div>

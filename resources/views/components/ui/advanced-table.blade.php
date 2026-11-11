@@ -496,12 +496,12 @@
                                                 </button>
                                             </div>
                                         @elseif($type === 'replacement_actions')
-                                            <div class="flex items-center justify-end gap-1.5">
+                                            <div class="flex flex-wrap items-center justify-end gap-1.5">
                                                 @if((is_object($row) ? $row->status : $row['status']) === 'pending')
                                                     <button type="button"
                                                         wire:click="approveReplacement({{ is_object($row) ? $row->id : $row['id'] }})"
                                                         class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition cursor-pointer">
-                                                        Approve
+                                                        Approve &amp; Replace
                                                     </button>
                                                     <button type="button"
                                                         wire:click="openRejectModal({{ is_object($row) ? $row->id : $row['id'] }})"
@@ -509,7 +509,14 @@
                                                         Reject
                                                     </button>
                                                 @else
-                                                    <span class="text-[11px] text-muted italic">Resolved</span>
+                                                    <button type="button" wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'original')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View Original</button>
+                                                    @if((is_object($row) ? $row->status : $row['status']) === 'approved')
+                                                        @if(is_object($row) ? $row->replacement_lead_id : ($row['replacement_lead_id'] ?? null))
+                                                            <button type="button" wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'replacement')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View Replacement</button>
+                                                        @else
+                                                            <span class="text-[11px] text-muted">No replacement linked</span>
+                                                        @endif
+                                                    @endif
                                                 @endif
                                             </div>
                                         @elseif($type === 'recharge_actions')
@@ -888,12 +895,12 @@
                                             </button>
                                         </div>
                                     @elseif($type === 'replacement_actions')
-                                        <div class="flex items-center justify-end gap-1.5">
+                                        <div class="flex flex-wrap items-center justify-end gap-1.5">
                                             @if((is_object($row) ? $row->status : $row['status']) === 'pending')
                                                 <button type="button"
                                                     wire:click="approveReplacement({{ is_object($row) ? $row->id : $row['id'] }})"
                                                     class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition cursor-pointer">
-                                                    Approve
+                                                    Approve &amp; Replace
                                                 </button>
                                                 <button type="button"
                                                     wire:click="openRejectModal({{ is_object($row) ? $row->id : $row['id'] }})"
@@ -901,7 +908,14 @@
                                                     Reject
                                                 </button>
                                             @else
-                                                <span class="text-[11px] text-muted italic">Resolved</span>
+                                                <button type="button" wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'original')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View Original</button>
+                                                    @if((is_object($row) ? $row->status : $row['status']) === 'approved')
+                                                        @if(is_object($row) ? $row->replacement_lead_id : ($row['replacement_lead_id'] ?? null))
+                                                            <button type="button" wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'replacement')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View Replacement</button>
+                                                        @else
+                                                            <span class="text-[11px] text-muted">No replacement linked</span>
+                                                        @endif
+                                                    @endif
                                             @endif
                                         </div>
                                     @elseif($type === 'recharge_actions')

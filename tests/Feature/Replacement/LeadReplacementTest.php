@@ -174,4 +174,34 @@ class LeadReplacementTest extends TestCase
             'subject_id' => $replacement->id,
         ]);
     }
+
+    public function test_queue_shows_pending_actions_then_replacement_links_without_reprocessing(): void
+    {
+        $admin=User::factory()->create();
+        $admin->assignRole('super-admin');
+        $org=Organization::create(['name'=>'Replacement Actions Org','status'=>'active']);
+        $client=Client::create(['organization_id'=>$org->id,'name'=>'Replacement Owner']);
+        $project=Project::create(['client_id'=>$client->id,'name'=>'Replacement Project']);
+        $source=LeadSource::create(['name'=>'Replacement Source']);
+        $reason=ReplacementReason::create(['label'=>'Invalid Phone','is_eligible'=>true,'requires_sla_check'=>false]);
+        $lead=Lead::factory()->create(['client_id'=>$client->id,'project_id'=>$project->id,'lead_source_id'=>$source->id]);
+        $wallet=CreditWallet::create(['client_id'=>$client->id,'balance'=>50]);
+        $claim=LeadReplacement::create(['lead_id'=>$lead->id,'reason_id'=>$reason->id,'requested_by'=>$client->id,'requested_at'=>now(),'status'=>'pending']);
+        $this->actingAs($admin);
+        $component=\Livewire\Livewire::test(\App\Livewire\Replacement\ReplacementQueue::class);
+        $component->assertSee('Approve &amp; Replace',false)->assertSee('Reject')
+            ->call('approveReplacement',$claim->id)->assertDispatched('toast',type:'success')
+            ->assertSee('View Original')->assertSee('View Replacement')->assertDontSee('Approve &amp; Replace',false);
+        $claim->refresh();
+        $this->assertSame('approved',$claim->status);
+        $this->assertNotNull($claim->replacement_lead_id);
+        $component->call('viewClaimLead',$claim->id,'replacement')->assertDispatched('open-lead-detail',id:$claim->replacement_lead_id);
+        $after=(float)$wallet->fresh()->balance;
+        $count=Lead::count();
+        $component->call('approveReplacement',$claim->id)->assertDispatched('toast',type:'warning');
+        $component->call('openRejectModal',$claim->id)->assertSet('showRejectModal',false)->assertDispatched('toast',type:'warning');
+        $this->assertSame($after,(float)$wallet->fresh()->balance);
+        $this->assertSame($count,Lead::count());
+        $this->assertSame('approved',$claim->fresh()->status);
+    }
 }

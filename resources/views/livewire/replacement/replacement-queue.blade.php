@@ -66,6 +66,9 @@
         </x-slot:action>
     </x-ui.advanced-table>
 
+    <livewire:leads.lead-detail />
+    <livewire:leads.lead-timeline />
+
     <!-- Rejection Note Modal -->
     @if($showRejectModal)
         <div class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">

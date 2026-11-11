@@ -57,15 +57,37 @@ class ReplacementQueue extends Component
 
     public function approveReplacement(int $id): void
     {
-        $replacement = LeadReplacement::find($id);
-        if ($replacement) {
-            $replacement->approve(auth()->id() ?? 1);
-            $this->dispatch('toast', type: 'success', message: 'Replacement APPROVED. Credit refunded and replacement lead generated.');
+        abort_unless(auth()->user()?->hasRole(['Super Admin', 'super-admin']), 403);
+        $approved = \Illuminate\Support\Facades\DB::transaction(function () use ($id) {
+            $replacement = LeadReplacement::lockForUpdate()->findOrFail($id);
+            if ($replacement->status !== 'pending') return false;
+            return $replacement->approve(auth()->id());
+        });
+        $this->dispatch('toast', type: $approved ? 'success' : 'warning', message: $approved
+            ? 'Replacement APPROVED. Credit refunded and replacement lead generated.'
+            : 'This claim has already been resolved. Open the original or replacement lead to review it.');
+    }
+
+    public function viewClaimLead(int $id, string $which = 'original'): void
+    {
+        abort_unless(auth()->user()?->hasRole(['Super Admin', 'super-admin']), 403);
+        abort_unless(in_array($which, ['original', 'replacement'], true), 422);
+        $claim = LeadReplacement::findOrFail($id);
+        $lead = $which === 'replacement' && $claim->status === 'approved' ? $claim->replacementLead : ($which === 'original' ? $claim->lead : null);
+        if (!$lead) {
+            $this->dispatch('toast', type: 'warning', message: 'No replacement lead is linked to this claim.');
+            return;
         }
+        $this->dispatch('open-lead-detail', id: $lead->id);
     }
 
     public function openRejectModal(int $id): void
     {
+        abort_unless(auth()->user()?->hasRole(['Super Admin', 'super-admin']), 403);
+        if (LeadReplacement::findOrFail($id)->status !== 'pending') {
+            $this->dispatch('toast', type: 'warning', message: 'Only pending claims can be rejected.');
+            return;
+        }
         $this->rejectingReplacementId = $id;
         $this->showRejectModal = true;
     }
@@ -79,15 +101,21 @@ class ReplacementQueue extends Component
 
     public function confirmReject(): void
     {
+        abort_unless(auth()->user()?->hasRole(['Super Admin', 'super-admin']), 403);
         $this->validate([
             'rejectionNote' => 'required|string|min:5',
         ]);
 
         if ($this->rejectingReplacementId) {
-            $replacement = LeadReplacement::find($this->rejectingReplacementId);
-            if ($replacement) {
-                $replacement->reject($this->rejectionNote, auth()->id() ?? 1);
+            $rejected = \Illuminate\Support\Facades\DB::transaction(function () {
+                $replacement = LeadReplacement::lockForUpdate()->findOrFail($this->rejectingReplacementId);
+                if ($replacement->status !== 'pending') return false;
+                return $replacement->reject($this->rejectionNote, auth()->id());
+            });
+            if ($rejected) {
                 $this->dispatch('toast', type: 'success', message: 'Replacement claim REJECTED with logged audit reason.');
+            } else {
+                $this->dispatch('toast', type: 'warning', message: 'This claim has already been resolved.');
             }
         }
 

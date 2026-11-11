@@ -753,11 +753,21 @@
                 :visibleColumns="$visibleColumns" 
                 :sortField="$sortField"
                 :sortDirection="$sortDirection" 
+                :showCheckboxes="true"
+                :selectedRows="$selectedRows"
+                :selectAll="$selectAll"
                 searchPlaceholder="Search leads by code, name, phone, city..."
                 emptyTitle="No Leads Found" 
                 emptyMessage="No leads matched your search and filter criteria.">
                 <x-slot:action>
                     <div class="flex items-center gap-2">
+                        @if(!empty($selectedRows))
+                            <button type="button" wire:click="openBulkAssignModal"
+                                class="px-3 h-8 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                <span>Assign Selected ({{ count($selectedRows) }})</span>
+                            </button>
+                        @endif
                         <x-ui.export-button target="exportExcel" class="text-xs" />
                         <button type="button" wire:click="openPullLeadsModal"
                             class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
@@ -1252,6 +1262,79 @@
             </div>
         </x-slot:footer>
     </x-ui.offcanvas>
+
+    <!-- Lead Manual & Bulk Assignment Modal -->
+    @if($showAssignModal)
+    <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-ink">Assign Leads to Team Member</h3>
+                        <p class="text-[11px] text-muted">
+                            Assigning <span class="font-bold text-primary">{{ count($selectedLeadIds) }}</span> lead(s) internally.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeAssignModal" class="text-muted hover:text-ink cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                @if(isset($assignTeams) && count($assignTeams) > 0)
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">Filter by Team (Optional)</label>
+                        <select wire:model.live="assignTeamId"
+                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
+                            <option value="">All Teams / Members</option>
+                            @foreach($assignTeams as $t)
+                                <option value="{{ $t->id }}">{{ $t->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                <div>
+                    <label class="block text-xs font-semibold text-ink mb-1">Select Sales Agent / Member <span class="text-red-500">*</span></label>
+                    <select wire:model="assignUserId"
+                        class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
+                        <option value="">-- Choose Eligible Team Member --</option>
+                        @foreach($eligibleAssignees as $member)
+                            <option value="{{ $member->id }}">{{ $member->name }} ({{ $member->email }})</option>
+                        @endforeach
+                    </select>
+                    @error('assignUserId') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="p-3 rounded-lg bg-canvas border border-border text-[11px] text-muted space-y-1">
+                    <div class="flex items-center gap-1.5 font-semibold text-ink">
+                        <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Credit &amp; Assignment Policy:</span>
+                    </div>
+                    <p>Internal team assignments do not consume extra client credits. The assignment will be recorded in the audit history and the agent will be notified.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button type="button" wire:click="closeAssignModal"
+                    class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" wire:click="executeAssignment"
+                    class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Confirm Assignment</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- CDN Script for SortableJS (Kanban drag-and-drop) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>

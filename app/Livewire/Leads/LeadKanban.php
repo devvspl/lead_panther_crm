@@ -89,6 +89,12 @@ class LeadKanban extends Component
     public bool $isPulling = false;
     public ?array $pullSummary = null;
 
+    // Lead Manual / Bulk Assignment Modal State
+    public bool $showAssignModal = false;
+    public array $selectedLeadIds = [];
+    public ?int $assignTeamId = null;
+    public ?int $assignUserId = null;
+
     // Single Manual Lead Ingestion State
     public string $manualName = '';
     public string $manualMobile = '';
@@ -491,6 +497,17 @@ class LeadKanban extends Component
                 $query->whereHas('client', function ($q) use ($user) {
                     $q->where('organization_id', $user->organization_id);
                 });
+            } elseif ($user->hasRole('builder') || $user->hasRole('Builder') || $user->hasRole('Builder/Developer') || $user->hasRole('builder-admin')) {
+                if ($user->organization_id) {
+                    $orgId = $user->organization_id;
+                    $query->where(function ($q) use ($orgId) {
+                        $q->whereHas('client', function ($sq) use ($orgId) {
+                            $sq->where('organization_id', $orgId);
+                        })->orWhereHas('assignedTo', function ($sq) use ($orgId) {
+                            $sq->where('organization_id', $orgId);
+                        });
+                    });
+                }
             }
         }
 
@@ -1175,6 +1192,30 @@ class LeadKanban extends Component
             ? LeadFormMapping::where('portal_account_id', $this->selectedPortalAccountId)->where('status', 'active')->orderBy('form_name')->get()
             : collect();
 
+        $user = auth()->user();
+        $orgId = $user?->organization_id;
+
+        $assignTeams = SalesTeam::query()
+            ->when($orgId && !$user->hasRole('Super Admin'), function ($q) use ($orgId, $user) {
+                $q->where(function ($sq) use ($orgId, $user) {
+                    $sq->where('ownable_type', 'App\\Models\\Organization')->where('ownable_id', $orgId)
+                       ->orWhere('ownable_type', 'App\\Models\\User')->where('ownable_id', $user->id);
+                });
+            })
+            ->orderBy('name')
+            ->get();
+
+        $eligibleAssignees = User::query()
+            ->where('status', 'active')
+            ->when($orgId && !$user->hasRole('Super Admin'), function ($q) use ($orgId) {
+                $q->where('organization_id', $orgId);
+            })
+            ->when($this->assignTeamId, function ($q) {
+                $q->whereIn('id', SalesTeamMember::where('sales_team_id', $this->assignTeamId)->pluck('user_id'));
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
         return view('livewire.leads.lead-kanban', [
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
@@ -1190,7 +1231,90 @@ class LeadKanban extends Component
             'allCampaigns' => $allCampaigns,
             'allLeadSources' => $allLeadSources,
             'allOrganizations' => $allOrganizations,
+            'eligibleAssignees' => $eligibleAssignees,
+            'assignTeams' => $assignTeams,
         ])->layout('layouts.app');
+    }
+
+    protected function getCurrentPageRowIds(): array
+    {
+        return $this->getScopedQuery()
+            ->latest('id')
+            ->paginate($this->perPage)
+            ->pluck('id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+    }
+
+    #[On('open-lead-assign')]
+    public function openAssignModalForSingleLead(int $id): void
+    {
+        $this->selectedLeadIds = [$id];
+        $this->assignTeamId = null;
+        $this->assignUserId = null;
+        $this->showAssignModal = true;
+    }
+
+    public function openBulkAssignModal(): void
+    {
+        if (empty($this->selectedRows)) {
+            $this->dispatch('toast', type: 'warning', message: 'Please select at least one lead from the table to assign.');
+            return;
+        }
+        $this->selectedLeadIds = array_map('intval', $this->selectedRows);
+        $this->assignTeamId = null;
+        $this->assignUserId = null;
+        $this->showAssignModal = true;
+    }
+
+    public function closeAssignModal(): void
+    {
+        $this->showAssignModal = false;
+        $this->selectedLeadIds = [];
+        $this->assignTeamId = null;
+        $this->assignUserId = null;
+    }
+
+    public function executeAssignment(): void
+    {
+        $this->validate([
+            'selectedLeadIds' => 'required|array|min:1',
+            'assignUserId' => 'required|exists:users,id',
+        ]);
+
+        $user = auth()->user();
+        $targetUser = User::findOrFail($this->assignUserId);
+        $leads = Lead::whereIn('id', $this->selectedLeadIds)->get();
+
+        $assignedCount = 0;
+        foreach ($leads as $lead) {
+            $lead->update([
+                'assigned_to' => $targetUser->id,
+                'current_stage' => in_array($lead->current_stage, ['new', 'pending_credit', 'assigned']) ? 'assigned' : $lead->current_stage,
+            ]);
+
+            LeadAssignment::create([
+                'lead_id' => $lead->id,
+                'assigned_to' => $targetUser->id,
+                'assigned_by' => $user->id,
+                'assigned_at' => now(),
+            ]);
+
+            LeadStatusHistory::create([
+                'lead_id' => $lead->id,
+                'from_status' => $lead->status,
+                'to_status' => $lead->status,
+                'changed_by' => $user->id,
+                'changed_at' => now(),
+            ]);
+
+            $assignedCount++;
+        }
+
+        $this->selectedRows = [];
+        $this->selectAll = false;
+        $this->closeAssignModal();
+        $this->dispatch('toast', type: 'success', message: "Successfully assigned {$assignedCount} lead(s) to {$targetUser->name}.");
     }
 
     public function tableColumns(): array

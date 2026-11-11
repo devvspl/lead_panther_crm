@@ -48,6 +48,11 @@ class DashboardShell extends Component
     public string $activeActivityTab = 'leads'; // 'leads', 'followups', 'sla', 'transactions', 'replacements', 'notifications'
     public string $activeKpiGroup = 'overview'; // 'overview', 'conversion', 'sla', 'credit'
 
+    // Builder Specific State
+    public bool $showBuilderRechargeModal = false;
+    public float $builderRechargeAmount = 1000.00;
+    public string $builderRechargeNote = '';
+
     public function mount(?string $role = null): void
     {
         if ($role) {
@@ -155,6 +160,17 @@ class DashboardShell extends Component
     protected function getFilteredLeadsQuery(?Carbon $start = null, ?Carbon $end = null)
     {
         $query = Lead::withoutGlobalScopes();
+
+        $user = auth()->user();
+        if ($this->role === 'builder' || ($user && ($user->hasRole('builder') || $user->hasRole('Builder') || $user->hasRole('Builder/Developer')))) {
+            $orgId = $user?->organization_id;
+            if ($orgId) {
+                $query->where(function ($q) use ($orgId) {
+                    $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
+                      ->orWhereHas('assignedTo', fn($sq) => $sq->where('organization_id', $orgId));
+                });
+            }
+        }
 
         if ($start && $end) {
             $query->whereBetween('created_at', [$start, $end]);
@@ -1548,6 +1564,332 @@ class DashboardShell extends Component
         return [];
     }
 
+    public function openBuilderRechargeModal(): void
+    {
+        $this->builderRechargeAmount = 1000.00;
+        $this->builderRechargeNote = '';
+        $this->showBuilderRechargeModal = true;
+    }
+
+    public function closeBuilderRechargeModal(): void
+    {
+        $this->showBuilderRechargeModal = false;
+    }
+
+    public function submitBuilderRechargeRequest(): void
+    {
+        $this->validate([
+            'builderRechargeAmount' => 'required|numeric|min:10',
+            'builderRechargeNote' => 'nullable|string|max:500',
+        ]);
+
+        $user = auth()->user();
+        $client = \App\Models\Client::where('organization_id', $user?->organization_id)->first() ?: $user;
+
+        RechargeRequest::create([
+            'client_id' => $client->id,
+            'package_id' => null,
+            'amount' => $this->builderRechargeAmount,
+            'status' => 'pending',
+            'reference_note' => $this->builderRechargeNote ?: 'Credit recharge request from Builder Dashboard',
+            'requested_at' => now(),
+        ]);
+
+        $this->closeBuilderRechargeModal();
+        $this->dispatch('toast', type: 'success', message: 'Recharge request submitted to Super Admin for approval.');
+    }
+
+    public function toggleAutoAssign(): void
+    {
+        $user = auth()->user();
+        if (!$user?->organization_id) return;
+
+        $org = Organization::find($user->organization_id);
+        if ($org) {
+            $newVal = !$org->auto_assign_enabled;
+            $org->update(['auto_assign_enabled' => $newVal]);
+            $this->dispatch('toast', type: 'success', message: 'Automatic assignment ' . ($newVal ? 'enabled' : 'disabled') . '.');
+        }
+    }
+
+    public function setDistributionMethod(string $method): void
+    {
+        $user = auth()->user();
+        if (!$user?->organization_id) return;
+
+        $org = Organization::find($user->organization_id);
+        if ($org && in_array($method, ['round_robin', 'capacity', 'team', 'priority', 'manual'])) {
+            $org->update(['distribution_method' => $method]);
+            $this->dispatch('toast', type: 'success', message: 'Distribution method updated to ' . ucwords(str_replace('_', ' ', $method)) . '.');
+        }
+    }
+
+    public function autoDistributeBuilderLeads(): void
+    {
+        $user = auth()->user();
+        $orgId = $user?->organization_id;
+        if (!$orgId) return;
+
+        $unassigned = Lead::withoutGlobalScopes()
+            ->whereNull('assigned_to')
+            ->where(function ($q) use ($orgId) {
+                $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
+                  ->orWhereHas('assignedTo', fn($sq) => $sq->where('organization_id', $orgId));
+            })
+            ->take(50)
+            ->get();
+
+        $service = app(\App\Services\LeadDistributionService::class);
+        $count = 0;
+        foreach ($unassigned as $lead) {
+            $res = $service->distribute($lead);
+            if (!empty($res['assigned_user'])) {
+                $count++;
+            }
+        }
+
+        $this->dispatch('toast', type: 'success', message: "Auto-distributed {$count} lead(s) to active team members.");
+    }
+
+    /**
+     * Complete Builder / Developer Dashboard Data: 12 Real Metrics, Wallet Summary, Distribution Summary, Charts.
+     */
+    public function getBuilderDashboardDataProperty(): array
+    {
+        $user = auth()->user();
+        $orgId = $user?->organization_id;
+        $org = $orgId ? Organization::find($orgId) : null;
+        [$start, $end, $prevStart, $prevEnd, $periodLabel] = $this->getDateBounds();
+
+        // 1. Organization Users & Clients
+        $orgUsers = $orgId ? User::where('organization_id', $orgId)->get() : collect([$user]);
+        $orgUserIds = $orgUsers->pluck('id')->toArray();
+
+        // 2. Filtered Leads Query
+        $baseQuery = Lead::withoutGlobalScopes()->where(function ($q) use ($orgId, $orgUserIds) {
+            if ($orgId) {
+                $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
+                  ->orWhereIn('assigned_to', $orgUserIds);
+            }
+        });
+
+        // Current & Previous Period Queries
+        $currQuery = (clone $baseQuery)->whereBetween('created_at', [$start, $end]);
+        $prevQuery = (clone $baseQuery)->whereBetween('created_at', [$prevStart, $prevEnd]);
+
+        // Filters applied
+        if ($this->filterProjectId) {
+            $currQuery->whereHas('campaign', fn($q) => $q->where('project_id', $this->filterProjectId));
+            $prevQuery->whereHas('campaign', fn($q) => $q->where('project_id', $this->filterProjectId));
+        }
+        if ($this->filterTeamId) {
+            $teamMembers = SalesTeamMember::where('sales_team_id', $this->filterTeamId)->pluck('user_id');
+            $currQuery->whereIn('assigned_to', $teamMembers);
+            $prevQuery->whereIn('assigned_to', $teamMembers);
+        }
+        if ($this->filterAssignedUserId) {
+            $currQuery->where('assigned_to', $this->filterAssignedUserId);
+            $prevQuery->where('assigned_to', $this->filterAssignedUserId);
+        }
+        if ($this->filterLeadSourceId) {
+            $currQuery->where('lead_source_id', $this->filterLeadSourceId);
+            $prevQuery->where('lead_source_id', $this->filterLeadSourceId);
+        }
+        if ($this->filterStatus) {
+            if ($this->filterStatus === 'unassigned') {
+                $currQuery->whereNull('assigned_to');
+                $prevQuery->whereNull('assigned_to');
+            } elseif ($this->filterStatus === 'assigned') {
+                $currQuery->whereNotNull('assigned_to');
+                $prevQuery->whereNotNull('assigned_to');
+            } else {
+                $currQuery->where(fn($q) => $q->where('status', $this->filterStatus)->orWhere('current_stage', $this->filterStatus));
+                $prevQuery->where(fn($q) => $q->where('status', $this->filterStatus)->orWhere('current_stage', $this->filterStatus));
+            }
+        }
+
+        // Aggregate 12 KPI values from actual database records
+        $currStats = (clone $currQuery)->selectRaw("
+            COUNT(*) as total_leads,
+            COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+            COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads,
+            COUNT(CASE WHEN current_stage IN ('in_progress', 'contacted', 'connected', 'interested', 'site_visit', 'negotiation', 'meeting', 'follow-up') THEN 1 END) as in_progress_leads,
+            COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads,
+            COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'wrong_number', 'dead', 'rejected') THEN 1 END) as lost_leads
+        ")->first();
+
+        $prevStats = (clone $prevQuery)->selectRaw("
+            COUNT(*) as total_leads,
+            COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
+            COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads
+        ")->first();
+
+        // Wallet Balance & Ledgers
+        $walletBalance = (float) CreditWallet::whereIn('client_id', $orgUserIds)->sum('balance');
+        $walletOpening = (float) CreditWallet::whereIn('client_id', $orgUserIds)->sum('opening_balance');
+        $totalRecharged = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->where('transaction_type', 'recharge')->whereBetween('created_at', [$start, $end])->sum('credit_used');
+        $creditsConsumed = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])->whereBetween('created_at', [$start, $end])->sum('credit_used');
+        $creditsRefunded = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->where('transaction_type', 'refund')->whereBetween('created_at', [$start, $end])->sum('credit_used');
+
+        $pricingService = app(\App\Services\LeadPricingService::class);
+        $pricingInfo = $pricingService->resolveCost(null, null, $org);
+        $costPerLead = (float) $pricingInfo['cost'];
+
+        // Team Metrics
+        $activeMembers = User::where('organization_id', $orgId)->where('status', 'active')->count();
+        $upcomingFollowups = Followup::whereIn('lead_id', (clone $currQuery)->pluck('id'))->where('due_at', '>=', now())->count();
+
+        $totalLeads = (int) ($currStats->total_leads ?? 0);
+        $convertedLeads = (int) ($currStats->converted_leads ?? 0);
+        $convRate = $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0;
+
+        $prevTotalLeads = (int) ($prevStats->total_leads ?? 0);
+        $prevConverted = (int) ($prevStats->converted_leads ?? 0);
+        $prevConvRate = $prevTotalLeads > 0 ? round(($prevConverted / $prevTotalLeads) * 100, 1) : 0;
+
+        // Team Member Distribution
+        $teamDistribution = User::where('organization_id', $orgId)
+            ->where('status', 'active')
+            ->withCount([
+                'assignedLeads as active_leads_count' => fn($q) => $q->whereNotIn('current_stage', ['closed_won', 'closed_lost', 'wrong_number']),
+                'assignedLeads as converted_leads_count' => fn($q) => $q->whereIn('current_stage', ['booking', 'closed_won']),
+            ])
+            ->orderByDesc('active_leads_count')
+            ->take(8)
+            ->get();
+
+        // Status Distribution for Doughnut Chart
+        $statusDistribution = [
+            'New' => (clone $currQuery)->whereIn('current_stage', ['new', 'lead_received'])->count(),
+            'Assigned' => (clone $currQuery)->where('current_stage', 'assigned')->count(),
+            'In Progress' => (int) ($currStats->in_progress_leads ?? 0),
+            'Converted' => $convertedLeads,
+            'Lost' => (int) ($currStats->lost_leads ?? 0),
+        ];
+
+        // Trend Data for Line Chart
+        $trendData = $this->buildBuilderTrendData($baseQuery, $start, $end);
+
+        // Recent Inbound Leads for Builder
+        $recentLeads = (clone $baseQuery)->with(['campaign.project', 'leadSource', 'assignedTo'])
+            ->latest('created_at')
+            ->take(6)
+            ->get();
+
+        // Funnel progression for Builder
+        $stage1 = $totalLeads;
+        $stage2 = (clone $currQuery)->whereNotIn('current_stage', ['duplicate'])->count();
+        $stage3 = (int) ($currStats->assigned_leads ?? 0);
+        $stage4 = (clone $currQuery)->whereNotNull('first_response_at')->count();
+        $stage5 = (clone $currQuery)->whereIn('current_stage', ['interested', 'site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+        $stage6 = (clone $currQuery)->whereIn('current_stage', ['site_visit', 'negotiation', 'booking', 'closed_won'])->count();
+        $stage7 = (int) ($currStats->converted_leads ?? 0);
+
+        $funnelStages = [
+            ['stage' => 'Received', 'count' => $stage1, 'pct' => 100],
+            ['stage' => 'Credit Cleared', 'count' => $stage2, 'pct' => $stage1 > 0 ? round(($stage2 / $stage1) * 100) : 0],
+            ['stage' => 'Assigned', 'count' => $stage3, 'pct' => $stage1 > 0 ? round(($stage3 / $stage1) * 100) : 0],
+            ['stage' => 'First Response', 'count' => $stage4, 'pct' => $stage1 > 0 ? round(($stage4 / $stage1) * 100) : 0],
+            ['stage' => 'Interested', 'count' => $stage5, 'pct' => $stage1 > 0 ? round(($stage5 / $stage1) * 100) : 0],
+            ['stage' => 'Site Visit', 'count' => $stage6, 'pct' => $stage1 > 0 ? round(($stage6 / $stage1) * 100) : 0],
+            ['stage' => 'Won / Booked', 'count' => $stage7, 'pct' => $stage1 > 0 ? round(($stage7 / $stage1) * 100) : 0],
+        ];
+
+        return [
+            'kpis' => [
+                'total_leads' => ['value' => $totalLeads, 'delta' => $this->calculateDelta($totalLeads, $prevTotalLeads)],
+                'available_credits' => ['value' => $walletBalance, 'is_low' => $walletBalance < ($org?->min_credit_threshold ?? 50.0)],
+                'credits_consumed' => ['value' => $creditsConsumed, 'delta' => ['delta' => $periodLabel, 'isPositive' => true]],
+                'available_for_assignment' => ['value' => (int) ($currStats->unassigned_leads ?? 0)],
+                'assigned_leads' => ['value' => (int) ($currStats->assigned_leads ?? 0), 'delta' => $this->calculateDelta((int) ($currStats->assigned_leads ?? 0), (int) ($prevStats->assigned_leads ?? 0))],
+                'unassigned_leads' => ['value' => (int) ($currStats->unassigned_leads ?? 0)],
+                'in_progress_leads' => ['value' => (int) ($currStats->in_progress_leads ?? 0)],
+                'converted_leads' => ['value' => $convertedLeads, 'delta' => $this->calculateDelta($convertedLeads, $prevConverted)],
+                'lost_leads' => ['value' => (int) ($currStats->lost_leads ?? 0)],
+                'active_team_members' => ['value' => $activeMembers],
+                'conversion_rate' => ['value' => $convRate, 'delta' => $this->calculateDelta($convRate, $prevConvRate)],
+                'upcoming_followups' => ['value' => $upcomingFollowups],
+            ],
+            'wallet_summary' => [
+                'available_credits' => $walletBalance,
+                'opening_balance' => $walletOpening,
+                'total_recharged' => $totalRecharged,
+                'credits_consumed' => $creditsConsumed,
+                'credits_refunded' => $creditsRefunded,
+                'cost_per_lead' => $costPerLead,
+                'is_low' => $walletBalance < ($org?->min_credit_threshold ?? 50.0),
+                'min_threshold' => (float) ($org?->min_credit_threshold ?? 50.0),
+            ],
+            'distribution_summary' => [
+                'auto_assign_enabled' => (bool) ($org?->auto_assign_enabled ?? true),
+                'distribution_method' => $org?->distribution_method ?: 'round_robin',
+                'assigned_leads' => (int) ($currStats->assigned_leads ?? 0),
+                'unassigned_leads' => (int) ($currStats->unassigned_leads ?? 0),
+                'team_distribution' => $teamDistribution,
+            ],
+            'charts' => [
+                'status_distribution' => $statusDistribution,
+                'trend' => $trendData,
+                'funnel' => $funnelStages,
+                'team_performance' => $teamDistribution->map(fn($m) => [
+                    'name' => $m->name,
+                    'active' => $m->active_leads_count,
+                    'converted' => $m->converted_leads_count,
+                ])->toArray(),
+            ],
+            'recent_leads' => $recentLeads,
+            'organization' => $org,
+        ];
+    }
+
+    protected function buildBuilderTrendData($baseQuery, Carbon $start, Carbon $end): array
+    {
+        $days = max(1, (int) $start->diffInDays($end));
+        $labels = [];
+        $received = [];
+        $assigned = [];
+        $credits = [];
+
+        if ($this->trendInterval === 'monthly' || $days > 60) {
+            $periods = collect(range(min(6, (int) ($days / 30)), 0))->map(fn($i) => now()->subMonths($i));
+            foreach ($periods as $p) {
+                $labels[] = $p->format('M Y');
+                $received[] = (clone $baseQuery)->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->count();
+                $assigned[] = (clone $baseQuery)->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->whereNotNull('assigned_to')->count();
+                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->sum('credit_used');
+            }
+        } elseif ($this->trendInterval === 'weekly' || $days > 14) {
+            $weeks = collect(range(min(8, (int) ($days / 7)), 0))->map(fn($i) => now()->subWeeks($i));
+            foreach ($weeks as $w) {
+                $labels[] = 'Wk ' . $w->format('W');
+                $wStart = (clone $w)->startOfWeek();
+                $wEnd = (clone $w)->endOfWeek();
+                $received[] = (clone $baseQuery)->whereBetween('created_at', [$wStart, $wEnd])->count();
+                $assigned[] = (clone $baseQuery)->whereBetween('created_at', [$wStart, $wEnd])->whereNotNull('assigned_to')->count();
+                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->whereBetween('created_at', [$wStart, $wEnd])->sum('credit_used');
+            }
+        } else {
+            // Daily
+            $dates = collect(range(min($days, 30), 0))->map(fn($i) => (clone $end)->subDays($i));
+            foreach ($dates as $d) {
+                $labels[] = $d->format('d M');
+                $received[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->count();
+                $assigned[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->whereNotNull('assigned_to')->count();
+                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->whereDate('created_at', $d->toDateString())->sum('credit_used');
+            }
+        }
+
+        return [
+            'labels' => $labels,
+            'received' => $received,
+            'assigned' => $assigned,
+            'credits' => $credits,
+        ];
+    }
+
     public function getChartDataProperty(): array
     {
         $months = collect(range(5, 0))->map(fn($i) => now()->subMonths($i));
@@ -1573,6 +1915,35 @@ class DashboardShell extends Component
     {
         $sourceOptions = LeadSource::pluck('name', 'id')->map(fn($name) => ucfirst($name))->toArray();
 
+        $user = auth()->user();
+        $orgId = $user?->organization_id;
+
+        $builderProjects = [];
+        $builderTeams = [];
+        $builderTeamMembers = [];
+
+        if ($this->role === 'builder' && $orgId) {
+            $builderProjects = Project::whereHas('client', function ($q) use ($orgId) {
+                $q->where('organization_id', $orgId);
+            })->pluck('name', 'id')->toArray();
+
+            if (empty($builderProjects)) {
+                $builderProjects = Project::where('client_id', $user->id)->pluck('name', 'id')->toArray();
+            }
+
+            $builderTeams = SalesTeam::where(function ($q) use ($orgId, $user) {
+                $q->where('ownable_type', 'App\\Models\\Organization')->where('ownable_id', $orgId)
+                  ->orWhere(function ($sq) use ($user) {
+                      $sq->where('ownable_type', 'App\\Models\\User')->where('ownable_id', $user->id);
+                  });
+            })->pluck('name', 'id')->toArray();
+
+            $builderTeamMembers = User::where('organization_id', $orgId)
+                ->where('status', 'active')
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+
         return view('livewire.dashboard.dashboard-shell', [
             'headerInfo' => $this->headerInfo,
             'quickActions' => $this->quickActions,
@@ -1593,6 +1964,12 @@ class DashboardShell extends Component
             'adminNotificationMonitoring' => $this->role === 'admin' ? $this->adminNotificationMonitoring : [],
             'adminRecentActivities' => $this->role === 'admin' ? $this->adminRecentActivities : [],
             'sourceOptions' => $sourceOptions,
+
+            // Builder / Developer Dashboard Data
+            'builderData' => $this->role === 'builder' ? $this->builderDashboardData : [],
+            'builderProjects' => $builderProjects,
+            'builderTeams' => $builderTeams,
+            'builderTeamMembers' => $builderTeamMembers,
         ]);
     }
 }

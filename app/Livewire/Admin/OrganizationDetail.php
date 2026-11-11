@@ -495,13 +495,19 @@ class OrganizationDetail extends Component
     // CREDITS & WALLET ADJUSTMENT METHODS
     // ─────────────────────────────────────────────────────────────
 
-    public function openCreditModal(?int $clientId = null): void
+    public function openCreditModal(?int $clientId = null, string $type = 'recharge'): void
     {
         $firstClient = Client::where('organization_id', $this->organization->id)->first();
         $this->selectedCreditClientId = $clientId ?: $firstClient?->id;
         $this->creditAmount = 100.00;
-        $this->creditAdjustmentType = 'recharge';
-        $this->creditReason = 'Manual admin allocation';
+        $this->creditAdjustmentType = in_array($type, ['recharge', 'opening_credit', 'refund', 'manual_adjustment', 'deduct']) ? $type : 'recharge';
+        $this->creditReason = match ($this->creditAdjustmentType) {
+            'opening_credit' => 'Initial opening balance allocation',
+            'refund' => 'Lead replacement / SLA refund',
+            'manual_adjustment' => 'Administrative wallet adjustment',
+            'deduct' => 'Manual deduction / fee',
+            default => 'Manual admin recharge',
+        };
         $this->showCreditModal = true;
         $this->dispatch('open-modal', 'adjust-org-credits-modal');
     }
@@ -517,8 +523,8 @@ class OrganizationDetail extends Component
     {
         $this->validate([
             'selectedCreditClientId' => 'required|exists:users,id',
-            'creditAmount' => 'required|numeric|min:1',
-            'creditAdjustmentType' => 'required|in:recharge,refund,deduct',
+            'creditAmount' => 'required|numeric|min:0.01',
+            'creditAdjustmentType' => 'required|in:recharge,opening_credit,refund,manual_adjustment,deduct',
             'creditReason' => 'required|string|min:3',
         ]);
 
@@ -530,32 +536,49 @@ class OrganizationDetail extends Component
                 $wallet = CreditWallet::create([
                     'client_id' => $client->id,
                     'balance' => 0.00,
+                    'opening_balance' => 0.00,
                 ]);
             }
 
             $before = (float) $wallet->balance;
-            if ($this->creditAdjustmentType === 'recharge' || $this->creditAdjustmentType === 'refund') {
+            $txType = $this->creditAdjustmentType;
+
+            if ($this->creditAdjustmentType === 'opening_credit') {
                 $after = $before + $this->creditAmount;
-                $txType = $this->creditAdjustmentType;
-            } else {
+                $wallet->update([
+                    'opening_balance' => ((float) $wallet->opening_balance) + $this->creditAmount,
+                    'balance' => $after,
+                ]);
+            } elseif ($this->creditAdjustmentType === 'recharge' || $this->creditAdjustmentType === 'refund') {
+                $after = $before + $this->creditAmount;
+                $wallet->update(['balance' => $after]);
+            } elseif ($this->creditAdjustmentType === 'manual_adjustment') {
+                // If reason contains debit or user is adjusting downwards, or standard addition
+                $after = $before + $this->creditAmount;
+                $wallet->update(['balance' => $after]);
+            } else { // deduct
                 $after = max(0.00, $before - $this->creditAmount);
+                $wallet->update(['balance' => $after]);
                 $txType = 'deduct';
             }
 
-            $wallet->update(['balance' => $after]);
-
             CreditTransaction::create([
                 'client_id' => $client->id,
+                'lead_id' => null,
+                'package_id' => null,
                 'credit_before' => $before,
                 'credit_used' => $this->creditAmount,
                 'credit_after' => $after,
                 'transaction_type' => $txType,
+                'description' => $this->creditReason,
+                'created_by' => auth()->id(),
                 'created_at' => now(),
             ]);
         });
 
         $this->closeCreditModal();
-        $this->dispatch('toast', type: 'success', message: "Credits adjusted successfully for {$client->name}.");
+        $this->organization->load('clients.wallet');
+        $this->dispatch('toast', type: 'success', message: "Credits updated successfully for {$client->name}.");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -811,10 +834,14 @@ class OrganizationDetail extends Component
         // 5. Credits Query
         $creditTxQuery = CreditTransaction::withoutGlobalScopes()
             ->whereIn('client_id', $clientIds)
-            ->with(['client', 'lead']);
+            ->with(['client', 'lead', 'createdBy']);
 
         if ($this->creditFilterType !== 'all') {
-            $creditTxQuery->where('transaction_type', $this->creditFilterType);
+            if ($this->creditFilterType === 'consumption') {
+                $creditTxQuery->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve']);
+            } else {
+                $creditTxQuery->where('transaction_type', $this->creditFilterType);
+            }
         }
 
         $creditTransactions = $creditTxQuery->latest('created_at')->paginate(15);
@@ -852,12 +879,17 @@ class OrganizationDetail extends Component
 
         $totalCreditsRecharged = DB::table('credit_transactions')
             ->whereIn('client_id', $clientIds)
-            ->whereIn('transaction_type', ['recharge', 'refund'])
+            ->where('transaction_type', 'recharge')
+            ->sum('credit_used') ?? 0;
+
+        $totalCreditsRefunded = DB::table('credit_transactions')
+            ->whereIn('client_id', $clientIds)
+            ->where('transaction_type', 'refund')
             ->sum('credit_used') ?? 0;
 
         $totalCreditsDeducted = DB::table('credit_transactions')
             ->whereIn('client_id', $clientIds)
-            ->whereIn('transaction_type', ['deduct', 'reserve'])
+            ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
             ->sum('credit_used') ?? 0;
 
         // 6. Audit Trail
@@ -900,6 +932,7 @@ class OrganizationDetail extends Component
             'totalWalletBalance' => (float) $totalWalletBalance,
             'globalDefaultLeadCost' => (float) $globalDefaultLeadCost,
             'totalCreditsRecharged' => (float) $totalCreditsRecharged,
+            'totalCreditsRefunded' => (float) $totalCreditsRefunded,
             'totalCreditsDeducted' => (float) $totalCreditsDeducted,
             'auditLogs' => $auditLogs,
             'clientProjects' => $clientProjects,

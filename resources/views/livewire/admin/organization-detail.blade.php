@@ -928,74 +928,86 @@
     <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
         <div class="space-y-6">
-            <!-- Credits Header & KPI Strip (4-Card Strip with Opening and Available Balances) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Credits Header & KPI Strip (5-Card Strip with Opening, Recharged, Consumed, Refunded, and Available Balances) -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <!-- 1. Opening Balance -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div
-                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Opening Balance</span>
                         <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 2) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
-                        <span>Baseline starting credits</span>
-                        <span
-                            class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
+                        <span>Baseline allocation</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
                     </div>
                 </div>
 
                 <!-- 2. Total Recharged -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div
-                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Recharged</span>
                         <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-emerald-600">
                         {{ number_format($totalCreditsRecharged, 2) }}
                     </div>
-                    <div class="text-[10px] text-muted">Total credited / refunded</div>
+                    <div class="text-[10px] text-muted">Total purchased & deposited</div>
                 </div>
 
-                <!-- 3. Total Deducted -->
+                <!-- 3. Total Consumed -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div
-                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Consumed</span>
                         <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted, 2) }}</div>
                     <div class="text-[10px] text-muted">Deducted for lead delivery</div>
                 </div>
 
-                <!-- 4. Available Balance -->
+                <!-- 4. Total Refunded -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div
-                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                        <span>Total Refunded</span>
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </div>
+                    <div class="text-2xl font-bold font-mono text-blue-600">{{ number_format($totalCreditsRefunded, 2) }}</div>
+                    <div class="text-[10px] text-muted">Returned for claims/SLA</div>
+                </div>
+
+                <!-- 5. Available Balance -->
+                <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 md:col-span-1">
+                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Available Balance</span>
                         <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance, 2) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
-                        <span>Live spendable credits</span>
-                        <span
-                            class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance > 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
-                            {{ $totalWalletBalance > 50 ? 'Active' : 'Low Balance' }}
+                        <span>Live spendable</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
+                            {{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Balance' }}
                         </span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Ledger Balance Calculation Formula Banner -->
+            <div class="p-3 bg-canvas border border-border rounded-xl flex items-center justify-between text-xs text-muted">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span><strong class="text-ink">Credit Calculation:</strong> Available Credits = Opening Balance ({{ number_format($totalOpeningBalance, 2) }}) + Total Recharged ({{ number_format($totalCreditsRecharged, 2) }}) + Refunds ({{ number_format($totalCreditsRefunded, 2) }}) - Total Consumed ({{ number_format($totalCreditsDeducted, 2) }}) = <strong class="text-primary font-mono font-bold">{{ number_format($totalWalletBalance, 2) }} Cr</strong></span>
                 </div>
             </div>
 
@@ -1005,7 +1017,6 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="text-sm font-bold text-ink flex items-center gap-1.5">
-                                <span class="p-1 rounded-md bg-purple-100 text-purple-700">⚡</span>
                                 <span>Clients Lead Cost Configuration</span>
                             </h3>
                             @if($organization->lead_cost !== null)
@@ -1053,8 +1064,7 @@
                 <div class="p-4 border-b border-border flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink">Client Credit Wallets</h3>
-                        <p class="text-[11px] text-muted">Opening balance baseline vs current available spendable credits
-                            per client.</p>
+                        <p class="text-[11px] text-muted">Opening balance baseline vs current available spendable credits per client.</p>
                     </div>
                     <span class="text-xs text-muted font-mono">{{ $clients->count() }} Registered Clients</span>
                 </div>
@@ -1076,8 +1086,7 @@
                                 <tr class="hover:bg-canvas/30 transition">
                                     <td class="py-3 px-4 font-bold text-ink">
                                         {{ $c->name }}
-                                        <div class="text-[10px] text-muted font-normal">{{ $c->projects_count }} active projects
-                                        </div>
+                                        <div class="text-[10px] text-muted font-normal">{{ $c->projects_count }} active projects</div>
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ $c->billing_email ?: '—' }}
@@ -1095,10 +1104,18 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 text-right">
-                                        <button type="button" wire:click="openCreditModal({{ $c->id }})"
-                                            class="px-2.5 py-1 rounded-lg bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold transition cursor-pointer shadow-2xs">
-                                            Adjust / Recharge
-                                        </button>
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <button type="button" wire:click="openCreditModal({{ $c->id }}, 'opening_credit')"
+                                                class="px-2.5 py-1 rounded-lg bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                                title="Set or Adjust Opening Balance">
+                                                Opening Credit
+                                            </button>
+                                            <button type="button" wire:click="openCreditModal({{ $c->id }}, 'recharge')"
+                                                class="px-2.5 py-1 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition cursor-pointer shadow-2xs"
+                                                title="Recharge Credits">
+                                                Recharge
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -1113,27 +1130,35 @@
                 </div>
             </div>
 
-            <!-- Controls bar for Credits -->
+            <!-- Controls bar for Credits Ledger -->
             <div
                 class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-muted font-semibold">Filter:</span>
-                    <div class="inline-flex p-0.5 rounded-lg bg-canvas border border-border text-xs">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-muted font-semibold">Filter Ledger:</span>
+                    <div class="inline-flex p-0.5 rounded-lg bg-canvas border border-border text-xs flex-wrap">
                         <button type="button" wire:click="$set('creditFilterType', 'all')"
                             class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'all' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
                             All
+                        </button>
+                        <button type="button" wire:click="$set('creditFilterType', 'opening_credit')"
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'opening_credit' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                            Opening
                         </button>
                         <button type="button" wire:click="$set('creditFilterType', 'recharge')"
                             class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'recharge' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
                             Recharges
                         </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'deduct')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'deduct' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Deductions
+                        <button type="button" wire:click="$set('creditFilterType', 'consumption')"
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'consumption' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                            Consumption
                         </button>
                         <button type="button" wire:click="$set('creditFilterType', 'refund')"
                             class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'refund' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
                             Refunds
+                        </button>
+                        <button type="button" wire:click="$set('creditFilterType', 'manual_adjustment')"
+                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'manual_adjustment' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                            Adjustments
                         </button>
                     </div>
                 </div>
@@ -1146,7 +1171,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        <span>Export Tab</span>
+                        <span>Export Ledger</span>
                     </button>
 
                     <button type="button" wire:click="openCreditModal()"
@@ -1155,12 +1180,12 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
-                        <span>Recharge / Adjust Credits</span>
+                        <span>Adjust / Recharge</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Transactions Table -->
+            <!-- Complete Credit Transaction Ledger Table -->
             <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs">
@@ -1169,11 +1194,13 @@
                             <tr>
                                 <th class="py-3 px-4">Tx ID</th>
                                 <th class="py-3 px-4">Client</th>
-                                <th class="py-3 px-4">Transaction Type</th>
-                                <th class="py-3 px-4">Lead Reference</th>
-                                <th class="py-3 px-4">Credits Before</th>
+                                <th class="py-3 px-4">Type</th>
+                                <th class="py-3 px-4">Reference Lead</th>
+                                <th class="py-3 px-4">Description / Note</th>
+                                <th class="py-3 px-4">Credit Before</th>
                                 <th class="py-3 px-4">Amount In / Out</th>
                                 <th class="py-3 px-4">Balance After</th>
+                                <th class="py-3 px-4">Created By</th>
                                 <th class="py-3 px-4 text-right">Date & Time</th>
                             </tr>
                         </thead>
@@ -1186,29 +1213,39 @@
                                         @php
                                             $typeBadge = match ($tx->transaction_type) {
                                                 'recharge' => 'bg-emerald-100 text-emerald-950 border-emerald-300',
+                                                'opening_credit' => 'bg-sky-100 text-sky-950 border-sky-300',
                                                 'refund' => 'bg-blue-100 text-blue-950 border-blue-300',
-                                                'reserve' => 'bg-amber-100 text-amber-950 border-amber-300',
+                                                'reserve', 'lead_consumption' => 'bg-amber-100 text-amber-950 border-amber-300',
                                                 'deduct' => 'bg-purple-100 text-purple-950 border-purple-300',
+                                                'manual_adjustment' => 'bg-indigo-100 text-indigo-950 border-indigo-300',
                                                 default => 'bg-slate-100 text-slate-900 border-slate-300',
                                             };
                                         @endphp
-                                        <span
-                                            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $typeBadge }}">
-                                            {{ $tx->transaction_type }}
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $typeBadge }}">
+                                            {{ $tx->transaction_type_label }}
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
-                                        {{ $tx->lead?->lead_code ?: 'Direct Allocation' }}
+                                        @if($tx->lead)
+                                            <a href="{{ route('leads.index') }}" class="font-bold text-primary hover:underline">{{ $tx->lead->lead_code }}</a>
+                                        @else
+                                            <span class="text-muted">Direct</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-4 text-muted max-w-xs truncate" title="{{ $tx->description }}">
+                                        {{ $tx->description ?: '—' }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ number_format($tx->credit_before, 2) }}
                                     </td>
-                                    <td
-                                        class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund']) ? 'text-emerald-600' : 'text-red-500' }}">
-                                        {{ in_array($tx->transaction_type, ['recharge', 'refund']) ? '+' : '-' }}{{ number_format($tx->credit_used, 2) }}
+                                    <td class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) || ($tx->transaction_type === 'manual_adjustment' && $tx->credit_after >= $tx->credit_before) ? 'text-emerald-600' : 'text-red-500' }}">
+                                        {{ $tx->credit_used_formatted }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
                                         {{ number_format($tx->credit_after, 2) }}
+                                    </td>
+                                    <td class="py-3 px-4 text-muted text-[11px]">
+                                        {{ $tx->createdBy?->name ?: 'System Admin' }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px] text-right">
                                         {{ $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y • h:i A') : '—' }}
@@ -1216,7 +1253,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="p-8 text-center text-xs text-muted">
+                                    <td colspan="10" class="p-8 text-center text-xs text-muted">
                                         No credit transactions recorded yet for this organization.
                                     </td>
                                 </tr>
@@ -1224,6 +1261,13 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if($creditTransactions->hasPages())
+                    <div class="p-3 border-t border-border bg-canvas/30">
+                        {{ $creditTransactions->links() }}
+                    </div>
+                @endif
+            </div>
 
                 @if($creditTransactions->hasPages())
                     <div class="p-3 border-t border-border bg-canvas/30">
@@ -1596,15 +1640,17 @@
                         <label class="font-bold text-ink">Action Type <span class="text-red-500">*</span></label>
                         <select wire:model="creditAdjustmentType"
                             class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
-                            <option value="recharge">+ Recharge / Credit</option>
-                            <option value="refund">+ Refund / Adjustment</option>
-                            <option value="deduct">- Deduct / Debit</option>
+                            <option value="recharge">+ Recharge Credits</option>
+                            <option value="opening_credit">+ Opening Credit (Baseline)</option>
+                            <option value="refund">+ Refund Credits (Replacement / SLA)</option>
+                            <option value="manual_adjustment">+ Manual Adjustment</option>
+                            <option value="deduct">- Deduct / Debit Credits</option>
                         </select>
                     </div>
 
                     <div>
                         <label class="font-bold text-ink">Credit Amount <span class="text-red-500">*</span></label>
-                        <input type="number" wire:model="creditAmount" step="1" min="1"
+                        <input type="number" wire:model="creditAmount" step="0.01" min="0.01"
                             class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
                         @error('creditAmount') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
                         @enderror

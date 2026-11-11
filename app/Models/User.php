@@ -44,6 +44,11 @@ class User extends Authenticatable
         return $this->hasMany(Lead::class, 'client_id');
     }
 
+    public function assignedLeads(): HasMany
+    {
+        return $this->hasMany(Lead::class, 'assigned_to');
+    }
+
     public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(CreditWallet::class, 'client_id');

@@ -35,8 +35,19 @@ class LeadDistributionService
     {
         // 1. Resolve Lead's Target Organization
         $targetOrgId = $this->resolveLeadOrganizationId($lead);
+        $targetOrg = $targetOrgId ? Organization::find($targetOrgId) : null;
 
-        // 2. Fetch Active Distribution Rule for project (or default)
+        // 2. Check if Auto-Assignment is Disabled for Organization
+        if ($targetOrg && !$targetOrg->auto_assign_enabled && empty($forceMethod)) {
+            return [
+                'assigned_user' => null,
+                'method' => self::METHOD_MANUAL,
+                'status' => 'held_for_manual_assignment',
+                'message' => "Automatic assignment disabled for {$targetOrg->name}. Lead placed in unassigned queue.",
+            ];
+        }
+
+        // 3. Fetch Active Distribution Rule for project (or organization default)
         $rule = null;
         if ($lead->project_id) {
             $rule = DistributionRule::where('project_id', $lead->project_id)
@@ -45,10 +56,11 @@ class LeadDistributionService
                 ->first();
         }
 
-        $method = $forceMethod ?: ($rule?->rule_type ?: self::METHOD_ROUND_ROBIN);
+        $orgDefaultMethod = $targetOrg?->distribution_method ?: self::METHOD_ROUND_ROBIN;
+        $method = $forceMethod ?: ($rule?->rule_type ?: $orgDefaultMethod);
         $config = array_merge($rule?->config ?? [], $overrideConfig);
 
-        // 3. If Manual distribution, hold unassigned
+        // 4. If Manual distribution, hold unassigned
         if ($method === self::METHOD_MANUAL) {
             return [
                 'assigned_user' => null,
@@ -58,27 +70,15 @@ class LeadDistributionService
             ];
         }
 
-        // 4. Fetch Organization-Secure Candidate Agents
+        // 5. Fetch Organization-Secure Candidate Agents
         $candidates = $this->getOrganizationAgents($targetOrgId);
 
         if ($candidates->isEmpty()) {
-            // Fallback: If no dedicated org agents, pick admin or hold unassigned
-            $adminFallback = User::where('id', 1)->orWhere('email', 'admin@leadpanther.com')->first();
-            if ($adminFallback) {
-                $this->assignLeadToUser($lead, $adminFallback, 'admin_fallback');
-                return [
-                    'assigned_user' => $adminFallback,
-                    'method' => 'admin_fallback',
-                    'status' => 'assigned_to_admin',
-                    'message' => 'No active organization sales executives found. Assigned to Platform Admin.',
-                ];
-            }
-
             return [
                 'assigned_user' => null,
                 'method' => $method,
                 'status' => 'unassigned',
-                'message' => 'No eligible organization sales executives available.',
+                'message' => 'No eligible organization team members available. Kept in unassigned queue.',
             ];
         }
 

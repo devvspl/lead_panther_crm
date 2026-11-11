@@ -1142,6 +1142,7 @@
     @endif
 
     <!-- Meta Lead Ads Sync & Manual Add Drawer -->
+    @if(!$isBuilder)
     <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Add / Ingest Leads"
         subtitle="Pull leads from Meta Ads (Facebook & Instagram) or create a single manual lead entry." maxWidth="lg">
         <x-slot:headerIcon>
@@ -1379,6 +1380,7 @@
             </div>
         </x-slot:footer>
     </x-ui.offcanvas>
+    @endif
 
     <!-- Lead Manual & Bulk Assignment Modal -->
     @if($showAssignModal)

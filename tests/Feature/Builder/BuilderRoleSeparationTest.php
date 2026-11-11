@@ -49,11 +49,12 @@ class BuilderRoleSeparationTest extends TestCase
         Livewire::actingAs($builderUser)
             ->test(DashboardShell::class, ['role' => 'builder'])
             ->assertSee('Builder / Developer Dashboard')
-            ->assertSee('Credit Summary')
+            ->assertSee('Credit Balance')
             ->assertSee('Read-Only')
             ->assertSee('Available Credits')
+            ->assertSee('Lead Performance')
             ->assertSee('Team Performance')
-            ->assertSee('Upcoming Schedule & Follow-ups')
+            ->assertSee('Upcoming Follow-ups')
             ->assertDontSee('Request Credit Recharge')
             ->assertDontSee('System Administration');
     }

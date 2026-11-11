@@ -531,10 +531,15 @@ class DashboardShell extends Component
         [$start, $end] = $this->getDateBounds();
 
         // Calculate Average First Response Time
+        $isSqlite = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite';
+        $timeDiffSql = $isSqlite
+            ? 'AVG((strftime("%s", first_response_at) - strftime("%s", created_at)) / 60) as avg_min'
+            : 'AVG(TIMESTAMPDIFF(MINUTE, created_at, first_response_at)) as avg_min';
+
         $avgResponseMin = Lead::withoutGlobalScopes()
             ->whereBetween('created_at', [$start, $end])
             ->whereNotNull('first_response_at')
-            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, first_response_at)) as avg_min')
+            ->selectRaw($timeDiffSql)
             ->value('avg_min');
 
         $avgResponseFormatted = $avgResponseMin !== null
@@ -964,6 +969,7 @@ class DashboardShell extends Component
 
         return $orgQuery->take(15)->get()->map(function ($org) use ($start, $end) {
             $userIds = $org->users->pluck('id');
+            $slaThreshold = now()->subMinutes(30)->toDateTimeString();
 
             $leadStats = Lead::withoutGlobalScopes()
                 ->whereIn('client_id', $userIds)
@@ -973,7 +979,7 @@ class DashboardShell extends Component
                     COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned,
                     COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned,
                     COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') THEN 1 END) as converted,
-                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= NOW() - INTERVAL 30 MINUTE THEN 1 END) as sla_breached
+                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= '{$slaThreshold}' THEN 1 END) as sla_breached
                 ")
                 ->first();
 
@@ -1018,6 +1024,8 @@ class DashboardShell extends Component
         }
 
         return $projQuery->take(10)->get()->map(function ($project) use ($start, $end) {
+            $slaThreshold = now()->subMinutes(30)->toDateTimeString();
+
             $leadStats = Lead::withoutGlobalScopes()
                 ->whereHas('campaign', fn($q) => $q->where('project_id', $project->id))
                 ->whereBetween('created_at', [$start, $end])
@@ -1026,7 +1034,7 @@ class DashboardShell extends Component
                     COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned,
                     COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned,
                     COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') THEN 1 END) as converted,
-                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= NOW() - INTERVAL 30 MINUTE THEN 1 END) as sla_breached
+                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= '{$slaThreshold}' THEN 1 END) as sla_breached
                 ")
                 ->first();
 

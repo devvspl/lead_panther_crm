@@ -30,15 +30,15 @@ class RoleDashboardTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(DashboardShell::class, ['role' => 'admin'])
-            ->assertSee('Super Admin Master Telemetry')
-            ->assertSee('Platform Leads Today')
-            ->assertSee('System Credits Supply')
-            ->assertSee('Active Organizations')
-            ->assertSee('Platform SLA Breaches');
+            ->assertSee('Super Admin Dashboard')
+            ->assertSee('Total Leads')
+            ->assertSee('Won Deals')
+            ->assertSee('SLA Breaches')
+            ->assertSee('Available Credits');
 
         $this->get('/admin/dashboard')
             ->assertOk()
-            ->assertSee('Super Admin Master Telemetry');
+            ->assertSee('Super Admin Dashboard');
     }
 
     public function test_builder_dashboard_metrics_and_header(): void
@@ -52,21 +52,24 @@ class RoleDashboardTest extends TestCase
         Livewire::actingAs($builder)
             ->test(DashboardShell::class, ['role' => 'builder'])
             ->assertSee('Builder / Developer Dashboard')
-            ->assertSee('Org Leads Today')
-            ->assertSee('Active Credits')
-            ->assertSee('Active Projects')
-            ->assertSee('Closed Bookings');
+            ->assertSee('Total Leads')
+            ->assertSee('New Leads')
+            ->assertSee('Unassigned Leads')
+            ->assertSee('Assigned Leads')
+            ->assertSee('In Progress')
+            ->assertSee('Closed Won')
+            ->assertSee('Credit Balance')
+            ->assertSee('Available Credits');
 
         $this->actingAs($builder)
             ->get('/builder/dashboard')
             ->assertOk()
             ->assertSee('Builder / Developer Dashboard');
 
-        // Navigation check: builder role key is 'builder' with only dashboard and team
+        // Navigation check: builder role key is 'builder' with allowed workspace items
         $this->assertEquals('builder', NavigationConfig::getRoleKey($builder));
         $allowed = NavigationConfig::getAllowedItemKeys($builder);
-        $this->assertEquals(['dashboard', 'team'], $allowed);
-        $this->assertNotContains('leads', $allowed);
+        $this->assertEquals(['dashboard', 'leads', 'team', 'replacements', 'reports'], $allowed);
         $this->assertNotContains('credits', $allowed);
         $this->assertNotContains('integrations', $allowed);
         $this->assertNotContains('organizations', $allowed);

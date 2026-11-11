@@ -1103,543 +1103,266 @@
 
     @elseif($role === 'builder')
         <!-- ================================================================= -->
-        <!-- BUILDER / DEVELOPER COMMAND CENTRE DASHBOARD                     -->
-        <!-- 12 KPIs, Wallet Summary Card + Modal, Lead Distribution Card,     -->
-        <!-- 6 Interactive Charts, Compact Filters Bar, Recent Inbound Leads  -->
+        <!-- BUILDER / DEVELOPER DASHBOARD (SIMPLE, CLEAN & SHORT)              -->
         <!-- ================================================================= -->
 
-        <!-- 1. Role-Tailored Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border">
+        <!-- 1. Header & Live Status -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
             <div>
-                <div class="flex items-center gap-2.5">
-                    <h1 class="text-2xl sm:text-3xl font-bold text-ink tracking-tight">Builder / Developer Dashboard</h1>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-50 text-emerald-800 border-emerald-200">
-                        Builder / Developer
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">Builder / Developer Dashboard</h1>
+                    <span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 bg-surface border border-border rounded-full text-xs font-semibold text-ink">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Live</span>
                     </span>
                 </div>
-                <p class="text-xs text-muted mt-1">
-                    Portfolio performance, organization leads &amp; credits for <span class="font-bold text-ink">{{ $builderData['organization']?->name ?? 'Organization' }}</span>
+                <p class="text-xs text-muted mt-0.5">
+                    Organization: <span class="font-bold text-ink">{{ $builderData['organization']?->name ?? 'Organization' }}</span>
                 </p>
             </div>
-            <div class="flex items-center gap-2.5 flex-wrap">
-                <span class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-surface border border-border rounded-full text-xs font-semibold text-ink shadow-2xs">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Live 30s Polling</span>
-                </span>
-                <button type="button" wire:click="resetFilters"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-canvas text-muted hover:text-ink text-xs font-semibold transition cursor-pointer">
+
+            <!-- 2. Quick Actions -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="{{ route('leads.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition shadow-2xs">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span>My Leads</span>
+                </a>
+                <a href="{{ route('builder.team') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border text-ink hover:bg-canvas rounded-lg text-xs font-semibold transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <span>Team Management</span>
+                </a>
+                <a href="{{ route('replacements.client') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border text-ink hover:bg-canvas rounded-lg text-xs font-semibold transition">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    <span>Reset</span>
-                </button>
+                    <span>Replacement Requests</span>
+                </a>
             </div>
         </div>
 
-        <!-- 2. Quick Action Shortcuts Bar -->
-        @if(!empty($quickActions))
-            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-                <span class="text-xs font-bold text-muted uppercase tracking-wider shrink-0 mr-1">Quick Actions:</span>
-                @foreach($quickActions as $act)
-                    <a href="{{ $act['url'] }}" wire:navigate
-                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 cursor-pointer {{ ($act['primary'] ?? false) ? 'bg-ink text-white hover:bg-neutral-800 shadow-2xs' : 'bg-surface border border-border text-ink hover:bg-canvas' }}">
-                        @if(($act['icon'] ?? '') === 'upload')
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                        @elseif(($act['icon'] ?? '') === 'leads')
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                        @elseif(($act['icon'] ?? '') === 'wallet')
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        @elseif(($act['icon'] ?? '') === 'team' || ($act['icon'] ?? '') === 'users')
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                        @else
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                        @endif
-                        <span>{{ $act['label'] }}</span>
-                    </a>
-                @endforeach
+        <!-- 3. Small Credit Summary (Read-Only) -->
+        <div class="bg-surface rounded-xl border border-border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Balance</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                    Read-Only
+                </span>
             </div>
-        @endif
-
-        <!-- 3. Global Filters Bar (Compact Horizontal Section) -->
-        <div class="bg-surface rounded-2xl border border-border p-3 shadow-2xs space-y-2">
-            <div class="flex items-center justify-between pb-1.5 border-b border-border/60">
-                <div class="flex items-center gap-1.5 text-xs font-bold text-ink uppercase tracking-wider">
-                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                    <span>Dashboard Filters</span>
+            <div class="flex items-center gap-4 text-xs">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-muted">Available Credits:</span>
+                    <span class="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {{ number_format($builderData['credits']['available_credits'] ?? 0, 2) }} Cr
+                    </span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" wire:click="$refresh"
-                        class="px-2.5 py-1 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        <span>Apply</span>
-                    </button>
-                    <button type="button" wire:click="resetFilters"
-                        class="px-2 py-1 text-muted hover:text-ink text-xs font-medium cursor-pointer">
-                        Reset
-                    </button>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-muted">Credits Consumed:</span>
+                    <span class="font-mono font-bold text-ink bg-canvas px-2 py-0.5 rounded border border-border">
+                        {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 2) }} Cr
+                    </span>
                 </div>
             </div>
-
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
-                <!-- Date Range -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Date Range</label>
-                    <select wire:model.live="dateRange"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="today">Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="7_days">Last 7 Days</option>
-                        <option value="30_days">This Month (30d)</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
-                </div>
-
-                <!-- Project -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Project</label>
-                    <select wire:model.live="filterProjectId"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">All Projects</option>
-                        @foreach($builderProjects as $pId => $pName)
-                            <option value="{{ $pId }}">{{ $pName }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Team -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Team</label>
-                    <select wire:model.live="filterTeamId"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">All Teams</option>
-                        @foreach($builderTeams as $tId => $tName)
-                            <option value="{{ $tId }}">{{ $tName }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Team Member / Agent -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Team Member</label>
-                    <select wire:model.live="filterAssignedUserId"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">All Members</option>
-                        @foreach($builderTeamMembers as $mId => $mName)
-                            <option value="{{ $mId }}">{{ $mName }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Lead Status -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Status / Stage</label>
-                    <select wire:model.live="filterStatus"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">All Statuses</option>
-                        <option value="new">New / Received</option>
-                        <option value="assigned">Assigned</option>
-                        <option value="unassigned">Unassigned Queue</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="interested">Interested</option>
-                        <option value="site_visit">Site Visit</option>
-                        <option value="negotiation">Negotiation</option>
-                        <option value="booking">Booked / Won</option>
-                        <option value="lost">Lost / Dead</option>
-                    </select>
-                </div>
-
-                <!-- Lead Source -->
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-muted block mb-0.5">Lead Source</label>
-                    <select wire:model.live="filterLeadSourceId"
-                        class="w-full h-8 px-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">All Sources</option>
-                        @foreach($sourceOptions as $sId => $sName)
-                            <option value="{{ $sId }}">{{ $sName }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            @if($dateRange === 'custom')
-                <div class="flex items-center gap-2 pt-1 border-t border-border/40">
-                    <span class="text-[11px] text-muted">From:</span>
-                    <input type="date" wire:model.live="customFrom" class="h-7 px-2 text-xs border border-border rounded bg-canvas">
-                    <span class="text-[11px] text-muted">To:</span>
-                    <input type="date" wire:model.live="customTo" class="h-7 px-2 text-xs border border-border rounded bg-canvas">
-                </div>
-            @endif
         </div>
 
-        <!-- 4. Performance Cards (10 Required Operational Cards) -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <!-- 1. Total Leads Received -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+        <!-- 4. Six Compact KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <!-- 1. Total Leads -->
+            <a href="{{ route('leads.index') }}?statusFilter=all" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Total Received</span>
+                    <span>Total Leads</span>
                     <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono text-ink">
+                <div class="text-xl font-bold font-mono text-ink mt-1">
                     {{ number_format($builderData['kpis']['total_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="inline-flex items-center gap-0.5 {{ ($builderData['kpis']['total_leads']['delta']['isPositive'] ?? true) ? 'text-emerald-600 font-bold' : 'text-neutral-500' }}">
-                        {{ $builderData['kpis']['total_leads']['delta']['delta'] ?? '0%' }}
-                    </span>
-                    <span class="text-muted text-[9px]">vs prior</span>
+                <div class="text-[10px] text-muted mt-1 truncate">
+                    Delivered leads
                 </div>
-            </div>
+            </a>
 
             <!-- 2. New Leads -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+            <a href="{{ route('leads.index') }}?statusFilter=new" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>New Leads</span>
                     <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono text-emerald-600">
+                <div class="text-xl font-bold font-mono text-emerald-600 mt-1">
                     {{ number_format($builderData['kpis']['new_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-emerald-700 font-bold">
-                        {{ $builderData['kpis']['new_leads']['delta']['delta'] ?? '0%' }}
-                    </span>
-                    <span class="text-muted text-[9px]">Fresh inbound</span>
+                <div class="text-[10px] text-emerald-700 font-medium mt-1 truncate">
+                    Uncontacted
                 </div>
-            </div>
+            </a>
 
             <!-- 3. Unassigned Leads -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+            <a href="{{ route('leads.index') }}?statusFilter=unassigned" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>Unassigned</span>
-                    <div class="w-6 h-6 rounded-lg {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600' }} flex items-center justify-center">
+                    <div class="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600' : 'text-ink' }}">
+                <div class="text-xl font-bold font-mono text-rose-600 mt-1">
                     {{ number_format($builderData['kpis']['unassigned_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="{{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600 font-bold' : 'text-muted' }}">
-                        {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'Needs assign' : 'All assigned' }}
-                    </span>
-                    @if(($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0)
-                        <button type="button" wire:click="autoDistributeBuilderLeads" class="text-primary hover:underline font-semibold text-[9px] cursor-pointer">
-                            Distribute &rarr;
-                        </button>
-                    @endif
+                <div class="text-[10px] text-muted mt-1 truncate">
+                    Needs assignment
                 </div>
-            </div>
+            </a>
 
             <!-- 4. Assigned Leads -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+            <a href="{{ route('leads.index') }}?statusFilter=assigned" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Assigned Leads</span>
+                    <span>Assigned</span>
                     <div class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono text-ink">
+                <div class="text-xl font-bold font-mono text-ink mt-1">
                     {{ number_format($builderData['kpis']['assigned_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-indigo-600 font-bold">
-                        {{ $builderData['kpis']['assigned_leads']['delta']['delta'] ?? '0%' }}
-                    </span>
-                    <span class="text-muted text-[9px]">With team</span>
+                <div class="text-[10px] text-muted mt-1 truncate">
+                    With team
                 </div>
-            </div>
+            </a>
 
-            <!-- 5. Leads in Progress -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+            <!-- 5. In Progress -->
+            <a href="{{ route('leads.index') }}?statusFilter=in_progress" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>In Progress</span>
                     <div class="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono text-amber-600">
+                <div class="text-xl font-bold font-mono text-amber-600 mt-1">
                     {{ number_format($builderData['kpis']['in_progress_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-amber-700 font-bold">
-                        {{ $builderData['kpis']['in_progress_leads']['delta']['delta'] ?? '0%' }}
-                    </span>
-                    <span class="text-muted text-[9px]">Active pipeline</span>
+                <div class="text-[10px] text-muted mt-1 truncate">
+                    Active discussion
                 </div>
-            </div>
+            </a>
 
-            <!-- 6. Follow-ups Due -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Follow-ups Due</span>
-                    <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                    </div>
-                </div>
-                <div class="text-xl font-bold font-mono text-blue-600">
-                    {{ number_format($builderData['kpis']['followups_due']['value'] ?? 0) }}
-                </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-blue-700 font-medium">Scheduled</span>
-                    <span class="text-muted text-[9px]">Tasks</span>
-                </div>
-            </div>
-
-            <!-- 7. Site Visits -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Site Visits</span>
-                    <div class="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </div>
-                </div>
-                <div class="text-xl font-bold font-mono text-purple-600">
-                    {{ number_format($builderData['kpis']['site_visits']['value'] ?? 0) }}
-                </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-purple-700 font-medium">Inspections</span>
-                    <span class="text-muted text-[9px]">Property tours</span>
-                </div>
-            </div>
-
-            <!-- 8. Bookings -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Bookings</span>
-                    <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                </div>
-                <div class="text-xl font-bold font-mono text-emerald-600">
-                    {{ number_format($builderData['kpis']['bookings']['value'] ?? 0) }}
-                </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-emerald-700 font-medium">Tokens</span>
-                    <span class="text-muted text-[9px]">Units booked</span>
-                </div>
-            </div>
-
-            <!-- 9. Closed Won -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
+            <!-- 6. Closed Won -->
+            <a href="{{ route('leads.index') }}?statusFilter=closed_won" wire:navigate
+               class="bg-surface hover:bg-canvas rounded-xl border border-border p-3 shadow-2xs transition group">
                 <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
                     <span>Closed Won</span>
                     <div class="w-6 h-6 rounded-lg bg-green-50 text-green-700 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
                     </div>
                 </div>
-                <div class="text-xl font-bold font-mono text-green-700">
+                <div class="text-xl font-bold font-mono text-green-700 mt-1">
                     {{ number_format($builderData['kpis']['closed_won']['value'] ?? 0) }}
                 </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-green-800 font-bold">
-                        {{ $builderData['kpis']['closed_won']['delta']['delta'] ?? '0%' }}
-                    </span>
-                    <span class="text-muted text-[9px]">Deals won</span>
+                <div class="text-[10px] text-green-800 font-bold mt-1 truncate">
+                    Converted deals
                 </div>
-            </div>
-
-            <!-- 10. Replacement Requests -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[10px] font-semibold uppercase tracking-wider">
-                    <span>Replacements</span>
-                    <div class="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    </div>
-                </div>
-                <div class="text-xl font-bold font-mono text-rose-600">
-                    {{ number_format($builderData['kpis']['replacement_requests']['value'] ?? 0) }}
-                </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-rose-700 font-medium">Claims</span>
-                    <a href="{{ route('replacements.client') }}" wire:navigate class="text-primary hover:underline text-[9px] font-semibold">
-                        View Log &rarr;
-                    </a>
-                </div>
-            </div>
+            </a>
         </div>
 
-        <!-- 5. Credit Summary (Read-Only) -->
-        <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Credit Summary</h3>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
-                                Read-Only
-                            </span>
-                        </div>
-                        <p class="text-[11px] text-muted">Organization lead allocation balance &amp; credit ledger (managed by Super Admin)</p>
-                    </div>
-                </div>
-                <div class="text-[11px] text-muted bg-canvas px-3 py-1.5 rounded-lg border border-border">
-                    Pricing &amp; balance managed exclusively by Super Admin
-                </div>
-            </div>
-
-            <!-- 3 Stat Badges -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
-                    <div>
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Available Credits</span>
-                        <div class="text-2xl font-bold font-mono text-emerald-600 mt-0.5">
-                            {{ number_format($builderData['credits']['available_credits'] ?? 0, 2) }}
-                        </div>
-                        <span class="text-[10px] text-muted">Spendable allocation balance</span>
-                    </div>
-                    <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
-                        Cr
-                    </div>
-                </div>
-
-                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
-                    <div>
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Credits Consumed</span>
-                        <div class="text-2xl font-bold font-mono text-ink mt-0.5">
-                            {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 2) }}
-                        </div>
-                        <span class="text-[10px] text-muted">Deducted for delivered leads</span>
-                    </div>
-                    <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
-                        &darr;
-                    </div>
-                </div>
-
-                <div class="p-3.5 rounded-xl bg-canvas border border-border flex items-center justify-between">
-                    <div>
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Total Leads Received</span>
-                        <div class="text-2xl font-bold font-mono text-ink mt-0.5">
-                            {{ number_format($builderData['credits']['total_leads_received'] ?? 0) }}
-                        </div>
-                        <span class="text-[10px] text-muted">All-time delivered leads</span>
-                    </div>
-                    <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
-                        #
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Credit Transactions Table -->
-            <div class="space-y-1.5 pt-1">
-                <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-muted uppercase tracking-wider">Recent Credit Ledger Entries</span>
-                    <span class="text-[10px] text-muted">Showing latest 8 transactions</span>
-                </div>
-                <div class="overflow-x-auto rounded-xl border border-border">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-canvas text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border">
-                            <tr>
-                                <th class="py-2 px-3">Date</th>
-                                <th class="py-2 px-3">Lead / Reference</th>
-                                <th class="py-2 px-3">Type</th>
-                                <th class="py-2 px-3 text-right">Credit Used</th>
-                                <th class="py-2 px-3 text-right">Balance After</th>
-                                <th class="py-2 px-3">Description</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border/60">
-                            @forelse($builderData['credits']['history'] ?? [] as $tx)
-                                <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-2 px-3 font-mono text-[11px] text-muted">
-                                        {{ $tx->created_at ? $tx->created_at->format('M d, H:i') : '—' }}
-                                    </td>
-                                    <td class="py-2 px-3 font-mono font-bold text-ink">
-                                        @if($tx->lead)
-                                            <a href="{{ route('leads.show', $tx->lead_id) }}" wire:navigate class="hover:underline text-primary">
-                                                #{{ $tx->lead->lead_code ?: $tx->lead_id }}
-                                            </a>
-                                        @elseif($tx->lead_id)
-                                            #{{ $tx->lead_id }}
-                                        @else
-                                            <span class="text-muted font-normal">System</span>
-                                        @endif
-                                    </td>
-                                    <td class="py-2 px-3">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
-                                            {{ ucwords(str_replace('_', ' ', $tx->transaction_type ?? 'consumption')) }}
-                                        </span>
-                                    </td>
-                                    <td class="py-2 px-3 font-mono font-bold text-right {{ (float)$tx->credit_used > 0 ? 'text-rose-600' : 'text-emerald-600' }}">
-                                        {{ (float)$tx->credit_used > 0 ? '-' : '+' }}{{ number_format(abs((float) $tx->credit_used), 2) }}
-                                    </td>
-                                    <td class="py-2 px-3 font-mono font-bold text-ink text-right">
-                                        {{ number_format((float) ($tx->credit_after ?? 0), 2) }}
-                                    </td>
-                                    <td class="py-2 px-3 text-muted text-[11px] truncate max-w-xs">
-                                        {{ $tx->description ?: 'Lead delivery deduction' }}
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="py-6 text-center text-xs text-muted">
-                                        No credit transactions recorded yet.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- 6. Team Performance Table & Lead Performance Chart (2 Columns) -->
+        <!-- 5. Three Main Sections: (A) Lead Performance & (B) Team Performance -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Left Column: Team Performance Table -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3 flex flex-col justify-between">
+            <!-- Section A: Lead Performance -->
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-3 flex flex-col justify-between">
                 <div class="flex items-center justify-between pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
                         <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Performance</h3>
+                            <p class="text-[10px] text-muted">Monthly leads received, assigned and converted</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 Top Metric Badges -->
+                @php
+                    $mLabels = $builderData['monthly_trend']['labels'] ?? [];
+                    $lastIdx = count($mLabels) - 1;
+                    $curReceived = $lastIdx >= 0 ? ($builderData['monthly_trend']['received'][$lastIdx] ?? 0) : 0;
+                    $curAssigned = $lastIdx >= 0 ? ($builderData['monthly_trend']['assigned'][$lastIdx] ?? 0) : 0;
+                    $curConverted = $lastIdx >= 0 ? ($builderData['monthly_trend']['converted'][$lastIdx] ?? 0) : 0;
+                @endphp
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border text-center">
+                        <span class="text-[10px] text-muted font-bold block uppercase">Received</span>
+                        <span class="text-base font-bold font-mono text-blue-600">{{ number_format($curReceived) }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border text-center">
+                        <span class="text-[10px] text-muted font-bold block uppercase">Assigned</span>
+                        <span class="text-base font-bold font-mono text-indigo-600">{{ number_format($curAssigned) }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-canvas border border-border text-center">
+                        <span class="text-[10px] text-muted font-bold block uppercase">Converted</span>
+                        <span class="text-base font-bold font-mono text-emerald-600">{{ number_format($curConverted) }}</span>
+                    </div>
+                </div>
+
+                <!-- Monthly Trend Chart -->
+                <div class="relative h-52 w-full">
+                    <canvas id="builderMonthlyTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Section B: Team Performance -->
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-3 flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                         </div>
                         <div>
                             <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Team Performance</h3>
-                            <p class="text-[10px] text-muted">Representative activity across lifecycle</p>
+                            <p class="text-[10px] text-muted">Representative activity and conversions</p>
                         </div>
                     </div>
-                    <a href="{{ route('builder.team') }}" wire:navigate
-                        class="text-primary hover:underline text-[11px] font-semibold flex items-center gap-1">
-                        <span>Manage Team</span>
-                        <span>&rarr;</span>
+                    <a href="{{ route('builder.team') }}" wire:navigate class="text-primary hover:underline text-[11px] font-semibold">
+                        Manage Team &rarr;
                     </a>
                 </div>
 
-                <div class="overflow-x-auto rounded-xl border border-border">
+                <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full text-xs text-left">
                         <thead class="bg-canvas text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border">
                             <tr>
-                                <th class="py-2 px-2.5">Member</th>
-                                <th class="py-2 px-2 text-center">Assigned</th>
-                                <th class="py-2 px-2 text-center">Contacted</th>
-                                <th class="py-2 px-2 text-center">Interested</th>
-                                <th class="py-2 px-2 text-center">Site Visit</th>
-                                <th class="py-2 px-2 text-center">Bookings</th>
-                                <th class="py-2 px-2 text-center">Won</th>
+                                <th class="py-2 px-3">Team Member</th>
+                                <th class="py-2 px-3 text-center">Assigned Leads</th>
+                                <th class="py-2 px-3 text-center">Contacted</th>
+                                <th class="py-2 px-3 text-center">Closed Won</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border/60">
                             @forelse($builderData['team_performance'] ?? [] as $m)
                                 <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-2 px-2.5">
-                                        <div class="font-bold text-ink truncate max-w-[130px]">{{ $m['name'] }}</div>
-                                        <div class="text-[10px] text-muted truncate max-w-[130px]">{{ $m['email'] }}</div>
+                                    <td class="py-2 px-3">
+                                        <div class="font-bold text-ink truncate max-w-[140px]">{{ $m['name'] }}</div>
+                                        <div class="text-[10px] text-muted truncate max-w-[140px]">{{ $m['email'] }}</div>
                                     </td>
-                                    <td class="py-2 px-2 text-center font-mono font-bold text-ink">{{ $m['assigned_leads'] }}</td>
-                                    <td class="py-2 px-2 text-center font-mono text-blue-600 font-semibold">{{ $m['contacted_leads'] }}</td>
-                                    <td class="py-2 px-2 text-center font-mono text-amber-600 font-semibold">{{ $m['interested_leads'] }}</td>
-                                    <td class="py-2 px-2 text-center font-mono text-purple-600 font-semibold">{{ $m['site_visits'] }}</td>
-                                    <td class="py-2 px-2 text-center font-mono text-emerald-600 font-bold">{{ $m['bookings'] }}</td>
-                                    <td class="py-2 px-2 text-center font-mono text-green-700 font-bold">{{ $m['closed_won'] }}</td>
+                                    <td class="py-2 px-3 text-center font-mono font-bold text-ink">
+                                        {{ number_format($m['assigned_leads'] ?? 0) }}
+                                    </td>
+                                    <td class="py-2 px-3 text-center font-mono text-blue-600 font-semibold">
+                                        {{ number_format($m['contacted_leads'] ?? 0) }}
+                                    </td>
+                                    <td class="py-2 px-3 text-center font-mono text-emerald-600 font-bold">
+                                        {{ number_format($m['closed_won'] ?? 0) }}
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="py-6 text-center text-xs text-muted">
-                                        No team members assigned yet.
+                                    <td colspan="4" class="py-6 text-center text-xs text-muted">
+                                        No team members found in organization.
                                     </td>
                                 </tr>
                             @endforelse
@@ -1647,173 +1370,84 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Right Column: Lead Performance Chart (Monthly Trend) -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3 flex flex-col justify-between">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Performance (6 Months)</h3>
-                            <p class="text-[10px] text-muted">Monthly trend: Received vs Assigned vs Converted</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative h-64 w-full">
-                    <canvas id="builderMonthlyTrendChart"></canvas>
-                </div>
-            </div>
         </div>
 
-        <!-- 7. Upcoming Follow-ups Widget -->
-        <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-3" x-data="{ tab: 'today' }">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+        <!-- Section C: Upcoming Follow-ups (Today's & Overdue) -->
+        <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-border">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Schedule &amp; Follow-ups</h3>
-                        <p class="text-[10px] text-muted">Customer callbacks, site visits, and pending negotiations</p>
+                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Follow-ups</h3>
+                        <p class="text-[10px] text-muted">Customer callbacks scheduled for today and overdue tasks</p>
                     </div>
                 </div>
-
-                <!-- Tabs: Today / Upcoming / Overdue -->
-                <div class="flex items-center gap-1 bg-canvas p-1 rounded-lg border border-border">
-                    <button type="button" @click="tab = 'today'"
-                        :class="tab === 'today' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
-                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
-                        <span>Today's</span>
-                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-mono font-bold">
-                            {{ count($builderData['followups']['today'] ?? []) }}
-                        </span>
-                    </button>
-                    <button type="button" @click="tab = 'upcoming'"
-                        :class="tab === 'upcoming' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
-                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
-                        <span>Upcoming</span>
-                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-mono font-bold">
-                            {{ count($builderData['followups']['upcoming'] ?? []) }}
-                        </span>
-                    </button>
-                    <button type="button" @click="tab = 'overdue'"
-                        :class="tab === 'overdue' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-muted hover:text-ink'"
-                        class="px-3 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1">
-                        <span>Overdue</span>
-                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono font-bold">
-                            {{ count($builderData['followups']['overdue'] ?? []) }}
-                        </span>
-                    </button>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        Today: {{ count($builderData['followups']['today'] ?? []) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                        Overdue: {{ count($builderData['followups']['overdue'] ?? []) }}
+                    </span>
                 </div>
             </div>
 
-            <!-- Tab Content: Today's Follow-ups -->
-            <div x-show="tab === 'today'" class="space-y-2">
-                @forelse($builderData['followups']['today'] ?? [] as $fu)
-                    <div class="p-3 rounded-xl bg-canvas border border-border flex items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0">
-                                ⏱
-                            </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-ink">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
-                                    <span class="text-muted text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Column 1: Today's Follow-ups -->
+                <div class="p-3 rounded-lg bg-canvas border border-border space-y-2">
+                    <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Today's Scheduled Calls</span>
+                    <div class="space-y-1.5 max-h-56 overflow-y-auto">
+                        @forelse($builderData['followups']['today'] ?? [] as $fu)
+                            <div class="p-2 rounded bg-surface border border-border flex items-center justify-between gap-2 text-xs">
+                                <div class="truncate">
+                                    <span class="font-bold text-ink block truncate">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
+                                    <span class="text-[10px] text-muted truncate block">{{ $fu->note ?: 'Scheduled customer follow-up' }}</span>
                                 </div>
-                                <p class="text-[11px] text-muted mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Scheduled customer follow-up call' }}</p>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="font-mono text-[10px] font-bold text-amber-700">{{ $fu->due_at ? $fu->due_at->format('H:i') : 'Today' }}</span>
+                                    @if($fu->lead_id)
+                                        <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="text-primary hover:underline font-semibold text-[11px]">View &rarr;</a>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
-                        <div class="flex items-center gap-3 shrink-0">
-                            <span class="text-[11px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                {{ $fu->due_at ? $fu->due_at->format('H:i') : 'Today' }}
-                            </span>
-                            @if($fu->lead_id)
-                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-surface border border-border text-primary hover:underline text-xs font-semibold">
-                                    Call / View &rarr;
-                                </a>
-                            @endif
-                        </div>
+                        @empty
+                            <div class="py-4 text-center text-xs text-muted">
+                                No follow-ups scheduled for today.
+                            </div>
+                        @endforelse
                     </div>
-                @empty
-                    <div class="py-8 text-center text-xs text-muted">
-                        No follow-ups scheduled for today. Great job staying on top of leads!
-                    </div>
-                @endforelse
-            </div>
+                </div>
 
-            <!-- Tab Content: Upcoming Follow-ups -->
-            <div x-show="tab === 'upcoming'" class="space-y-2" style="display: none;">
-                @forelse($builderData['followups']['upcoming'] ?? [] as $fu)
-                    <div class="p-3 rounded-xl bg-canvas border border-border flex items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center shrink-0">
-                                📅
-                            </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-ink">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
-                                    <span class="text-muted text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+                <!-- Column 2: Overdue Follow-ups -->
+                <div class="p-3 rounded-lg bg-rose-50/40 border border-rose-200 space-y-2">
+                    <span class="text-[10px] font-bold text-rose-800 uppercase tracking-wider block">Overdue Follow-ups</span>
+                    <div class="space-y-1.5 max-h-56 overflow-y-auto">
+                        @forelse($builderData['followups']['overdue'] ?? [] as $fu)
+                            <div class="p-2 rounded bg-white border border-rose-200 flex items-center justify-between gap-2 text-xs">
+                                <div class="truncate">
+                                    <span class="font-bold text-rose-900 block truncate">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
+                                    <span class="text-[10px] text-rose-700 truncate block">{{ $fu->note ?: 'Pending overdue call' }}</span>
                                 </div>
-                                <p class="text-[11px] text-muted mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Upcoming appointment or follow-up' }}</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-3 shrink-0">
-                            <span class="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                                {{ $fu->due_at ? $fu->due_at->format('M d, H:i') : 'Upcoming' }}
-                            </span>
-                            @if($fu->lead_id)
-                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-surface border border-border text-primary hover:underline text-xs font-semibold">
-                                    View &rarr;
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                @empty
-                    <div class="py-8 text-center text-xs text-muted">
-                        No upcoming follow-ups scheduled for later this week.
-                    </div>
-                @endforelse
-            </div>
-
-            <!-- Tab Content: Overdue Follow-ups -->
-            <div x-show="tab === 'overdue'" class="space-y-2" style="display: none;">
-                @forelse($builderData['followups']['overdue'] ?? [] as $fu)
-                    <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-200 flex items-center justify-between gap-3 text-xs">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-800 font-bold flex items-center justify-center shrink-0">
-                                ⚠️
-                            </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-rose-900">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
-                                    <span class="text-rose-700 text-[10px]">({{ $fu->lead?->campaign?->project?->name ?? 'Project' }})</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="font-mono text-[10px] font-bold text-rose-800">{{ $fu->due_at ? $fu->due_at->format('M d') : 'Overdue' }}</span>
+                                    @if($fu->lead_id)
+                                        <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="text-rose-800 hover:underline font-semibold text-[11px]">Action &rarr;</a>
+                                    @endif
                                 </div>
-                                <p class="text-[11px] text-rose-700 mt-0.5 truncate max-w-md">{{ $fu->note ?: 'Overdue follow-up' }}</p>
                             </div>
-                        </div>
-                        <div class="flex items-center gap-3 shrink-0">
-                            <span class="text-[11px] font-mono font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
-                                {{ $fu->due_at ? $fu->due_at->format('M d') : 'Overdue' }}
-                            </span>
-                            @if($fu->lead_id)
-                                <a href="{{ route('leads.show', $fu->lead_id) }}" wire:navigate class="px-2.5 py-1 rounded-md bg-white border border-rose-300 text-rose-800 hover:bg-rose-100 text-xs font-semibold">
-                                    Take Action &rarr;
-                                </a>
-                            @endif
-                        </div>
+                        @empty
+                            <div class="py-4 text-center text-xs text-muted">
+                                No overdue follow-ups. All clear!
+                            </div>
+                        @endforelse
                     </div>
-                @empty
-                    <div class="py-8 text-center text-xs text-muted">
-                        Zero overdue follow-ups! Excellent team discipline.
-                    </div>
-                @endforelse
+                </div>
             </div>
         </div>
 
-        <!-- 8. Chart.js Initialization for Builder Dashboard -->
+        <!-- 6. Chart.js Initialization for Lead Performance -->
         <script>
             function renderBuilderCharts() {
                 const bTrend = @json($builderData['monthly_trend'] ?? []);
@@ -1830,10 +1464,10 @@
                                     data: bTrend.received || [],
                                     borderColor: '#2563EB',
                                     backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                                    borderWidth: 2.5,
+                                    borderWidth: 2,
                                     fill: true,
                                     tension: 0.3,
-                                    pointRadius: 3,
+                                    pointRadius: 2.5,
                                     pointBackgroundColor: '#2563EB',
                                 },
                                 {
@@ -1843,7 +1477,7 @@
                                     backgroundColor: 'transparent',
                                     borderWidth: 2,
                                     tension: 0.3,
-                                    pointRadius: 3,
+                                    pointRadius: 2.5,
                                     pointBackgroundColor: '#6366F1',
                                 },
                                 {
@@ -1853,7 +1487,7 @@
                                     backgroundColor: 'transparent',
                                     borderWidth: 2,
                                     tension: 0.3,
-                                    pointRadius: 3,
+                                    pointRadius: 2.5,
                                     pointBackgroundColor: '#10B981',
                                 }
                             ]
@@ -1882,7 +1516,6 @@
             document.addEventListener('livewire:initialized', renderBuilderCharts);
             document.addEventListener('livewire:updated', renderBuilderCharts);
         </script>
-
     @else
         <!-- ================================================================= -->
         <!-- TAILORED DASHBOARD VIEW FOR NON-ADMIN ROLES                       -->

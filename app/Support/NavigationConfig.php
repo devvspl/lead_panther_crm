@@ -35,7 +35,7 @@ class NavigationConfig
                 'failed-jobs', 'recharge-queue', 'backups', 'git-sync'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
-                'dashboard', 'team'
+                'dashboard', 'leads', 'team', 'replacements', 'reports'
             ],
             'broker' => [
                 'dashboard', 'leads', 'credits', 'reports'
@@ -79,11 +79,13 @@ class NavigationConfig
         $leadsRoute = route('leads.index');
 
         $replacementsRoute = match ($roleKey) {
-            'client' => route('replacements.client'),
+            'builder', 'client' => route('replacements.client'),
             default => route('replacements.queue'),
         };
 
         $devToolsUrl = route('admin.dev-tools');
+
+        $isBuilder = $roleKey === 'builder';
 
         $allMasterItems = [
             'dashboard' => [
@@ -98,7 +100,7 @@ class NavigationConfig
             ],
             'leads' => [
                 'key' => 'leads',
-                'label' => 'Leads',
+                'label' => $isBuilder ? 'My Leads' : 'Leads',
                 'url' => $leadsRoute,
                 'data_nav_route' => 'leads',
                 'data_nav_exact' => 'false',
@@ -134,7 +136,7 @@ class NavigationConfig
             ],
             'replacements' => [
                 'key' => 'replacements',
-                'label' => 'Replacements',
+                'label' => $isBuilder ? 'Replacement Requests' : 'Replacements',
                 'url' => $replacementsRoute,
                 'data_nav_route' => 'replacements',
                 'data_nav_exact' => 'false',
@@ -143,7 +145,7 @@ class NavigationConfig
             ],
             'reports' => [
                 'key' => 'reports',
-                'label' => 'Reports',
+                'label' => $isBuilder ? 'My Reports' : 'Reports',
                 'url' => route('reports.index'),
                 'data_nav_route' => 'reports',
                 'data_nav_exact' => 'false',

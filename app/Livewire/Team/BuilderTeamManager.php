@@ -29,7 +29,7 @@ class BuilderTeamManager extends Component
         return [
             ['key' => 'id', 'label' => 'Member ID', 'prefix' => '#', 'class' => 'font-mono font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'name', 'label' => 'Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
-            ['key' => 'email', 'label' => 'Email', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 1],
+            ['key' => 'email', 'label' => 'Email', 'class' => 'font-mono text-muted text-xs', 'sortable' => true, 'priority' => 1],
             ['key' => 'role', 'label' => 'Role', 'type' => 'badge', 'sortable' => false, 'priority' => 1, 'badgeMap' => [
                 'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
@@ -38,6 +38,11 @@ class BuilderTeamManager extends Component
                 'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
             ], 'default' => 'Executive'],
+            ['key' => 'assigned_leads_count', 'label' => 'Assigned', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink text-center'],
+            ['key' => 'contacted_leads_count', 'label' => 'Contacted', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-blue-600 text-center'],
+            ['key' => 'followups_count', 'label' => 'Follow-ups', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-ink text-center'],
+            ['key' => 'site_visits_count', 'label' => 'Site Visits', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-purple-600 text-center'],
+            ['key' => 'bookings_count', 'label' => 'Bookings Won', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-emerald-600 text-center'],
         ];
     }
 
@@ -126,7 +131,15 @@ class BuilderTeamManager extends Component
 
     public function render()
     {
-        $query = User::where('organization_id', auth()->user()?->organization_id);
+        $orgId = auth()->user()?->organization_id;
+        $query = User::where('organization_id', $orgId)
+            ->withCount([
+                'assignedLeads as assigned_leads_count',
+                'assignedLeads as contacted_leads_count' => fn($q) => $q->whereIn('current_stage', ['contacted', 'connected', 'qualified', 'interested', 'site_visit', 'negotiation', 'booking', 'closed_won']),
+                'assignedLeads as followups_count' => fn($q) => $q->whereHas('followups'),
+                'assignedLeads as site_visits_count' => fn($q) => $q->where(fn($sq) => $sq->whereHas('siteVisits')->orWhere('current_stage', 'site_visit')),
+                'assignedLeads as bookings_count' => fn($q) => $q->where(fn($sq) => $sq->whereHas('bookings')->orWhereIn('current_stage', ['booking', 'closed_won'])),
+            ]);
 
         if (!empty($this->search)) {
             $query->where(function ($q) {
@@ -136,7 +149,7 @@ class BuilderTeamManager extends Component
             });
         }
 
-        $sortField = in_array($this->sortField, ['id', 'name', 'email']) ? $this->sortField : 'id';
+        $sortField = in_array($this->sortField, ['id', 'name', 'email', 'assigned_leads_count', 'contacted_leads_count', 'followups_count', 'site_visits_count', 'bookings_count']) ? $this->sortField : 'id';
         $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
 
         $members = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);

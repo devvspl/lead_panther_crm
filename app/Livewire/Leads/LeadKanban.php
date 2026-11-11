@@ -25,6 +25,8 @@ use App\Models\Booking;
 use App\Models\GeneralSetting;
 use App\Models\PortalAccount;
 use App\Models\LeadFormMapping;
+use App\Models\ReplacementReason;
+use App\Models\AuditLog;
 use App\Events\LeadStageChanged;
 use App\Livewire\Concerns\HasAdvancedTable;
 use Carbon\Carbon;
@@ -94,6 +96,13 @@ class LeadKanban extends Component
     public array $selectedLeadIds = [];
     public ?int $assignTeamId = null;
     public ?int $assignUserId = null;
+
+    // Return Lead to Super Admin (Replacement Request) State
+    public bool $showReturnLeadModal = false;
+    public ?int $returnLeadId = null;
+    public ?Lead $returnLeadModel = null;
+    public ?int $returnReasonId = null;
+    public string $returnRemarks = '';
 
     // Single Manual Lead Ingestion State
     public string $manualName = '';
@@ -1233,6 +1242,7 @@ class LeadKanban extends Component
             'allOrganizations' => $allOrganizations,
             'eligibleAssignees' => $eligibleAssignees,
             'assignTeams' => $assignTeams,
+            'replacementReasons' => ReplacementReason::all(),
         ])->layout('layouts.app');
     }
 
@@ -1253,6 +1263,176 @@ class LeadKanban extends Component
         $this->assignTeamId = null;
         $this->assignUserId = null;
         $this->showAssignModal = true;
+    }
+
+    #[On('open-return-lead')]
+    public function handleOpenReturnLead(int $id): void
+    {
+        $this->openReturnLeadModal($id);
+    }
+
+    public function openReturnLeadModal(int $leadId): void
+    {
+        $user = auth()->user();
+        $lead = Lead::find($leadId);
+
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+            return;
+        }
+
+        // Validate organization ownership for non-super admins
+        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess && $orgId) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+                return;
+            }
+        }
+
+        if ($lead->replacement_status === 'pending') {
+            $this->dispatch('toast', type: 'warning', message: 'A replacement claim is already pending Super Admin review for this lead.');
+            return;
+        }
+
+        $this->returnLeadId = $lead->id;
+        $this->returnLeadModel = $lead;
+        $this->returnRemarks = '';
+        $firstReason = ReplacementReason::first();
+        $this->returnReasonId = $firstReason ? $firstReason->id : null;
+        $this->showReturnLeadModal = true;
+    }
+
+    public function closeReturnLeadModal(): void
+    {
+        $this->showReturnLeadModal = false;
+        $this->returnLeadId = null;
+        $this->returnLeadModel = null;
+        $this->returnReasonId = null;
+        $this->returnRemarks = '';
+    }
+
+    public function submitReturnLead(): void
+    {
+        $this->validate([
+            'returnLeadId' => 'required|exists:leads,id',
+            'returnReasonId' => 'required|exists:replacement_reasons,id',
+            'returnRemarks' => 'nullable|string|max:1000',
+        ]);
+
+        $user = auth()->user();
+        $lead = Lead::find($this->returnLeadId);
+        $reason = ReplacementReason::find($this->returnReasonId);
+
+        if (!$lead || !$reason) {
+            $this->dispatch('toast', type: 'error', message: 'Invalid lead or replacement reason.');
+            return;
+        }
+
+        // Validate organization ownership for non-super admins
+        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess && $orgId) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized action on this lead.');
+                return;
+            }
+        }
+
+        // SLA met calculation
+        $slaMet = false;
+        if ($lead->first_response_at && $lead->created_at) {
+            $diffMins = Carbon::parse($lead->created_at)->diffInMinutes(Carbon::parse($lead->first_response_at));
+            $slaMet = ($diffMins <= 30);
+        } else {
+            $diffMins = Carbon::parse($lead->created_at ?? now())->diffInMinutes(now());
+            $slaMet = ($diffMins <= 30);
+        }
+
+        // Create pending replacement record (Super Admin review required; no auto-refund)
+        $replacement = LeadReplacement::create([
+            'lead_id' => $lead->id,
+            'reason_id' => $reason->id,
+            'requested_by' => $user?->id ?? 1,
+            'requested_at' => now(),
+            'sla_met' => $slaMet,
+            'status' => 'pending',
+        ]);
+
+        $oldStatus = $lead->replacement_status;
+        $lead->update(['replacement_status' => 'pending']);
+
+        // Log audit trail
+        AuditLog::create([
+            'user_id' => $user?->id ?? 1,
+            'action' => 'lead.return_requested',
+            'subject_type' => Lead::class,
+            'subject_id' => $lead->id,
+            'from_value' => json_encode(['replacement_status' => $oldStatus ?: 'none']),
+            'to_value' => json_encode([
+                'replacement_status' => 'pending',
+                'replacement_id' => $replacement->id,
+                'reason_id' => $reason->id,
+                'reason_label' => $reason->label,
+                'remarks' => $this->returnRemarks,
+                'sla_met' => $slaMet,
+            ]),
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+            'created_at' => now(),
+        ]);
+
+        $leadCode = $lead->lead_code;
+        $this->closeReturnLeadModal();
+        $this->dispatch('toast', type: 'success', message: "Lead #{$leadCode} returned to Super Admin for replacement review. Credits will be refunded upon approval.");
+        $this->dispatch('lead-updated');
+    }
+
+    public function autoDistributeUnassignedLeads(): void
+    {
+        $user = auth()->user();
+        $query = Lead::withoutGlobalScopes()
+            ->whereNull('assigned_to');
+
+        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+            $orgId = $user->organization_id;
+            if ($orgId) {
+                $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
+                $query->where(function ($q) use ($orgId, $orgUserIds) {
+                    $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
+                      ->orWhereHas('assignedTo', fn($sq) => $sq->where('organization_id', $orgId))
+                      ->orWhereIn('client_id', $orgUserIds);
+                });
+            }
+        }
+
+        $unassigned = $query->take(50)->get();
+
+        if ($unassigned->isEmpty()) {
+            $this->dispatch('toast', type: 'info', message: 'No unassigned leads found in your pipeline.');
+            return;
+        }
+
+        $service = app(\App\Services\LeadDistributionService::class);
+        $count = 0;
+        foreach ($unassigned as $lead) {
+            $res = $service->distribute($lead);
+            if (!empty($res['assigned_user'])) {
+                $count++;
+            }
+        }
+
+        $this->dispatch('toast', type: 'success', message: "Auto-assigned {$count} lead(s) to eligible team members according to organization distribution rules.");
+        $this->dispatch('lead-updated');
     }
 
     public function openBulkAssignModal(): void

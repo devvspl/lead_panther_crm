@@ -101,26 +101,35 @@ class LeadDetail extends Component
 
         $lead = Lead::find($this->leadId);
         if ($lead) {
+            if ($lead->replacement_status === 'pending') {
+                $this->dispatch('toast', type: 'warning', message: 'A replacement claim is already pending Super Admin review for this lead.');
+                return;
+            }
+
             LeadReplacement::create([
                 'lead_id' => $lead->id,
                 'reason_id' => $this->replacementReasonId,
                 'requested_by' => auth()->id() ?? 1,
                 'requested_at' => now(),
                 'status' => 'pending',
+                'sla_met' => $lead->created_at ? $lead->created_at->diffInMinutes(now()) <= 30 : true,
             ]);
 
-            $oldStage = $lead->current_stage;
-            $lead->update(['current_stage' => 'replaced', 'status' => 'replaced']);
+            $lead->update(['replacement_status' => 'pending']);
 
-            LeadStatusHistory::create([
-                'lead_id' => $lead->id,
-                'from_status' => $oldStage,
-                'to_status' => 'replaced',
-                'changed_by' => auth()->id() ?? 1,
-                'changed_at' => now(),
+            \App\Models\AuditLog::create([
+                'user_id' => auth()->id() ?? 1,
+                'action' => 'lead.return_requested',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'from_value' => json_encode(['replacement_status' => 'none']),
+                'to_value' => json_encode(['replacement_status' => 'pending', 'reason_id' => $this->replacementReasonId]),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+                'created_at' => now(),
             ]);
 
-            $this->dispatch('toast', type: 'success', message: 'Replacement requested.');
+            $this->dispatch('toast', type: 'success', message: 'Lead returned to Super Admin for replacement review. Credits will be refunded upon approval.');
             $this->dispatch('lead-updated');
         }
     }

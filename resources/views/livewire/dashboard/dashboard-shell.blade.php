@@ -1270,7 +1270,7 @@
             @endif
         </div>
 
-        <!-- 4. Main KPI Cards (12 Real Metrics) -->
+        <!-- 4. Main Operational KPI Cards (11 Real Metrics) -->
         <!-- Primary Headline Row (4 Cards) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- 1. Total Leads Received -->
@@ -1292,36 +1292,47 @@
                 </div>
             </div>
 
-            <!-- 2. Available Credits -->
+            <!-- 2. New Leads -->
             <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
                 <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                    <span>Available Credits</span>
-                    <div class="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>New Leads</span>
+                    <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     </div>
                 </div>
-                <div class="text-2xl font-bold font-mono text-primary flex items-baseline gap-1">
-                    <span>{{ number_format($builderData['kpis']['available_credits']['value'] ?? 0, 2) }}</span>
-                    <span class="text-xs font-normal text-muted">Cr</span>
+                <div class="text-2xl font-bold font-mono text-emerald-600">
+                    {{ number_format($builderData['kpis']['new_leads']['value'] ?? 0) }}
                 </div>
                 <div class="text-[10px] text-muted flex items-center justify-between">
-                    @if($builderData['wallet_summary']['is_low'] ?? false)
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                            Low Balance
-                        </span>
-                    @else
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Active Balance
-                        </span>
-                    @endif
-                    <button type="button" wire:click="openBuilderRechargeModal"
-                        class="text-[10px] font-bold text-primary hover:underline cursor-pointer">
-                        + Recharge
+                    <span class="text-emerald-700 font-bold">
+                        {{ $builderData['kpis']['new_leads']['delta']['delta'] ?? '0%' }} vs prior
+                    </span>
+                    <span class="text-muted font-mono font-medium">Fresh inbound</span>
+                </div>
+            </div>
+
+            <!-- 3. Unassigned Leads -->
+            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
+                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <span>Unassigned Leads</span>
+                    <div class="w-7 h-7 rounded-lg {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600' }} flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                </div>
+                <div class="text-2xl font-bold font-mono {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600' : 'text-ink' }}">
+                    {{ number_format($builderData['kpis']['unassigned_leads']['value'] ?? 0) }}
+                </div>
+                <div class="text-[10px] text-muted flex items-center justify-between">
+                    <span class="{{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600 font-bold' : 'text-muted' }}">
+                        {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'Needs assignment' : 'All assigned' }}
+                    </span>
+                    <button type="button" wire:click="autoDistributeBuilderLeads" class="text-primary hover:underline font-semibold cursor-pointer">
+                        Distribute &rarr;
                     </button>
                 </div>
             </div>
 
-            <!-- 3. Assigned Leads -->
+            <!-- 4. Assigned Leads -->
             <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
                 <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                     <span>Assigned Leads</span>
@@ -1336,184 +1347,80 @@
                     <span class="text-emerald-600 font-bold">
                         {{ $builderData['kpis']['assigned_leads']['delta']['delta'] ?? '0%' }} allocated
                     </span>
-                    <span class="text-muted font-mono">
-                        {{ number_format($builderData['kpis']['unassigned_leads']['value'] ?? 0) }} unassigned
-                    </span>
-                </div>
-            </div>
-
-            <!-- 4. Converted Leads -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-1 hover:border-primary/40 transition">
-                <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                    <span>Converted Won</span>
-                    <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
-                    </div>
-                </div>
-                <div class="text-2xl font-bold font-mono text-emerald-600">
-                    {{ number_format($builderData['kpis']['converted_leads']['value'] ?? 0) }}
-                </div>
-                <div class="text-[10px] text-muted flex items-center justify-between">
-                    <span class="text-emerald-700 font-bold">
-                        {{ $builderData['kpis']['conversion_rate']['value'] ?? 0 }}% Conv. Rate
-                    </span>
-                    <span class="text-muted font-mono font-medium">Booked / Won</span>
+                    <span class="text-muted font-mono font-medium">Distributed to reps</span>
                 </div>
             </div>
         </div>
 
-        <!-- Secondary Compact Metric Grid (8 Cards in 4-column layout) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            <!-- 5. Available for Assignment -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Avail. to Assign</span>
-                <div class="text-lg font-bold font-mono text-ink">
-                    {{ number_format($builderData['kpis']['available_for_assignment']['value'] ?? 0) }}
-                </div>
-                <div class="text-[9px] text-muted">Ready in queue</div>
-            </div>
-
-            <!-- 6. In Progress -->
+        <!-- Secondary Compact Metric Grid (7 Operational Metrics) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            <!-- 5. Leads in Progress -->
             <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
                 <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">In Progress</span>
                 <div class="text-lg font-bold font-mono text-amber-600">
                     {{ number_format($builderData['kpis']['in_progress_leads']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Active follow-ups</div>
+                <div class="text-[9px] text-muted">Active conversations</div>
             </div>
 
-            <!-- 7. Lost Leads -->
+            <!-- 6. Follow-ups Due -->
             <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Lost / Dead</span>
-                <div class="text-lg font-bold font-mono text-neutral-500">
-                    {{ number_format($builderData['kpis']['lost_leads']['value'] ?? 0) }}
-                </div>
-                <div class="text-[9px] text-muted">Closed lost</div>
-            </div>
-
-            <!-- 8. Upcoming Follow-ups -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Follow-ups</span>
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Follow-ups Due</span>
                 <div class="text-lg font-bold font-mono text-blue-600">
-                    {{ number_format($builderData['kpis']['upcoming_followups']['value'] ?? 0) }}
+                    {{ number_format($builderData['kpis']['followups_due']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Scheduled tours</div>
+                <div class="text-[9px] text-muted">Scheduled client calls</div>
             </div>
 
-            <!-- 9. Credits Consumed -->
+            <!-- 7. Site Visits -->
             <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Credits Consumed</span>
-                <div class="text-lg font-bold font-mono text-ink">
-                    {{ number_format($builderData['kpis']['credits_consumed']['value'] ?? 0, 1) }}
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Site Visits</span>
+                <div class="text-lg font-bold font-mono text-purple-600">
+                    {{ number_format($builderData['kpis']['site_visits']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Deducted for leads</div>
+                <div class="text-[9px] text-muted">Property inspections</div>
             </div>
 
-            <!-- 10. Active Team Members -->
+            <!-- 8. Bookings -->
             <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Active Team</span>
-                <div class="text-lg font-bold font-mono text-ink">
-                    {{ number_format($builderData['kpis']['active_team_members']['value'] ?? 0) }}
-                </div>
-                <div class="text-[9px] text-muted">Sales agents</div>
-            </div>
-
-            <!-- 11. Conversion Rate -->
-            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Conv. Rate</span>
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Bookings</span>
                 <div class="text-lg font-bold font-mono text-emerald-600">
-                    {{ $builderData['kpis']['conversion_rate']['value'] ?? 0 }}%
+                    {{ number_format($builderData['kpis']['bookings']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Deals won ratio</div>
+                <div class="text-[9px] text-muted">Tokens &amp; units booked</div>
             </div>
 
-            <!-- 12. Unassigned Leads -->
+            <!-- 9. Closed Won -->
             <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
-                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Unassigned</span>
-                <div class="text-lg font-bold font-mono {{ ($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0 ? 'text-rose-600' : 'text-ink' }}">
-                    {{ number_format($builderData['kpis']['unassigned_leads']['value'] ?? 0) }}
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Closed Won</span>
+                <div class="text-lg font-bold font-mono text-green-700">
+                    {{ number_format($builderData['kpis']['closed_won']['value'] ?? 0) }}
                 </div>
-                <div class="text-[9px] text-muted">Pending agent</div>
+                <div class="text-[9px] text-muted">Deals successfully closed</div>
+            </div>
+
+            <!-- 10. Replacement Requests -->
+            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Replacements</span>
+                <div class="text-lg font-bold font-mono text-rose-600">
+                    {{ number_format($builderData['kpis']['replacement_requests']['value'] ?? 0) }}
+                </div>
+                <div class="text-[9px] text-muted">Claims submitted</div>
+            </div>
+
+            <!-- 11. Approved Replacements -->
+            <div class="bg-surface rounded-xl border border-border p-3 shadow-2xs space-y-0.5">
+                <span class="text-[10px] font-semibold text-muted uppercase tracking-wider block">Approved Repl.</span>
+                <div class="text-lg font-bold font-mono text-emerald-600">
+                    {{ number_format($builderData['kpis']['approved_replacements']['value'] ?? 0) }}
+                </div>
+                <div class="text-[9px] text-muted">Credits refunded</div>
             </div>
         </div>
 
-        <!-- 5. Two Hero Control Panels (Credit Wallet & Lead Distribution) -->
+        <!-- 5. Two Hero Operational Panels (Team Assignment & Lead Replacements) -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Panel A: Client Credit Wallet Summary Card -->
-            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-border">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Credit Wallet Summary</h3>
-                            <p class="text-[11px] text-muted">Balance &amp; spend telemetry for lead delivery</p>
-                        </div>
-                    </div>
-                    <button type="button" wire:click="openBuilderRechargeModal"
-                        class="px-3 py-1.5 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs cursor-pointer flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        <span>Request Recharge</span>
-                    </button>
-                </div>
-
-                @if($builderData['wallet_summary']['is_low'] ?? false)
-                    <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
-                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <div>
-                            <span class="font-bold">Low Credit Warning:</span> Available credits ({{ number_format($builderData['wallet_summary']['available_credits'], 2) }} Cr) are below minimum threshold ({{ $builderData['wallet_summary']['min_threshold'] }} Cr). Lead delivery may pause when exhausted.
-                        </div>
-                    </div>
-                @endif
-
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Opening Balance</span>
-                        <div class="text-base font-bold font-mono text-ink">
-                            {{ number_format($builderData['wallet_summary']['opening_balance'] ?? 0, 2) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Baseline allocation</span>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Total Recharged</span>
-                        <div class="text-base font-bold font-mono text-emerald-600">
-                            {{ number_format($builderData['wallet_summary']['total_recharged'] ?? 0, 2) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Purchased credits</span>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Credits Consumed</span>
-                        <div class="text-base font-bold font-mono text-amber-600">
-                            {{ number_format($builderData['wallet_summary']['credits_consumed'] ?? 0, 2) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Delivered leads</span>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
-                        <span class="text-[10px] text-muted font-semibold uppercase">Cost Per Lead</span>
-                        <div class="text-base font-bold font-mono text-primary">
-                            {{ number_format($builderData['wallet_summary']['cost_per_lead'] ?? 10.0, 2) }}
-                        </div>
-                        <span class="text-[9px] text-muted">Rate / deduction</span>
-                    </div>
-                </div>
-
-                <div class="p-2.5 rounded-xl bg-canvas/60 border border-border/80 flex items-center justify-between text-xs">
-                    <div class="flex items-center gap-1.5 text-muted">
-                        <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Ledger Formula:</span>
-                        <span class="font-mono text-ink font-semibold">Available = Opening + Recharged + Refunds - Consumed</span>
-                    </div>
-                    <a href="{{ route('credits.wallet') }}" wire:navigate class="text-primary font-bold hover:underline text-[11px] shrink-0">
-                        View Ledger &rarr;
-                    </a>
-                </div>
-            </div>
-
-            <!-- Panel B: Lead Distribution Summary Card -->
+            <!-- Panel A: Team Assignment & Lead Distribution -->
             <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-2">
@@ -1521,57 +1428,149 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Distribution Engine</h3>
-                            <p class="text-[11px] text-muted">Internal sales assignment rules &amp; team workload</p>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Team Assignment Engine</h3>
+                            <p class="text-[11px] text-muted">Internal sales distribution &amp; representative capacity</p>
                         </div>
                     </div>
                     <a href="{{ route('builder.team') }}" wire:navigate
                         class="px-3 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface text-ink text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                        <span>Manage Team</span>
+                        <span>Team Management</span>
                     </a>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Auto-Assignment Toggle -->
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-bold text-ink">Auto-Assignment</span>
+                    <!-- Super Admin Configured Distribution Rule (Read-Only) -->
+                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-1.5">
+                        <span class="text-[10px] text-muted font-bold uppercase tracking-wider block">Active Distribution Rule</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {{ ucwords(str_replace('_', ' ', $builderData['distribution_summary']['distribution_method'] ?? 'round_robin')) }}
+                            </span>
+                            <span class="text-[10px] text-muted font-medium">(Super Admin Configured)</span>
+                        </div>
+                        <p class="text-[10px] text-muted">
+                            Leads are automatically routed to your sales executives using this policy.
+                        </p>
+                    </div>
+
+                    <!-- Auto-Assignment Status -->
+                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-1.5">
+                        <span class="text-[10px] text-muted font-bold uppercase tracking-wider block">Auto-Assignment Status</span>
+                        <div>
                             @if($builderData['distribution_summary']['auto_assign_enabled'] ?? true)
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    Active
+                                <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span>Active Engine</span>
                                 </span>
                             @else
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                    Paused
+                                <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    Paused by Super Admin
                                 </span>
                             @endif
                         </div>
                         <p class="text-[10px] text-muted">
-                            Automatically assign leads to eligible reps upon delivery.
-                        </p>
-                        <button type="button" wire:click="toggleAutoAssign"
-                            class="w-full py-1 text-center text-xs font-semibold rounded-lg border transition cursor-pointer {{ ($builderData['distribution_summary']['auto_assign_enabled'] ?? true) ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' }}">
-                            {{ ($builderData['distribution_summary']['auto_assign_enabled'] ?? true) ? 'Pause Auto-Assignment' : 'Enable Auto-Assignment' }}
-                        </button>
-                    </div>
-
-                    <!-- Distribution Method Selector -->
-                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
-                        <span class="text-[11px] font-bold text-ink block">Distribution Method</span>
-                        <select wire:change="setDistributionMethod($event.target.value)"
-                            class="w-full h-8 px-2.5 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                            <option value="round_robin" @selected(($builderData['distribution_summary']['distribution_method'] ?? '') === 'round_robin')>Round Robin</option>
-                            <option value="capacity" @selected(($builderData['distribution_summary']['distribution_method'] ?? '') === 'capacity')>Capacity-Based</option>
-                            <option value="team" @selected(($builderData['distribution_summary']['distribution_method'] ?? '') === 'team')>Team-Based</option>
-                            <option value="priority" @selected(($builderData['distribution_summary']['distribution_method'] ?? '') === 'priority')>Priority Score</option>
-                            <option value="manual" @selected(($builderData['distribution_summary']['distribution_method'] ?? '') === 'manual')>Manual Assignment Only</option>
-                        </select>
-                        <p class="text-[10px] text-muted">
-                            Determines rule order for routing unassigned inbound leads.
+                            New inbound leads are automatically dispatched to active sales reps upon delivery.
                         </p>
                     </div>
                 </div>
+
+                <!-- Unassigned Queue Alert & Action -->
+                @if(($builderData['kpis']['unassigned_leads']['value'] ?? 0) > 0)
+                    <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-2 text-blue-900">
+                            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                            <span><strong>{{ $builderData['kpis']['unassigned_leads']['value'] }}</strong> leads waiting in unassigned queue.</span>
+                        </div>
+                        <button type="button" wire:click="autoDistributeBuilderLeads"
+                            class="px-3 py-1 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs cursor-pointer shrink-0">
+                            Distribute Unassigned Leads
+                        </button>
+                    </div>
+                @endif
+
+                <!-- Team Workload Preview -->
+                @if(!empty($builderData['distribution_summary']['team_distribution']) && count($builderData['distribution_summary']['team_distribution']) > 0)
+                    <div class="space-y-1.5 pt-1">
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Team Workload Distribution</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            @foreach($builderData['distribution_summary']['team_distribution']->take(4) as $member)
+                                <div class="p-2 rounded-lg bg-canvas border border-border/80 flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center">
+                                            {{ strtoupper(substr($member->name, 0, 1)) }}
+                                        </div>
+                                        <span class="font-medium text-ink truncate max-w-[120px]">{{ $member->name }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 font-mono text-[11px]">
+                                        <span class="text-primary font-bold" title="Active Leads">{{ $member->active_leads_count }} act</span>
+                                        <span class="text-emerald-600 font-bold" title="Won Leads">{{ $member->converted_leads_count }} won</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <!-- Panel B: Lead Replacements & Quality Operations -->
+            <div class="bg-surface rounded-2xl border border-border p-4 shadow-2xs space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Replacement Operations</h3>
+                            <p class="text-[11px] text-muted">Super Admin review queue &amp; credit refund tracking</p>
+                        </div>
+                    </div>
+                    <a href="{{ route('replacements.client') }}" wire:navigate
+                        class="px-3 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface text-ink text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span>Replacement Requests</span>
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                        <span class="text-[10px] text-muted font-semibold uppercase">Pending Claims</span>
+                        <div class="text-xl font-bold font-mono text-amber-600">
+                            {{ max(0, ($builderData['kpis']['replacement_requests']['value'] ?? 0) - ($builderData['kpis']['approved_replacements']['value'] ?? 0)) }}
+                        </div>
+                        <span class="text-[9px] text-muted">Awaiting Super Admin review</span>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                        <span class="text-[10px] text-muted font-semibold uppercase">Approved Replacements</span>
+                        <div class="text-xl font-bold font-mono text-emerald-600">
+                            {{ number_format($builderData['kpis']['approved_replacements']['value'] ?? 0) }}
+                        </div>
+                        <span class="text-[9px] text-muted">Refunded &amp; replaced</span>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-canvas border border-border space-y-2 text-xs">
+                    <div class="flex items-center gap-2 font-bold text-ink">
+                        <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>How Lead Returns Work</span>
+                    </div>
+                    <p class="text-muted text-[11px] leading-relaxed">
+                        If a lead has an invalid mobile number, duplicate contact details, or is unreachable within policy limits, click <strong>Return Lead</strong> on your leads table to submit a claim. Super Admin exclusively evaluates and approves claims to process credit refunds.
+                    </p>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 text-xs">
+                    <a href="{{ route('leads.index') }}" wire:navigate class="text-primary font-bold hover:underline flex items-center gap-1 text-[11px]">
+                        <span>Open My Leads to Return Unsuitable Leads</span>
+                        <span>&rarr;</span>
+                    </a>
+                    <a href="{{ route('replacements.client') }}" wire:navigate class="text-muted hover:text-ink text-[11px] font-medium">
+                        View Claims Log &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
 
                 <!-- Unassigned Queue Alert & Action -->
                 @if(($builderData['distribution_summary']['unassigned_leads'] ?? 0) > 0)

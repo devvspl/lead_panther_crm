@@ -37,34 +37,42 @@ class ClientReplacementHistory extends Component
     public function render()
     {
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?? Client::first();
+        $orgId = $user?->organization_id;
+        $client = $orgId ? (Client::where('organization_id', $orgId)->first() ?? Client::first()) : Client::first();
 
-        if ($client) {
-            $query = LeadReplacement::with(['lead', 'reason', 'replacementLead'])
-                ->whereHas('lead', function ($q) use ($client) {
-                    $q->where('client_id', $client->id);
-                });
+        $query = LeadReplacement::with(['lead', 'reason', 'replacementLead']);
 
-            if (!empty($this->search)) {
-                $query->where(function ($q) {
-                    $q->whereHas('lead', function ($lq) {
-                        $lq->where('name', 'like', "%{$this->search}%")
-                           ->orWhere('lead_code', 'like', "%{$this->search}%");
-                    })->orWhere('resolution_note', 'like', "%{$this->search}%");
+        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+            if ($orgId) {
+                $orgUserIds = \App\Models\User::where('organization_id', $orgId)->pluck('id')->toArray();
+                $query->whereHas('lead', function ($q) use ($orgId, $orgUserIds) {
+                    $q->where(function ($sub) use ($orgId, $orgUserIds) {
+                        $sub->whereHas('client', fn($cq) => $cq->where('organization_id', $orgId))
+                            ->orWhereHas('assignedTo', fn($aq) => $aq->where('organization_id', $orgId))
+                            ->orWhereIn('assigned_to', $orgUserIds)
+                            ->orWhereIn('client_id', $orgUserIds);
+                    });
                 });
             }
-
-            if ($this->statusFilter && $this->statusFilter !== 'all') {
-                $query->where('status', $this->statusFilter);
-            }
-
-            $sortField = in_array($this->sortField, ['requested_at', 'status', 'id']) ? $this->sortField : 'requested_at';
-            $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
-
-            $replacements = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);
-        } else {
-            $replacements = LeadReplacement::query()->whereRaw('1 = 0')->paginate($this->perPage);
         }
+
+        if (!empty($this->search)) {
+            $query->where(function ($q) {
+                $q->whereHas('lead', function ($lq) {
+                    $lq->where('name', 'like', "%{$this->search}%")
+                       ->orWhere('lead_code', 'like', "%{$this->search}%");
+                })->orWhere('resolution_note', 'like', "%{$this->search}%");
+            });
+        }
+
+        if ($this->statusFilter && $this->statusFilter !== 'all') {
+            $query->where('status', $this->statusFilter);
+        }
+
+        $sortField = in_array($this->sortField, ['requested_at', 'status', 'id']) ? $this->sortField : 'requested_at';
+        $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
+
+        $replacements = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);
 
         return view('livewire.replacement.client-replacement-history', [
             'replacements' => $replacements,
@@ -75,12 +83,24 @@ class ClientReplacementHistory extends Component
     public function exportExcel()
     {
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?? Client::first();
+        $orgId = $user?->organization_id;
+        $client = $orgId ? (Client::where('organization_id', $orgId)->first() ?? Client::first()) : Client::first();
 
-        $query = $client ? LeadReplacement::with(['lead', 'reason', 'replacementLead'])
-            ->whereHas('lead', function ($q) use ($client) {
-                $q->where('client_id', $client->id);
-            }) : LeadReplacement::query()->whereRaw('1 = 0');
+        $query = LeadReplacement::with(['lead', 'reason', 'replacementLead']);
+
+        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+            if ($orgId) {
+                $orgUserIds = \App\Models\User::where('organization_id', $orgId)->pluck('id')->toArray();
+                $query->whereHas('lead', function ($q) use ($orgId, $orgUserIds) {
+                    $q->where(function ($sub) use ($orgId, $orgUserIds) {
+                        $sub->whereHas('client', fn($cq) => $cq->where('organization_id', $orgId))
+                            ->orWhereHas('assignedTo', fn($aq) => $aq->where('organization_id', $orgId))
+                            ->orWhereIn('assigned_to', $orgUserIds)
+                            ->orWhereIn('client_id', $orgUserIds);
+                    });
+                });
+            }
+        }
 
         $data = $query->latest('requested_at')->get();
         $clientSlug = $client ? \Illuminate\Support\Str::slug($client->name) : 'client';

@@ -1385,10 +1385,10 @@ class DashboardShell extends Component
     {
         return match ($this->role) {
             'builder' => [
-                ['label' => '+ Import Leads', 'url' => route('leads.upload'), 'icon' => 'upload', 'primary' => true],
-                ['label' => 'View Leads', 'url' => route('leads.index'), 'icon' => 'leads', 'primary' => false],
-                ['label' => 'Credits & Wallet', 'url' => route('credits.wallet'), 'icon' => 'wallet', 'primary' => false],
-                ['label' => 'Team', 'url' => route('builder.team'), 'icon' => 'team', 'primary' => false],
+                ['label' => 'My Leads', 'url' => route('leads.index'), 'icon' => 'leads', 'primary' => true],
+                ['label' => 'Team Management', 'url' => route('builder.team'), 'icon' => 'team', 'primary' => false],
+                ['label' => 'Replacement Requests', 'url' => route('replacements.client'), 'icon' => 'refresh', 'primary' => false],
+                ['label' => 'My Reports', 'url' => route('reports.index'), 'icon' => 'reports', 'primary' => false],
             ],
             'broker' => [
                 ['label' => 'My Buyer Leads', 'url' => route('leads.index'), 'icon' => 'leads', 'primary' => true],
@@ -1602,6 +1602,11 @@ class DashboardShell extends Component
     public function toggleAutoAssign(): void
     {
         $user = auth()->user();
+        if (!$user?->hasRole('Super Admin') && !$user?->hasRole('super-admin')) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Auto-distribution settings are centrally managed by Super Admin.');
+            return;
+        }
+
         if (!$user?->organization_id) return;
 
         $org = Organization::find($user->organization_id);
@@ -1615,6 +1620,11 @@ class DashboardShell extends Component
     public function setDistributionMethod(string $method): void
     {
         $user = auth()->user();
+        if (!$user?->hasRole('Super Admin') && !$user?->hasRole('super-admin')) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Distribution rules are centrally configured by Super Admin.');
+            return;
+        }
+
         if (!$user?->organization_id) return;
 
         $org = Organization::find($user->organization_id);
@@ -1639,6 +1649,11 @@ class DashboardShell extends Component
             ->take(50)
             ->get();
 
+        if ($unassigned->isEmpty()) {
+            $this->dispatch('toast', type: 'info', message: 'No unassigned leads found in organization queue.');
+            return;
+        }
+
         $service = app(\App\Services\LeadDistributionService::class);
         $count = 0;
         foreach ($unassigned as $lead) {
@@ -1648,11 +1663,11 @@ class DashboardShell extends Component
             }
         }
 
-        $this->dispatch('toast', type: 'success', message: "Auto-distributed {$count} lead(s) to active team members.");
+        $this->dispatch('toast', type: 'success', message: "Auto-distributed {$count} lead(s) to active team members according to Super Admin configured rule.");
     }
 
     /**
-     * Complete Builder / Developer Dashboard Data: 12 Real Metrics, Wallet Summary, Distribution Summary, Charts.
+     * Complete Builder / Developer Dashboard Data: 11 Operational Metrics, Team Assignment, Replacements & Visual Analytics.
      */
     public function getBuilderDashboardDataProperty(): array
     {
@@ -1669,6 +1684,8 @@ class DashboardShell extends Component
         $baseQuery = Lead::withoutGlobalScopes()->where(function ($q) use ($orgId, $orgUserIds) {
             if ($orgId) {
                 $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
+                  ->orWhereHas('assignedTo', fn($sq) => $sq->where('organization_id', $orgId))
+                  ->orWhereIn('client_id', $orgUserIds)
                   ->orWhereIn('assigned_to', $orgUserIds);
             }
         });
@@ -1708,44 +1725,53 @@ class DashboardShell extends Component
             }
         }
 
-        // Aggregate 12 KPI values from actual database records
+        // Aggregate 11 Operational KPI values from actual database records
         $currStats = (clone $currQuery)->selectRaw("
             COUNT(*) as total_leads,
+            COUNT(CASE WHEN current_stage IN ('new', 'lead_received') THEN 1 END) as new_leads,
             COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
             COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads,
-            COUNT(CASE WHEN current_stage IN ('in_progress', 'contacted', 'connected', 'interested', 'site_visit', 'negotiation', 'meeting', 'follow-up') THEN 1 END) as in_progress_leads,
-            COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads,
-            COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'wrong_number', 'dead', 'rejected') THEN 1 END) as lost_leads
+            COUNT(CASE WHEN current_stage IN ('in_progress', 'contacted', 'connected', 'interested', 'negotiation', 'meeting') THEN 1 END) as in_progress_leads,
+            COUNT(CASE WHEN current_stage = 'site_visit' THEN 1 END) as site_visits_stage,
+            COUNT(CASE WHEN current_stage = 'booking' THEN 1 END) as bookings_stage,
+            COUNT(CASE WHEN current_stage IN ('closed_won', 'won') THEN 1 END) as closed_won_leads
         ")->first();
 
         $prevStats = (clone $prevQuery)->selectRaw("
             COUNT(*) as total_leads,
+            COUNT(CASE WHEN current_stage IN ('new', 'lead_received') THEN 1 END) as new_leads,
             COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_leads,
-            COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads
+            COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_leads,
+            COUNT(CASE WHEN current_stage IN ('in_progress', 'contacted', 'connected', 'interested', 'negotiation', 'meeting') THEN 1 END) as in_progress_leads,
+            COUNT(CASE WHEN current_stage IN ('closed_won', 'won') THEN 1 END) as closed_won_leads
         ")->first();
 
-        // Wallet Balance & Ledgers
-        $walletBalance = (float) CreditWallet::whereIn('client_id', $orgUserIds)->sum('balance');
-        $walletOpening = (float) CreditWallet::whereIn('client_id', $orgUserIds)->sum('opening_balance');
-        $totalRecharged = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->where('transaction_type', 'recharge')->whereBetween('created_at', [$start, $end])->sum('credit_used');
-        $creditsConsumed = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])->whereBetween('created_at', [$start, $end])->sum('credit_used');
-        $creditsRefunded = (float) CreditTransaction::whereIn('client_id', $orgUserIds)->where('transaction_type', 'refund')->whereBetween('created_at', [$start, $end])->sum('credit_used');
+        $currLeadIds = (clone $currQuery)->pluck('id');
+        $prevLeadIds = (clone $prevQuery)->pluck('id');
 
-        $pricingService = app(\App\Services\LeadPricingService::class);
-        $pricingInfo = $pricingService->resolveCost(null, null, $org);
-        $costPerLead = (float) $pricingInfo['cost'];
+        // Operational counts
+        $followupsDue = Followup::whereIn('lead_id', $currLeadIds)->where('due_at', '>=', now())->count();
+        if ($followupsDue === 0) {
+            $followupsDue = (clone $currQuery)->where('current_stage', 'follow-up')->count();
+        }
 
-        // Team Metrics
-        $activeMembers = User::where('organization_id', $orgId)->where('status', 'active')->count();
-        $upcomingFollowups = Followup::whereIn('lead_id', (clone $currQuery)->pluck('id'))->where('due_at', '>=', now())->count();
+        $siteVisits = SiteVisit::whereIn('lead_id', $currLeadIds)->count();
+        if ($siteVisits === 0) {
+            $siteVisits = (int) ($currStats->site_visits_stage ?? 0);
+        }
+
+        $bookings = Booking::whereIn('lead_id', $currLeadIds)->count();
+        if ($bookings === 0) {
+            $bookings = (int) ($currStats->bookings_stage ?? 0);
+        }
+
+        $closedWon = (int) ($currStats->closed_won_leads ?? 0);
+
+        $replacementRequests = LeadReplacement::whereIn('lead_id', $currLeadIds)->count();
+        $approvedReplacements = LeadReplacement::whereIn('lead_id', $currLeadIds)->where('status', 'approved')->count();
 
         $totalLeads = (int) ($currStats->total_leads ?? 0);
-        $convertedLeads = (int) ($currStats->converted_leads ?? 0);
-        $convRate = $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0;
-
         $prevTotalLeads = (int) ($prevStats->total_leads ?? 0);
-        $prevConverted = (int) ($prevStats->converted_leads ?? 0);
-        $prevConvRate = $prevTotalLeads > 0 ? round(($prevConverted / $prevTotalLeads) * 100, 1) : 0;
 
         // Team Member Distribution
         $teamDistribution = User::where('organization_id', $orgId)
@@ -1760,11 +1786,12 @@ class DashboardShell extends Component
 
         // Status Distribution for Doughnut Chart
         $statusDistribution = [
-            'New' => (clone $currQuery)->whereIn('current_stage', ['new', 'lead_received'])->count(),
-            'Assigned' => (clone $currQuery)->where('current_stage', 'assigned')->count(),
+            'New' => (int) ($currStats->new_leads ?? 0),
+            'Assigned' => (int) ($currStats->assigned_leads ?? 0),
             'In Progress' => (int) ($currStats->in_progress_leads ?? 0),
-            'Converted' => $convertedLeads,
-            'Lost' => (int) ($currStats->lost_leads ?? 0),
+            'Site Visits' => $siteVisits,
+            'Bookings' => $bookings,
+            'Closed Won' => $closedWon,
         ];
 
         // Trend Data for Line Chart
@@ -1778,47 +1805,34 @@ class DashboardShell extends Component
 
         // Funnel progression for Builder
         $stage1 = $totalLeads;
-        $stage2 = (clone $currQuery)->whereNotIn('current_stage', ['duplicate'])->count();
-        $stage3 = (int) ($currStats->assigned_leads ?? 0);
-        $stage4 = (clone $currQuery)->whereNotNull('first_response_at')->count();
-        $stage5 = (clone $currQuery)->whereIn('current_stage', ['interested', 'site_visit', 'negotiation', 'booking', 'closed_won'])->count();
-        $stage6 = (clone $currQuery)->whereIn('current_stage', ['site_visit', 'negotiation', 'booking', 'closed_won'])->count();
-        $stage7 = (int) ($currStats->converted_leads ?? 0);
+        $stage2 = (int) ($currStats->assigned_leads ?? 0);
+        $stage3 = (int) ($currStats->in_progress_leads ?? 0);
+        $stage4 = $siteVisits;
+        $stage5 = $bookings;
+        $stage6 = $closedWon;
 
         $funnelStages = [
             ['stage' => 'Received', 'count' => $stage1, 'pct' => 100],
-            ['stage' => 'Credit Cleared', 'count' => $stage2, 'pct' => $stage1 > 0 ? round(($stage2 / $stage1) * 100) : 0],
-            ['stage' => 'Assigned', 'count' => $stage3, 'pct' => $stage1 > 0 ? round(($stage3 / $stage1) * 100) : 0],
-            ['stage' => 'First Response', 'count' => $stage4, 'pct' => $stage1 > 0 ? round(($stage4 / $stage1) * 100) : 0],
-            ['stage' => 'Interested', 'count' => $stage5, 'pct' => $stage1 > 0 ? round(($stage5 / $stage1) * 100) : 0],
-            ['stage' => 'Site Visit', 'count' => $stage6, 'pct' => $stage1 > 0 ? round(($stage6 / $stage1) * 100) : 0],
-            ['stage' => 'Won / Booked', 'count' => $stage7, 'pct' => $stage1 > 0 ? round(($stage7 / $stage1) * 100) : 0],
+            ['stage' => 'Assigned', 'count' => $stage2, 'pct' => $stage1 > 0 ? round(($stage2 / $stage1) * 100) : 0],
+            ['stage' => 'In Progress', 'count' => $stage3, 'pct' => $stage1 > 0 ? round(($stage3 / $stage1) * 100) : 0],
+            ['stage' => 'Site Visit', 'count' => $stage4, 'pct' => $stage1 > 0 ? round(($stage4 / $stage1) * 100) : 0],
+            ['stage' => 'Booked', 'count' => $stage5, 'pct' => $stage1 > 0 ? round(($stage5 / $stage1) * 100) : 0],
+            ['stage' => 'Closed Won', 'count' => $stage6, 'pct' => $stage1 > 0 ? round(($stage6 / $stage1) * 100) : 0],
         ];
 
         return [
             'kpis' => [
                 'total_leads' => ['value' => $totalLeads, 'delta' => $this->calculateDelta($totalLeads, $prevTotalLeads)],
-                'available_credits' => ['value' => $walletBalance, 'is_low' => $walletBalance < ($org?->min_credit_threshold ?? 50.0)],
-                'credits_consumed' => ['value' => $creditsConsumed, 'delta' => ['delta' => $periodLabel, 'isPositive' => true]],
-                'available_for_assignment' => ['value' => (int) ($currStats->unassigned_leads ?? 0)],
-                'assigned_leads' => ['value' => (int) ($currStats->assigned_leads ?? 0), 'delta' => $this->calculateDelta((int) ($currStats->assigned_leads ?? 0), (int) ($prevStats->assigned_leads ?? 0))],
+                'new_leads' => ['value' => (int) ($currStats->new_leads ?? 0), 'delta' => $this->calculateDelta((int) ($currStats->new_leads ?? 0), (int) ($prevStats->new_leads ?? 0))],
                 'unassigned_leads' => ['value' => (int) ($currStats->unassigned_leads ?? 0)],
+                'assigned_leads' => ['value' => (int) ($currStats->assigned_leads ?? 0), 'delta' => $this->calculateDelta((int) ($currStats->assigned_leads ?? 0), (int) ($prevStats->assigned_leads ?? 0))],
                 'in_progress_leads' => ['value' => (int) ($currStats->in_progress_leads ?? 0)],
-                'converted_leads' => ['value' => $convertedLeads, 'delta' => $this->calculateDelta($convertedLeads, $prevConverted)],
-                'lost_leads' => ['value' => (int) ($currStats->lost_leads ?? 0)],
-                'active_team_members' => ['value' => $activeMembers],
-                'conversion_rate' => ['value' => $convRate, 'delta' => $this->calculateDelta($convRate, $prevConvRate)],
-                'upcoming_followups' => ['value' => $upcomingFollowups],
-            ],
-            'wallet_summary' => [
-                'available_credits' => $walletBalance,
-                'opening_balance' => $walletOpening,
-                'total_recharged' => $totalRecharged,
-                'credits_consumed' => $creditsConsumed,
-                'credits_refunded' => $creditsRefunded,
-                'cost_per_lead' => $costPerLead,
-                'is_low' => $walletBalance < ($org?->min_credit_threshold ?? 50.0),
-                'min_threshold' => (float) ($org?->min_credit_threshold ?? 50.0),
+                'followups_due' => ['value' => $followupsDue],
+                'site_visits' => ['value' => $siteVisits],
+                'bookings' => ['value' => $bookings],
+                'closed_won' => ['value' => $closedWon, 'delta' => $this->calculateDelta($closedWon, (int) ($prevStats->closed_won_leads ?? 0))],
+                'replacement_requests' => ['value' => $replacementRequests],
+                'approved_replacements' => ['value' => $approvedReplacements],
             ],
             'distribution_summary' => [
                 'auto_assign_enabled' => (bool) ($org?->auto_assign_enabled ?? true),

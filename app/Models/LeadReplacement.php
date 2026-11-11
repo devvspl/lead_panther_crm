@@ -74,8 +74,15 @@ class LeadReplacement extends Model
             // 3. Refund credits to client wallet
             $wallet = CreditWallet::where('client_id', $lead->client_id)->lockForUpdate()->first();
             if ($wallet) {
+                $cost = (float) CreditTransaction::where('lead_id', $lead->id)
+                    ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->value('credit_used');
+                if ($cost <= 0) {
+                    $cost = (float) ($lead->lead_cost ?: 10.00);
+                }
+
                 $before = (float) $wallet->balance;
-                $after = $before + 10.00; // Refund 10 credits
+                $after = $before + $cost;
                 $wallet->update(['balance' => $after]);
 
                 CreditTransaction::create([
@@ -83,9 +90,11 @@ class LeadReplacement extends Model
                     'lead_id' => $lead->id,
                     'package_id' => null,
                     'credit_before' => $before,
-                    'credit_used' => 10.00,
+                    'credit_used' => $cost,
                     'credit_after' => $after,
                     'transaction_type' => 'refund',
+                    'description' => "Replacement approved for lead {$lead->lead_code}: " . ($this->resolution_note ?: ($this->reason?->label ?: 'Lead Replacement')),
+                    'created_by' => $userId,
                     'created_at' => now(),
                 ]);
             }

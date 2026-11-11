@@ -768,6 +768,12 @@
                                 <span>Assign Selected ({{ count($selectedRows) }})</span>
                             </button>
                         @endif
+                        <button type="button" wire:click="autoDistributeUnassignedLeads"
+                            class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                            title="Distribute unassigned leads using the Super Admin configured distribution rule">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            <span>Auto-Assign</span>
+                        </button>
                         <x-ui.export-button target="exportExcel" class="text-xs" />
                         <button type="button" wire:click="openPullLeadsModal"
                             class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
@@ -1330,6 +1336,107 @@
                     class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     <span>Confirm Assignment</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Return Lead to Super Admin (Replacement Request) Modal -->
+    @if($showReturnLeadModal && $returnLeadModel)
+    <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-ink">Return Lead to Super Admin</h3>
+                        <p class="text-[11px] text-muted">Submit lead replacement request for review &amp; credit refund</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeReturnLeadModal" class="text-muted hover:text-ink cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Lead Details Summary -->
+            <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-mono font-bold text-ink">{{ $returnLeadModel->lead_code }}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        {{ ucfirst(str_replace('_', ' ', $returnLeadModel->current_stage)) }}
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <span class="text-[10px] text-muted block">Contact Name</span>
+                        <span class="font-semibold text-ink">{{ $returnLeadModel->name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-muted block">Mobile Number</span>
+                        <span class="font-mono font-semibold text-ink">{{ $returnLeadModel->mobile }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-muted block">Project</span>
+                        <span class="text-ink">{{ $returnLeadModel->project_name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-muted block">Delivered At</span>
+                        <span class="font-mono text-muted text-[11px]">{{ $returnLeadModel->created_at?->format('d M Y, H:i') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Replacement Form -->
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-ink mb-1">
+                        Replacement Reason <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model="returnReasonId"
+                        class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
+                        <option value="">-- Select Reason --</option>
+                        @foreach($replacementReasons as $reason)
+                            <option value="{{ $reason->id }}">{{ $reason->label }}</option>
+                        @endforeach
+                    </select>
+                    @error('returnReasonId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-ink mb-1">
+                        Remarks / Unsuitability Details
+                    </label>
+                    <textarea wire:model="returnRemarks" rows="3"
+                        placeholder="Provide details for Super Admin review (e.g. customer unreachable after 3 attempts, invalid number, duplicate lead)..."
+                        class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition"></textarea>
+                    @error('returnRemarks') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-800 text-[11px] space-y-1">
+                    <div class="font-bold flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Super Admin Review Policy</span>
+                    </div>
+                    <p class="text-amber-700 leading-relaxed">
+                        Submitting this return request places the claim into the Super Admin Replacement Review Queue. Once reviewed and approved by Super Admin, the lead credit will be refunded to your client wallet and a replacement lead will be generated per policy.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <button type="button" wire:click="closeReturnLeadModal"
+                    class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" wire:click="submitReturnLead"
+                    class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Return Lead to Super Admin</span>
                 </button>
             </div>
         </div>

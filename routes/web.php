@@ -95,7 +95,7 @@ Route::get('/leads/upload-history', UploadHistory::class)->middleware(['auth'])-
 Route::get('/credits', CreditWallet::class)->middleware(['auth'])->name('credits.wallet');
 
 // Distribution Rules & Team Availability Routes
-Route::get('/projects/{project}/distribution', DistributionRuleForm::class)->middleware(['auth'])->name('distribution.project');
+Route::get('/projects/{project}/distribution', DistributionRuleForm::class)->middleware(['auth', 'role:Super Admin|super-admin'])->name('distribution.project');
 
 Route::get('/distribution/availability', TeamAvailability::class)->middleware(['auth'])->name('distribution.availability');
 
@@ -105,7 +105,7 @@ Route::get('/account-manager/leads', function () {
 })->middleware(['auth'])->name('account_manager.leads');
 
 // Replacement Queue & Client History Routes
-Route::get('/replacements', ReplacementQueue::class)->middleware(['auth'])->name('replacements.queue');
+Route::get('/replacements', ReplacementQueue::class)->middleware(['auth', 'role:Super Admin|super-admin'])->name('replacements.queue');
 
 Route::get('/client/replacements', ClientReplacementHistory::class)->middleware(['auth'])->name('replacements.client');
 
@@ -115,7 +115,7 @@ Route::get('/reports', ReportsContainer::class)->middleware(['auth'])->name('rep
 // Settings Routes
 Route::get('/settings/organization', OrganizationProfile::class)->middleware(['auth'])->name('settings.organization');
 
-Route::get('/settings/integrations', IntegrationsManager::class)->middleware(['auth', 'role:Super Admin|super-admin|Builder/Developer|Builder|builder'])->name('settings.integrations');
+Route::get('/settings/integrations', IntegrationsManager::class)->middleware(['auth', 'role:Super Admin|super-admin'])->name('settings.integrations');
 
 Route::get('/settings/users', UserInvite::class)->middleware(['auth'])->name('settings.users');
 

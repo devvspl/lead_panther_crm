@@ -36,6 +36,11 @@ class LeadReplacement extends Model
         return $this->belongsTo(User::class, 'requested_by');
     }
 
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+
     /**
      * Approve replacement request: refunds credit, creates replacement lead, updates status history & audit log.
      */

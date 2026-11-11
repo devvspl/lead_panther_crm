@@ -902,7 +902,7 @@
                                         </span>
                                     </div>
                                     <div class="text-[11px] text-muted">
-                                        {{ $claim->requester?->name ?: 'Agent' }} &bull; {{ $claim->reason?->name ?: 'Invalid Contact' }}
+                                        {{ ($claim->requestedBy?->name ?? $claim->requester?->name) ?: 'Agent' }} &bull; {{ ($claim->reason?->label ?? $claim->reason?->reason_name) ?: 'Invalid Contact' }}
                                     </div>
                                 </div>
                             </div>
@@ -1569,45 +1569,6 @@
                         View Claims Log &rarr;
                     </a>
                 </div>
-            </div>
-        </div>
-
-                <!-- Unassigned Queue Alert & Action -->
-                @if(($builderData['distribution_summary']['unassigned_leads'] ?? 0) > 0)
-                    <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between gap-2 text-xs">
-                        <div class="flex items-center gap-2 text-blue-900">
-                            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                            <span><strong>{{ $builderData['distribution_summary']['unassigned_leads'] }}</strong> leads waiting in unassigned queue.</span>
-                        </div>
-                        <button type="button" wire:click="autoDistributeBuilderLeads"
-                            class="px-3 py-1 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs cursor-pointer shrink-0">
-                            Distribute Now
-                        </button>
-                    </div>
-                @endif
-
-                <!-- Team Workload Preview -->
-                @if(!empty($builderData['distribution_summary']['team_distribution']) && count($builderData['distribution_summary']['team_distribution']) > 0)
-                    <div class="space-y-1.5 pt-1">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Team Workload Ranking</span>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            @foreach($builderData['distribution_summary']['team_distribution']->take(4) as $member)
-                                <div class="p-2 rounded-lg bg-canvas border border-border/80 flex items-center justify-between text-xs">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center">
-                                            {{ strtoupper(substr($member->name, 0, 1)) }}
-                                        </div>
-                                        <span class="font-medium text-ink truncate max-w-[120px]">{{ $member->name }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 font-mono text-[11px]">
-                                        <span class="text-primary font-bold" title="Active Leads">{{ $member->active_leads_count }} act</span>
-                                        <span class="text-emerald-600 font-bold" title="Won Leads">{{ $member->converted_leads_count }} won</span>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
 

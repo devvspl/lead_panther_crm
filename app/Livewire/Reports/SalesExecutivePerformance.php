@@ -10,10 +10,14 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ReportExport;
 use App\Models\User;
 use App\Models\Lead;
+use App\Exports\BaseStyledExport;
+use App\Models\Booking;
+use App\Models\SiteVisit;
 
 class SalesExecutivePerformance extends Component
 {
     public string $sortField = 'bookings_closed';
+
     public string $sortDirection = 'desc';
 
     public function tableColumns(): array
@@ -43,13 +47,13 @@ class SalesExecutivePerformance extends Component
         $headings = ['Sales Executive', 'Leads Assigned', 'Contacted Within SLA (%)', 'Site Visits Logged', 'Bookings Closed'];
         $columns = ['executive_name', 'assigned_leads', fn($r) => $r['sla_contacted_rate'] . '%', 'site_visits', 'bookings_closed'];
 
-        $filename = "sales-executive-leaderboard_" . now()->format('Y-m-d') . ".xlsx";
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . " | Sorted By: {$this->sortField} ({$this->sortDirection})";
+        $filename = 'sales-executive-leaderboard_'.now()->format('Y-m-d').'.xlsx';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T')." | Sorted By: {$this->sortField} ({$this->sortDirection})";
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
-            new \App\Exports\BaseStyledExport(
+            new BaseStyledExport(
                 data: $rows,
                 title: 'Sales Executive Performance Leaderboard',
                 subtitle: $subtitle,
@@ -73,15 +77,28 @@ class SalesExecutivePerformance extends Component
                 $execsQuery->where('id', $user->id);
             }
 
+            if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
+                $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+            }
             $execs = $execsQuery->get();
             $data = [];
 
             foreach ($execs as $exec) {
-                $assignedCount = Lead::where('assigned_to', $exec->id)->count();
+                $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
                 $slaRate = 88.5;
-                $siteVisits = Lead::where('assigned_to', $exec->id)->whereIn('current_stage', ['site_visit', 'negotiation', 'proposal', 'booking', 'closed_won'])->count();
-                $bookingsClosed = Lead::where('assigned_to', $exec->id)->whereIn('current_stage', ['booking', 'payment', 'closed_won'])->count();
+                if (Lead::usesSalesPanel()) {
+                    $assigned = Lead::panelQuery()->where('assigned_to', $exec->id)->get();
+                    $met = $assigned->filter(fn ($lead) => $lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at) <= 15)->count();
+                    $slaRate = $assigned->count() ? round($met / $assigned->count() * 100, 1) : 0;
+                }
+                $siteVisits = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->whereIn('current_stage', ['site_visit', 'negotiation', 'proposal', 'booking', 'closed_won'])->count();
+                $bookingsClosed = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->whereIn('current_stage', ['booking', 'payment', 'closed_won'])->count();
 
+                if (Lead::usesSalesPanel()) {
+                    $leadIds = Lead::panelQuery()->where('assigned_to', $exec->id)->select('id');
+                    $siteVisits = SiteVisit::whereIn('lead_id', clone $leadIds)->count();
+                    $bookingsClosed = Booking::whereIn('lead_id', clone $leadIds)->count();
+                }
                 $data[] = [
                     'executive_name' => $exec->name,
                     'assigned_leads' => $assignedCount,
@@ -91,7 +108,7 @@ class SalesExecutivePerformance extends Component
                 ];
             }
 
-            if (empty($data)) {
+            if (empty($data) && ! Lead::usesSalesPanel()) {
                 $data[] = ['executive_name' => 'Rahul Sharma', 'assigned_leads' => 45, 'sla_contacted_rate' => 92.5, 'site_visits' => 14, 'bookings_closed' => 5];
                 $data[] = ['executive_name' => 'Priya Patel', 'assigned_leads' => 38, 'sla_contacted_rate' => 94.7, 'site_visits' => 12, 'bookings_closed' => 4];
                 $data[] = ['executive_name' => 'Amit Kumar', 'assigned_leads' => 30, 'sla_contacted_rate' => 86.0, 'site_visits' => 8, 'bookings_closed' => 2];
@@ -100,10 +117,14 @@ class SalesExecutivePerformance extends Component
             // Sort data by active column
             usort($data, function ($a, $b) {
                 $field = $this->sortField;
-                if (!isset($a[$field])) return 0;
+                if (! isset($a[$field])) {
+                    return 0;
+                }
                 $valA = $a[$field];
                 $valB = $b[$field];
-                if ($valA == $valB) return 0;
+                if ($valA == $valB) {
+                    return 0;
+                }
                 if ($this->sortDirection === 'asc') {
                     return ($valA < $valB) ? -1 : 1;
                 } else {

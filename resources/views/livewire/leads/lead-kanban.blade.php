@@ -344,6 +344,7 @@
         @endif
     </div>
 
+    @if($isSalesExecutive)<div class="flex gap-2 text-xs items-center"><label for="lead-followup-filter">Follow-ups</label><select id="lead-followup-filter" wire:model.live="followupFilter" class="rounded-lg border-border"><option value="">All</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option></select></div>@endif
     @if($isBuilder)
         <!-- 3. BUILDER COMPACT 8 OPERATIONAL KPI CARDS -->
         <div class="space-y-2">
@@ -366,7 +367,7 @@
                 @endforeach
             </div>
         </div>
-    @else
+    @elseif(!$isSalesExecutive)
     <!-- 3. LEAD OVERVIEW KPI CARDS -->
     <div class="space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -460,7 +461,7 @@
 
     @endif
 
-    @if(!$isBuilder)
+    @if(!$isBuilder && !$isSalesExecutive)
     <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
     <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
@@ -881,12 +882,14 @@
                                     <span>Assign Selected ({{ count($selectedRows) }})</span>
                                 </button>
                             @endif
+                            @if(!$isBuilder)
                             <button type="button" wire:click="autoDistributeUnassignedLeads"
                                 class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
                                 title="Distribute unassigned leads using the Super Admin configured distribution rule">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 <span>Auto-Assign</span>
                             </button>
+                            @endif
                         @endif
                         <x-ui.export-button target="exportExcel" class="text-xs" />
                         @if(!$isBuilder && !$isSalesExecutive)
@@ -951,7 +954,7 @@
                                  x-data="{ 
                                     initSortable() { 
                                         new Sortable($el, { 
-                                            group: 'kanban', 
+                                            disabled: @js($isBuilder), group: 'kanban',
                                             animation: 150, 
                                             ghostClass: 'opacity-50',
                                             onEnd: function(evt) { 
@@ -986,7 +989,7 @@
                                             </div>
 
                                             <div class="flex items-center gap-1">
-                                                @if($lead->first_response_at)
+                                                @if($lead->first_response_at && (!\App\Models\Lead::usesSalesPanel() || $lead->created_at->diffInMinutes($lead->first_response_at)<=15))
                                                     <span class="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[9px]">SLA Met</span>
                                                 @elseif(\Carbon\Carbon::parse($lead->created_at)->diffInMinutes(now()) > 15)
                                                     <span class="px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 font-bold text-[9px]">SLA Breached</span>
@@ -1084,7 +1087,7 @@
                                             <span class="px-1.5 py-0.2 rounded bg-surface border border-border font-mono">{{ $stageCounts[$oStageKey] ?? 0 }}</span>
                                         </div>
                                         <div data-stage-key="{{ $oStageKey }}"
-                                            x-data="{ initSortable() { new Sortable($el, { group: 'kanban', animation: 150, onEnd: function(evt) { const leadId = evt.item.getAttribute('data-lead-id'); const toStage = evt.to.getAttribute('data-stage-key'); $wire.updateLeadStage(leadId, toStage); } }); } }"
+                                            x-data="{ initSortable() { new Sortable($el, { disabled: @js($isBuilder), group: 'kanban',animation: 150, onEnd: function(evt) { const leadId = evt.item.getAttribute('data-lead-id'); const toStage = evt.to.getAttribute('data-stage-key'); $wire.updateLeadStage(leadId, toStage); } }); } }"
                                             x-init="initSortable()" class="space-y-2 min-h-[50px]">
                                             @foreach($stageLeads[$oStageKey] ?? [] as $oLead)
                                                 <div data-lead-id="{{ $oLead->id }}"
@@ -1147,7 +1150,7 @@
     @endif
 
     <!-- Meta Lead Ads Sync & Manual Add Drawer -->
-    @if(!$isBuilder)
+    @if(!$isBuilder && !$isSalesExecutive)
     <x-ui.offcanvas wire:model="showPullLeadsModal" name="pull-leads-drawer" title="Add / Ingest Leads"
         subtitle="Pull leads from Meta Ads (Facebook & Instagram) or create a single manual lead entry." maxWidth="lg">
         <x-slot:headerIcon>
@@ -1501,6 +1504,8 @@
                 </button>
             </div>
 
+            @foreach($errors->all() as $error)<p class="text-xs text-red-700" role="alert">{{ $error }}</p>@endforeach
+            @if($isBuilder)<textarea aria-label="Supporting information" wire:model="returnSupportingInfo" class="w-full text-xs rounded-lg border-border" placeholder="Supporting information (optional)"></textarea>@endif
             <!-- Lead Details Summary -->
             <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
                 <div class="flex items-center justify-between text-xs">

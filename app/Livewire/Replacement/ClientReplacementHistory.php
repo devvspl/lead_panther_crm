@@ -6,6 +6,13 @@ use Livewire\Component;
 use App\Models\LeadReplacement;
 use App\Models\Client;
 use App\Livewire\Concerns\HasAdvancedTable;
+use App\Exports\BaseStyledExport;
+use App\Models\Lead;
+use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ClientReplacementHistory extends Component
 {
@@ -40,11 +47,14 @@ class ClientReplacementHistory extends Component
         $orgId = $user?->organization_id;
         $client = $orgId ? (Client::where('organization_id', $orgId)->first() ?? Client::first()) : Client::first();
 
-        $query = LeadReplacement::with(['lead', 'reason', 'replacementLead']);
+        $query = LeadReplacement::with(['lead' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'reason', 'replacementLead' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q]);
 
-        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+        if (Lead::usesSalesPanel()) {
+            $query->whereIn('lead_id', Lead::panelQuery()->select('id'));
+        }
+        if (! Lead::usesSalesPanel() && $user && ! $user->hasRole('Super Admin') && ! $user->hasRole('super-admin')) {
             if ($orgId) {
-                $orgUserIds = \App\Models\User::where('organization_id', $orgId)->pluck('id')->toArray();
+                $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
                 $query->whereHas('lead', function ($q) use ($orgId, $orgUserIds) {
                     $q->where(function ($sub) use ($orgId, $orgUserIds) {
                         $sub->whereHas('client', fn($cq) => $cq->where('organization_id', $orgId))
@@ -86,11 +96,14 @@ class ClientReplacementHistory extends Component
         $orgId = $user?->organization_id;
         $client = $orgId ? (Client::where('organization_id', $orgId)->first() ?? Client::first()) : Client::first();
 
-        $query = LeadReplacement::with(['lead', 'reason', 'replacementLead']);
+        $query = LeadReplacement::with(['lead' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'reason', 'replacementLead' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q]);
 
-        if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
+        if (Lead::usesSalesPanel()) {
+            $query->whereIn('lead_id', Lead::panelQuery()->select('id'));
+        }
+        if (! Lead::usesSalesPanel() && $user && ! $user->hasRole('Super Admin') && ! $user->hasRole('super-admin')) {
             if ($orgId) {
-                $orgUserIds = \App\Models\User::where('organization_id', $orgId)->pluck('id')->toArray();
+                $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
                 $query->whereHas('lead', function ($q) use ($orgId, $orgUserIds) {
                     $q->where(function ($sub) use ($orgId, $orgUserIds) {
                         $sub->whereHas('client', fn($cq) => $cq->where('organization_id', $orgId))
@@ -103,24 +116,24 @@ class ClientReplacementHistory extends Component
         }
 
         $data = $query->latest('requested_at')->get();
-        $clientSlug = $client ? \Illuminate\Support\Str::slug($client->name) : 'client';
-        $filename = "replacement-history_{$clientSlug}_" . now()->format('Y-m-d') . ".xlsx";
+        $clientSlug = $client ? Str::slug($client->name) : 'client';
+        $filename = "replacement-history_{$clientSlug}_".now()->format('Y-m-d').'.xlsx';
 
         $headings = ['Requested At', 'Lead Code', 'Reason', 'Status', 'Resolution / Note'];
         $columns = [
-            fn($r) => $r->requested_at ? ($r->requested_at instanceof \Carbon\CarbonInterface ? $r->requested_at->format('M d, Y H:i') : \Carbon\Carbon::parse($r->requested_at)->format('M d, Y H:i')) : '',
+            fn ($r) => $r->requested_at ? ($r->requested_at instanceof CarbonInterface ? $r->requested_at->format('M d, Y H:i') : Carbon::parse($r->requested_at)->format('M d, Y H:i')) : '',
             fn($r) => $r->lead?->lead_code ?: 'N/A',
             fn($r) => $r->reason?->reason_name ?: 'N/A',
             fn($r) => $r->status,
             fn($r) => $r->resolution_note ?: ($r->replacementLead ? "Replaced by {$r->replacementLead->lead_code}" : 'Under Review'),
         ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($client ? " | Client: {$client->name}" : '');
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').($client ? " | Client: {$client->name}" : '');
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\BaseStyledExport(
+        return Excel::download(
+            new BaseStyledExport(
                 data: $data,
                 title: 'Client Replacement History',
                 subtitle: $subtitle,

@@ -10,6 +10,9 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ReportExport;
 use App\Models\User;
 use App\Models\LeadCommunication;
+use App\Exports\BaseStyledExport;
+use App\Models\Followup;
+use App\Models\Lead;
 
 class FollowupPerformance extends Component
 {
@@ -29,13 +32,13 @@ class FollowupPerformance extends Component
         $headings = ['Sales Executive', 'Completed On Time', 'Overdue / Delayed', 'On-Time Completion Rate (%)'];
         $columns = ['executive_name', 'on_time', 'overdue', fn($r) => $r['on_time_rate'] . '%'];
 
-        $filename = "followup-performance-report_" . now()->format('Y-m-d') . ".xlsx";
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . " | Followup Compliance Audit";
+        $filename = 'followup-performance-report_'.now()->format('Y-m-d').'.xlsx';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Followup Compliance Audit';
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
-            new \App\Exports\BaseStyledExport(
+            new BaseStyledExport(
                 data: $rows,
                 title: 'Followup Adherence & Performance Report',
                 subtitle: $subtitle,
@@ -59,6 +62,9 @@ class FollowupPerformance extends Component
                 $execsQuery->where('id', $user->id);
             }
 
+            if (Lead::usesSalesPanel() && ! $user->hasRole('Sales Executive')) {
+                $execsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+            }
             $execs = $execsQuery->get();
             $data = [];
 
@@ -68,6 +74,12 @@ class FollowupPerformance extends Component
                 $overdue = $totalComms - $onTime;
                 $rate = $totalComms > 0 ? round(($onTime / $totalComms) * 100, 1) : 100.0;
 
+                if (Lead::usesSalesPanel()) {
+                    $followups = Followup::whereIn('lead_id', Lead::panelQuery()->where('assigned_to', $exec->id)->select('id'))->get();
+                    $onTime = $followups->filter(fn ($f) => $f->status === 'completed' && $f->updated_at <= $f->due_at)->count();
+                    $overdue = $followups->filter(fn ($f) => $f->status === 'completed' ? $f->updated_at > $f->due_at : $f->due_at < now())->count();
+                    $rate = ($onTime + $overdue) > 0 ? round($onTime / ($onTime + $overdue) * 100, 1) : 0;
+                }
                 $data[] = [
                     'executive_name' => $exec->name,
                     'on_time' => $onTime,
@@ -76,7 +88,7 @@ class FollowupPerformance extends Component
                 ];
             }
 
-            if (empty($data)) {
+            if (empty($data) && ! Lead::usesSalesPanel()) {
                 $data[] = ['executive_name' => 'Rahul Sharma', 'on_time' => 38, 'overdue' => 4, 'on_time_rate' => 90.5];
                 $data[] = ['executive_name' => 'Priya Patel', 'on_time' => 31, 'overdue' => 2, 'on_time_rate' => 93.9];
                 $data[] = ['executive_name' => 'Amit Kumar', 'on_time' => 24, 'overdue' => 6, 'on_time_rate' => 80.0];

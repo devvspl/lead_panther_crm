@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\DashboardReportExport;
+use App\Models\Client;
+use App\Models\LeadAssignment;
+use App\Models\Scopes\ClientScope;
+use App\Services\LeadDistributionService;
 
 class DashboardShell extends Component
 {
@@ -32,25 +36,39 @@ class DashboardShell extends Component
 
     // Global Dashboard Filter Properties
     public string $dateRange = '30_days'; // 'today', 'yesterday', '7_days', '30_days', 'custom'
+
     public ?string $customFrom = null;
+
     public ?string $customTo = null;
+
     public ?int $filterOrganizationId = null;
+
     public ?int $filterTeamId = null;
+
     public ?int $filterProjectId = null;
+
     public ?int $filterLeadSourceId = null;
+
     public ?int $filterAssignedUserId = null;
+
     public ?string $filterStatus = null;
+
     public ?int $filterCampaignId = null;
+
     public ?string $filterTransactionType = null;
 
     // View Controls
     public string $trendInterval = 'daily'; // 'daily', 'weekly', 'monthly'
+
     public string $activeActivityTab = 'leads'; // 'leads', 'followups', 'sla', 'transactions', 'replacements', 'notifications'
+
     public string $activeKpiGroup = 'overview'; // 'overview', 'conversion', 'sla', 'credit'
 
     // Builder Specific State
     public bool $showBuilderRechargeModal = false;
+
     public float $builderRechargeAmount = 1000.00;
+
     public string $builderRechargeNote = '';
 
     public function mount(?string $role = null): void
@@ -159,7 +177,7 @@ class DashboardShell extends Component
      */
     protected function getFilteredLeadsQuery(?Carbon $start = null, ?Carbon $end = null)
     {
-        $query = Lead::withoutGlobalScopes();
+        $query = Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::withoutGlobalScopes();
 
         $user = auth()->user();
         if ($this->role === 'builder' || ($user && ($user->hasRole('builder') || $user->hasRole('Builder') || $user->hasRole('Builder/Developer')))) {
@@ -247,6 +265,7 @@ class DashboardShell extends Component
      */
     public function getAdminKpisProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end, $prevStart, $prevEnd, $periodLabel] = $this->getDateBounds();
         $todayStr = now()->toDateString();
 
@@ -531,7 +550,7 @@ class DashboardShell extends Component
         [$start, $end] = $this->getDateBounds();
 
         // Calculate Average First Response Time
-        $isSqlite = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite';
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $timeDiffSql = $isSqlite
             ? 'AVG((strftime("%s", first_response_at) - strftime("%s", created_at)) / 60) as avg_min'
             : 'AVG(TIMESTAMPDIFF(MINUTE, created_at, first_response_at)) as avg_min';
@@ -668,6 +687,7 @@ class DashboardShell extends Component
      */
     public function getAdminFunnelProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         $leadsQuery = $this->getFilteredLeadsQuery($start, $end);
@@ -789,6 +809,7 @@ class DashboardShell extends Component
      */
     public function getAdminLeadAnalyticsProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         // 1. Time Series Trend (Daily, Weekly, Monthly)
@@ -960,6 +981,7 @@ class DashboardShell extends Component
      */
     public function getAdminOrgPerformanceProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         $orgQuery = Organization::with(['users' => fn($q) => $q->select('id', 'organization_id')]);
@@ -1016,6 +1038,7 @@ class DashboardShell extends Component
 
     public function getAdminProjectPerformanceProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         $projQuery = Project::with('client');
@@ -1066,6 +1089,7 @@ class DashboardShell extends Component
      */
     public function getAdminCreditAnalyticsProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         $globalBalance = (float) CreditWallet::sum('balance');
@@ -1109,6 +1133,7 @@ class DashboardShell extends Component
      */
     public function getAdminDistributionMonitoringProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
         $totalLeads = (int) $this->getFilteredLeadsQuery($start, $end)->count();
         $assignedCount = (int) $this->getFilteredLeadsQuery($start, $end)->whereNotNull('assigned_to')->count();
@@ -1133,6 +1158,7 @@ class DashboardShell extends Component
      */
     public function getAdminNotificationMonitoringProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
         $channels = ['whatsapp', 'sms', 'email', 'crm'];
@@ -1193,6 +1219,7 @@ class DashboardShell extends Component
      */
     public function getAdminRecentActivitiesProperty(): array
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         // 1. Recently Received Leads
         $recentLeads = Lead::withoutGlobalScopes()
             ->with(['client.organization', 'leadSource', 'campaign'])
@@ -1308,8 +1335,11 @@ class DashboardShell extends Component
     // =========================================================================
     protected function getScopedLeadsQuery()
     {
+        if (Lead::usesSalesPanel()) {
+            return Lead::panelQuery();
+        }
         $user = auth()->user();
-        $query = Lead::withoutGlobalScope(\App\Models\Scopes\ClientScope::class);
+        $query = Lead::withoutGlobalScope(ClientScope::class);
 
         if (!$user) {
             return $query;
@@ -1353,7 +1383,7 @@ class DashboardShell extends Component
         return match ($this->role) {
             'builder' => [
                 'title' => 'Builder / Developer Dashboard',
-                'subtitle' => $orgName ? "Portfolio performance, organization leads & credits for {$orgName}" : "Portfolio performance, lead distribution & credit balance",
+                'subtitle' => $orgName ? "Portfolio performance, organization leads & credits for {$orgName}" : 'Portfolio performance, lead distribution & credit balance',
                 'roleBadge' => 'Builder / Developer',
                 'badgeClass' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
             ],
@@ -1365,7 +1395,7 @@ class DashboardShell extends Component
             ],
             'partner' => [
                 'title' => 'Channel Partner Command Center',
-                'subtitle' => $orgName ? "Agency lead pipeline & sub-agent productivity for {$orgName}" : "Agency lead pipeline, sub-agent productivity & deal closures",
+                'subtitle' => $orgName ? "Agency lead pipeline & sub-agent productivity for {$orgName}" : 'Agency lead pipeline, sub-agent productivity & deal closures',
                 'roleBadge' => 'Channel Partner',
                 'badgeClass' => 'bg-purple-50 text-purple-700 border-purple-200',
             ],
@@ -1439,7 +1469,7 @@ class DashboardShell extends Component
                 $userWallet = CreditWallet::where('client_id', $orgPrimaryUserId)->value('balance') ?? 0;
             }
             $walletBalance = (int) ($userWallet ?? 0);
-            $projectsCount = Project::withoutGlobalScope(\App\Models\Scopes\ClientScope::class)
+            $projectsCount = Project::withoutGlobalScope(ClientScope::class)
                 ->where(function ($q) use ($user) {
                     $q->where('client_id', $user?->id);
                     if ($user?->organization_id) {
@@ -1447,7 +1477,7 @@ class DashboardShell extends Component
                           ->orWhereHas('client', fn($cq) => $cq->where('organization_id', $user->organization_id));
                     }
                 })->count();
-            $bookingsCount = Booking::whereHas('lead', fn($q) => $q->withoutGlobalScope(\App\Models\Scopes\ClientScope::class)->where(function ($sub) use ($user) {
+            $bookingsCount = Booking::whereHas('lead', fn ($q) => $q->withoutGlobalScope(ClientScope::class)->where(function ($sub) use ($user) {
                 $sub->where('client_id', $user?->id);
                 if ($user?->organization_id) {
                     $sub->orWhere('client_id', $user->organization_id)
@@ -1586,13 +1616,14 @@ class DashboardShell extends Component
 
     public function submitBuilderRechargeRequest(): void
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         $this->validate([
             'builderRechargeAmount' => 'required|numeric|min:10',
             'builderRechargeNote' => 'nullable|string|max:500',
         ]);
 
         $user = auth()->user();
-        $client = \App\Models\Client::where('organization_id', $user?->organization_id)->first() ?: $user;
+        $client = Client::where('organization_id', $user?->organization_id)->first() ?: $user;
 
         RechargeRequest::create([
             'client_id' => $client->id,
@@ -1644,9 +1675,12 @@ class DashboardShell extends Component
 
     public function autoDistributeBuilderLeads(): void
     {
+        abort_if(Lead::usesSalesPanel(), 403);
         $user = auth()->user();
         $orgId = $user?->organization_id;
-        if (!$orgId) return;
+        if (! $orgId) {
+            return;
+        }
 
         $unassigned = Lead::withoutGlobalScopes()
             ->whereNull('assigned_to')
@@ -1659,10 +1693,11 @@ class DashboardShell extends Component
 
         if ($unassigned->isEmpty()) {
             $this->dispatch('toast', type: 'info', message: 'No unassigned leads found in organization queue.');
+
             return;
         }
 
-        $service = app(\App\Services\LeadDistributionService::class);
+        $service = app(LeadDistributionService::class);
         $count = 0;
         foreach ($unassigned as $lead) {
             $res = $service->distribute($lead);
@@ -1689,14 +1724,7 @@ class DashboardShell extends Component
         $orgUserIds = $orgUsers->pluck('id')->toArray();
 
         // 2. Filtered Leads Query
-        $baseQuery = Lead::withoutGlobalScopes()->where(function ($q) use ($orgId, $orgUserIds) {
-            if ($orgId) {
-                $q->whereHas('client', fn($sq) => $sq->where('organization_id', $orgId))
-                  ->orWhereHas('assignedTo', fn($sq) => $sq->where('organization_id', $orgId))
-                  ->orWhereIn('client_id', $orgUserIds)
-                  ->orWhereIn('assigned_to', $orgUserIds);
-            }
-        });
+        $baseQuery = Lead::panelQuery();
 
         // Current & Previous Period Queries
         $currQuery = (clone $baseQuery)->whereBetween('created_at', [$start, $end]);
@@ -1758,10 +1786,7 @@ class DashboardShell extends Component
         $prevLeadIds = (clone $prevQuery)->pluck('id');
 
         // Operational counts
-        $followupsDue = Followup::whereIn('lead_id', $currLeadIds)->where('due_at', '>=', now())->count();
-        if ($followupsDue === 0) {
-            $followupsDue = (clone $currQuery)->where('current_stage', 'follow-up')->count();
-        }
+        $followupsDue = Followup::whereIn('lead_id', $currLeadIds)->where('status', 'pending')->where('due_at', '<=', now()->endOfDay())->count();
 
         $siteVisits = SiteVisit::whereIn('lead_id', $currLeadIds)->count();
         if ($siteVisits === 0) {
@@ -1809,7 +1834,7 @@ class DashboardShell extends Component
 
         // 4. Team Performance Table (7 Required Operational Metrics)
         $teamPerformance = $orgUsers->where('status', 'active')->map(function ($member) {
-            $memberLeads = Lead::withoutGlobalScopes()->where('assigned_to', $member->id);
+            $memberLeads = Lead::panelQuery()->where('assigned_to', $member->id);
 
             return [
                 'name' => $member->name,
@@ -1972,14 +1997,11 @@ class DashboardShell extends Component
         $leadsQuery = Lead::withoutGlobalScopes()->where('assigned_to', $userId);
 
         $totalLeads = (clone $leadsQuery)->count();
-        $newLeads = (clone $leadsQuery)->whereIn('current_stage', ['new', 'contacted', 'connected'])->count();
-        $inProgress = (clone $leadsQuery)->whereIn('current_stage', ['interested', 'follow_up', 'meeting_scheduled', 'meeting', 'site_visit', 'negotiation', 'booking'])->count();
+        $newLeads = (clone $leadsQuery)->whereIn('current_stage', array_merge(Lead::stageValues('new'), Lead::stageValues('assigned')))->count();
+        $inProgress = (clone $leadsQuery)->whereIn('current_stage', array_merge(...array_map([Lead::class, 'stageValues'], ['contacted', 'interested', 'follow_up', 'meeting_scheduled', 'site_visit', 'negotiation', 'booking', 'payment_received'])))->count();
 
         $followupsDue = Followup::where('status', 'pending')
-            ->where(function ($q) use ($userId) {
-                $q->where('created_by', $userId)
-                  ->orWhereHas('lead', fn($lq) => $lq->where('assigned_to', $userId));
-            })
+            ->whereIn('lead_id', (clone $leadsQuery)->select('id'))
             ->where('due_at', '<=', now()->endOfDay())
             ->count();
 
@@ -1987,19 +2009,16 @@ class DashboardShell extends Component
         $lostLeads = (clone $leadsQuery)->whereIn('current_stage', ['lost', 'closed_lost', 'invalid', 'unreachable'])->count();
 
         $todayFollowups = Followup::where('status', 'pending')
-            ->where(function ($q) use ($userId) {
-                $q->where('created_by', $userId)
-                  ->orWhereHas('lead', fn($lq) => $lq->where('assigned_to', $userId));
-            })
+            ->whereIn('lead_id', (clone $leadsQuery)->select('id'))
             ->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])
-            ->with(['lead.project'])
+            ->with(['lead' => fn ($q) => $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()])])
             ->orderBy('due_at', 'asc')
             ->take(10)
             ->get();
 
         $recentLeads = (clone $leadsQuery)
             ->with(['project', 'leadSource'])
-            ->latest('updated_at')
+            ->orderByDesc(LeadAssignment::select('assigned_at')->whereColumn('lead_id', 'leads.id')->latest('assigned_at')->limit(1))->latest('created_at')
             ->take(8)
             ->get();
 
@@ -2019,6 +2038,9 @@ class DashboardShell extends Component
 
     public function render()
     {
+        if (Lead::usesSalesPanel()) {
+            $this->role = NavigationConfig::getRoleKey(auth()->user()) === 'builder' ? 'builder' : 'sales';
+        }
         $sourceOptions = LeadSource::pluck('name', 'id')->map(fn($name) => ucfirst($name))->toArray();
 
         $user = auth()->user();
@@ -2055,8 +2077,8 @@ class DashboardShell extends Component
             'quickActions' => $this->quickActions,
             'stats' => $this->roleStats,
             'upcomingEvents' => $this->upcomingEvents,
-            'auditLogs' => $this->auditLogs,
-            'chartData' => $this->chartData,
+            'auditLogs' => Lead::usesSalesPanel() ? collect() : $this->auditLogs,
+            'chartData' => Lead::usesSalesPanel() ? [] : $this->chartData,
 
             // Super Admin Command Centre Data
             'adminKpis' => $this->role === 'admin' ? $this->adminKpis : [],

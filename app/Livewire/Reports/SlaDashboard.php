@@ -10,9 +10,9 @@ use App\Exports\ReportExport;
 use App\Models\Lead;
 use App\Models\Client;
 use Carbon\Carbon;
-
 use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Exports\BaseStyledExport;
 
 class SlaDashboard extends Component
 {
@@ -36,13 +36,13 @@ class SlaDashboard extends Component
         $headings = ['Lead Code', 'Lead Name', 'Client Name', 'Assigned Executive', 'Created At', 'First Response At', 'Minutes Over SLA', 'SLA Status'];
         $columns = ['lead_code', 'name', 'client_name', 'assigned_name', 'created_at', 'first_response_at', 'minutes_over', 'status_label'];
 
-        $filename = "first-response-sla-report_" . now()->format('Y-m-d') . ".xlsx";
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . " | Breached & Late Response Audit";
+        $filename = 'first-response-sla-report_'.now()->format('Y-m-d').'.xlsx';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Breached & Late Response Audit';
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
-            new \App\Exports\BaseStyledExport(
+            new BaseStyledExport(
                 data: $breached,
                 title: 'First Response SLA Compliance & Breach Report',
                 subtitle: $subtitle,
@@ -58,9 +58,9 @@ class SlaDashboard extends Component
     protected function getSlaBuckets(): array
     {
         $user = auth()->user();
-        $query = Lead::query();
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query());
 
-        if ($user) {
+        if ($user && ! Lead::usesSalesPanel()) {
             if ($user->hasRole('Client')) {
                 $client = Client::where('organization_id', $user->organization_id)->first();
                 if ($client) {
@@ -79,18 +79,26 @@ class SlaDashboard extends Component
         foreach ($leads as $l) {
             if (!$l->first_response_at) {
                 $wait = Carbon::parse($l->created_at)->diffInMinutes(now());
-                if ($wait > 30) $breached++;
-                elseif ($wait > 15) $acceptable++;
-                else $excellent++;
+                if ($wait > 30) {
+                    $breached++;
+                } elseif ($wait > 15) {
+                    $acceptable++;
+                } else {
+                    $excellent++;
+                }
             } else {
                 $diff = Carbon::parse($l->created_at)->diffInMinutes(Carbon::parse($l->first_response_at));
-                if ($diff <= 15) $excellent++;
-                elseif ($diff <= 30) $acceptable++;
-                else $breached++;
+                if ($diff <= 15) {
+                    $excellent++;
+                } elseif ($diff <= 30) {
+                    $acceptable++;
+                } else {
+                    $breached++;
+                }
             }
         }
 
-        if ($excellent == 0 && $acceptable == 0 && $breached == 0) {
+        if (! Lead::usesSalesPanel() && $excellent == 0 && $acceptable == 0 && $breached == 0) {
             $excellent = 18;
             $acceptable = 7;
             $breached = 3;
@@ -106,9 +114,9 @@ class SlaDashboard extends Component
     protected function getBreachedLeadsData(): array
     {
         $user = auth()->user();
-        $query = Lead::with(['client', 'assignedTo']);
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'assignedTo']);
 
-        if ($user) {
+        if ($user && ! Lead::usesSalesPanel()) {
             if ($user->hasRole('Client')) {
                 $client = Client::where('organization_id', $user->organization_id)->first();
                 if ($client) {

@@ -32,47 +32,97 @@ use App\Livewire\Concerns\HasAdvancedTable;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Events\LeadCreated;
+use App\Exports\BaseStyledExport;
+use App\Models\Client;
+use App\Notifications\LeadAssignedNotification;
+use App\Services\LeadDistributionService;
+use App\Services\MetaLeadSyncService;
+use App\Support\NavigationConfig;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class LeadKanban extends Component
 {
     use HasAdvancedTable;
 
     // Global Filters (URL bound)
-    #[Url] public string $search = '';
-    #[Url] public string $statusFilter = 'all';
-    #[Url] public string $stageFilter = '';
-    #[Url] public string $project = '';
-    #[Url] public string $campaign = '';
-    #[Url] public string $filterOrganizationId = '';
-    #[Url] public string $partner = '';
-    #[Url] public string $executive = '';
-    #[Url] public string $team = '';
-    #[Url] public string $source = '';
-    #[Url] public string $leadType = '';
-    #[Url] public string $date_range = 'month';
-    #[Url] public bool $sla_breached = false;
-    #[Url] public string $sort_by = 'created_desc';
+    #[Url]
+    public string $search = '';
+
+    #[Url]
+    public string $statusFilter = 'all';
+
+    #[Url]
+    public string $stageFilter = '';
+
+    #[Url]
+    public string $project = '';
+
+    #[Url]
+    public string $campaign = '';
+
+    #[Url]
+    public string $filterOrganizationId = '';
+
+    #[Url]
+    public string $partner = '';
+
+    #[Url]
+    public string $executive = '';
+
+    #[Url]
+    public string $team = '';
+
+    #[Url]
+    public string $source = '';
+
+    #[Url]
+    public string $leadType = '';
+
+    #[Url]
+    public string $date_range = 'month';
+
+    #[Url]
+    public bool $sla_breached = false;
+
+    #[Url]
+    public string $sort_by = 'created_desc';
 
     // View & Analytics State
     public string $viewMode = 'kanban'; // 'kanban' | 'table'
+
     public string $analyticsRange = 'month';
+
     public ?string $analyticsCustomFrom = null;
+
     public ?string $analyticsCustomTo = null;
+
     public string $breakdownTab = 'project'; // 'overview' | 'project' | 'source' | 'executive' | 'team' | 'organization'
+
     public string $activeKpiGroup = 'all'; // 'all' | 'intake' | 'assignment' | 'progress' | 'conversion' | 'quality'
 
     // Breakdown Advanced Table State
-    #[Url] public string $breakdownSearch = '';
+    #[Url]
+    public string $breakdownSearch = '';
+
     public string $breakdownSortField = 'total_leads';
+
     public string $breakdownSortDirection = 'desc';
+
     public int $breakdownPerPage = 10;
 
     public bool $otherColumnExpanded = false;
 
     // Terminal stage confirmation modal state
     public bool $showConfirmModal = false;
+
     public ?int $pendingLeadId = null;
+
     public string $pendingToStage = '';
+
     public string $pendingFromStage = '';
 
     // Per-column limits for Kanban view
@@ -80,40 +130,71 @@ class LeadKanban extends Component
 
     // Manual Lead Ingestion & Meta Pull Modal State
     public bool $showPullLeadsModal = false;
+
     public string $pullMode = 'meta'; // 'meta' | 'manual'
+
     public ?int $selectedPortalAccountId = null;
+
     public string $selectedFormOption = '';
+
     public string $customFormId = '';
+
     public string $customPageAccessToken = '';
+
     public int $pullLimit = 25;
+
     public ?int $syncProjectId = null;
+
     public ?int $syncCampaignId = null;
+
     public bool $isPulling = false;
+
     public ?array $pullSummary = null;
 
     // Lead Manual / Bulk Assignment Modal State
     public bool $showAssignModal = false;
+
     public array $selectedLeadIds = [];
+
     public ?int $assignTeamId = null;
+
     public ?int $assignUserId = null;
 
     // Return Lead to Super Admin (Replacement Request) State
     public bool $showReturnLeadModal = false;
+
     public ?int $returnLeadId = null;
+
     public ?Lead $returnLeadModel = null;
+
     public ?int $returnReasonId = null;
+
     public string $returnRemarks = '';
+
+    public string $returnSupportingInfo = '';
+
+    #[Url]
+    public string $followupFilter = '';
 
     // Single Manual Lead Ingestion State
     public string $manualName = '';
+
     public string $manualMobile = '';
+
     public string $manualEmail = '';
+
     public string $manualCity = '';
+
     public string $manualBudget = '';
+
     public string $manualPropertyType = '';
+
     public string $manualRequirement = '';
+
     public ?int $manualProjectId = null;
+
     public ?int $manualCampaignId = null;
+
     public ?int $manualLeadSourceId = null;
 
     // 13 Complete Lifecycle Stages + Supported Active Stages
@@ -144,6 +225,10 @@ class LeadKanban extends Component
 
     public function mount(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->mainStages = ['new' => 'New', 'assigned' => 'Assigned', 'contacted' => 'Contacted', 'interested' => 'Interested', 'follow_up' => 'Follow-up', 'meeting_scheduled' => 'Meeting Scheduled', 'site_visit' => 'Site Visit', 'negotiation' => 'Negotiation', 'booking' => 'Booking', 'payment_received' => 'Payment Received', 'closed_won' => 'Closed Won'];
+            $this->otherStages = ['lost' => 'Lost', 'invalid' => 'Invalid', 'unreachable' => 'Unreachable', 'replaced' => 'Replaced', 'pending_credit' => 'Awaiting Lead Panther'];
+        }
         foreach (array_merge(array_keys($this->mainStages), array_keys($this->otherStages)) as $stage) {
             $this->stageLimits[$stage] = 20;
         }
@@ -249,19 +334,70 @@ class LeadKanban extends Component
         $this->resetPage();
     }
 
-    public function updatedProject(): void { $this->resetPage(); }
-    public function updatedCampaign(): void { $this->resetPage(); }
-    public function updatedFilterOrganizationId(): void { $this->resetPage(); }
-    public function updatedExecutive(): void { $this->resetPage(); }
-    public function updatedTeam(): void { $this->resetPage(); }
-    public function updatedSource(): void { $this->resetPage(); }
-    public function updatedLeadType(): void { $this->resetPage(); }
-    public function updatedStatusFilter(): void { $this->resetPage(); }
-    public function updatedStageFilter(): void { $this->resetPage(); }
-    public function updatedSlaBreached(): void { $this->resetPage(); }
-    public function updatedSortBy(): void { $this->resetPage(); }
-    public function updatedBreakdownSearch(): void { $this->resetPage('breakdownPage'); }
-    public function updatedBreakdownTab(): void { $this->resetPage('breakdownPage'); }
+    public function updatedProject(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCampaign(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterOrganizationId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedExecutive(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedTeam(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSource(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedLeadType(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedStageFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSlaBreached(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSortBy(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedBreakdownSearch(): void
+    {
+        $this->resetPage('breakdownPage');
+    }
+
+    public function updatedBreakdownTab(): void
+    {
+        $this->resetPage('breakdownPage');
+    }
 
     public function sortBreakdownBy(string $field): void
     {
@@ -274,10 +410,16 @@ class LeadKanban extends Component
         $this->resetPage('breakdownPage');
     }
 
+    public function updatedFollowupFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters(): void
     {
         $this->reset([
             'search',
+            'followupFilter',
             'statusFilter',
             'stageFilter',
             'project',
@@ -326,8 +468,21 @@ class LeadKanban extends Component
 
     public function updateLeadStage(int $leadId, string $toStage): void
     {
+        if (Lead::usesSalesPanel()) {
+            abort_unless($this->isSalesExecutive, 403);
+            $lead = Lead::panelQuery()->findOrFail($leadId);
+            $actions = ['contacted' => 'logCallAction', 'interested' => 'markInterestedAction', 'follow_up' => 'scheduleFollowupAction', 'meeting_scheduled' => 'scheduleMeetingAction', 'site_visit' => 'saveSiteVisitAction', 'negotiation' => 'saveNegotiationAction', 'booking' => 'saveBookingAction', 'payment_received' => 'recordPaymentAction', 'closed_won' => 'markClosedWonAction', 'lost' => 'markLostAction', 'invalid' => 'markInvalidAction', 'unreachable' => 'markInvalidAction'];
+            $action = $actions[Lead::normalizeStage($toStage)] ?? '';
+            $this->validateStageAction($lead, $action);
+            $this->dispatch('open-lead-detail', id: $leadId);
+            $this->dispatch('toast', type: 'info', message: 'Complete the stage action in Lead Details to save the change.');
+
+            return;
+        }
         $lead = Lead::find($leadId);
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         // Prevent client users from dragging (read-only)
         if (auth()->user()?->hasRole('client')) {
@@ -335,7 +490,9 @@ class LeadKanban extends Component
         }
 
         $fromStage = $lead->current_stage;
-        if ($fromStage === $toStage) return;
+        if ($fromStage === $toStage) {
+            return;
+        }
 
         // If moving to terminal/exception stage
         if (array_key_exists($toStage, $this->otherStages) || $toStage === 'closed_lost') {
@@ -343,14 +500,25 @@ class LeadKanban extends Component
             $this->pendingFromStage = $fromStage;
             $this->pendingToStage = $toStage;
             $this->showConfirmModal = true;
+
             return;
         }
 
         $this->executeStageTransition($lead, $fromStage, $toStage);
     }
 
+    protected function validateStageAction(Lead $lead, string $action): void
+    {
+        Validator::make(['action' => $action], ['action' => Rule::in($lead->permittedSalesActions())], ['action.in' => 'This transition is not permitted at the current stage.'])->validate();
+    }
+
     public function confirmTerminalTransition(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->updateLeadStage((int) $this->pendingLeadId, $this->pendingToStage);
+
+            return;
+        }
         if ($this->pendingLeadId && $this->pendingToStage) {
             $lead = Lead::find($this->pendingLeadId);
             if ($lead) {
@@ -483,7 +651,7 @@ class LeadKanban extends Component
             return false;
         }
 
-        return \App\Support\NavigationConfig::getRoleKey($user) === 'builder'
+        return NavigationConfig::getRoleKey($user) === 'builder'
             || $user->hasRole('builder')
             || $user->hasRole('Builder')
             || $user->hasRole('Builder/Developer')
@@ -497,7 +665,7 @@ class LeadKanban extends Component
             return false;
         }
 
-        return \App\Support\NavigationConfig::getRoleKey($user) === 'sales-executive'
+        return NavigationConfig::getRoleKey($user) === 'sales-executive'
             || $user->hasRole('sales-executive')
             || $user->hasRole('Sales Executive')
             || $user->hasRole('Executive')
@@ -540,10 +708,10 @@ class LeadKanban extends Component
     protected function getScopedQuery(?Carbon $start = null, ?Carbon $end = null)
     {
         $user = auth()->user();
-        $query = Lead::withoutGlobalScopes()
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::withoutGlobalScopes())
             ->with([
                 'client.organization',
-                'campaign.project',
+                'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()]) : $q->with('project'),
                 'leadSource',
                 'assignedTo.salesTeamMembers.salesTeam',
                 'metadata',
@@ -553,7 +721,7 @@ class LeadKanban extends Component
             ]);
 
         // Role Scoping
-        if ($user) {
+        if ($user && ! Lead::usesSalesPanel()) {
             if ($this->isSalesExecutive) {
                 $query->where('assigned_to', $user->id);
             } elseif ($user->hasRole('channel-partner') || $user->hasRole('Channel Partner')) {
@@ -604,7 +772,7 @@ class LeadKanban extends Component
         // Project Filter
         if (!empty($this->project)) {
             $query->whereHas('campaign', function ($q) {
-                $q->where('project_id', $this->project);
+                $q->withoutGlobalScopes()->where('project_id', $this->project);
             });
         }
 
@@ -652,7 +820,7 @@ class LeadKanban extends Component
 
         // Stage Filter
         if (!empty($this->stageFilter)) {
-            $query->where('current_stage', $this->stageFilter);
+            $query->whereIn('current_stage', Lead::usesSalesPanel() ? Lead::stageValues(Lead::normalizeStage($this->stageFilter)) : [$this->stageFilter]);
         }
 
         // Status Filter
@@ -697,6 +865,19 @@ class LeadKanban extends Component
                     $q->where('current_stage', $sf)->orWhere('status', $sf);
                 });
             }
+        }
+
+        if (Lead::usesSalesPanel() && in_array($this->followupFilter, ['today', 'overdue', 'upcoming'])) {
+            $query->whereHas('followups', function ($q) {
+                $q->where('status', 'pending');
+                if ($this->followupFilter === 'today') {
+                    $q->whereDate('due_at', today());
+                } elseif ($this->followupFilter === 'overdue') {
+                    $q->where('due_at', '<', now());
+                } else {
+                    $q->where('due_at', '>', now()->endOfDay());
+                }
+            });
         }
 
         return $query;
@@ -1103,6 +1284,7 @@ class LeadKanban extends Component
             if (is_numeric($valA) && is_numeric($valB)) {
                 return $this->breakdownSortDirection === 'asc' ? $valA <=> $valB : $valB <=> $valA;
             }
+
             return $this->breakdownSortDirection === 'asc'
                 ? strcasecmp((string)$valA, (string)$valB)
                 : strcasecmp((string)$valB, (string)$valA);
@@ -1114,7 +1296,7 @@ class LeadKanban extends Component
         $perPage = $this->breakdownPerPage ?: 10;
         $slicedRows = array_slice($breakdownRows, max(0, ($page - 1) * $perPage), $perPage);
 
-        $paginatedBreakdown = new \Illuminate\Pagination\LengthAwarePaginator(
+        $paginatedBreakdown = new LengthAwarePaginator(
             $slicedRows,
             $totalBreakdownCount,
             $perPage,
@@ -1215,10 +1397,10 @@ class LeadKanban extends Component
     public function render()
     {
         $baseQuery = $this->getScopedQuery();
-        $kpis = $this->leadKpis;
-        $funnel = $this->leadFunnel;
-        $analytics = $this->leadAnalytics;
-        $monitoring = $this->monitoringStats;
+        $kpis = Lead::usesSalesPanel() ? [] : $this->leadKpis;
+        $funnel = Lead::usesSalesPanel() ? [] : $this->leadFunnel;
+        $analytics = Lead::usesSalesPanel() ? [] : $this->leadAnalytics;
+        $monitoring = Lead::usesSalesPanel() ? [] : $this->monitoringStats;
         $availableTeams = $this->getAvailableTeams();
 
         $stageLeads = [];
@@ -1242,7 +1424,7 @@ class LeadKanban extends Component
             $allStages = array_merge($this->mainStages, $this->otherStages);
 
             foreach ($allStages as $stageKey => $stageLabel) {
-                $stageQuery = (clone $baseQuery)->where('current_stage', $stageKey);
+                $stageQuery = (clone $baseQuery)->whereIn('current_stage', Lead::usesSalesPanel() ? Lead::stageValues($stageKey) : [$stageKey]);
                 $stageCounts[$stageKey] = $stageQuery->count();
                 $limit = $this->stageLimits[$stageKey] ?? 20;
 
@@ -1308,6 +1490,16 @@ class LeadKanban extends Component
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        if (Lead::usesSalesPanel()) {
+            $portalAccounts = collect();
+            $activeFormMappings = collect();
+            $allOrganizations = collect();
+            $allCampaigns = Campaign::withoutGlobalScopes()->whereIn('id', Lead::panelQuery()->select('campaign_id'))->get();
+            $allProjects = Project::withoutGlobalScopes()->whereIn('id', $allCampaigns->pluck('project_id')->filter())->get();
+            $assignTeams = $this->isBuilder && $orgId ? SalesTeam::where('ownable_type', Organization::class)->where('ownable_id', $orgId)->get() : collect();
+            $eligibleAssignees = $this->isBuilder && $orgId ? User::where('organization_id', $orgId)->where('status', 'active')->get()->filter(fn ($member) => NavigationConfig::getRoleKey($member) === 'sales-executive')->filter(fn ($member) => ! $this->assignTeamId || SalesTeamMember::where('sales_team_id', $this->assignTeamId)->where('user_id', $member->id)->where('is_active', true)->exists()) : collect();
+        }
+
         return view('livewire.leads.lead-kanban', [
             'isBuilder' => $this->isBuilder,
             'isSalesExecutive' => $this->isSalesExecutive,
@@ -1346,14 +1538,21 @@ class LeadKanban extends Component
     public function openAssignModalForSingleLead(int $id): void
     {
         if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'This action is only available to your builder.');
+
+            return;
+        }
+        if ($this->isSalesExecutive) {
             $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot assign leads.');
+
             return;
         }
 
         $user = auth()->user();
-        $lead = Lead::find($id);
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->find($id);
         if (!$lead) {
             $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
             return;
         }
 
@@ -1366,6 +1565,7 @@ class LeadKanban extends Component
 
             if (!$hasOrgAccess) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+
                 return;
             }
         }
@@ -1384,11 +1584,17 @@ class LeadKanban extends Component
 
     public function openReturnLeadModal(int $leadId): void
     {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'This action is only available to your builder.');
+
+            return;
+        }
         $user = auth()->user();
-        $lead = Lead::find($leadId);
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->find($leadId);
 
         if (!$lead) {
             $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
             return;
         }
 
@@ -1402,12 +1608,14 @@ class LeadKanban extends Component
 
             if (!$hasOrgAccess && $orgId) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+
                 return;
             }
         }
 
         if ($lead->replacement_status === 'pending') {
             $this->dispatch('toast', type: 'warning', message: 'A replacement claim is already pending Super Admin review for this lead.');
+
             return;
         }
 
@@ -1430,6 +1638,21 @@ class LeadKanban extends Component
 
     public function submitReturnLead(): void
     {
+        if (Lead::usesSalesPanel()) {
+            abort_unless($this->isBuilder, 403);
+            $this->validate(['returnLeadId' => 'required|integer', 'returnReasonId' => 'required|exists:replacement_reasons,id', 'returnRemarks' => 'required|string|min:5|max:1000', 'returnSupportingInfo' => 'nullable|string|max:2000']);
+            $detail = app(LeadDetail::class);
+            $detail->leadId = $this->returnLeadId;
+            $detail->replacementReasonId = $this->returnReasonId;
+            $detail->replacementRemarks = $this->returnRemarks;
+            $detail->replacementSupportingInfo = $this->returnSupportingInfo;
+            $detail->requestReplacement();
+            $this->closeReturnLeadModal();
+            $this->dispatch('lead-updated');
+            $this->dispatch('toast', type: 'success', message: 'Replacement request submitted for review.');
+
+            return;
+        }
         $this->validate([
             'returnLeadId' => 'required|exists:leads,id',
             'returnReasonId' => 'required|exists:replacement_reasons,id',
@@ -1442,6 +1665,7 @@ class LeadKanban extends Component
 
         if (!$lead || !$reason) {
             $this->dispatch('toast', type: 'error', message: 'Invalid lead or replacement reason.');
+
             return;
         }
 
@@ -1455,6 +1679,7 @@ class LeadKanban extends Component
 
             if (!$hasOrgAccess && $orgId) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized action on this lead.');
+
                 return;
             }
         }
@@ -1510,8 +1735,14 @@ class LeadKanban extends Component
 
     public function autoDistributeUnassignedLeads(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
+
+            return;
+        }
         if ($this->isSalesExecutive) {
             $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot trigger lead distribution.');
+
             return;
         }
 
@@ -1535,10 +1766,11 @@ class LeadKanban extends Component
 
         if ($unassigned->isEmpty()) {
             $this->dispatch('toast', type: 'info', message: 'No unassigned leads found in your pipeline.');
+
             return;
         }
 
-        $service = app(\App\Services\LeadDistributionService::class);
+        $service = app(LeadDistributionService::class);
         $count = 0;
         foreach ($unassigned as $lead) {
             $res = $service->distribute($lead);
@@ -1578,8 +1810,44 @@ class LeadKanban extends Component
 
     public function executeAssignment(): void
     {
+        if ($this->isBuilder) {
+            $this->validate(['selectedLeadIds' => 'required|array|min:1', 'selectedLeadIds.*' => 'integer|distinct', 'assignUserId' => 'required|integer']);
+            $actor = auth()->user();
+            $assignee = User::whereNotNull('organization_id')->where('organization_id', $actor->organization_id)->where('status', 'active')->find($this->assignUserId);
+            abort_unless($assignee, 403);
+            abort_unless(NavigationConfig::getRoleKey($assignee) === 'sales-executive', 403);
+            if ($this->assignTeamId) {
+                abort_unless(SalesTeam::whereKey($this->assignTeamId)->where('ownable_type', Organization::class)->where('ownable_id', $actor->organization_id)->exists(), 403);
+                abort_unless(SalesTeamMember::where('sales_team_id', $this->assignTeamId)->where('user_id', $assignee->id)->where('is_active', true)->exists(), 403);
+            }
+            $assigned = [];
+            DB::transaction(function () use ($assignee, &$assigned) {
+                $leads = Lead::panelQuery()->whereIn('id', $this->selectedLeadIds)->orderBy('id')->lockForUpdate()->get();
+                abort_unless($leads->count() === count($this->selectedLeadIds), 403);
+                foreach ($leads as $lead) {
+                    Validator::make(['eligible' => ! $lead->isTerminalStage() && Lead::normalizeStage($lead->current_stage) !== 'pending_credit'], ['eligible' => 'accepted'], ['eligible.accepted' => 'This lead cannot be assigned at its current stage.'])->validate();
+                    if ((int) $lead->assigned_to === (int) $assignee->id) {
+                        continue;
+                    }
+                    $previous = $lead->assigned_to;
+                    app(LeadDistributionService::class)->assignLeadToUser($lead, $assignee, 'manual');
+                    AuditLog::create(['user_id' => auth()->id(), 'action' => 'lead.assigned', 'subject_type' => Lead::class, 'subject_id' => $lead->id, 'from_value' => json_encode(['assigned_to' => $previous]), 'to_value' => json_encode(['assigned_to' => $assignee->id, 'remarks' => 'Assigned within organization team.']), 'created_at' => now()]);
+                    $assigned[] = $lead;
+                }
+            });
+            foreach ($assigned as $lead) {
+                $assignee->notify(new LeadAssignedNotification($lead));
+            }
+            $this->selectedRows = [];
+            $this->closeAssignModal();
+            $this->dispatch('lead-updated');
+            $this->dispatch('toast', type: 'success', message: 'Assignment saved and executive notified.');
+
+            return;
+        }
         if ($this->isSalesExecutive) {
             $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot assign leads.');
+
             return;
         }
 
@@ -1595,6 +1863,7 @@ class LeadKanban extends Component
         if ($this->isBuilder && $user?->organization_id) {
             if ($targetUser->organization_id !== $user->organization_id) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Cannot assign leads to a user outside your organization.');
+
                 return;
             }
         }
@@ -1635,7 +1904,7 @@ class LeadKanban extends Component
                 'changed_at' => now(),
             ]);
 
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => $user->id,
                 'action' => 'lead.assigned',
                 'subject_type' => Lead::class,
@@ -1658,6 +1927,10 @@ class LeadKanban extends Component
 
     public function tableColumns(): array
     {
+        if ($this->isSalesExecutive) {
+            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : 'text', 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
+        }
+
         if ($this->isSalesExecutive) {
             return [
                 ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
@@ -1806,6 +2079,11 @@ class LeadKanban extends Component
 
     public function openPullLeadsModal(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
+
+            return;
+        }
         $this->showPullLeadsModal = true;
         $this->pullSummary = null;
         $firstAccount = PortalAccount::where('type', 'meta')->first();
@@ -1822,6 +2100,11 @@ class LeadKanban extends Component
 
     public function pullMetaLeads(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
+
+            return;
+        }
         $this->isPulling = true;
         $this->pullSummary = null;
 
@@ -1841,6 +2124,7 @@ class LeadKanban extends Component
             if (!$account) {
                 $this->dispatch('toast', type: 'error', message: 'No Meta Account found. Please configure credentials in Settings > Integrations.');
                 $this->isPulling = false;
+
                 return;
             }
 
@@ -1848,7 +2132,7 @@ class LeadKanban extends Component
                 ? trim($this->customFormId)
                 : ($this->selectedFormOption ?: (trim($this->customFormId) ?: null));
 
-            $syncService = app(\App\Services\MetaLeadSyncService::class);
+            $syncService = app(MetaLeadSyncService::class);
             $result = $syncService->sync(
                 $account,
                 $targetFormId ?: null,
@@ -1878,6 +2162,11 @@ class LeadKanban extends Component
 
     public function createManualLead(): void
     {
+        if (Lead::usesSalesPanel()) {
+            $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
+
+            return;
+        }
         $this->validate([
             'manualName' => 'required|string|max:255',
             'manualMobile' => 'required|string|min:10',
@@ -1889,7 +2178,7 @@ class LeadKanban extends Component
             'manualProjectId.required' => 'Please select an associated project.',
         ]);
 
-        $client = \App\Models\Client::first();
+        $client = Client::first();
         $clientId = $client?->id ?: 1;
         $leadSourceId = $this->manualLeadSourceId ?: (LeadSource::firstOrCreate(['name' => 'direct'])->id);
 
@@ -1909,6 +2198,7 @@ class LeadKanban extends Component
 
         if ($existingLead) {
             $this->dispatch('toast', type: 'warning', title: 'Duplicate Detected', message: "Lead with mobile '{$mobile}' already exists (#{$existingLead->lead_code}).");
+
             return;
         }
 
@@ -1944,7 +2234,7 @@ class LeadKanban extends Component
             'assigned_to' => null,
         ]);
 
-        event(new \App\Events\LeadCreated($lead));
+        event(new LeadCreated($lead));
 
         $this->reset([
             'manualName',
@@ -1966,7 +2256,7 @@ class LeadKanban extends Component
 
         $user = auth()->user();
         $orgName = $user && $user->organization ? Str::slug($user->organization->name) : 'all';
-        $filename = "leads-directory_{$orgName}_" . now()->format('Y-m-d') . ".xlsx";
+        $filename = "leads-directory_{$orgName}_".now()->format('Y-m-d').'.xlsx';
 
         $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'City', 'Property Type', 'Budget', 'Project', 'Campaign', 'Source', 'Assigned Agent', 'Stage', 'Score', 'Created At'];
         $columns = [
@@ -1986,12 +2276,12 @@ class LeadKanban extends Component
             fn($l) => $l->created_at ? $l->created_at->format('M d, Y H:i') : '',
         ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->search ? " | Search: {$this->search}" : '') . ($this->project ? " | ProjectID: {$this->project}" : '');
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').($this->search ? " | Search: {$this->search}" : '').($this->project ? " | ProjectID: {$this->project}" : '');
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\BaseStyledExport(
+        return Excel::download(
+            new BaseStyledExport(
                 data: $data,
                 title: 'Leads Directory & Pipeline Export',
                 subtitle: $subtitle,

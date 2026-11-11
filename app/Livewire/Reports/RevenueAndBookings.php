@@ -11,6 +11,10 @@ use App\Exports\ReportExport;
 use App\Models\Client;
 use App\Models\CreditTransaction;
 use App\Models\Lead;
+use App\Exports\BaseStyledExport;
+use App\Models\Booking;
+use App\Models\PaymentReceived;
+use App\Support\NavigationConfig;
 
 class RevenueAndBookings extends Component
 {
@@ -19,9 +23,9 @@ class RevenueAndBookings extends Component
         return [
             ['key' => 'client_name', 'label' => 'Client Organization', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'credits_spent', 'label' => 'Credits Consumed', 'class' => 'font-mono', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 2],
-            ['key' => 'credits_spent_amount', 'label' => 'Cost Equivalent', 'prefix' => '₹', 'formatter' => fn($v) => number_format((float)$v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credits_spent_amount', 'label' => Lead::usesSalesPanel() ? 'Credits Consumed' : 'Cost Equivalent', 'prefix' => Lead::usesSalesPanel() ? '' : '₹', 'formatter' => fn ($v) => number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'bookings_closed', 'label' => 'Bookings Closed', 'class' => 'font-mono font-bold text-success', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'revenue', 'label' => 'Closed Sales Volume', 'formatter' => fn($v) => '₹' . number_format(((float)$v) / 100000, 1) . ' Lakhs', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
+            ['key' => 'revenue', 'label' => Lead::usesSalesPanel() ? 'Payments Received' : 'Closed Sales Volume', 'formatter' => fn ($v) => '₹'.number_format(((float) $v) / 100000, 1).' Lakhs', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'roi_ratio', 'label' => 'ROI Ratio', 'suffix' => 'x', 'formatter' => fn($v) => number_format((float)$v, 1), 'class' => 'font-mono font-bold text-purple-700', 'sortable' => false, 'priority' => 1],
         ];
     }
@@ -29,16 +33,16 @@ class RevenueAndBookings extends Component
     public function exportExcel()
     {
         $rows = collect($this->getClientRoiData());
-        $headings = ['Client Name', 'Credits Spent (Amount)', 'Bookings Closed', 'Total Revenue Generated', 'ROI Multiplier'];
+        $headings = Lead::usesSalesPanel() ? ['Client Name', 'Credits Consumed', 'Bookings', 'Payments Received', 'Payments per Credit'] : ['Client Name', 'Credits Spent (Amount)', 'Bookings Closed', 'Total Revenue Generated', 'ROI Multiplier'];
         $columns = ['client_name', 'credits_spent_amount', 'bookings_closed', 'revenue', fn($r) => $r['roi_ratio'] . 'x'];
 
-        $filename = "revenue-and-bookings-roi-report_" . now()->format('Y-m-d') . ".xlsx";
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . " | Client ROI & Revenue Summary";
+        $filename = 'revenue-and-bookings-roi-report_'.now()->format('Y-m-d').'.xlsx';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T').' | Client ROI & Revenue Summary';
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
-            new \App\Exports\BaseStyledExport(
+            new BaseStyledExport(
                 data: $rows,
                 title: 'Revenue & Bookings ROI Report',
                 subtitle: $subtitle,
@@ -59,7 +63,14 @@ class RevenueAndBookings extends Component
             $user = auth()->user();
             $clientsQuery = Client::query();
 
-            if ($user && $user->hasRole('Client')) {
+            if (Lead::usesSalesPanel()) {
+                if (NavigationConfig::getRoleKey($user) === 'sales-executive') {
+                    $clientsQuery->whereIn('id', Lead::panelQuery()->select('client_id'));
+                } else {
+                    $clientsQuery->where('organization_id', $user->organization_id)->whereNotNull('organization_id');
+                }
+            }
+            if (! Lead::usesSalesPanel() && $user && $user->hasRole('Client')) {
                 $clientsQuery->where('organization_id', $user->organization_id);
             }
 
@@ -67,16 +78,22 @@ class RevenueAndBookings extends Component
             $data = [];
 
             foreach ($clients as $client) {
-                $creditsUsed = CreditTransaction::where('client_id', $client->id)
-                    ->where('transaction_type', 'reserve')
+                $creditsUsed = (Lead::usesSalesPanel() ? CreditTransaction::withoutGlobalScopes() : CreditTransaction::query())->where('client_id', $client->id)
+                    ->when(Lead::usesSalesPanel(), fn ($q) => $q->whereIn('lead_id', Lead::panelQuery()->select('id')))
+                    ->whereIn('transaction_type', Lead::usesSalesPanel() ? ['reserve', 'deduct', 'lead_consumption'] : ['reserve'])
                     ->sum('credit_used');
 
-                $bookingsCount = Lead::where('client_id', $client->id)
+                $bookingsCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('client_id', $client->id)
                     ->whereIn('current_stage', ['booking', 'payment', 'closed_won'])
                     ->count();
 
                 $revenue = $bookingsCount * 7500000.00; // Estimated project booking value
-                $spentAmount = $creditsUsed * 10.00; // ₹10 per credit cost value
+                if (Lead::usesSalesPanel()) {
+                    $bookings = Booking::whereIn('lead_id', Lead::panelQuery()->where('client_id', $client->id)->select('id'))->get();
+                    $bookingsCount = $bookings->count();
+                    $revenue = PaymentReceived::whereIn('booking_id', $bookings->pluck('id'))->where('status', 'completed')->sum('amount');
+                }
+                $spentAmount = Lead::usesSalesPanel() ? $creditsUsed : $creditsUsed * 10.00; // ₹10 per credit cost value
                 $roiRatio = $spentAmount > 0 ? round($revenue / $spentAmount, 1) : 0.0;
 
                 $data[] = [
@@ -89,7 +106,7 @@ class RevenueAndBookings extends Component
                 ];
             }
 
-            if (empty($data)) {
+            if (empty($data) && ! Lead::usesSalesPanel()) {
                 $data[] = ['client_name' => 'Godrej Properties Client', 'credits_spent' => 450, 'credits_spent_amount' => 4500.00, 'bookings_closed' => 8, 'revenue' => 60000000.00, 'roi_ratio' => 13333.3];
                 $data[] = ['client_name' => 'Lodha Developers Client', 'credits_spent' => 320, 'credits_spent_amount' => 3200.00, 'bookings_closed' => 5, 'revenue' => 37500000.00, 'roi_ratio' => 11718.8];
             }
@@ -100,6 +117,21 @@ class RevenueAndBookings extends Component
 
     protected function getMonthlyRevenueChart(): array
     {
+        if (Lead::usesSalesPanel()) {
+            $labels = [];
+            $counts = [];
+            $revenues = [];
+            foreach (range(5, 0) as $offset) {
+                $month = now()->subMonthsNoOverflow($offset);
+                $labels[] = $month->format('M Y');
+                $bookings = Booking::whereIn('lead_id', Lead::panelQuery()->select('id'));
+                $counts[] = (clone $bookings)->whereYear('booked_at', $month->year)->whereMonth('booked_at', $month->month)->count();
+                $revenues[] = (float) PaymentReceived::whereIn('booking_id', $bookings->select('id'))->where('status', 'completed')->whereYear('paid_at', $month->year)->whereMonth('paid_at', $month->month)->sum('amount') / 10000000;
+            }
+
+            return ['labels' => $labels, 'bookings' => $counts, 'revenues' => $revenues];
+        }
+
         return [
             'labels' => ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
             'bookings' => [4, 7, 9, 12, 15, 18],

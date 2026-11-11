@@ -10,6 +10,10 @@ class LeadApiController extends Controller
 {
     public function show(Lead $lead): LeadResource
     {
+        if (Lead::usesSalesPanel()) {
+            abort_unless(Lead::panelQuery()->whereKey($lead->id)->exists(), 403);
+        }
+
         return new LeadResource($lead);
     }
 }

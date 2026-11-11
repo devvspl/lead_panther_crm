@@ -6,18 +6,25 @@ use Livewire\Component;
 use App\Models\Lead;
 use App\Services\LeadJourneyService;
 use Livewire\Attributes\On;
+use App\Support\NavigationConfig;
 
 class LeadTimeline extends Component
 {
     public bool $isOpen = false;
+
     public ?int $leadId = null;
+
     public string $filterType = 'all'; // 'all' | 'status' | 'assignment' | 'credit' | 'sla' | 'replacement' | 'communication'
+
     public string $sortOrder = 'desc'; // 'desc' | 'asc'
 
     #[On('open-lead-journey')]
     #[On('show-lead-journey')]
     public function openJourney(int $id): void
     {
+        if (Lead::usesSalesPanel()) {
+            abort_unless(Lead::panelQuery()->whereKey($id)->exists(), 403);
+        }
         $this->leadId = $id;
         $this->isOpen = true;
         $this->filterType = 'all';
@@ -43,9 +50,12 @@ class LeadTimeline extends Component
     {
         $journey = null;
         if ($this->leadId) {
-            $lead = Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo'])->find($this->leadId);
+            $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'project', 'campaign', 'leadSource', 'assignedTo'])->find($this->leadId);
             if ($lead) {
                 $journey = $journeyService->getJourney($lead);
+                if (NavigationConfig::getRoleKey(auth()->user()) === 'sales-executive') {
+                    $journey['events'] = array_values(array_filter($journey['events'], fn ($event) => ! in_array($event['type'], ['credit', 'replacement'])));
+                }
 
                 // Apply milestone filtering
                 if ($this->filterType !== 'all') {

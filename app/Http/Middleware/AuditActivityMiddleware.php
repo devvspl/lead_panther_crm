@@ -7,6 +7,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
+use App\Support\NavigationConfig;
 
 class AuditActivityMiddleware
 {
@@ -44,6 +45,15 @@ class AuditActivityMiddleware
 
     public function handle(Request $request, Closure $next): Response
     {
+        $role = NavigationConfig::getRoleKey(auth()->user());
+        if (in_array($role, ['builder', 'sales-executive'])) {
+            foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*', 'credits*'] as $path) {
+                abort_if($request->is($path), 403);
+            }
+            if ($role === 'sales-executive') {
+                abort_if($request->is('client/replacements*', 'client/leads*'), 403);
+            }
+        }
         /** @var Response $response */
         $response = $next($request);
 

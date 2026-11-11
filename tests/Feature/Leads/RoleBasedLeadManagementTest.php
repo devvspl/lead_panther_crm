@@ -24,16 +24,27 @@ use App\Livewire\Leads\LeadDetail;
 use App\Livewire\Activity\FollowupList;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
+use App\Livewire\Reports\SalesExecutivePerformance;
+use App\Livewire\Reports\SourcePerformance;
+use App\Models\LeadAssignment;
+use App\Models\ProjectUnit;
+use App\Notifications\LeadAssignedNotification;
+use Illuminate\Support\Facades\Notification;
 
 class RoleBasedLeadManagementTest extends TestCase
 {
     use RefreshDatabase;
 
     protected Organization $org;
+
     protected User $builderUser;
+
     protected User $exec1;
+
     protected User $exec2;
+
     protected Project $project;
+
     protected LeadSource $leadSource;
 
     protected function setUp(): void
@@ -285,6 +296,7 @@ class RoleBasedLeadManagementTest extends TestCase
             'current_stage' => 'new',
             'status' => 'new',
             'budget' => 5000000,
+            'project_id' => $this->project->id,
         ]);
 
         $this->actingAs($this->exec1);
@@ -356,6 +368,7 @@ class RoleBasedLeadManagementTest extends TestCase
         $lead->refresh();
         $this->assertEquals('negotiation', $lead->current_stage);
 
+        ProjectUnit::create(['project_id' => $this->project->id, 'unit_number' => 'Tower A - 501', 'status' => 'available']);
         // 9. Booking
         $test->set('bookingAmount', '100000')
             ->set('bookingUnit', 'Tower A - 501')
@@ -368,6 +381,7 @@ class RoleBasedLeadManagementTest extends TestCase
         // 10. Payment Received & Closed Won
         $test->set('paymentAmount', '100000')
             ->set('paymentMethod', 'Bank Transfer')
+            ->set('paymentTransactionId', 'TXN-FLOW-001')
             ->call('recordPaymentAction')
             ->assertDispatched('toast', type: 'success');
 
@@ -437,5 +451,142 @@ class RoleBasedLeadManagementTest extends TestCase
         $this->assertNotNull($replacement);
         $this->assertEquals('pending', $replacement->status);
         $this->assertEquals($reason->id, $replacement->reason_id);
+    }
+
+    protected function panelLead(string $stage = 'new', ?User $assignee = null): Lead
+    {
+        return Lead::create(['lead_code' => 'LP-PANEL-'.uniqid(), 'name' => 'Panel Customer', 'mobile' => '9876543210', 'client_id' => $this->builderUser->id, 'assigned_to' => ($assignee ?? $this->exec1)->id, 'lead_source_id' => $this->leadSource->id, 'current_stage' => $stage, 'status' => $stage]);
+}
+
+    public function test_builder_cannot_execute_sales_actions(): void
+    {
+        $lead = $this->panelLead();
+        $this->actingAs($this->builderUser);
+        Livewire::test(LeadDetail::class)->set('leadId', $lead->id)->call('markInterestedAction')->assertForbidden();
+        $this->assertSame('new', $lead->fresh()->current_stage);
+    }
+
+    public function test_closed_lead_rejects_earlier_stage_actions(): void
+    {
+        $lead = $this->panelLead('closed_won');
+        $this->actingAs($this->exec1);
+        Livewire::test(LeadDetail::class)->call('openLead', $lead->id)->call('markInterestedAction')->assertHasErrors('action');
+        $this->assertSame('closed_won', $lead->fresh()->current_stage);
+    }
+
+    public function test_detail_render_does_not_expose_another_executives_lead(): void
+    {
+        $lead = $this->panelLead('new', $this->exec2);
+        $this->actingAs($this->exec1);
+        Livewire::test(LeadDetail::class)->set('leadId', $lead->id)->set('isOpen', true)->assertDontSee('Panel Customer');
+    }
+
+    public function test_kanban_cannot_skip_required_stage_actions(): void
+    {
+        $lead = $this->panelLead();
+        $this->actingAs($this->exec1);
+        Livewire::test(LeadKanban::class)->call('updateLeadStage', $lead->id, 'closed_won')->assertHasErrors('action');
+        $this->assertSame('new', $lead->fresh()->current_stage);
+    }
+
+    public function test_builder_cannot_assign_to_another_organization(): void
+    {
+        $lead = $this->panelLead();
+        $org = Organization::create(['name' => 'Other org']);
+        $other = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $other->assignRole('sales-executive');
+        $this->actingAs($this->builderUser);
+        Livewire::test(LeadKanban::class)->set('selectedLeadIds', [$lead->id])->set('assignUserId', $other->id)->call('executeAssignment')->assertForbidden();
+        $this->assertSame($this->exec1->id, $lead->fresh()->assigned_to);
+    }
+
+    public function test_reassignment_closes_previous_assignment_and_notifies_once(): void
+    {
+        Notification::fake();
+        $lead = $this->panelLead('assigned');
+        $old = LeadAssignment::create(['lead_id' => $lead->id, 'assigned_to' => $this->exec1->id, 'assigned_by' => $this->builderUser->id, 'assigned_at' => now()]);
+        $this->actingAs($this->builderUser);
+        Livewire::test(LeadKanban::class)->set('selectedLeadIds', [$lead->id])->set('assignUserId', $this->exec2->id)->call('executeAssignment')->assertHasNoErrors();
+        $this->assertNotNull($old->fresh()->unassigned_at);
+        $this->assertSame($this->exec2->id, $lead->fresh()->assigned_to);
+        $this->assertSame(1, LeadAssignment::where('lead_id', $lead->id)->whereNull('unassigned_at')->count());
+        Notification::assertSentToTimes($this->exec2, LeadAssignedNotification::class, 1);
+    }
+
+    public function test_executive_cannot_change_another_users_followup(): void
+    {
+        $lead = $this->panelLead('follow_up', $this->exec2);
+        $followup = Followup::create(['lead_id' => $lead->id, 'created_by' => $this->exec2->id, 'due_at' => now(), 'status' => 'pending']);
+        $this->actingAs($this->exec1);
+        Livewire::test(FollowupList::class)->set('completingFollowupId', $followup->id)->call('completeWithNextStep')->assertForbidden();
+        $this->assertSame('pending', $followup->fresh()->status);
+    }
+
+    public function test_replacement_requires_remarks_and_stays_pending(): void
+    {
+        $lead = $this->panelLead('invalid');
+        $reason = ReplacementReason::create(['label' => 'Invalid contact', 'is_eligible' => true, 'requires_sla_check' => false]);
+        $this->actingAs($this->builderUser);
+        $component = Livewire::test(LeadDetail::class)->call('openLead', $lead->id)->set('replacementReasonId', $reason->id);
+        $component->call('requestReplacement')->assertHasErrors('replacementRemarks');
+        $component->set('replacementRemarks', 'Wrong number confirmed by customer')->call('requestReplacement')->assertHasNoErrors();
+        $this->assertSame('pending', $lead->replacements()->first()->status);
+        $component->call('requestReplacement')->assertHasErrors('eligible');
+        $this->assertSame(1, $lead->replacements()->count());
+    }
+
+    public function test_executive_management_routes_are_forbidden(): void
+    {
+        $this->actingAs($this->exec1);
+        foreach (['/settings/organization', '/settings/users', '/distribution/availability', '/credits', '/leads/upload'] as $path) {
+            $this->get($path)->assertForbidden();
+        }
+    }
+
+    public function test_reports_do_not_substitute_sample_rows_for_an_empty_panel(): void
+    {
+        $this->actingAs($this->exec1);
+        Livewire::test(SourcePerformance::class)->assertDontSee('Meta Ads');
+        Livewire::test(SalesExecutivePerformance::class)->assertDontSee('Rahul Sharma');
+    }
+
+    public function test_existing_return_modal_submits_to_the_existing_pending_review_flow(): void
+    {
+        $lead = $this->panelLead('invalid');
+        $reason = ReplacementReason::create(['label' => 'Invalid contact', 'is_eligible' => true, 'requires_sla_check' => false]);
+        $this->actingAs($this->builderUser);
+        Livewire::test(LeadKanban::class)->set('returnLeadId', $lead->id)->set('returnReasonId', $reason->id)->set('returnRemarks', 'Verified incorrect contact number')->call('submitReturnLead')->assertHasNoErrors();
+        $this->assertSame('pending', $lead->replacements()->first()->status);
+        $this->assertSame('pending', $lead->fresh()->replacement_status);
+    }
+
+    public function test_builder_detail_has_no_sales_mutation_buttons(): void
+    {
+        $lead = $this->panelLead();
+        $this->actingAs($this->builderUser);
+        Livewire::test(LeadDetail::class)->call('openLead', $lead->id)->assertSee('Reassign Lead')->assertDontSee('wire:click="logCallAction"', false)->assertDontSee('wire:click="markInterestedAction"', false);
+    }
+
+    public function test_executive_can_upload_payment_proof_only_at_payment_stage(): void
+    {
+        $lead = $this->panelLead('new');
+        $this->actingAs($this->exec1);
+        Livewire::test(LeadDetail::class)->set('leadId', $lead->id)->call('uploadPaymentProofAction')->assertHasErrors('action');
+        $this->assertDatabaseMissing('lead_metadata',['lead_id' => $lead->id, 'key' => 'payment_proof']);
+    }
+
+    public function test_payment_proof_is_stored_privately_and_logged(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('documents');
+        $lead=$this->panelLead('payment_received');
+        $unit=\App\Models\ProjectUnit::create(['project_id'=>$this->project->id,'unit_number'=>'PROOF-101','status'=>'reserved']);
+        $booking=Booking::create(['lead_id'=>$lead->id,'project_unit_id'=>$unit->id,'booking_amount'=>100,'booked_at'=>now(),'status'=>'confirmed']);
+        PaymentReceived::create(['booking_id'=>$booking->id,'amount'=>100,'method'=>'UPI','transaction_id'=>'PROOF-TEST','paid_at'=>now(),'status'=>'completed']);
+        $this->actingAs($this->exec1);
+        Livewire::test(LeadDetail::class)->set('leadId',$lead->id)->set('paymentProof',\Illuminate\Http\UploadedFile::fake()->create('receipt.pdf',20,'application/pdf'))->call('uploadPaymentProofAction')->assertHasNoErrors();
+        $proof=$lead->metadata()->where('key','payment_proof')->firstOrFail();
+        \Illuminate\Support\Facades\Storage::disk('documents')->assertExists($proof->value);
+        $this->assertDatabaseHas('audit_logs',['subject_id'=>$lead->id,'action'=>'lead.payment_proof_uploaded']);
+        $this->assertSame('payment_received',$lead->fresh()->current_stage);
     }
 }

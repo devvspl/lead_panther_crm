@@ -19,77 +19,115 @@ use App\Models\LeadAssignment;
 use App\Models\AuditLog;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
+use App\Models\Project;
+use App\Models\ProjectUnit;
+use App\Services\LeadJourneyService;
+use App\Support\NavigationConfig;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Livewire\WithFileUploads;
 
 class LeadDetail extends Component
 {
+    use WithFileUploads;
+
+    public $paymentProof = null;
+
+    public string $replacementSupportingInfo = '';
+
     public bool $isOpen = false;
+
     public ?int $leadId = null;
+
     public string $activeTab = 'stage_details'; // stage_details, timeline, communications
 
     // Stage-specific form inputs
     public string $actionRemarks = '';
+
     public string $targetNextStage = '';
 
     // Contact / Call Form
     public string $callOutcome = 'Connected';
+
     public int $callDuration = 5;
+
     public string $callNotes = '';
 
     // Follow-up Form
     public string $followupDueAt = '';
+
     public string $followupNote = '';
+
     public ?int $completingFollowupId = null;
+
     public string $followupCompleteOutcome = 'Completed';
 
     // Meeting Form
     public string $meetingScheduledAt = '';
+
     public string $meetingLocation = 'Site Office';
+
     public string $meetingStatus = 'Scheduled';
+
     public string $meetingNotes = '';
 
     // Site Visit Form
     public string $visitDate = '';
+
     public string $visitAttendance = 'attended';
+
     public string $visitOutcome = 'Liked layout';
+
     public string $visitRemarks = '';
 
     // Negotiation Form
     public string $quotedAmount = '';
+
     public string $negotiationNotes = '';
 
     // Booking Form
     public string $bookingUnit = '';
+
     public string $bookingAmount = '';
+
     public string $bookingDate = '';
 
     // Payment Form
     public string $paymentAmount = '';
+
     public string $paymentMethod = 'Bank Transfer';
+
     public string $paymentTransactionId = '';
+
     public string $paymentNotes = '';
 
     // Lost / Invalid Form
     public string $lostReason = 'Budget mismatch';
+
     public string $lostRemarks = '';
 
     // Replacement Form
     public ?int $replacementReasonId = null;
+
     public string $replacementRemarks = '';
 
     #[On('open-lead-detail')]
     public function openLead(int $id): void
     {
         $user = auth()->user();
-        $lead = Lead::with(['client', 'project', 'campaign', 'leadSource', 'assignedTo', 'siteVisits', 'followups', 'meetings', 'bookings.payments'])->find($id);
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'project' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'leadSource', 'assignedTo', 'siteVisits', 'followups', 'meetings', 'bookings.payments'])->find($id);
 
         if (!$lead) {
             $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
             return;
         }
 
         // Backend authorization validation
         if (!$this->hasLeadAccess($lead, $user)) {
             $this->dispatch('toast', type: 'error', message: 'Unauthorized: You do not have permission to access this lead.');
+
             return;
         }
 
@@ -124,6 +162,7 @@ class LeadDetail extends Component
 
         $latestBooking = $lead->bookings()->latest()->first();
         if ($latestBooking) {
+            $this->bookingUnit = $latestBooking->unit?->unit_number ?? '';
             $this->bookingAmount = (string) $latestBooking->booking_amount;
             $this->paymentAmount = (string) $latestBooking->booking_amount;
         }
@@ -144,9 +183,14 @@ class LeadDetail extends Component
      */
     protected function hasLeadAccess(Lead $lead, $user): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
+        if (Lead::usesSalesPanel()) {
+            return Lead::panelQuery()->whereKey($lead->id)->exists();
+        }
 
-        $roleKey = \App\Support\NavigationConfig::getRoleKey($user);
+        $roleKey = NavigationConfig::getRoleKey($user);
 
         if ($roleKey === 'super-admin' || $user->hasRole('Super Admin') || $user->hasRole('super-admin')) {
             return true;
@@ -173,12 +217,19 @@ class LeadDetail extends Component
 
     protected function getActiveLead(): ?Lead
     {
-        if (!$this->leadId) return null;
-        $lead = Lead::find($this->leadId);
-        if (!$lead || !$this->hasLeadAccess($lead, auth()->user())) {
-            $this->dispatch('toast', type: 'error', message: 'Unauthorized action on lead.');
+        if (! $this->leadId) {
             return null;
         }
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->find($this->leadId);
+        if (!$lead || !$this->hasLeadAccess($lead, auth()->user())) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized action on lead.');
+
+            return null;
+        }
+        if (Lead::usesSalesPanel()) {
+            $lead->load(['campaign' => fn ($q) => $q->withoutGlobalScopes(), 'project' => fn ($q) => $q->withoutGlobalScopes()]);
+        }
+
         return $lead;
     }
 
@@ -195,7 +246,7 @@ class LeadDetail extends Component
             'status' => in_array($newStage, ['closed_won']) ? 'closed_won' : (in_array($newStage, ['lost', 'invalid', 'unreachable']) ? 'closed' : 'in_progress'),
         ];
 
-        if (!$lead->first_response_at) {
+        if (! $lead->first_response_at && ! Lead::usesSalesPanel()) {
             $updateData['first_response_at'] = now();
         }
 
@@ -230,10 +281,12 @@ class LeadDetail extends Component
     // -------------------------------------------------------------------------
 
     // Stage 1: New / Contacted
-    public function logCallAction(): void
+    protected function performLogCallAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'callOutcome' => 'required|string|max:100',
@@ -254,7 +307,7 @@ class LeadDetail extends Component
             $lead->update(['first_response_at' => now()]);
         }
 
-        if (in_array($lead->current_stage, ['new', 'assigned'])) {
+        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'assigned'])) {
             $this->recordStageTransition($lead, 'contacted', "Call logged: {$this->callOutcome}");
         } else {
             AuditLog::create([
@@ -270,14 +323,19 @@ class LeadDetail extends Component
             ]);
         }
 
+        if (Lead::usesSalesPanel()) {
+            $this->logLeadAction($lead, 'contact_recorded', [], ['outcome' => $this->callOutcome, 'duration_minutes' => $this->callDuration], $this->callNotes);
+        }
         $this->dispatch('toast', type: 'success', message: 'Call log recorded successfully.');
         $this->dispatch('lead-updated');
     }
 
-    public function addRemarksAction(): void
+    protected function performAddRemarksAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'actionRemarks' => 'required|string|min:3|max:1000',
@@ -303,10 +361,12 @@ class LeadDetail extends Component
     }
 
     // Stage 2: Interested -> Schedule Follow-up or Advance
-    public function markInterestedAction(): void
+    protected function performMarkInterestedAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->recordStageTransition($lead, 'interested', $this->actionRemarks ?: 'Customer confirmed interest in project.');
         $this->actionRemarks = '';
@@ -314,13 +374,15 @@ class LeadDetail extends Component
         $this->dispatch('lead-updated');
     }
 
-    public function scheduleFollowupAction(): void
+    protected function performScheduleFollowupAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
-            'followupDueAt' => 'required|date',
+            'followupDueAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
             'followupNote' => 'nullable|string|max:500',
         ]);
 
@@ -334,7 +396,7 @@ class LeadDetail extends Component
             'status' => 'pending',
         ]);
 
-        if (in_array($lead->current_stage, ['new', 'contacted', 'interested'])) {
+        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'contacted', 'interested'])) {
             $this->recordStageTransition($lead, 'follow_up', "Follow-up scheduled for {$this->followupDueAt}");
         }
 
@@ -344,13 +406,18 @@ class LeadDetail extends Component
     }
 
     // Stage 3: Follow-Up & Reminder
-    public function completeFollowupAction(int $followupId): void
+    protected function performCompleteFollowupAction(int $followupId): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $fu = Followup::where('lead_id', $lead->id)->find($followupId);
         if ($fu) {
+            if (Lead::usesSalesPanel()) {
+                $this->validatePendingFollowup($fu);
+            }
             $fu->update(['status' => 'completed']);
             AuditLog::create([
                 'user_id' => auth()->id() ?? 1,
@@ -368,17 +435,22 @@ class LeadDetail extends Component
         }
     }
 
-    public function rescheduleFollowupAction(int $followupId): void
+    protected function performRescheduleFollowupAction(int $followupId): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
-            'followupDueAt' => 'required|date',
+            'followupDueAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
         ]);
 
         $fu = Followup::where('lead_id', $lead->id)->find($followupId);
         if ($fu) {
+            if (Lead::usesSalesPanel()) {
+                $this->validatePendingFollowup($fu);
+            }
             $oldDue = $fu->due_at;
             $fu->update([
                 'due_at' => Carbon::parse($this->followupDueAt),
@@ -404,18 +476,28 @@ class LeadDetail extends Component
     }
 
     // Stage 4: Meeting Scheduled
-    public function scheduleMeetingAction(): void
+    protected function performScheduleMeetingAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
-            'meetingScheduledAt' => 'required|date',
+            'meetingScheduledAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
             'meetingLocation' => 'required|string|max:200',
         ]);
 
         $user = auth()->user();
 
+        if (Lead::usesSalesPanel() && Lead::normalizeStage($lead->current_stage) === 'meeting_scheduled') {
+            $meeting = $lead->meetings()->latest()->firstOrFail();
+            $before = $meeting->getAttributes();
+            $meeting->update(['scheduled_at' => $this->meetingScheduledAt, 'location' => $this->meetingLocation, 'notes' => $this->meetingNotes]);
+            $this->logLeadAction($lead, 'meeting_rescheduled', $before, $meeting->getAttributes(), $this->meetingNotes);
+
+            return;
+        }
         Meeting::create([
             'lead_id' => $lead->id,
             'scheduled_at' => Carbon::parse($this->meetingScheduledAt),
@@ -430,11 +512,16 @@ class LeadDetail extends Component
         $this->dispatch('lead-updated');
     }
 
-    public function updateMeetingStatusAction(string $status): void
+    protected function performUpdateMeetingStatusAction(string $status): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
+        if (Lead::usesSalesPanel()) {
+            Validator::make(['status' => $status], ['status' => 'in:Scheduled,Completed,Cancelled,No Show'])->validate();
+        }
         $latestMeeting = $lead->meetings()->latest()->first();
         if ($latestMeeting) {
             $latestMeeting->update([
@@ -460,19 +547,29 @@ class LeadDetail extends Component
     }
 
     // Stage 5: Site Visit Completed
-    public function saveSiteVisitAction(): void
+    protected function performSaveSiteVisitAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'visitDate' => 'required|date',
-            'visitAttendance' => 'required|string',
+            'visitAttendance' => Lead::usesSalesPanel() ? 'required|in:attended,no_show' : 'required|string',
             'visitOutcome' => 'required|string|max:200',
         ]);
 
         $user = auth()->user();
 
+        if (Lead::usesSalesPanel() && Lead::normalizeStage($lead->current_stage) === 'site_visit' && ($visit = $lead->siteVisits()->latest()->first())) {
+            $this->validate(['visitRemarks' => 'required|string|min:3|max:1000']);
+            $before = $visit->getAttributes();
+            $visit->update(['remarks' => $this->visitRemarks, 'outcome' => $this->visitOutcome]);
+            $this->logLeadAction($lead, 'visit_updated', $before, $visit->getAttributes(), $this->visitRemarks);
+
+            return;
+        }
         SiteVisit::create([
             'lead_id' => $lead->id,
             'visit_date' => Carbon::parse($this->visitDate),
@@ -488,10 +585,12 @@ class LeadDetail extends Component
     }
 
     // Stage 6: Negotiation & Proposal
-    public function saveNegotiationAction(): void
+    protected function performSaveNegotiationAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'negotiationNotes' => 'required|string|max:1000',
@@ -505,6 +604,9 @@ class LeadDetail extends Component
             'status' => 'in_progress',
         ]);
 
+        if (Lead::usesSalesPanel()) {
+            $this->validate(['quotedAmount' => 'nullable|numeric|min:1']);
+        }
         if ($this->quotedAmount) {
             $numericBudget = (float) str_replace([',', ' '], '', $this->quotedAmount);
             if ($numericBudget > 0) {
@@ -518,10 +620,12 @@ class LeadDetail extends Component
     }
 
     // Stage 7: Unit Booking
-    public function saveBookingAction(): void
+    protected function performSaveBookingAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'bookingAmount' => 'required|numeric|min:1',
@@ -530,16 +634,32 @@ class LeadDetail extends Component
 
         $user = auth()->user();
 
+        if (Lead::usesSalesPanel()) {
+            $this->validate(['bookingUnit' => 'required|string|max:100', 'bookingDate' => 'required|date']);
+            $unit = ProjectUnit::where('project_id', $lead->project_id)->where('unit_number', $this->bookingUnit)->lockForUpdate()->first();
+            $booking = $lead->bookings()->latest()->first();
+            Validator::make(['unit' => $unit && (! in_array(strtolower($unit->status), ['reserved', 'booked', 'sold']) || ($booking && $booking->project_unit_id === $unit->id))], ['unit' => 'accepted'], ['unit.accepted' => 'Select an available unit belonging to this project.'])->validate();
+            if ($booking && $booking->project_unit_id !== $unit->id) {
+                ProjectUnit::whereKey($booking->project_unit_id)->update(['status' => 'available']);
+            }
+            $unit->update(['status' => 'reserved']);
+            $values = ['project_unit_id' => $unit->id, 'booking_amount' => $this->bookingAmount, 'booked_at' => $this->bookingDate, 'status' => 'confirmed'];
+            $booking ? $booking->update($values) : $lead->bookings()->create($values);
+            $lead->update(['booking_status' => 'confirmed']);
+            $this->recordStageTransition($lead, 'booking', 'Booking details saved.');
+
+            return;
+        }
         $unit = null;
         if ($lead->project_id) {
-            $unit = \App\Models\ProjectUnit::firstOrCreate(
+            $unit = ProjectUnit::firstOrCreate(
                 ['project_id' => $lead->project_id, 'unit_number' => $this->bookingUnit ?: 'Unit-101'],
                 ['type' => 'Standard', 'price' => (float) $this->bookingAmount, 'status' => 'booked']
             );
         } else {
-            $proj = \App\Models\Project::first();
+            $proj = Project::first();
             if ($proj) {
-                $unit = \App\Models\ProjectUnit::firstOrCreate(
+                $unit = ProjectUnit::firstOrCreate(
                     ['project_id' => $proj->id, 'unit_number' => $this->bookingUnit ?: 'Unit-101'],
                     ['type' => 'Standard', 'price' => (float) $this->bookingAmount, 'status' => 'booked']
                 );
@@ -556,16 +676,18 @@ class LeadDetail extends Component
 
         $lead->update(['booking_status' => 'confirmed']);
 
-        $this->recordStageTransition($lead, 'booking', "Unit booking created for ₹".number_format((float) $this->bookingAmount));
+        $this->recordStageTransition($lead, 'booking', 'Unit booking created for ₹'.number_format((float) $this->bookingAmount));
         $this->dispatch('toast', type: 'success', message: 'Unit booking recorded successfully.');
         $this->dispatch('lead-updated');
     }
 
     // Stage 8: Payment Received
-    public function recordPaymentAction(): void
+    protected function performRecordPaymentAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'paymentAmount' => 'required|numeric|min:1',
@@ -575,6 +697,10 @@ class LeadDetail extends Component
 
         $latestBooking = $lead->bookings()->latest()->first();
 
+        if (Lead::usesSalesPanel()) {
+            Validator::make(['booking' => $latestBooking?->id], ['booking' => 'required'])->validate();
+            $this->validate(['paymentTransactionId' => 'required|string|max:100|unique:payments,transaction_id']);
+        }
         PaymentReceived::create([
             'booking_id' => $latestBooking?->id,
             'amount' => (float) $this->paymentAmount,
@@ -584,27 +710,36 @@ class LeadDetail extends Component
             'status' => 'completed',
         ]);
 
-        $this->recordStageTransition($lead, 'payment_received', "Payment of ₹".number_format((float) $this->paymentAmount)." recorded via {$this->paymentMethod}");
+        $this->recordStageTransition($lead, 'payment_received', 'Payment of ₹'.number_format((float) $this->paymentAmount)." recorded via {$this->paymentMethod}");
         $this->dispatch('toast', type: 'success', message: 'Payment recorded successfully.');
         $this->dispatch('lead-updated');
     }
 
     // Stage 9: Closed Won
-    public function markClosedWonAction(): void
+    protected function performMarkClosedWonAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
+        if (Lead::usesSalesPanel()) {
+            $booking = $lead->bookings()->with('payments')->latest()->first();
+            Validator::make(['paid' => $booking && $booking->payments->where('status', 'completed')->sum('amount') >= $booking->booking_amount], ['paid' => 'accepted'], ['paid.accepted' => 'The booking amount must be paid before closing won.'])->validate();
+            ProjectUnit::whereKey($booking->project_unit_id)->update(['status' => 'sold']);
+        }
         $this->recordStageTransition($lead, 'closed_won', $this->actionRemarks ?: 'Deal successfully closed won.');
         $this->dispatch('toast', type: 'success', message: 'Congratulations! Lead marked as Closed Won.');
         $this->dispatch('lead-updated');
     }
 
     // Stage 10: Lost (Mandatory Reason & Remarks)
-    public function markLostAction(): void
+    protected function performMarkLostAction(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'lostReason' => 'required|string|min:3|max:100',
@@ -617,10 +752,12 @@ class LeadDetail extends Component
     }
 
     // Outcome: Invalid / Unreachable
-    public function markInvalidAction(string $statusType = 'invalid'): void
+    protected function performMarkInvalidAction(string $statusType = 'invalid'): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $this->validate([
             'lostRemarks' => 'required|string|min:5|max:1000',
@@ -633,25 +770,30 @@ class LeadDetail extends Component
     }
 
     // Super Admin Replacement Request (Builder / Developer only)
-    public function requestReplacement(): void
+    protected function performRequestReplacement(): void
     {
         $lead = $this->getActiveLead();
-        if (!$lead) return;
+        if (! $lead) {
+            return;
+        }
 
         $user = auth()->user();
-        $isSales = \App\Support\NavigationConfig::getRoleKey($user) === 'sales-executive' || $user->hasRole(['sales-executive', 'Sales Executive']);
+        $isSales = NavigationConfig::getRoleKey($user) === 'sales-executive' || $user->hasRole(['sales-executive', 'Sales Executive']);
         if ($isSales) {
             $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot submit replacement claims.');
+
             return;
         }
 
         $this->validate([
             'replacementReasonId' => 'required|exists:replacement_reasons,id',
-            'replacementRemarks' => 'nullable|string|max:1000',
+            'replacementRemarks' => Lead::usesSalesPanel() ? 'required|string|min:5|max:1000' : 'nullable|string|max:1000',
+            'replacementSupportingInfo' => 'nullable|string|max:2000',
         ]);
 
         if ($lead->replacement_status === 'pending') {
             $this->dispatch('toast', type: 'warning', message: 'A replacement claim is already pending Super Admin review for this lead.');
+
             return;
         }
 
@@ -662,6 +804,9 @@ class LeadDetail extends Component
             $slaMet = Carbon::parse($lead->created_at)->diffInMinutes(now()) <= 30;
         }
 
+        if (Lead::usesSalesPanel()) {
+            $slaMet = $lead->first_response_at && Carbon::parse($lead->created_at)->diffInMinutes($lead->first_response_at) <= 30;
+        }
         $replacement = LeadReplacement::create([
             'lead_id' => $lead->id,
             'reason_id' => $reason->id,
@@ -685,6 +830,7 @@ class LeadDetail extends Component
                 'reason_id' => $reason->id,
                 'reason_label' => $reason->label,
                 'remarks' => $this->replacementRemarks,
+                'supporting_information' => $this->replacementSupportingInfo,
                 'sla_met' => $slaMet,
             ]),
             'ip_address' => request()->ip() ?? '127.0.0.1',
@@ -696,6 +842,135 @@ class LeadDetail extends Component
         $this->dispatch('lead-updated');
     }
 
+    public function logCallAction(): void
+    {
+        $this->saveLeadAction('logCallAction', fn () => $this->performLogCallAction());
+    }
+
+    public function addRemarksAction(): void
+    {
+        $this->saveLeadAction('addRemarksAction', fn () => $this->performAddRemarksAction());
+    }
+
+    public function markInterestedAction(): void
+    {
+        $this->saveLeadAction('markInterestedAction', fn () => $this->performMarkInterestedAction());
+    }
+
+    public function scheduleFollowupAction(): void
+    {
+        $this->saveLeadAction('scheduleFollowupAction', fn () => $this->performScheduleFollowupAction());
+    }
+
+    public function completeFollowupAction(int $followupId): void
+    {
+        $this->saveLeadAction('completeFollowupAction', fn () => $this->performCompleteFollowupAction($followupId));
+    }
+
+    public function rescheduleFollowupAction(int $followupId): void
+    {
+        $this->saveLeadAction('rescheduleFollowupAction', fn () => $this->performRescheduleFollowupAction($followupId));
+    }
+
+    public function scheduleMeetingAction(): void
+    {
+        $this->saveLeadAction('scheduleMeetingAction', fn () => $this->performScheduleMeetingAction());
+    }
+
+    public function updateMeetingStatusAction(string $status): void
+    {
+        $this->saveLeadAction('updateMeetingStatusAction', fn () => $this->performUpdateMeetingStatusAction($status));
+    }
+
+    public function saveSiteVisitAction(): void
+    {
+        $this->saveLeadAction('saveSiteVisitAction', fn () => $this->performSaveSiteVisitAction());
+    }
+
+    public function saveNegotiationAction(): void
+    {
+        $this->saveLeadAction('saveNegotiationAction', fn () => $this->performSaveNegotiationAction());
+    }
+
+    public function saveBookingAction(): void
+    {
+        $this->saveLeadAction('saveBookingAction', fn () => $this->performSaveBookingAction());
+    }
+
+    public function recordPaymentAction(): void
+    {
+        $this->saveLeadAction('recordPaymentAction', fn () => $this->performRecordPaymentAction());
+    }
+
+    public function markClosedWonAction(): void
+    {
+        $this->saveLeadAction('markClosedWonAction', fn () => $this->performMarkClosedWonAction());
+    }
+
+    public function markLostAction(): void
+    {
+        $this->saveLeadAction('markLostAction', fn () => $this->performMarkLostAction());
+    }
+
+    public function markInvalidAction(string $statusType = 'invalid'): void
+    {
+        $this->saveLeadAction('markInvalidAction', fn () => $this->performMarkInvalidAction($statusType));
+    }
+
+    public function requestReplacement(): void
+    {
+        $this->saveLeadAction('requestReplacement', fn () => $this->performRequestReplacement());
+    }
+
+    protected function validatePendingFollowup(Followup $followup): void
+    {
+        Validator::make(['status' => $followup->status], ['status' => 'in:pending'])->validate();
+    }
+
+    protected function saveLeadAction(string $action, callable $save): void
+    {
+        if (! Lead::usesSalesPanel()) {
+            $save();
+
+            return;
+        }
+        DB::transaction(function () use ($action, $save) {
+            $lead = Lead::panelQuery()->lockForUpdate()->findOrFail($this->leadId);
+            $role = NavigationConfig::getRoleKey(auth()->user());
+            if ($action === 'requestReplacement') {
+                abort_unless($role === 'builder', 403);
+                Validator::make(['eligible' => ! in_array(Lead::normalizeStage($lead->current_stage), ['closed_won', 'booking', 'payment_received', 'replaced', 'pending_credit']) && ! $lead->replacements()->whereIn('status', ['pending', 'approved'])->exists()], ['eligible' => 'accepted'], ['eligible.accepted' => 'This lead is not eligible or already has a replacement request.'])->validate();
+            } else {
+                abort_unless($role === 'sales-executive', 403);
+                Validator::make(['action' => $action], ['action' => Rule::in($lead->permittedSalesActions())], ['action.in' => 'This action is not available at the current lead stage.'])->validate();
+            }
+            $before = $lead->getAttributes();
+            $save();
+            $this->logLeadAction($lead, $action, $before, $lead->fresh()->getAttributes(), $this->actionRemarks ?: $this->lostRemarks);
+        });
+        $this->targetNextStage = '';
+        $this->dispatch('lead-updated');
+        $this->dispatch('toast', type: 'success', message: 'Lead action saved.');
+    }
+
+    protected function logLeadAction(Lead $lead, string $action, array $before, array $after, string $remarks = ''): void
+    {
+        AuditLog::create(['user_id' => auth()->id(), 'action' => 'lead.'.$action, 'subject_type' => Lead::class, 'subject_id' => $lead->id, 'from_value' => json_encode($before), 'to_value' => json_encode(['values' => $after, 'remarks' => $remarks]), 'ip_address' => request()->ip(), 'user_agent' => request()->userAgent(), 'created_at' => now()]);
+    }
+
+    public function uploadPaymentProofAction(): void
+    {
+        $this->saveLeadAction('uploadPaymentProofAction', function () {
+            $this->validate(['paymentProof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120']);
+            $lead = $this->getActiveLead();
+            abort_unless($lead->bookings()->whereHas('payments')->exists(), 422);
+            $path = $this->paymentProof->store($lead->client_id.'/'.$lead->id.'/payments', 'documents');
+            $lead->metadata()->create(['key' => 'payment_proof', 'value' => $path]);
+            $this->logLeadAction($lead, 'payment_proof_uploaded', [], ['path' => $path], $this->paymentNotes);
+            $this->paymentProof = null;
+        });
+    }
+
     public function showFullJourney(): void
     {
         if ($this->leadId) {
@@ -703,7 +978,7 @@ class LeadDetail extends Component
         }
     }
 
-    public function render(\App\Services\LeadJourneyService $journeyService)
+    public function render(LeadJourneyService $journeyService)
     {
         $lead = null;
         $communications = [];
@@ -723,14 +998,14 @@ class LeadDetail extends Component
 
         if ($this->leadId) {
             $user = auth()->user();
-            $roleKey = \App\Support\NavigationConfig::getRoleKey($user);
+            $roleKey = NavigationConfig::getRoleKey($user);
             $isBuilder = $roleKey === 'builder' || ($user && $user->hasRole(['builder', 'Builder', 'Builder/Developer']));
             $isSalesExecutive = $roleKey === 'sales-executive' || ($user && $user->hasRole(['sales-executive', 'Sales Executive']));
 
-            $lead = Lead::with([
+            $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with([
                 'client.organization',
-                'project',
-                'campaign',
+                'project' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q,
+                'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q,
                 'leadSource',
                 'assignedTo',
                 'metadata',
@@ -741,6 +1016,9 @@ class LeadDetail extends Component
                 'replacements.reason',
             ])->find($this->leadId);
 
+            if ($lead && ! $this->hasLeadAccess($lead, $user)) {
+                $lead = null;
+            }
             if ($lead) {
                 $communications = LeadCommunication::where('lead_id', $this->leadId)->latest()->get();
                 $statusHistory = LeadStatusHistory::where('lead_id', $this->leadId)->with('changer')->latest('changed_at')->get();
@@ -758,6 +1036,9 @@ class LeadDetail extends Component
         }
 
         return view('livewire.leads.lead-detail', [
+            'salesActions' => $lead ? $lead->permittedSalesActions() : [],
+            'normalizedStage' => $lead ? Lead::normalizeStage($lead->current_stage) : '',
+            'activityLogs' => $lead ? AuditLog::where('subject_type', Lead::class)->where('subject_id', $lead->id)->with('user')->latest('created_at')->get() : collect(),
             'lead' => $lead,
             'communications' => $communications,
             'statusHistory' => $statusHistory,

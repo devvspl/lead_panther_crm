@@ -11,9 +11,9 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ReportExport;
 use App\Models\Lead;
 use App\Models\Client;
-
 use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Exports\BaseStyledExport;
 
 class SourcePerformance extends Component
 {
@@ -26,7 +26,7 @@ class SourcePerformance extends Component
         return [
             ['key' => 'source_name', 'label' => 'Lead Source', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'cost_per_lead', 'label' => 'Est. Cost Per Lead', 'prefix' => '₹', 'formatter' => fn($v) => number_format((float)$v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'cost_per_lead', 'label' => Lead::usesSalesPanel() ? 'Credits Per Lead' : 'Est. Cost Per Lead', 'prefix' => Lead::usesSalesPanel() ? '' : '₹', 'formatter' => fn ($v) => number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn($v) => number_format((float)$v), 'sortable' => false, 'priority' => 1],
             ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
@@ -40,16 +40,16 @@ class SourcePerformance extends Component
     public function exportExcel()
     {
         $rows = collect($this->getReportData());
-        $headings = ['Lead Source', 'Total Leads', 'Est. Cost Per Lead', 'Closed Won', 'Conversion Rate (%)'];
+        $headings = ['Lead Source', 'Total Leads', Lead::usesSalesPanel() ? 'Credits Per Lead' : 'Est. Cost Per Lead', 'Closed Won', 'Conversion Rate (%)'];
         $columns = ['source_name', 'total_leads', 'cost_per_lead', 'closed_won', fn($r) => $r['conversion_rate'] . '%'];
 
-        $filename = "source-performance-report_" . now()->format('Y-m-d') . ".xlsx";
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . " | Timeframe: Last {$this->days} Days";
+        $filename = 'source-performance-report_'.now()->format('Y-m-d').'.xlsx';
+        $subtitle = 'Exported '.now()->format('d M Y, H:i T')." | Timeframe: Last {$this->days} Days";
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
-            new \App\Exports\BaseStyledExport(
+            new BaseStyledExport(
                 data: $rows,
                 title: 'Lead Source Performance Report',
                 subtitle: $subtitle,
@@ -68,9 +68,9 @@ class SourcePerformance extends Component
 
         return Cache::remember($cacheKey, 300, function () {
             $user = auth()->user();
-            $query = Lead::query()->where('created_at', '>=', now()->subDays($this->days));
+            $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('created_at', '>=', now()->subDays($this->days));
 
-            if ($user) {
+            if ($user && ! Lead::usesSalesPanel()) {
                 if ($user->hasRole('Client')) {
                     $client = Client::where('organization_id', $user->organization_id)->first();
                     if ($client) {
@@ -84,6 +84,7 @@ class SourcePerformance extends Component
             $results = $query->select(
                 'lead_source_id',
                 DB::raw('count(*) as total_leads'),
+                DB::raw('AVG(COALESCE(lead_cost,0)) as actual_cost'),
                 DB::raw("sum(case when current_stage = 'closed_won' or status = 'closed_won' then 1 else 0 end) as closed_won")
             )->groupBy('lead_source_id')->with('leadSource')->get();
 
@@ -92,7 +93,7 @@ class SourcePerformance extends Component
                 $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
                 $total = $row->total_leads ?: 1;
                 $won = $row->closed_won ?: 0;
-                $costPerLead = 150.00; // Estimated budget avg
+                $costPerLead = Lead::usesSalesPanel() ? round((float) $row->actual_cost, 2) : 150.00; // Estimated budget avg
                 $conversionRate = round(($won / $total) * 100, 1);
 
                 $data[] = [
@@ -104,7 +105,7 @@ class SourcePerformance extends Component
                 ];
             }
 
-            if (empty($data)) {
+            if (empty($data) && ! Lead::usesSalesPanel()) {
                 $data[] = ['source_name' => 'Meta Ads', 'total_leads' => 45, 'cost_per_lead' => 120.00, 'closed_won' => 12, 'conversion_rate' => 26.7];
                 $data[] = ['source_name' => 'Google Ads', 'total_leads' => 30, 'cost_per_lead' => 180.00, 'closed_won' => 9, 'conversion_rate' => 30.0];
                 $data[] = ['source_name' => 'Housing Portal', 'total_leads' => 25, 'cost_per_lead' => 95.00, 'closed_won' => 5, 'conversion_rate' => 20.0];

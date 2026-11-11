@@ -155,7 +155,7 @@ class NavigationConfig
             ],
             'reports' => [
                 'key' => 'reports',
-                'label' => $isBuilder ? 'My Reports' : 'Reports',
+                'label' => $isBuilderOrSales ? 'My Reports' : 'Reports',
                 'url' => route('reports.index'),
                 'data_nav_route' => 'reports',
                 'data_nav_exact' => 'false',

@@ -8,16 +8,94 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\ClientScoped;
 use Carbon\Carbon;
+use App\Models\Scopes\ClientScope;
+use App\Support\NavigationConfig;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Lead extends Model
 {
-    use HasFactory, ClientScoped;
+    use ClientScoped, HasFactory;
 
     protected $guarded = [];
 
     protected $casts = [
         'first_response_at' => 'datetime',
     ];
+
+    public static function usesSalesPanel(): bool
+    {
+        return in_array(NavigationConfig::getRoleKey(auth()->user()), ['builder', 'sales-executive']);
+    }
+
+    /** Owner IDs refer to users. Organization IDs must never be compared to client_id. */
+    public static function panelQuery(): Builder
+    {
+        $query = static::withoutGlobalScope(ClientScope::class);
+        $user = auth()->user();
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+        $role = NavigationConfig::getRoleKey($user);
+        if ($role === 'sales-executive') {
+            return $query->where('assigned_to', $user->id);
+        }
+        if ($role === 'builder') {
+            return $query->where(function ($q) use ($user) {
+                $q->where('client_id', $user->id);
+                if ($user->organization_id) {
+                    $q->orWhereHas('client', fn ($owner) => $owner->where('organization_id', $user->organization_id));
+                }
+            });
+        }
+
+        return $user->hasRole('Super Admin') ? $query : static::query();
+    }
+
+    public static function normalizeStage(string $stage): string
+    {
+        $stage = strtolower(str_replace([' ', '-'], '_', trim($stage)));
+
+        return match ($stage) {
+            'lead_received' => 'new', 'connected', 'qualified' => 'contacted',
+            'followup' => 'follow_up', 'meeting' => 'meeting_scheduled', 'proposal' => 'negotiation',
+            'payment' => 'payment_received', 'won' => 'closed_won', 'closed_lost', 'dead', 'rejected' => 'lost',
+            'wrong_number' => 'invalid', default => $stage,
+        };
+    }
+
+    public static function stageValues(string $stage): array
+    {
+        $aliases = ['new' => ['lead_received'], 'contacted' => ['connected', 'qualified'], 'follow_up' => ['follow-up', 'followup'], 'meeting_scheduled' => ['meeting', 'Meeting'], 'site_visit' => ['Site Visit'], 'negotiation' => ['proposal', 'Proposal'], 'booking' => ['Booking'], 'payment_received' => ['payment', 'Payment'], 'closed_won' => ['won', 'Closed Won'], 'lost' => ['closed_lost', 'dead', 'rejected'], 'invalid' => ['wrong_number']];
+
+        return array_unique(array_merge([$stage, str_replace('_', '-', $stage), ucwords(str_replace('_', ' ', $stage))], $aliases[$stage] ?? []));
+    }
+
+    public function isTerminalStage(): bool
+    {
+        return in_array(static::normalizeStage($this->current_stage), ['closed_won', 'lost', 'invalid', 'unreachable', 'replaced']);
+    }
+
+    /** The detail forms and Kanban use the same allowed operations. */
+    public function permittedSalesActions(): array
+    {
+        if ($this->isTerminalStage()) {
+            return [];
+        }
+        $actions = match (static::normalizeStage($this->current_stage)) {
+            'new', 'assigned', 'contacted' => ['logCallAction', 'markInterestedAction', 'addRemarksAction'],
+            'interested' => ['addRemarksAction', 'scheduleFollowupAction'],
+            'follow_up' => ['scheduleFollowupAction', 'completeFollowupAction', 'rescheduleFollowupAction', 'scheduleMeetingAction'],
+            'meeting_scheduled' => ['scheduleMeetingAction', 'updateMeetingStatusAction', 'saveSiteVisitAction'],
+            'site_visit' => ['saveSiteVisitAction', 'saveNegotiationAction'],
+            'negotiation' => ['saveNegotiationAction', 'saveBookingAction'],
+            'booking' => ['saveBookingAction', 'recordPaymentAction'],
+            'payment_received' => ['recordPaymentAction', 'uploadPaymentProofAction', 'markClosedWonAction'],
+            default => [],
+        };
+
+        return $actions ? array_merge($actions, ['markLostAction', 'markInvalidAction']) : [];
+    }
 
     public static function generateUniqueLeadCode(string $prefix = 'LP'): string
     {
@@ -37,7 +115,7 @@ class Lead extends Model
         return $this->belongsTo(User::class, 'client_id');
     }
 
-    public function project(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    public function project(): HasOneThrough
     {
         return $this->hasOneThrough(Project::class, Campaign::class, 'id', 'id', 'campaign_id', 'project_id');
     }
@@ -276,11 +354,16 @@ class Lead extends Model
     public function getSlaBadgeAttribute(): string
     {
         if ($this->first_response_at) {
+            if (static::usesSalesPanel() && $this->created_at->diffInMinutes($this->first_response_at) > 15) {
+                return 'SLA Breached';
+            }
+
             return 'SLA Met';
         }
         if ($this->created_at && Carbon::parse($this->created_at)->diffInMinutes(now()) > 15) {
             return 'SLA Breached';
         }
+
         return 'SLA Pending';
     }
 
@@ -305,10 +388,11 @@ class Lead extends Model
 
     public function getNextFollowupAttribute(): string
     {
-        $f = $this->followups->where('due_at', '>=', now())->sortBy('due_at')->first();
+        $f = (static::usesSalesPanel() ? $this->followups->where('status', 'pending') : $this->followups->where('due_at', '>=', now()))->sortBy('due_at')->first();
         if ($f && $f->due_at) {
             return Carbon::parse($f->due_at)->format('M d, H:i');
         }
+
         return '-';
     }
 }

@@ -15,7 +15,9 @@
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
                                 Replacement Pending
                             </span>
-                        @elseif($lead->replacement_status === 'approved')
+                        @elseif($lead->replacement_status === 'rejected' || $latestReplacement?->status === 'rejected')
+                                    <span class="text-xs font-bold text-red-700">Rejected</span>
+                                @elseif($lead->replacement_status === 'approved')
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                                 Replacement Approved
                             </span>
@@ -56,6 +58,7 @@
                     </button>
                 </div>
 
+                @foreach($errors->all() as $error)<p class="text-xs text-red-700" role="alert">{{ $error }}</p>@endforeach
                 @if($activeTab === 'stage_details')
                     <!-- ========================================================= -->
                     <!-- SECTION 1 & 2: CUSTOMER & PROJECT INFORMATION             -->
@@ -238,12 +241,29 @@
                             <x-ui.badge status="{{ $lead->current_stage }}">{{ ucfirst(str_replace('_', ' ', $lead->current_stage)) }}</x-ui.badge>
                         </div>
 
+                        @if($isBuilder)
+                            <div class="text-xs space-y-2">
+                                <p>Requirements: {{ $lead->requirement ?: '—' }} · Budget: {{ $lead->budget ?: '—' }}</p>
+                                @if($normalizedStage === 'follow_up')@foreach($leadFollowups as $followup)<p>{{ $followup->due_at }} · {{ $followup->note }} · {{ $followup->status }}</p>@endforeach @endif
+                                @if($normalizedStage === 'meeting_scheduled')<p>{{ $latestMeeting?->scheduled_at }} · {{ $latestMeeting?->location }} · {{ $latestMeeting?->outcome }}</p><p>{{ $latestMeeting?->notes }}</p>@endif
+                                @if($normalizedStage === 'site_visit')<p>{{ $latestSiteVisit?->visit_date }} · {{ $latestSiteVisit?->attendance }} · {{ $latestSiteVisit?->outcome }}</p><p>{{ $latestSiteVisit?->remarks }}</p>@endif
+                                @if($normalizedStage === 'negotiation')<p>{{ $latestNegotiation?->notes }}</p>@endif
+                                @if(in_array($normalizedStage,['booking','payment_received','closed_won']))<p>Unit: {{ $latestBooking?->unit?->unit_number }} · Booking: {{ $latestBooking?->booking_amount }} · {{ $latestBooking?->booked_at }}</p>@foreach($latestBooking?->payments ?? [] as $payment)<p>Payment: {{ $payment->amount }} · {{ $payment->paid_at }} · {{ $payment->transaction_id }}</p>@endforeach @endif
+                                @if(!in_array($normalizedStage,['closed_won','lost','invalid','unreachable','replaced','pending_credit']))<x-ui.button x-on:click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })" variant="secondary">{{ $lead->assigned_to ? 'Reassign Lead' : 'Assign Lead' }}</x-ui.button>@endif
+                            </div>
+                        @else
+                        @php
+                            $nextForms=['follow_up'=>'meeting_scheduled','meeting_scheduled'=>'site_visit','site_visit'=>'negotiation','negotiation'=>'booking','booking'=>'payment_received'];
+                            $actionStage=\App\Models\Lead::usesSalesPanel() ? $normalizedStage : $lead->current_stage;
+                            if($isSalesExecutive && ($nextForms[$normalizedStage] ?? null)===$targetNextStage) $actionStage=$targetNextStage;
+                        @endphp
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: NEW / CONTACTED                                -->
                         <!-- ----------------------------------------------------- -->
-                        @if(in_array($lead->current_stage, ['new', 'contacted', 'connected', 'qualified', 'assigned', 'pending_credit']))
+                        @if(in_array($actionStage, ['new', 'contacted', 'connected', 'qualified', 'assigned']))
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Log Customer Interaction &amp; Update Status</span>
+                                <a href="tel:{{ $lead->mobile }}" class="text-xs text-primary underline">Contact Customer</a>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Call Outcome</label>
@@ -274,7 +294,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: INTERESTED                                     -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'interested')
+                        @elseif($actionStage === 'interested')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Customer Interest &amp; Next Action</span>
                                 <div>
@@ -301,7 +321,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: FOLLOW-UP & REMINDER                           -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'follow_up')
+                        @elseif($actionStage === 'follow_up')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Active Follow-up Queue</span>
                                 @php
@@ -327,6 +347,11 @@
                                             Reschedule Call
                                         </button>
                                     </div>
+                                @if($completingFollowupId === $activeFollowup->id)
+                                    <input aria-label="New follow-up time" type="datetime-local" wire:model="followupDueAt" class="w-full text-xs rounded-lg border-border">
+                                    <textarea aria-label="Follow-up remarks" wire:model="followupNote" class="w-full text-xs rounded-lg border-border"></textarea>
+                                    <x-ui.button wire:click="rescheduleFollowupAction({{ $activeFollowup->id }})">Save Rescheduled Follow-up</x-ui.button>
+                                @endif
                                 @else
                                     <p class="text-xs text-muted">No pending follow-up scheduled. Schedule a new one below:</p>
                                     <div class="grid grid-cols-2 gap-3">
@@ -348,7 +373,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: MEETING SCHEDULED                              -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif(in_array($lead->current_stage, ['meeting', 'meeting_scheduled']))
+                        @elseif(in_array($actionStage, ['meeting', 'meeting_scheduled']))
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Meeting Schedule &amp; Execution</span>
                                 <div class="grid grid-cols-2 gap-3">
@@ -379,9 +404,10 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: SITE VISIT COMPLETED                           -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'site_visit')
+                        @elseif($actionStage === 'site_visit')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Site Visit Execution &amp; Feedback</span>
+                                <textarea wire:model="visitRemarks" placeholder="Visit remarks" class="w-full text-xs rounded-lg border-border"></textarea>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Visit Date &amp; Time</label>
@@ -391,7 +417,7 @@
                                         <label class="text-[10px] font-semibold text-muted">Attendance Status</label>
                                         <select wire:model="visitAttendance" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                             <option value="attended">Attended Visit</option>
-                                            <option value="scheduled">Scheduled / Upcoming</option>
+                                            @if(!\App\Models\Lead::usesSalesPanel())<option value="scheduled">Scheduled / Upcoming</option>@endif
                                             <option value="no_show">No Show / Cancelled</option>
                                         </select>
                                     </div>
@@ -402,7 +428,7 @@
                                 </div>
                                 <div class="flex items-center gap-2 pt-1">
                                     <x-ui.button wire:click="saveSiteVisitAction" variant="primary" class="text-xs flex-1">
-                                        Record Visit Feedback
+                                        Save Visit Details / Remarks
                                     </x-ui.button>
                                 </div>
                             </div>
@@ -410,7 +436,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: NEGOTIATION & PROPOSAL                         -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'negotiation')
+                        @elseif($actionStage === 'negotiation')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Negotiation &amp; Commercial Terms</span>
                                 <div class="grid grid-cols-2 gap-3">
@@ -441,9 +467,10 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: UNIT BOOKING                                   -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'booking')
+                        @elseif($actionStage === 'booking')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Unit Booking Details</span>
+                                @if($latestBooking)<p class="text-xs">Selected unit: {{ $latestBooking->unit?->unit_number }} · Booked: {{ $latestBooking->booked_at }}</p>@endif
                                 <div class="grid grid-cols-3 gap-3">
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Unit / Flat No.</label>
@@ -468,7 +495,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: PAYMENT RECEIVED                               -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'payment_received')
+                        @elseif($actionStage === 'payment_received')
                             <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                                 <span class="text-xs font-bold text-ink block">Record Payment &amp; Verify Receipt</span>
                                 <div class="grid grid-cols-3 gap-3">
@@ -504,7 +531,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: CLOSED WON (Read-only Summary)                 -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif($lead->current_stage === 'closed_won')
+                        @elseif($actionStage === 'closed_won')
                             <div class="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-2">
                                 <div class="flex items-center gap-2">
                                     <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -524,38 +551,49 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: LOST / INVALID (Read-only Summary)             -->
                         <!-- ----------------------------------------------------- -->
-                        @elseif(in_array($lead->current_stage, ['lost', 'closed_lost', 'invalid', 'unreachable']))
+                        @elseif(in_array($actionStage, ['lost', 'closed_lost', 'invalid', 'unreachable']))
                             <div class="p-3.5 rounded-lg bg-neutral-100 border border-neutral-300 text-xs space-y-2">
-                                <span class="font-bold text-neutral-800 block text-sm">Outcome: {{ ucfirst(str_replace('_', ' ', $lead->current_stage)) }}</span>
+                                <span class="font-bold text-neutral-800 block text-sm">Outcome: {{ ucfirst(str_replace('_', ' ', $actionStage)) }}</span>
                                 <p class="text-[11px] text-neutral-700">
-                                    This lead has been marked as {{ $lead->current_stage }}. See activity timeline for the recorded reason and detailed remarks.
+                                    This lead has been marked as {{ $actionStage }}. See activity timeline for the recorded reason and detailed remarks.
                                 </p>
                             </div>
                         @endif
 
+                        @if($isSalesExecutive && in_array('addRemarksAction',$salesActions))
+                            @if($normalizedStage !== 'interested')<textarea aria-label="Customer interaction notes" wire:model="actionRemarks" rows="2" placeholder="Customer interaction notes" class="w-full text-xs rounded-lg border-border"></textarea>@endif
+                            <x-ui.button wire:click="addRemarksAction" variant="secondary" class="text-xs">Add Remarks / Notes</x-ui.button>
+                        @endif
                         <!-- General Stage Progression Buttons & Outcome Handlers -->
-                        @if(!in_array($lead->current_stage, ['closed_won', 'lost', 'closed_lost', 'invalid', 'unreachable']))
+                        @if(!in_array($actionStage, ['closed_won', 'lost', 'closed_lost', 'invalid', 'unreachable', 'replaced', 'pending_credit']))
                             <div class="pt-3 border-t border-primary/20 flex items-center justify-between gap-2 flex-wrap text-xs">
+                                @if($isSalesExecutive)
+                                    <div class="flex gap-2 items-center">
+                                        @if(isset($nextForms[$normalizedStage]))<button type="button" wire:click="$set('targetNextStage','{{ $nextForms[$normalizedStage] }}')" class="px-2.5 py-1 rounded bg-surface border border-border font-semibold text-xs">{{ ucwords(str_replace('_',' ',$nextForms[$normalizedStage])) }}</button>@endif
+                                        @if($targetNextStage && !in_array($targetNextStage,['lost_form','invalid_form']))<button type="button" wire:click="$set('targetNextStage','')" class="text-xs text-muted">Back to current stage</button>@endif
+                                    </div>
+                                @else
                                 <div class="flex items-center gap-2">
                                     <span class="text-[10px] font-bold text-muted uppercase">Advance To:</span>
-                                    @if(in_array($lead->current_stage, ['new', 'contacted', 'connected']))
+                                    @if(in_array($actionStage, ['new', 'contacted', 'connected']))
                                         <button type="button" wire:click="markInterestedAction" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Interested</button>
                                     @endif
-                                    @if(in_array($lead->current_stage, ['interested', 'follow_up']))
-                                        <button type="button" wire:click="$set('lead.current_stage', 'meeting_scheduled')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Meeting</button>
-                                        <button type="button" wire:click="$set('lead.current_stage', 'site_visit')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Site Visit</button>
+                                    @if(in_array($actionStage, ['interested', 'follow_up']))
+                                        <button type="button" wire:click="$set('targetNextStage', 'meeting_scheduled')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Meeting</button>
+                                        <button type="button" wire:click="$set('targetNextStage', 'site_visit')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Site Visit</button>
                                     @endif
-                                    @if(in_array($lead->current_stage, ['meeting', 'meeting_scheduled', 'site_visit']))
-                                        <button type="button" wire:click="$set('lead.current_stage', 'negotiation')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Negotiation</button>
+                                    @if(in_array($actionStage, ['meeting', 'meeting_scheduled', 'site_visit']))
+                                        <button type="button" wire:click="$set('targetNextStage', 'negotiation')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Negotiation</button>
                                     @endif
-                                    @if($lead->current_stage === 'negotiation')
-                                        <button type="button" wire:click="$set('lead.current_stage', 'booking')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Unit Booking</button>
+                                    @if($actionStage === 'negotiation')
+                                        <button type="button" wire:click="$set('targetNextStage', 'booking')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Unit Booking</button>
                                     @endif
-                                    @if($lead->current_stage === 'booking')
-                                        <button type="button" wire:click="$set('lead.current_stage', 'payment_received')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Payment</button>
+                                    @if($actionStage === 'booking')
+                                        <button type="button" wire:click="$set('targetNextStage', 'payment_received')" class="px-2.5 py-1 rounded bg-surface border border-border hover:bg-canvas font-semibold text-[11px] cursor-pointer">Payment</button>
                                     @endif
                                 </div>
 
+                                @endif
                                 <!-- Negative Outcome Controls (Lost / Invalid) -->
                                 <div class="flex items-center gap-1.5 ml-auto">
                                     <button type="button" wire:click="$set('targetNextStage', 'lost_form')"
@@ -570,6 +608,15 @@
                             </div>
                         @endif
 
+                        @if($isSalesExecutive && in_array($normalizedStage,['payment_received','closed_won']))
+                            @foreach($latestBooking?->payments ?? [] as $payment)<p class="text-xs">Payment {{ $payment->amount }} · {{ $payment->paid_at }} · {{ $payment->transaction_id }} · {{ $payment->method }}</p>@endforeach
+                        @endif
+                        @if(in_array($normalizedStage,['lost','invalid','unreachable']))
+                            @foreach($activityLogs->where('action','lead.stage_changed')->take(1) as $entry)<p class="text-xs">{{ data_get(json_decode($entry->to_value,true),'remarks') }}</p>@endforeach
+                        @endif
+                        @if($isSalesExecutive && $normalizedStage === 'payment_received')
+                            <div class="space-y-2"><label class="text-xs font-semibold">Payment Proof (PDF, JPG or PNG)</label><input type="file" wire:model="paymentProof" accept=".pdf,.jpg,.jpeg,.png"><x-ui.button wire:click="uploadPaymentProofAction">Upload Payment Proof</x-ui.button></div>
+                        @endif
                         <!-- Lost Form Panel -->
                         @if($targetNextStage === 'lost_form')
                             <div class="p-3 bg-red-50/70 rounded-lg border border-red-200 text-xs space-y-2 mt-2">
@@ -619,6 +666,7 @@
                                 </div>
                             </div>
                         @endif
+                        @endif
                     </div>
 
                     <!-- ========================================================= -->
@@ -642,7 +690,7 @@
                                             <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Done</span>
                                         @else
                                             <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>
-                                            <button type="button" wire:click="completeFollowupAction({{ $fu->id }})" class="text-[10px] font-bold text-primary hover:underline cursor-pointer">Complete</button>
+                                            @if(!$isBuilder && (!$isSalesExecutive || in_array('completeFollowupAction',$salesActions)))<button type="button" wire:click="completeFollowupAction({{ $fu->id }})" class="text-[10px] font-bold text-primary hover:underline cursor-pointer">Complete</button>@endif
                                         @endif
                                     </div>
                                 </div>
@@ -664,12 +712,14 @@
                                 </div>
                                 @if($lead->replacement_status === 'pending')
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Pending Review</span>
+                                @elseif($lead->replacement_status === 'rejected' || $latestReplacement?->status === 'rejected')
+                                    <span class="text-xs font-bold text-red-700">Rejected</span>
                                 @elseif($lead->replacement_status === 'approved')
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Refund Approved</span>
                                 @endif
                             </div>
 
-                            @if($lead->replacement_status !== 'pending' && $lead->replacement_status !== 'approved')
+                            @if($lead->replacement_status !== 'pending' && $lead->replacement_status !== 'approved' && !in_array($normalizedStage,['closed_won','booking','payment_received','replaced','pending_credit']))
                                 <p class="text-[11px] text-rose-700 leading-relaxed">
                                     If this lead is invalid, duplicate, or unreachable within policy SLA, submit a replacement claim to Super Admin for credit refund.
                                 </p>
@@ -687,9 +737,10 @@
                                         <label class="text-[10px] font-semibold text-rose-900 block">Detailed Remarks for Super Admin</label>
                                         <textarea wire:model="replacementRemarks" rows="2" placeholder="Call attempts made, customer feedback, reasons..." class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-white text-ink mt-0.5"></textarea>
                                     </div>
+                                    <textarea wire:model="replacementSupportingInfo" rows="2" placeholder="Supporting information (optional)" class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-white text-ink"></textarea>
                                     <button type="button" wire:click="requestReplacement"
                                         class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition shadow-2xs cursor-pointer">
-                                        Submit Replacement Claim to Super Admin
+                                        Request Replacement
                                     </button>
                                 </div>
                             @else
@@ -711,6 +762,9 @@
                             <button type="button" wire:click="showFullJourney" class="text-xs font-semibold text-primary hover:underline cursor-pointer">Expand Lead Journey &rarr;</button>
                         </div>
 
+                        @foreach($activityLogs as $entry)
+                            <div class="p-3 bg-canvas rounded-lg border border-border text-xs space-y-1"><strong>{{ $entry->action }}</strong><p>{{ $entry->user?->name ?? 'System' }} · {{ $entry->created_at }}</p><p class="break-words">Previous: {{ $entry->from_value ?: '—' }}</p><p class="break-words">New: {{ $entry->to_value ?: '—' }}</p></div>
+                        @endforeach
                         <!-- Stage History -->
                         <div class="space-y-2">
                             @forelse($statusHistory as $sh)

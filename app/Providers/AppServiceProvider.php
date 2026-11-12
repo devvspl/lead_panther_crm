@@ -84,6 +84,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // First Response SLA Observers
+        Lead::observe(\App\Observers\LeadObserver::class);
         LeadCall::observe(FirstResponseObserver::class);
         LeadMessage::observe(FirstResponseObserver::class);
         LeadCommunication::observe(FirstResponseObserver::class);

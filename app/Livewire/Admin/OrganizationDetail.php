@@ -41,6 +41,29 @@ class OrganizationDetail extends Component
     public string $editName = '';
     public string $editStatus = 'active';
     public ?float $orgLeadCost = null;
+    public array $deliverySettings = [];
+
+    public function saveDeliverySettings(string $type, int $id): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        abort_unless(in_array($type, ['project', 'campaign']), 422);
+        $model = $type === 'project' ? Project::withoutGlobalScopes() : \App\Models\Campaign::withoutGlobalScopes();
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+        $projects = Project::withoutGlobalScopes()->whereIn('client_id', $owners)->select('id');
+        $record = $type === 'project' ? $model->whereIn('id', $projects)->findOrFail($id)
+            : $model->whereIn('project_id', $projects)->findOrFail($id);
+        $key = $type.'_'.$id;
+        $this->validate([
+            "deliverySettings.$key.limit" => 'nullable|integer|min:1|max:100000',
+            "deliverySettings.$key.interval" => 'nullable|integer|min:0|max:10080',
+        ]);
+        $settings = $this->deliverySettings[$key] ?? [];
+        $record->update([
+            'delivery_daily_limit' => ($settings['limit'] ?? '') !== '' ? ($settings['limit'] ?? null) : null,
+            'delivery_interval_minutes' => ($settings['interval'] ?? '') !== '' ? ($settings['interval'] ?? null) : null,
+        ]);
+        $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. New leads will follow these settings; queued leads keep their scheduled delivery time.');
+    }
 
     // Team Management & Filters
     public string $userSearch = '';
@@ -87,9 +110,16 @@ class OrganizationDetail extends Component
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
         $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
+        $projectIds = Project::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $organization->id)->select('id'))->pluck('id');
+        foreach (['project' => Project::withoutGlobalScopes()->whereIn('id', $projectIds)->get(),
+            'campaign' => \App\Models\Campaign::withoutGlobalScopes()->whereIn('project_id', $projectIds)->get()] as $type => $records) {
+            foreach ($records as $record) {
+                $this->deliverySettings[$type.'_'.$record->id] = ['limit' => $record->delivery_daily_limit, 'interval' => $record->delivery_interval_minutes];
+            }
+        }
 
         $requestedTab = request()->query('tab');
-        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
+        if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity', 'campaigns'])) {
             $this->activeTab = $requestedTab;
         }
 
@@ -99,7 +129,7 @@ class OrganizationDetail extends Component
 
     public function setTab(string $tab): void
     {
-        if (in_array($tab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity'])) {
+        if (in_array($tab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity', 'campaigns'])) {
             $this->activeTab = $tab;
             $this->resetPage();
         }

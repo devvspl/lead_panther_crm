@@ -312,8 +312,51 @@
                 </svg>
                 <span>Activity & Audit</span>
             </a>
+            <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'campaigns']) }}"
+                wire:click.prevent="setTab('campaigns')"
+                class="py-3 px-2 border-b-2 whitespace-nowrap {{ $activeTab === 'campaigns' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted' }}">Campaign Details & Delivery</a>
         </nav>
     </div>
+
+    @if($activeTab === 'campaigns')
+        <section class="bg-surface border border-border rounded-xl p-6 space-y-5">
+            <h2 class="font-bold text-ink">Campaign Details & Lead Delivery</h2>
+            <p class="text-sm text-muted">Set project defaults or override individual campaigns. Blank campaign values inherit the project setting. Blank project limits mean unlimited; a zero interval means immediate delivery. Excess leads wait for the next available slot. Times use {{ config('app.timezone') }}. Changes apply to new leads; existing queued leads retain their scheduled time.</p>
+            @forelse($projects as $project)
+                @php
+                    $campaigns = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
+                @endphp
+                <div class="border border-border rounded-lg p-4 space-y-4" wire:key="delivery-project-{{ $project->id }}">
+                    <h3 class="font-semibold text-ink">{{ $project->name }}</h3>
+                    @foreach(collect([$project])->concat($campaigns) as $record)
+                        @php
+                            $type = $loop->first ? 'project' : 'campaign';
+                            $key = $type.'_'.$record->id;
+                            $queue = \App\Models\Lead::withoutGlobalScopes()->when($type === 'campaign', fn ($q) => $q->where('campaign_id', $record->id), fn ($q) => $q->whereIn('campaign_id', $campaigns->pluck('id')));
+                        @endphp
+                        <form wire:submit="saveDeliverySettings('{{ $type }}', {{ $record->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border-t border-border pt-3" wire:key="delivery-{{ $key }}">
+                            <div class="min-w-0 text-sm text-ink">
+                                <div class="font-semibold break-words">{{ $type === 'project' ? 'Project defaults' : $record->name }}</div>
+                                <div class="text-xs text-muted">{{ $type === 'campaign' ? $record->leadSource?->name.' · '.$record->status : 'All campaigns in this project' }}</div>
+                                <div class="text-xs text-muted">{{ (clone $queue)->count() }} total · {{ (clone $queue)->where('delivery_pending', true)->count() }} queued</div>
+                            </div>
+                            <label class="text-xs text-ink">Daily lead limit
+                                <input type="number" min="1" max="100000" wire:model="deliverySettings.{{ $key }}.limit" placeholder="{{ $type === 'campaign' ? 'Inherit project' : 'Unlimited' }}" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
+                                @error('deliverySettings.'.$key.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                            <label class="text-xs text-ink">Interval (minutes)
+                                <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $key }}.interval" placeholder="{{ $type === 'campaign' ? 'Inherit project' : 'Immediate' }}" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
+                                @error('deliverySettings.'.$key.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                            <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
+                        </form>
+                    @endforeach
+                </div>
+            @empty
+                <p class="text-sm text-muted">No projects or campaigns are linked to this organization.</p>
+            @endforelse
+        </section>
+    @endif
 
     <!-- TAB 1: OVERVIEW -->
     @if($activeTab === 'overview')

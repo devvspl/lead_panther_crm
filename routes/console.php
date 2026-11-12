@@ -35,6 +35,16 @@ Artisan::command('inspire', function () {
 Schedule::command('queue:work --stop-when-empty --tries=3')->everyMinute()->withoutOverlapping();
 
 // Schedule 2: Check Low Credit Balances & Notify Client Admins (Hourly)
+Schedule::call(function () {
+    \App\Models\Lead::withoutGlobalScopes()->where('delivery_pending', true)
+        ->where('delivery_at', '<=', now())
+        ->chunkById(100, function ($leads) {
+            foreach ($leads as $lead) {
+                app(\App\Services\LeadDistributionService::class)->releaseDelivery($lead->id);
+            }
+        });
+})->name('release-scheduled-leads')->everyMinute()->withoutOverlapping();
+
 Schedule::command('credits:check-low-balances')->hourly();
 
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)

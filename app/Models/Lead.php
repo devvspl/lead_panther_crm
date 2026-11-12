@@ -21,11 +21,20 @@ class Lead extends Model
 
     protected $casts = [
         'first_response_at' => 'datetime',
+        'delivery_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'delivery_pending' => 'boolean',
     ];
 
     public static function usesSalesPanel(): bool
     {
         return in_array(NavigationConfig::getRoleKey(auth()->user()), ['builder', 'sales-executive']);
+    }
+
+    // Keep delivery slot allocation and insertion under the same project lock.
+    protected function performInsert(Builder $query)
+    {
+        return \Illuminate\Support\Facades\DB::transaction(fn () => parent::performInsert($query));
     }
 
     /** Owner IDs refer to users. Organization IDs must never be compared to client_id. */
@@ -37,6 +46,9 @@ class Lead extends Model
             return $query->whereRaw('1 = 0');
         }
         $role = NavigationConfig::getRoleKey($user);
+        if (in_array($role, ['builder', 'sales-executive'])) {
+            $query->where('delivery_pending', false);
+        }
         if ($role === 'sales-executive') {
             return $query->where('assigned_to', $user->id);
         }

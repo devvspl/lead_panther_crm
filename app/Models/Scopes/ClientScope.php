@@ -15,6 +15,9 @@ class ClientScope implements Scope
         }
 
         $user = auth()->user();
+        if ($model instanceof \App\Models\Lead && \App\Models\Lead::usesSalesPanel()) {
+            $builder->where('leads.delivery_pending', false);
+        }
 
         // Super Admin bypasses multi-tenant scoping
         if ($user->hasRole(['Super Admin', 'super-admin'])) {

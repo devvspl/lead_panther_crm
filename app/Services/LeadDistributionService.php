@@ -16,6 +16,66 @@ use Illuminate\Support\Facades\DB;
 
 class LeadDistributionService
 {
+    public function scheduleDelivery(Lead $lead): void
+    {
+        $campaign = \App\Models\Campaign::withoutGlobalScopes()->find($lead->campaign_id);
+        if (! $campaign) return;
+        $project = Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first();
+        if (! $project) return;
+
+        $limit = $campaign->delivery_daily_limit ?? $project->delivery_daily_limit;
+        $interval = $campaign->delivery_interval_minutes ?? $project->delivery_interval_minutes;
+        if (! $limit && ! $interval) return;
+
+        // Campaign overrides have their own queue; otherwise share the project queue.
+        $queue = Lead::withoutGlobalScopes()->whereIn('campaign_id',
+            \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
+        $campaignQueue = (clone $queue)->where('campaign_id', $campaign->id);
+        $intervalQueue = $campaign->delivery_interval_minutes !== null ? $campaignQueue : $queue;
+        $limitQueue = $campaign->delivery_daily_limit !== null ? $campaignQueue : $queue;
+        $at = now();
+        $last = (clone $intervalQueue)->max('delivery_at');
+        if ($interval && $last) {
+            $next = \Carbon\Carbon::parse($last)->addMinutes($interval);
+            if ($next->gt($at)) $at = $next;
+        }
+        if ($limit) {
+            while ((clone $limitQueue)->whereRaw('COALESCE(delivery_at, created_at) >= ?', [$at->copy()->startOfDay()])
+                ->whereRaw('COALESCE(delivery_at, created_at) < ?', [$at->copy()->addDay()->startOfDay()])->count() >= $limit) {
+                $at->addDay()->startOfDay();
+            }
+        }
+        $lead->delivery_at = $at;
+        $lead->delivery_pending = true;
+    }
+
+    public function releaseDelivery(int $leadId): bool
+    {
+        return DB::transaction(function () use ($leadId) {
+            $candidate = Lead::withoutGlobalScopes()->find($leadId);
+            $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
+            $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
+            $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
+            if (! $lead || ! $lead->delivery_pending || $lead->delivery_at?->isFuture()) return false;
+            if ($project) {
+                $queue = Lead::withoutGlobalScopes()->where('delivery_pending', false)->whereIn('campaign_id',
+                    \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
+                $limit = $campaign->delivery_daily_limit ?? $project->delivery_daily_limit;
+                $interval = $campaign->delivery_interval_minutes ?? $project->delivery_interval_minutes;
+                $daily = clone $queue;
+                $spaced = clone $queue;
+                if ($campaign->delivery_daily_limit !== null) $daily->where('campaign_id', $campaign->id);
+                if ($campaign->delivery_interval_minutes !== null) $spaced->where('campaign_id', $campaign->id);
+                if ($limit && $daily->whereRaw('COALESCE(delivered_at, created_at) >= ?', [now()->startOfDay()])->count() >= $limit) return false;
+                $last = $spaced->max('delivered_at');
+                if ($interval && $last && \Carbon\Carbon::parse($last)->addMinutes($interval)->isFuture()) return false;
+            }
+            if (! \App\Models\CreditTransaction::reserveForLead($lead)) return false;
+            $lead->update(['delivery_pending' => false, 'delivered_at' => now()]);
+            return true;
+        });
+    }
+
     /**
      * Supported distribution methods.
      */

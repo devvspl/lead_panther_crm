@@ -288,6 +288,10 @@
                                     <td @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['cellClass'] ?? '' }}">
                                         @if(isset(${'cell_' . $colKey}))
                                             {{ ${'cell_' . $colKey}($row) }}
+                                        @elseif($type === 'lead_id')
+                                            <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
+                                                class="font-mono font-bold text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
+                                                aria-label="View lead {{ $val }}">{{ $val }}</button>
                                         @elseif($type === 'badge')
                                             @php
                                                 $badgeStyle = $col['badgeStyle'] ?? null;
@@ -721,7 +725,13 @@
                                     $primaryCol = $activeColumns[0] ?? null;
                                     $primaryVal = $primaryCol ? (is_object($row) ? data_get($row, $primaryCol['key']) : ($row[$primaryCol['key']] ?? null)) : 'Item';
                                 @endphp
-                                <div class="font-bold text-sm text-ink">{{ $primaryVal }}</div>
+                                @if(($primaryCol['type'] ?? '') === 'lead_id')
+                                    <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ $rowId }} })"
+                                        class="font-mono font-bold text-sm text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
+                                        aria-label="View lead {{ $primaryVal }}">{{ $primaryVal }}</button>
+                                @else
+                                    <div class="font-bold text-sm text-ink">{{ $primaryVal }}</div>
+                                @endif
                             </div>
                         </div>
 
@@ -749,6 +759,10 @@
                                 <div>
                                     @if(isset(${'cell_' . $colKey}))
                                         {{ ${'cell_' . $colKey} }}
+                                    @elseif($type === 'lead_id')
+                                        <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ $rowId }} })"
+                                            class="font-mono font-bold text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
+                                            aria-label="View lead {{ $val }}">{{ $val }}</button>
                                     @elseif($type === 'badge')
                                         @php
                                             $badgeStyle = $col['badgeStyle'] ?? null;

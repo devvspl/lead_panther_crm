@@ -1928,12 +1928,12 @@ class LeadKanban extends Component
     public function tableColumns(): array
     {
         if ($this->isSalesExecutive) {
-            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : 'text', 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
+            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : ($key === 'lead_code' ? 'lead_id' : 'text'), 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
         }
 
         if ($this->isSalesExecutive) {
             return [
-                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
                 ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
@@ -1970,7 +1970,7 @@ class LeadKanban extends Component
 
         if ($this->isBuilder) {
             return [
-                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+                ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
                 ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
@@ -2009,7 +2009,7 @@ class LeadKanban extends Component
         }
 
         return [
-            ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
+            ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
             ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],

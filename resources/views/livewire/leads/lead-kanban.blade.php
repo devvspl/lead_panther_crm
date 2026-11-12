@@ -1423,6 +1423,7 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Filter by Team (Optional)</label>
                         <livewire:shared.searchable-select
                             wire:model.live="assignTeamId"
+                            class="block w-full"
                             :options="$assignTeams->pluck('name', 'id')->all()"
                             placeholder="All Teams / Members"
                             :key="'assignment-team-select'"
@@ -1434,6 +1435,7 @@
                     <label class="block text-xs font-semibold text-ink mb-1">Select Sales Agent / Member <span class="text-red-500">*</span></label>
                     <livewire:shared.searchable-select
                         wire:model.live="assignUserId"
+                        class="block w-full"
                         :options="$eligibleAssignees->mapWithKeys(fn ($member) => [$member->id => $member->name.' ('.$member->email.')'])->all()"
                         placeholder="Choose Eligible Team Member"
                         :key="'assignment-member-select-'.($assignTeamId ?? 'all')"

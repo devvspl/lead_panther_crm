@@ -22,6 +22,8 @@ class SearchableSelect extends Component
     public int $page = 1;
     public int $perPage = 20;
     public array $options = [];
+    public bool $showClearOption = true;
+    public $clearValue = null;
 
     public function mount(
         string $model = '',
@@ -33,7 +35,9 @@ class SearchableSelect extends Component
         bool $searchable = true,
         string $class = '',
         $value = null,
-        $options = []
+        $options = [],
+        bool $showClearOption = true,
+        $clearValue = null
     ): void {
         $this->model = $model;
         $this->searchColumn = $searchColumn;
@@ -43,7 +47,9 @@ class SearchableSelect extends Component
         $this->roleFilter = $roleFilter;
         $this->searchable = $searchable;
         $this->class = $class;
-        $this->value = ($value !== null && $value !== '') ? $value : null;
+        $this->showClearOption = $showClearOption;
+        $this->clearValue = $clearValue;
+        $this->value = ($value !== null && $value !== '') ? $value : $clearValue;
         $this->options = is_array($options) ? $options : (is_iterable($options) ? iterator_to_array($options) : []);
     }
 
@@ -64,7 +70,7 @@ class SearchableSelect extends Component
 
     public function clearSelection(): void
     {
-        $this->value = null;
+        $this->value = $this->clearValue;
         $this->search = '';
         $this->page = 1;
     }

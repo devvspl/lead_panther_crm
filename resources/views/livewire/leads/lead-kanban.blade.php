@@ -145,7 +145,9 @@
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
                     <livewire:shared.searchable-select 
-                        wire:model.live="statusFilter" 
+                        wire:model.live="statusFilter"
+                    :show-clear-option="false"
+                    clear-value="all"
                         :options="$statusOptions" 
                         placeholder="All Statuses" 
                         class="w-full"
@@ -244,7 +246,9 @@
             <div class="flex flex-col space-y-1 w-full">
                 <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
                 <livewire:shared.searchable-select 
-                    wire:model.live="statusFilter" 
+                    wire:model.live="statusFilter"
+                    :show-clear-option="false"
+                    clear-value="all"
                     :options="$statusOptions" 
                     placeholder="All Statuses" 
                     class="w-full"
@@ -1417,25 +1421,23 @@
                 @if(isset($assignTeams) && count($assignTeams) > 0)
                     <div>
                         <label class="block text-xs font-semibold text-ink mb-1">Filter by Team (Optional)</label>
-                        <select wire:model.live="assignTeamId"
-                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
-                            <option value="">All Teams / Members</option>
-                            @foreach($assignTeams as $t)
-                                <option value="{{ $t->id }}">{{ $t->name }}</option>
-                            @endforeach
-                        </select>
+                        <livewire:shared.searchable-select
+                            wire:model.live="assignTeamId"
+                            :options="$assignTeams->pluck('name', 'id')->all()"
+                            placeholder="All Teams / Members"
+                            :key="'assignment-team-select'"
+                        />
                     </div>
                 @endif
 
                 <div>
                     <label class="block text-xs font-semibold text-ink mb-1">Select Sales Agent / Member <span class="text-red-500">*</span></label>
-                    <select wire:model="assignUserId"
-                        class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
-                        <option value="">-- Choose Eligible Team Member --</option>
-                        @foreach($eligibleAssignees as $member)
-                            <option value="{{ $member->id }}">{{ $member->name }} ({{ $member->email }})</option>
-                        @endforeach
-                    </select>
+                    <livewire:shared.searchable-select
+                        wire:model.live="assignUserId"
+                        :options="$eligibleAssignees->mapWithKeys(fn ($member) => [$member->id => $member->name.' ('.$member->email.')'])->all()"
+                        placeholder="Choose Eligible Team Member"
+                        :key="'assignment-member-select-'.($assignTeamId ?? 'all')"
+                    />
                     @error('assignUserId') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
                 </div>
 

@@ -7,7 +7,7 @@
         </span>
 
         <div class="flex items-center gap-1 shrink-0 text-muted">
-            @if($value !== null && $value !== '')
+            @if($value !== null && $value !== '' && (string)$value !== (string)$clearValue)
                 <span wire:click.stop="clearSelection" title="Clear filter"
                     class="hover:text-ink cursor-pointer text-xs font-bold leading-none p-0.5">✕</span>
             @endif
@@ -53,6 +53,7 @@
         <!-- Results List -->
         <div class="max-h-52 overflow-y-auto sidebar-scroll space-y-0.5">
             <!-- Clear Selection / All Option -->
+            @if($showClearOption)
             <button type="button" wire:click="clearSelection" @click="open = false"
                 class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between gap-3 font-semibold {{ $value === null || $value === '' ? 'bg-canvas text-ink font-bold' : 'text-muted' }}">
                 <span class="truncate">{{ $placeholder }}</span>
@@ -60,6 +61,7 @@
                     <span class="text-ink text-xs shrink-0">✓</span>
                 @endif
             </button>
+            @endif
 
             @forelse($items as $item)
                 @php

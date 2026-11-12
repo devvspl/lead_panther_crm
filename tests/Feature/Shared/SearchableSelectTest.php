@@ -111,4 +111,19 @@ class SearchableSelectTest extends TestCase
         ->assertSee('Alice Agent')
         ->assertDontSee('Bob Sales Exec');
     }
+
+    public function test_status_select_has_one_all_option_and_clears_to_all(): void
+    {
+        $component=\Livewire\Livewire::test(\App\Livewire\Shared\SearchableSelect::class,[
+            'options'=>['all'=>'All Statuses','new'=>'New'],
+            'placeholder'=>'All Statuses',
+            'value'=>'all',
+            'showClearOption'=>false,
+            'clearValue'=>'all',
+        ]);
+        $html=$component->html();
+        $this->assertSame(1,substr_count($html,"selectOption('all')"));
+        $this->assertStringNotContainsString('wire:click="clearSelection"',$html);
+        $component->call('selectOption','new')->assertSet('value','new')->call('clearSelection')->assertSet('value','all');
+    }
 }

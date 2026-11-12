@@ -1800,6 +1800,12 @@ class LeadKanban extends Component
         $this->showAssignModal = true;
     }
 
+    public function updatedAssignTeamId(): void
+    {
+        $this->assignUserId = null;
+        $this->resetValidation('assignUserId');
+    }
+
     public function closeAssignModal(): void
     {
         $this->showAssignModal = false;

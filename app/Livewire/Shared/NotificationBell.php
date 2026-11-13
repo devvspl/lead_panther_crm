@@ -27,8 +27,8 @@ class NotificationBell extends Component
 
     public function markAsReadAndNavigate(string $notificationId): mixed
     {
-        app(NotificationDeliveryService::class)->inbox(auth()->user())->whereKey($notificationId)->firstOrFail();
-        return redirect()->route('notifications.open', ['notification' => $notificationId]);
+        // Reuse the authenticated entity resolver even during a stale route-cache deployment.
+        return app(\App\Http\Controllers\NotificationController::class)->open($notificationId);
     }
 
     protected function notifyReadChange(): void

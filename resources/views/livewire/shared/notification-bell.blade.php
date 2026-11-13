@@ -16,7 +16,9 @@
                     <p class="p-6 text-center text-xs text-muted">No notifications yet. Your updates will appear here.</p>
                 @endforelse
             </div>
-            <a href="{{ route('notifications.index') }}" class="block text-center p-3 text-xs font-semibold text-primary border-t border-border">View All Notifications & Preferences</a>
+            @if(\Illuminate\Support\Facades\Route::has('notifications.index'))
+                <a href="{{ route('notifications.index') }}" class="block text-center p-3 text-xs font-semibold text-primary border-t border-border">View All Notifications & Preferences</a>
+            @endif
         </section>
     @endif
 </div>

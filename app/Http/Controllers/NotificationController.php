@@ -13,7 +13,7 @@ class NotificationController extends Controller
         $data = $record->data;
         $entity = $data['entity_type'] ?? (isset($data['lead_id']) ? 'lead' : null);
         $id = $data['entity_id'] ?? $data['lead_id'] ?? null;
-        $target = route('notifications.index');
+        $target = \Illuminate\Support\Facades\Route::has('notifications.index') ? route('notifications.index') : route('dashboard');
         if ($entity === 'lead') {
             $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->findOrFail($id);
             $target = route('leads.index', ['search' => $lead->lead_code, 'notification_lead' => $lead->id]);

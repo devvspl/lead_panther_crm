@@ -263,4 +263,26 @@ class WebNotificationTest extends TestCase
         $this->assertSame(0, app(NotificationDeliveryService::class)->inbox($this->outsider)->whereKey($id)->count());
         $this->assertSame(0, app(NotificationDeliveryService::class)->inbox($unscopedUser)->whereKey($unknownId)->count());
     }
+
+    public function test_stale_notification_routes_do_not_break_bell_rendering_or_secure_navigation(): void
+    {
+        $lead = $this->lead(); app(LeadDistributionService::class)->releaseDelivery($lead->id);
+        $notice = $this->builder->notifications()->where('data->type', 'lead_delivered')->firstOrFail();
+        $routes = new \Illuminate\Routing\RouteCollection;
+        foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
+            if (! in_array($route->getName(), ['notifications.open', 'notifications.index'])) $routes->add($route);
+        }
+        app('router')->setRoutes($routes); app('url')->setRoutes($routes);
+        Livewire::actingAs($this->builder)->test(NotificationBell::class)->call('toggleDropdown')
+            ->assertSee('New lead delivered')->call('markAsReadAndNavigate', $notice->id)
+            ->assertRedirect(route('leads.index', ['search' => $lead->lead_code, 'notification_lead' => $lead->id]));
+        $this->assertNotNull($notice->fresh()->read_at);
+        $this->send($this->builder, 'no-entity-fallback');
+        $generic = $this->builder->notifications()->where('data->type', 'test')->firstOrFail();
+        Livewire::actingAs($this->builder)->test(NotificationBell::class)->call('markAsReadAndNavigate', $generic->id)->assertRedirect(route('dashboard'));
+        $this->send($this->outsider, 'not-yours');
+        $other = $this->outsider->notifications()->firstOrFail();
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        Livewire::actingAs($this->builder)->test(NotificationBell::class)->call('markAsReadAndNavigate', $other->id);
+    }
 }

@@ -52,6 +52,7 @@ Schedule::command('credits:check-low-balances')->hourly();
 
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
 Schedule::command('followups:check-due')->everyFifteenMinutes();
+Schedule::command('notifications:check-operational')->everyFiveMinutes()->withoutOverlapping();
 
 // Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
 Schedule::command('team:auto-offline')->everyFiveMinutes();

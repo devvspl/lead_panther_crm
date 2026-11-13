@@ -10,12 +10,7 @@ class SendCampaignPausedNotificationListener
 {
     public function handle(CampaignPaused $event): void
     {
-        $client = $event->client ?? $event->lead?->client;
-        if (!$client) return;
-
-        $clientUser = User::where('organization_id', $client->organization_id)->first() ?? User::first();
-        if ($clientUser) {
-            $clientUser->notify(new CampaignPausedNotification($client));
-        }
+        app(\App\Services\NotificationDeliveryService::class)->leadAlert($event->lead, 'campaign_paused', 'Campaign delivery paused',
+            $event->reason, 'campaign-credit-paused:'.$event->lead->campaign_id.':'.now()->toDateString(), 'delivery', true);
     }
 }

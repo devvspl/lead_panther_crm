@@ -12,6 +12,86 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationDeliveryService
 {
+    public const WEB_CATEGORIES = ['assignment', 'followup', 'sla', 'replacement', 'delivery'];
+
+    public function inbox(User $user): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        $query = $user->notifications();
+        if (! $user->hasAnyRole(['Super Admin', 'super-admin'])) {
+            $query->where('organization_id', $user->organization_id);
+            $query->where(fn ($row) => $row->whereNull('data->quarantined')->orWhere('data->quarantined', false));
+        }
+        return $query;
+    }
+
+    public function webAllowed(User $user, string $category, bool $important): bool
+    {
+        $role = \App\Support\NavigationConfig::getRoleKey($user);
+        return ($important && in_array($role, ['super-admin', 'builder'])) || ($user->notification_preferences[$category] ?? true);
+    }
+
+    public function sendWeb(User $recipient, string $type, string $title, string $message, string $eventKey,
+        string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false): void
+    {
+        if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && $recipient->organization_id != $organizationId) return;
+        if ($recipient->status !== 'active' || ! $this->webAllowed($recipient, $category, $important)) return;
+        $hash = hash('sha256', $recipient->id.'|'.$eventKey);
+        $id = substr($hash, 0, 8).'-'.substr($hash, 8, 4).'-'.substr($hash, 12, 4).'-'.substr($hash, 16, 4).'-'.substr($hash, 20, 12);
+        $payload = ['type' => $type, 'title' => $title, 'message' => $message, 'category' => $category,
+            'organization_id' => $organizationId, 'recipient_user_id' => $recipient->id,
+            'entity_type' => $entityType, 'entity_id' => $entityId,
+            'action_url' => '/notifications/'.$id.'/open', 'important' => $important];
+        // Write in the business transaction; rollbacks remove the notification too.
+        // Deterministic primary/event keys protect against concurrent queue retries.
+        $notification = \Illuminate\Notifications\DatabaseNotification::firstOrCreate(['id' => $id], [
+            'type' => \App\Notifications\WebNotification::class, 'notifiable_type' => $recipient->getMorphClass(),
+            'notifiable_id' => $recipient->id, 'organization_id' => $organizationId, 'event_key' => $hash, 'data' => $payload,
+        ]);
+        if ($notification->wasRecentlyCreated) {
+            \Illuminate\Support\Facades\DB::afterCommit(function () use ($recipient) {
+                try { event(new \App\Events\WebNotificationsChanged($recipient->id)); }
+                catch (\Throwable $e) { report($e); } // Persistence/polling survive a broadcast outage.
+            });
+        }
+    }
+
+    public function organizationRecipients(?int $organizationId, ?int $ownerId = null, ?int $executiveId = null, bool $adminsOnly = false)
+    {
+        return User::with('roles')->where('status', 'active')->where(function ($query) use ($organizationId, $ownerId, $executiveId) {
+            $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['Super Admin', 'super-admin']));
+            if ($organizationId) $query->orWhere('organization_id', $organizationId);
+            if ($ownerId) $query->orWhere('id', $ownerId);
+            if ($executiveId) $query->orWhere('id', $executiveId);
+        })->get()->filter(function ($user) use ($organizationId, $ownerId, $executiveId, $adminsOnly) {
+            if ($user->hasAnyRole(['Super Admin', 'super-admin'])) return true;
+            if ($adminsOnly || $user->organization_id != $organizationId) return false;
+            $role = \App\Support\NavigationConfig::getRoleKey($user);
+            return $user->id === $ownerId || ($organizationId && $role === 'builder') || ($user->id === $executiveId && $role === 'sales-executive');
+        });
+    }
+
+    public function leadAlert(Lead $lead, string $type, string $title, string $message, string $eventKey,
+        string $category = 'delivery', bool $important = false, bool $adminsOnly = false): void
+    {
+        $orgId = User::find($lead->client_id)?->organization_id;
+        foreach ($this->organizationRecipients($orgId, $lead->client_id, $lead->assigned_to, $adminsOnly) as $recipient) {
+            if ($lead->delivery_pending && $category === 'delivery' && \App\Support\NavigationConfig::getRoleKey($recipient) === 'sales-executive') continue;
+            $queued = $lead->delivery_pending && $category === 'delivery' && $lead->campaign_id;
+            $this->sendWeb($recipient, $type, $title, $message, $eventKey, $category, $orgId, $queued ? 'campaign' : 'lead', $queued ? $lead->campaign_id : $lead->id, $important);
+        }
+    }
+
+    public function configurationAlert(\Illuminate\Database\Eloquent\Model $record, string $type, string $title, string $message, string $eventKey): void
+    {
+        $project = $record instanceof \App\Models\Project ? $record : \App\Models\Project::withoutGlobalScopes()->find($record->project_id);
+        if (! $project) return;
+        $owner = User::find($project->client_id);
+        foreach ($this->organizationRecipients($owner?->organization_id, $owner?->id) as $recipient) {
+            $this->sendWeb($recipient, $type, $title, $message, $eventKey, 'delivery', $owner?->organization_id,
+                $record instanceof \App\Models\Project ? 'project' : 'campaign', $record->id, true);
+        }
+    }
+
     public const CHANNEL_SMS = 'sms';
     public const CHANNEL_WHATSAPP = 'whatsapp';
     public const CHANNEL_EMAIL = 'email';
@@ -70,6 +150,7 @@ class NotificationDeliveryService
                 'body' => $body,
                 'template_key' => $templateKey,
                 'tokens' => $tokens,
+                'lead_id' => $lead?->id,
             ]),
             'retries' => 0,
             'last_error' => null,
@@ -77,7 +158,9 @@ class NotificationDeliveryService
         ]);
 
         // 3. Dispatch Delivery via Channel Driver
-        $deliveryResult = $this->dispatchToChannel($channel, $recipient, $subject, $body, $tokens);
+        $deliveryResult = $channel === self::CHANNEL_CRM
+            ? $this->deliverCrmLog($log, $subject, $body)
+            : $this->dispatchToChannel($channel, $recipient, $subject, $body, $tokens);
 
         // 4. Update Status & Timestamps
         if ($deliveryResult['success']) {
@@ -124,7 +207,9 @@ class NotificationDeliveryService
         $body = $payload['body'] ?? '';
         $tokens = $payload['tokens'] ?? [];
 
-        $deliveryResult = $this->dispatchToChannel($log->channel, $recipient, $subject, $body, $tokens);
+        $deliveryResult = $log->channel === self::CHANNEL_CRM
+            ? $this->deliverCrmLog($log, $subject, $body)
+            : $this->dispatchToChannel($log->channel, $recipient, $subject, $body, $tokens);
 
         if ($deliveryResult['success']) {
             $log->update([
@@ -186,6 +271,21 @@ class NotificationDeliveryService
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    private function deliverCrmLog(NotificationLog $log, string $title, string $message): array
+    {
+        $payload = json_decode($log->payload, true);
+        $lead = $log->notifiable_type === Lead::class ? Lead::withoutGlobalScopes()->find($log->notifiable_id)
+            : (! empty($payload['lead_id']) ? Lead::withoutGlobalScopes()->find($payload['lead_id']) : null);
+        $recipient = in_array($log->notifiable_type, [User::class, \App\Models\Client::class]) ? User::find($log->notifiable_id) : User::find($lead?->assigned_to ?? $lead?->client_id);
+        if (! $recipient) return ['success' => false, 'error' => 'CRM notification requires an explicit valid recipient.'];
+        $orgId = $lead ? User::find($lead->client_id)?->organization_id : $recipient->organization_id;
+        if ($lead && ! $this->organizationRecipients($orgId, $lead->client_id, $lead->assigned_to)->contains('id', $recipient->id)) {
+            return ['success' => false, 'error' => 'Recipient cannot access this lead.'];
+        }
+        $this->sendWeb($recipient, 'crm_message', $title, $message, 'crm-log:'.$log->id, 'assignment', $orgId, $lead ? 'lead' : null, $lead?->id);
+        return ['success' => true];
     }
 
     /**

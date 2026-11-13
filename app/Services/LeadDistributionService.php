@@ -108,7 +108,11 @@ class LeadDistributionService
                     $queue = $this->campaignDeliveryQuery($campaign->id);
                     [$start, $end] = $this->deliveryDay(now(), $config['timezone']);
                     $successful = (clone $queue)->where('delivered_at', '>=', $start)->where('delivered_at', '<', $end)->count();
-                    if ($config['limit'] && $successful >= $config['limit']) return false;
+                    if ($config['limit'] && $successful >= $config['limit']) {
+                        app(NotificationDeliveryService::class)->leadAlert($lead, 'daily_limit_reached', 'Daily delivery limit reached',
+                            "Campaign daily limit reached. Pending leads are waiting for the next delivery day.", 'limit:'.$campaign->id.':'.$start->toDateString(), 'delivery', true);
+                        return false;
+                    }
                     $last = (clone $queue)->max('delivered_at');
                     if ($config['interval'] && $last && \Carbon\Carbon::parse($last)->addMinutes($config['interval'])->isFuture()) return false;
                 }
@@ -117,6 +121,11 @@ class LeadDistributionService
                     return false;
                 }
                 $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'delivery_failed_at' => null, 'delivery_error' => null]);
+                if ($project && $config['limit'] && $successful + 1 >= $config['limit']) {
+                    app(NotificationDeliveryService::class)->leadAlert($lead, 'daily_limit_reached', 'Daily delivery limit reached',
+                        'Campaign daily delivery capacity has been used. Further leads will wait for the next available day.',
+                        'limit:'.$campaign->id.':'.$start->toDateString(), 'delivery', true);
+                }
                 return true;
             }, 3);
         } catch (\Throwable $e) {
@@ -475,11 +484,16 @@ class LeadDistributionService
 
             $newStage = ($oldStage === 'new' || empty($oldStage)) ? 'assigned' : $oldStage;
 
-            $lead->update([
-                'assigned_to' => $user->id,
-                'current_stage' => $newStage,
-                'status' => $newStage,
-            ]);
+            $lead->webAssignmentRecorded = true;
+            try {
+                $lead->update([
+                    'assigned_to' => $user->id,
+                    'current_stage' => $newStage,
+                    'status' => $newStage,
+                ]);
+            } finally {
+                $lead->webAssignmentRecorded = false;
+            }
 
             // Status transition history
             LeadStatusHistory::create([

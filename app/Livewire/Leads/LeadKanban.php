@@ -225,6 +225,10 @@ class LeadKanban extends Component
 
     public function mount(): void
     {
+        if ($notificationLead = request()->integer('notification_lead')) {
+            $accessible = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->whereKey($notificationLead)->exists();
+            if ($accessible) $this->dispatch('open-lead-detail', id: $notificationLead);
+        }
         if (Lead::usesSalesPanel()) {
             $this->mainStages = ['new' => 'New', 'assigned' => 'Assigned', 'contacted' => 'Contacted', 'interested' => 'Interested', 'follow_up' => 'Follow-up', 'meeting_scheduled' => 'Meeting Scheduled', 'site_visit' => 'Site Visit', 'negotiation' => 'Negotiation', 'booking' => 'Booking', 'payment_received' => 'Payment Received', 'closed_won' => 'Closed Won'];
             $this->otherStages = ['lost' => 'Lost', 'invalid' => 'Invalid', 'unreachable' => 'Unreachable', 'replaced' => 'Replaced', 'pending_credit' => 'Awaiting Lead Panther'];

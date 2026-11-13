@@ -84,6 +84,10 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // First Response SLA Observers
+        foreach ([Lead::class, \App\Models\LeadAssignment::class, \App\Models\LeadReplacement::class,
+            \App\Models\Meeting::class, SiteVisit::class, \App\Models\Project::class, \App\Models\Campaign::class] as $modelClass) {
+            $modelClass::observe(\App\Observers\WebNotificationObserver::class);
+        }
         Lead::observe(\App\Observers\LeadObserver::class);
         LeadCall::observe(FirstResponseObserver::class);
         LeadMessage::observe(FirstResponseObserver::class);

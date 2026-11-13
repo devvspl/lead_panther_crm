@@ -22,11 +22,17 @@ class CheckDueFollowupsCommand extends Command
 
         $count = 0;
         foreach ($dueFollowups as $followup) {
-            $user = User::find($followup->created_by) ?? User::find($followup->lead?->assigned_to) ?? User::first();
-            if ($user) {
+            $lead = \App\Models\Lead::withoutGlobalScopes()->find($followup->lead_id);
+            if (! $lead || $lead->delivery_pending) continue;
+            $service = app(\App\Services\NotificationDeliveryService::class);
+            $key = 'followup:'.$followup->id.':'.$followup->due_at->toDateTimeString();
+            $user = User::find($lead->assigned_to);
+            $alreadySent = $user && \Illuminate\Notifications\DatabaseNotification::where('event_key', hash('sha256', $user->id.'|'.$key))->exists();
+            $service->leadAlert($lead, 'followup_due', 'Follow-up reminder due', "Follow-up for {$lead->lead_code} is due.", $key, 'followup');
+            if ($user && ! $alreadySent && $service->webAllowed($user, 'followup', false) && $user->organization_id == User::find($lead->client_id)?->organization_id) {
                 $user->notify(new FollowupDueNotification($followup));
-                $count++;
             }
+            $count++;
         }
 
         $this->info("Follow-up check completed: notified for {$count} due follow-ups.");

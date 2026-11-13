@@ -37,10 +37,11 @@ class CommunicationEngineTest extends TestCase
 
         $org = Organization::create(['name' => 'Builder Org', 'type' => 'builder']);
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Builder Client']);
+        $user->update(['organization_id' => $org->id]);
         $project = Project::create(['client_id' => $client->id, 'name' => 'Sky Towers']);
         $source = LeadSource::create(['name' => 'meta']);
 
-        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id]);
+        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id, 'assigned_to' => $user->id]);
 
         $user->notify(new LeadAssignedNotification($lead));
 
@@ -68,10 +69,11 @@ class CommunicationEngineTest extends TestCase
 
         $org = Organization::create(['name' => 'Builder Org 2', 'type' => 'builder']);
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Builder Client 2']);
+        $user->update(['organization_id' => $org->id]);
         $project = Project::create(['client_id' => $client->id, 'name' => 'River Palms']);
         $source = LeadSource::create(['name' => 'google']);
 
-        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id]);
+        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id, 'assigned_to' => $user->id]);
 
         $user->notify(new LeadAssignedNotification($lead));
         $this->assertEquals(1, $user->fresh()->unreadNotifications->count());
@@ -112,10 +114,13 @@ class CommunicationEngineTest extends TestCase
 
         $org = Organization::create(['name' => 'Builder Org 3', 'type' => 'builder']);
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Builder Client 3']);
+        $user->update(['organization_id' => $org->id]);
         $project = Project::create(['client_id' => $client->id, 'name' => 'Project Followup']);
         $source = LeadSource::create(['name' => 'portal']);
 
-        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id]);
+        $lead = Lead::factory()->create(['project_id' => $project->id, 'client_id' => $client->id, 'lead_source_id' => $source->id, 'assigned_to' => $user->id, 'status' => 'new', 'current_stage' => 'new']);
+        \App\Models\CreditWallet::create(['client_id' => $client->id, 'balance' => 1000, 'opening_balance' => 1000]);
+        event(new \App\Events\LeadCreated($lead));
 
         Followup::create([
             'lead_id' => $lead->id,
@@ -128,6 +133,6 @@ class CommunicationEngineTest extends TestCase
         $this->artisan('followups:check-due')
             ->assertExitCode(0);
 
-        $this->assertEquals(1, $user->fresh()->unreadNotifications->count());
+        $this->assertEquals(1, $user->notifications()->whereNull('read_at')->where('data->type', 'followup_due')->count());
     }
 }

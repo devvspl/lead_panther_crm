@@ -21,7 +21,8 @@ class FollowupDueNotification extends Notification
 
     public function via($notifiable): array
     {
-        return ['database', WhatsAppChannel::class, SmsChannel::class];
+        if (! app(\App\Services\NotificationDeliveryService::class)->webAllowed($notifiable, 'followup', false)) return [];
+        return [\App\Notifications\Channels\WebInboxChannel::class, WhatsAppChannel::class, SmsChannel::class];
     }
 
     public function toArray($notifiable): array

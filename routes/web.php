@@ -63,6 +63,9 @@ Route::get('dashboard', function () {
 Route::get('/impersonate/stop', [ImpersonationController::class, 'stop'])->middleware(['auth'])->name('impersonate.stop');
 
 // Lead Kanban Routes
+Route::get('/notifications', \App\Livewire\Shared\NotificationCenter::class)->middleware('auth')->name('notifications.index');
+Route::get('/notifications/{notification}/open', [\App\Http\Controllers\NotificationController::class, 'open'])->middleware('auth')->name('notifications.open');
+
 Route::get('/leads', LeadKanban::class)->middleware(['auth'])->name('leads.index');
 
 Route::get('/leads/kanban', LeadKanban::class)->middleware(['auth'])->name('leads.kanban');

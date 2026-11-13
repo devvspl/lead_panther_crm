@@ -18,6 +18,8 @@ class Lead extends Model
     use ClientScoped, HasFactory;
 
     protected $guarded = [];
+    // Transient service context: the assignment observer has already written the inbox alert.
+    public bool $webAssignmentRecorded = false;
 
     protected $casts = [
         'first_response_at' => 'datetime',

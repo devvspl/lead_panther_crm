@@ -338,7 +338,7 @@
                     $project = $row['project'];
                     $projectKey = 'project_'.$project->id;
                 @endphp
-                <article class="bg-surface border border-border rounded-xl p-5 space-y-5" wire:key="delivery-project-{{ $project->id }}">
+                <article id="delivery-project-{{ $project->id }}" class="bg-surface border border-border rounded-xl p-5 space-y-5" wire:key="delivery-project-{{ $project->id }}">
                     <h3 class="font-bold text-ink">{{ $project->name }} <span class="text-xs text-muted">Project: {{ ucfirst($project->status) }}</span></h3>
                     <h4 class="text-sm font-semibold text-ink">Project Default Settings</h4>
                     <form wire:submit="saveDeliverySettings('project', {{ $project->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
@@ -364,7 +364,7 @@
                             $key = 'campaign_'.$campaign->id;
                             $effective = $item['effective'];
                         @endphp
-                        <div class="border border-border rounded-lg p-4 space-y-3" wire:key="delivery-campaign-{{ $campaign->id }}">
+                        <div id="delivery-campaign-{{ $campaign->id }}" class="border border-border rounded-lg p-4 space-y-3" wire:key="delivery-campaign-{{ $campaign->id }}">
                             <h5 class="font-semibold text-ink">{{ $campaign->name }}</h5>
                             <p class="text-xs text-muted">Source: {{ $campaign->leadSource?->name ?? 'Not linked' }} | Campaign status: {{ ucfirst($campaign->status) }} | Delivery: {{ $project->delivery_enabled && $project->status === 'active' && $campaign->status === 'active' ? 'Active' : 'Paused' }}</p>
                             <form wire:submit="saveDeliverySettings('campaign', {{ $campaign->id }})" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">

@@ -37,7 +37,10 @@ Schedule::command('queue:work --stop-when-empty --tries=3')->everyMinute()->with
 // Schedule 2: Check Low Credit Balances & Notify Client Admins (Hourly)
 Schedule::call(function () {
     \App\Models\Lead::withoutGlobalScopes()->where('delivery_pending', true)
+        ->whereNotIn('status', ['duplicate', 'rejected', 'invalid'])
+        ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid'])
         ->where('delivery_at', '<=', now())
+        ->where(function ($q) { $q->whereNull('delivery_failed_at')->orWhere('delivery_failed_at', '<=', now()->subMinutes(5)); })
         ->chunkById(100, function ($leads) {
             foreach ($leads as $lead) {
                 app(\App\Services\LeadDistributionService::class)->releaseDelivery($lead->id);

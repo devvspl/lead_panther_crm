@@ -16,64 +16,136 @@ use Illuminate\Support\Facades\DB;
 
 class LeadDistributionService
 {
+    public function effectiveDeliveryConfig(\App\Models\Campaign $campaign, ?Project $project = null): array
+    {
+        $project ??= Project::withoutGlobalScopes()->findOrFail($campaign->project_id);
+        return [
+            'limit' => (int) ($campaign->delivery_daily_limit ?? $project->delivery_daily_limit ?? 0),
+            'interval' => (int) ($campaign->delivery_interval_minutes ?? $project->delivery_interval_minutes ?? 0),
+            'timezone' => User::find($project->client_id)?->organization?->delivery_timezone ?: config('app.timezone'),
+            'limit_source' => $campaign->delivery_daily_limit === null ? 'Project default' : 'Campaign override',
+            'interval_source' => $campaign->delivery_interval_minutes === null ? 'Project default' : 'Campaign override',
+        ];
+    }
+
+    private function campaignDeliveryQuery(int $campaignId): \Illuminate\Database\Eloquent\Builder
+    {
+        return Lead::withoutGlobalScopes()->where('campaign_id', $campaignId)
+            ->whereNotIn('status', ['duplicate', 'rejected', 'invalid'])
+            ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid']);
+    }
+
+    private function deliveryDay($at, string $timezone): array
+    {
+        $local = $at->copy()->setTimezone($timezone)->startOfDay();
+        return [$local->copy()->setTimezone(config('app.timezone')), $local->addDay()->setTimezone(config('app.timezone'))];
+    }
+
+    private function deliveryRecipientBelongsToProject(Lead $lead, Project $project): bool
+    {
+        if ($lead->client_id == $project->client_id) return true;
+        $owner = User::find($project->client_id);
+        $recipient = User::find($lead->client_id);
+        return $owner?->organization_id && $owner->organization_id == $recipient?->organization_id;
+    }
+
     public function scheduleDelivery(Lead $lead): void
     {
         $campaign = \App\Models\Campaign::withoutGlobalScopes()->find($lead->campaign_id);
         if (! $campaign) return;
         $project = Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first();
         if (! $project) return;
-
-        $limit = $campaign->delivery_daily_limit ?? $project->delivery_daily_limit;
-        $interval = $campaign->delivery_interval_minutes ?? $project->delivery_interval_minutes;
-        if (! $limit && ! $interval) return;
-
-        // Campaign overrides have their own queue; otherwise share the project queue.
-        $queue = Lead::withoutGlobalScopes()->whereIn('campaign_id',
-            \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
-        $campaignQueue = (clone $queue)->where('campaign_id', $campaign->id);
-        $intervalQueue = $campaign->delivery_interval_minutes !== null ? $campaignQueue : $queue;
-        $limitQueue = $campaign->delivery_daily_limit !== null ? $campaignQueue : $queue;
-        $at = now();
-        $last = (clone $intervalQueue)->max('delivery_at');
-        if ($interval && $last) {
-            $next = \Carbon\Carbon::parse($last)->addMinutes($interval);
-            if ($next->gt($at)) $at = $next;
+        if (! $this->deliveryRecipientBelongsToProject($lead, $project)) {
+            throw new \DomainException('Lead recipient does not belong to the campaign organization.');
         }
-        if ($limit) {
-            while ((clone $limitQueue)->whereRaw('COALESCE(delivery_at, created_at) >= ?', [$at->copy()->startOfDay()])
-                ->whereRaw('COALESCE(delivery_at, created_at) < ?', [$at->copy()->addDay()->startOfDay()])->count() >= $limit) {
-                $at->addDay()->startOfDay();
+        $config = $this->effectiveDeliveryConfig($campaign, $project);
+        $queue = $this->campaignDeliveryQuery($campaign->id);
+        $at = now();
+        $lastDelivered = (clone $queue)->max('delivered_at');
+        $lastScheduled = (clone $queue)->where('delivery_pending', true)->whereNull('delivery_failed_at')->max('delivery_at');
+        foreach ([$lastDelivered, $lastScheduled] as $last) {
+            if ($config['interval'] && $last) {
+                $next = \Carbon\Carbon::parse($last)->addMinutes($config['interval']);
+                if ($next->gt($at)) $at = $next;
             }
         }
+        if ($config['limit']) {
+            do {
+                [$start, $end] = $this->deliveryDay($at, $config['timezone']);
+                $successful = (clone $queue)->where('delivered_at', '>=', $start)->where('delivered_at', '<', $end)->count();
+                // Reserve planning slots without counting pending leads as successful deliveries.
+                $reserved = (clone $queue)->where('delivery_pending', true)->whereNull('delivery_failed_at')
+                    ->where('delivery_at', '>=', $start)->where('delivery_at', '<', $end)->count();
+                if ($successful + $reserved < $config['limit']) break;
+                $at = $end;
+            } while (true);
+        }
         $lead->delivery_at = $at;
+        $lead->delivery_config = $config;
         $lead->delivery_pending = true;
     }
 
     public function releaseDelivery(int $leadId): bool
     {
-        return DB::transaction(function () use ($leadId) {
-            $candidate = Lead::withoutGlobalScopes()->find($leadId);
-            $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
-            $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
-            $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
-            if (! $lead || ! $lead->delivery_pending || $lead->delivery_at?->isFuture()) return false;
-            if ($project) {
-                $queue = Lead::withoutGlobalScopes()->where('delivery_pending', false)->whereIn('campaign_id',
-                    \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
-                $limit = $campaign->delivery_daily_limit ?? $project->delivery_daily_limit;
-                $interval = $campaign->delivery_interval_minutes ?? $project->delivery_interval_minutes;
-                $daily = clone $queue;
-                $spaced = clone $queue;
-                if ($campaign->delivery_daily_limit !== null) $daily->where('campaign_id', $campaign->id);
-                if ($campaign->delivery_interval_minutes !== null) $spaced->where('campaign_id', $campaign->id);
-                if ($limit && $daily->whereRaw('COALESCE(delivered_at, created_at) >= ?', [now()->startOfDay()])->count() >= $limit) return false;
-                $last = $spaced->max('delivered_at');
-                if ($interval && $last && \Carbon\Carbon::parse($last)->addMinutes($interval)->isFuture()) return false;
-            }
-            if (! \App\Models\CreditTransaction::reserveForLead($lead)) return false;
-            $lead->update(['delivery_pending' => false, 'delivered_at' => now()]);
-            return true;
-        });
+        try {
+            return DB::transaction(function () use ($leadId) {
+                $candidate = Lead::withoutGlobalScopes()->find($leadId);
+                $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
+                $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
+                $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
+                if (! $lead || ! $lead->delivery_pending || $lead->delivery_at?->isFuture()) return false;
+                if ($project && ! $this->deliveryRecipientBelongsToProject($lead, $project)) {
+                    $lead->update(['delivery_failed_at' => now(), 'delivery_error' => 'Lead recipient does not belong to the campaign organization.']);
+                    return false;
+                }
+                if (in_array(strtolower($lead->status), ['duplicate', 'rejected', 'invalid']) || in_array(strtolower($lead->current_stage), ['duplicate', 'rejected', 'invalid'])) {
+                    // Keep undelivered rejected records hidden from the customer panel.
+                    return false;
+                }
+                if ($project && (! $project->delivery_enabled || $project->status !== 'active' || $campaign->status !== 'active')) return false;
+                if ($project) {
+                    $config = $lead->delivery_config ?? $this->effectiveDeliveryConfig($campaign, $project);
+                    $queue = $this->campaignDeliveryQuery($campaign->id);
+                    [$start, $end] = $this->deliveryDay(now(), $config['timezone']);
+                    $successful = (clone $queue)->where('delivered_at', '>=', $start)->where('delivered_at', '<', $end)->count();
+                    if ($config['limit'] && $successful >= $config['limit']) return false;
+                    $last = (clone $queue)->max('delivered_at');
+                    if ($config['interval'] && $last && \Carbon\Carbon::parse($last)->addMinutes($config['interval'])->isFuture()) return false;
+                }
+                if (! \App\Models\CreditTransaction::reserveForLead($lead)) {
+                    $lead->update(['delivery_failed_at' => now(), 'delivery_error' => 'Credit reservation failed: check organization status and available balance.']);
+                    return false;
+                }
+                $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'delivery_failed_at' => null, 'delivery_error' => null]);
+                return true;
+            }, 3);
+        } catch (\Throwable $e) {
+            Lead::withoutGlobalScopes()->whereKey($leadId)->where('delivery_pending', true)
+                ->update(['delivery_failed_at' => now(), 'delivery_error' => 'Delivery failed; see application log.']);
+            report($e);
+            return false;
+        }
+    }
+
+    public function deliveryStatistics(Project $project, ?\App\Models\Campaign $campaign = null): array
+    {
+        $timezone = User::find($project->client_id)?->organization?->delivery_timezone ?: config('app.timezone');
+        [$start, $end] = $this->deliveryDay(now(), $timezone);
+        $query = Lead::withoutGlobalScopes()->whereIn('campaign_id', \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
+        if ($campaign) $query->where('campaign_id', $campaign->id);
+        $successful = (clone $query)->whereNotIn('status', ['duplicate', 'rejected', 'invalid'])->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid']);
+        $today = (clone $successful)->where('delivered_at', '>=', $start)->where('delivered_at', '<', $end)->count();
+        $pending = (clone $successful)->where('delivery_pending', true);
+        $limit = $campaign ? $this->effectiveDeliveryConfig($campaign, $project)['limit'] : (int) $project->delivery_daily_limit;
+        $remaining = $limit ? max(0, $limit - $today) : null;
+        if (! $campaign) {
+            $capacities = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->get()
+                ->map(fn ($item) => $this->deliveryStatistics($project, $item)['remaining']);
+            $remaining = $capacities->containsStrict(null) ? null : $capacities->sum();
+        }
+        return ['total' => (clone $query)->count(), 'today' => $today, 'remaining' => $remaining,
+            'pending' => (clone $pending)->count(), 'failed' => (clone $pending)->whereNotNull('delivery_failed_at')->count(),
+            'next' => (clone $pending)->min('delivery_at'), 'last' => (clone $successful)->max('delivered_at'), 'timezone' => $timezone];
     }
 
     /**

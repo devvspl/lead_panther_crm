@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\Project;
 use App\Models\Lead;
 use App\Models\LeadSource;
+use App\Models\Campaign;
 use App\Models\CreditWallet;
 use App\Models\CreditTransaction;
 use App\Models\RechargeRequest;
@@ -42,6 +43,34 @@ class OrganizationDetail extends Component
     public string $editStatus = 'active';
     public ?float $orgLeadCost = null;
     public array $deliverySettings = [];
+    public string $deliveryTimezone = '';
+
+    public function saveDeliveryTimezone(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $this->validate(['deliveryTimezone' => 'required|timezone']);
+        try {
+            $this->organization->update(['delivery_timezone' => $this->deliveryTimezone]);
+        } catch (Throwable $e) {
+            report($e);
+            $this->dispatch('toast', type: 'error', message: 'Delivery timezone could not be saved. Please try again.');
+            return;
+        }
+        $this->dispatch('toast', type: 'success', message: 'Organization delivery timezone saved. Existing queued schedules are preserved.');
+    }
+
+    public function getDeliveryProjectsProperty()
+    {
+        $service = app(\App\Services\LeadDistributionService::class);
+        return Project::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $this->organization->id)->select('id'))
+            ->orderBy('name')->get()->map(function ($project) use ($service) {
+                $campaigns = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
+                return ['project' => $project, 'stats' => $service->deliveryStatistics($project),
+                    'campaigns' => $campaigns->map(fn ($campaign) => ['campaign' => $campaign,
+                        'effective' => $service->effectiveDeliveryConfig($campaign, $project),
+                        'stats' => $service->deliveryStatistics($project, $campaign)])];
+            });
+    }
 
     public function saveDeliverySettings(string $type, int $id): void
     {
@@ -54,14 +83,27 @@ class OrganizationDetail extends Component
             : $model->whereIn('project_id', $projects)->findOrFail($id);
         $key = $type.'_'.$id;
         $this->validate([
-            "deliverySettings.$key.limit" => 'nullable|integer|min:1|max:100000',
+            "deliverySettings.$key.limit" => 'nullable|integer|min:0|max:100000',
             "deliverySettings.$key.interval" => 'nullable|integer|min:0|max:10080',
+            "deliverySettings.$key.enabled" => 'sometimes|boolean',
+            "deliverySettings.$key.inherit_limit" => 'sometimes|boolean',
+            "deliverySettings.$key.inherit_interval" => 'sometimes|boolean',
         ]);
         $settings = $this->deliverySettings[$key] ?? [];
-        $record->update([
-            'delivery_daily_limit' => ($settings['limit'] ?? '') !== '' ? ($settings['limit'] ?? null) : null,
-            'delivery_interval_minutes' => ($settings['interval'] ?? '') !== '' ? ($settings['interval'] ?? null) : null,
-        ]);
+        $values = [];
+        foreach (['limit' => 'delivery_daily_limit', 'interval' => 'delivery_interval_minutes'] as $field => $column) {
+            $value = $settings[$field] ?? null;
+            $values[$column] = $type === 'campaign' && (($settings['inherit_'.$field] ?? false) || $value === '' || $value === null)
+                ? null : (int) $value;
+        }
+        if ($type === 'project') $values['delivery_enabled'] = (bool) ($settings['enabled'] ?? $record->delivery_enabled);
+        try {
+            $record->update($values);
+        } catch (Throwable $e) {
+            report($e);
+            $this->dispatch('toast', type: 'error', message: 'Delivery settings could not be saved. Please try again.');
+            return;
+        }
         $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. New leads will follow these settings; queued leads keep their scheduled delivery time.');
     }
 
@@ -107,6 +149,7 @@ class OrganizationDetail extends Component
     public function mount(Organization $organization): void
     {
         $this->organization = $organization;
+        $this->deliveryTimezone = $organization->delivery_timezone ?: config('app.timezone');
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
         $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
@@ -114,7 +157,13 @@ class OrganizationDetail extends Component
         foreach (['project' => Project::withoutGlobalScopes()->whereIn('id', $projectIds)->get(),
             'campaign' => \App\Models\Campaign::withoutGlobalScopes()->whereIn('project_id', $projectIds)->get()] as $type => $records) {
             foreach ($records as $record) {
-                $this->deliverySettings[$type.'_'.$record->id] = ['limit' => $record->delivery_daily_limit, 'interval' => $record->delivery_interval_minutes];
+                $this->deliverySettings[$type.'_'.$record->id] = [
+                    'limit' => $record->delivery_daily_limit ?? ($type === 'project' ? 0 : null),
+                    'interval' => $record->delivery_interval_minutes ?? ($type === 'project' ? 0 : null),
+                    'enabled' => $type === 'project' ? (bool) $record->delivery_enabled : true,
+                    'inherit_limit' => $type === 'campaign' && $record->delivery_daily_limit === null,
+                    'inherit_interval' => $type === 'campaign' && $record->delivery_interval_minutes === null,
+                ];
             }
         }
 
@@ -502,11 +551,8 @@ class OrganizationDetail extends Component
             'assigned_to' => $this->newLeadAssignedTo, // Direct assignment!
         ]);
 
-        // Try reserving credit for lead
-        try {
-            CreditTransaction::reserveForLead($lead);
-        } catch (Throwable $e) {
-        }
+        // Use the same scheduled delivery path as webhook and Meta ingestion.
+        event(new \App\Events\LeadCreated($lead));
 
         $assignedName = $lead->assignedTo?->name ?: 'Direct Pool';
         $this->closeCreateLeadModal();

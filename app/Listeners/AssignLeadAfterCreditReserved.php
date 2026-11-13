@@ -17,20 +17,8 @@ class AssignLeadAfterCreditReserved
         $assignee = DistributionRule::pickAssignee($lead);
 
         if ($assignee) {
-            $lead->update([
-                'assigned_to' => $assignee->id,
-                'current_stage' => 'assigned',
-                'status' => 'assigned',
-            ]);
-
-            $assignerId = auth()->id() ?? \App\Models\User::where('id', 1)->value('id') ?? \App\Models\User::value('id') ?? $assignee->id;
-
-            $assignment = LeadAssignment::create([
-                'lead_id' => $lead->id,
-                'assigned_to' => $assignee->id,
-                'assigned_by' => $assignerId,
-                'assigned_at' => now(),
-            ]);
+            // pickAssignee delegates to the existing service, which already records assignment.
+            $assignment = LeadAssignment::where('lead_id', $lead->id)->where('assigned_to', $assignee->id)->latest('id')->firstOrFail();
 
             event(new LeadAssigned($lead, $assignee, $assignment));
         }

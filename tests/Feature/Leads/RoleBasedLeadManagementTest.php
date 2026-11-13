@@ -299,6 +299,10 @@ class RoleBasedLeadManagementTest extends TestCase
             'project_id' => $this->project->id,
         ]);
 
+        // Campaign leads enter the panel only after actual delivery succeeds.
+        \App\Models\CreditWallet::firstOrCreate(['client_id' => $this->builderUser->id], ['balance' => 1000, 'opening_balance' => 1000]);
+        event(new \App\Events\LeadCreated($lead));
+
         $this->actingAs($this->exec1);
 
         $test = Livewire::test(LeadDetail::class);

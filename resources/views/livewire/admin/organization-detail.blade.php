@@ -319,45 +319,87 @@
     </div>
 
     @if($activeTab === 'campaigns')
-        <section class="bg-surface border border-border rounded-xl p-6 space-y-5">
-            <h2 class="font-bold text-ink">Campaign Details & Lead Delivery</h2>
-            <p class="text-sm text-muted">Set project defaults or override individual campaigns. Blank campaign values inherit the project setting. Blank project limits mean unlimited; a zero interval means immediate delivery. Excess leads wait for the next available slot. Times use {{ config('app.timezone') }}. Changes apply to new leads; existing queued leads retain their scheduled time.</p>
-            @forelse($projects as $project)
+        <section class="space-y-5" wire:poll.30s>
+            <div class="bg-surface border border-border rounded-xl p-5 space-y-3">
+                <h2 class="font-bold text-ink">Campaign Details & Lead Delivery</h2>
+                <p class="text-sm text-muted">Project defaults apply independently to each campaign. Zero means unlimited leads or immediate delivery. Queued leads keep their saved configuration and scheduled time; active/inactive controls pause releases.</p>
+                <form wire:submit="saveDeliveryTimezone" class="flex flex-wrap items-end gap-3">
+                    <label class="text-xs text-ink">Organization delivery timezone
+                        <input wire:model="deliveryTimezone" list="delivery-timezones" class="block mt-1 rounded-lg border border-border bg-canvas p-2" required>
+                        <datalist id="delivery-timezones">@foreach(\DateTimeZone::listIdentifiers() as $zone)<option value="{{ $zone }}">@endforeach</datalist>
+                        @error('deliveryTimezone') <span class="text-red-600">{{ $message }}</span> @enderror
+                    </label>
+                    <button type="submit" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Timezone</button>
+                </form>
+                <p class="text-xs text-muted">Statistics use {{ $organization->delivery_timezone ?: config('app.timezone') }}. Only recorded successful deliveries consume daily capacity. Historical leads without delivery records are not assumed to have been delivered.</p>
+            </div>
+            @forelse($this->deliveryProjects as $row)
                 @php
-                    $campaigns = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
+                    $project = $row['project'];
+                    $projectKey = 'project_'.$project->id;
                 @endphp
-                <div class="border border-border rounded-lg p-4 space-y-4" wire:key="delivery-project-{{ $project->id }}">
-                    <h3 class="font-semibold text-ink">{{ $project->name }}</h3>
-                    @foreach(collect([$project])->concat($campaigns) as $record)
+                <article class="bg-surface border border-border rounded-xl p-5 space-y-5" wire:key="delivery-project-{{ $project->id }}">
+                    <h3 class="font-bold text-ink">{{ $project->name }} <span class="text-xs text-muted">Project: {{ ucfirst($project->status) }}</span></h3>
+                    <h4 class="text-sm font-semibold text-ink">Project Default Settings</h4>
+                    <form wire:submit="saveDeliverySettings('project', {{ $project->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                        <label class="text-xs text-ink">Daily Lead Limit (0 = unlimited)
+                            <input type="number" min="0" max="100000" wire:model="deliverySettings.{{ $projectKey }}.limit" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
+                            @error('deliverySettings.'.$projectKey.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
+                        </label>
+                        <label class="text-xs text-ink">Delivery Interval (Minutes; 0 = immediate)
+                            <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $projectKey }}.interval" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
+                            @error('deliverySettings.'.$projectKey.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
+                        </label>
+                        <label class="text-xs text-ink">Delivery status
+                            <select wire:model="deliverySettings.{{ $projectKey }}.enabled" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2"><option value="1">Active</option><option value="0">Inactive</option></select>
+                        </label>
+                        <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
+                    </form>
+                    <h4 class="text-sm font-semibold text-ink">Live Delivery Statistics <span class="font-normal text-muted">(project totals; capacity summed across campaigns)</span></h4>
+                    <x-ui.delivery-statistics :stats="$row['stats']" />
+                    <h4 class="text-sm font-semibold text-ink border-t border-border pt-4">Campaign Override Settings</h4>
+                    @forelse($row['campaigns'] as $item)
                         @php
-                            $type = $loop->first ? 'project' : 'campaign';
-                            $key = $type.'_'.$record->id;
-                            $queue = \App\Models\Lead::withoutGlobalScopes()->when($type === 'campaign', fn ($q) => $q->where('campaign_id', $record->id), fn ($q) => $q->whereIn('campaign_id', $campaigns->pluck('id')));
+                            $campaign = $item['campaign'];
+                            $key = 'campaign_'.$campaign->id;
+                            $effective = $item['effective'];
                         @endphp
-                        <form wire:submit="saveDeliverySettings('{{ $type }}', {{ $record->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end border-t border-border pt-3" wire:key="delivery-{{ $key }}">
-                            <div class="min-w-0 text-sm text-ink">
-                                <div class="font-semibold break-words">{{ $type === 'project' ? 'Project defaults' : $record->name }}</div>
-                                <div class="text-xs text-muted">{{ $type === 'campaign' ? $record->leadSource?->name.' · '.$record->status : 'All campaigns in this project' }}</div>
-                                <div class="text-xs text-muted">{{ (clone $queue)->count() }} total · {{ (clone $queue)->where('delivery_pending', true)->count() }} queued</div>
+                        <div class="border border-border rounded-lg p-4 space-y-3" wire:key="delivery-campaign-{{ $campaign->id }}">
+                            <h5 class="font-semibold text-ink">{{ $campaign->name }}</h5>
+                            <p class="text-xs text-muted">Source: {{ $campaign->leadSource?->name ?? 'Not linked' }} | Campaign status: {{ ucfirst($campaign->status) }} | Delivery: {{ $project->delivery_enabled && $project->status === 'active' && $campaign->status === 'active' ? 'Active' : 'Paused' }}</p>
+                            <form wire:submit="saveDeliverySettings('campaign', {{ $campaign->id }})" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                                <div class="text-xs text-ink">
+                                    <label>Daily Lead Limit (0 = unlimited)
+                                        <input type="number" min="0" max="100000" wire:model="deliverySettings.{{ $key }}.limit" @disabled($deliverySettings[$key]['inherit_limit'] ?? true) placeholder="Inherit project" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2 disabled:opacity-50">
+                                    </label>
+                                    <label class="flex gap-2 mt-2"><input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_limit"> Inherit Project Default</label>
+                                    @error('deliverySettings.'.$key.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
+                                </div>
+                                <div class="text-xs text-ink">
+                                    <label>Delivery Interval (Minutes; 0 = immediate)
+                                        <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $key }}.interval" @disabled($deliverySettings[$key]['inherit_interval'] ?? true) placeholder="Inherit project" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2 disabled:opacity-50">
+                                    </label>
+                                    <label class="flex gap-2 mt-2"><input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_interval"> Inherit Project Default</label>
+                                    @error('deliverySettings.'.$key.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
+                                </div>
+                                <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
+                            </form>
+                            <div class="text-xs text-ink bg-canvas border border-border rounded-lg p-3">
+                                Effective daily limit: <strong>{{ $effective['limit'] === 0 ? 'Unlimited' : $effective['limit'] }}</strong> ({{ $effective['limit_source'] }}) |
+                                Effective interval: <strong>{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' minutes' }}</strong> ({{ $effective['interval_source'] }})
                             </div>
-                            <label class="text-xs text-ink">Daily lead limit
-                                <input type="number" min="1" max="100000" wire:model="deliverySettings.{{ $key }}.limit" placeholder="{{ $type === 'campaign' ? 'Inherit project' : 'Unlimited' }}" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
-                                @error('deliverySettings.'.$key.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
-                            </label>
-                            <label class="text-xs text-ink">Interval (minutes)
-                                <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $key }}.interval" placeholder="{{ $type === 'campaign' ? 'Inherit project' : 'Immediate' }}" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
-                                @error('deliverySettings.'.$key.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
-                            </label>
-                            <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
-                        </form>
-                    @endforeach
-                </div>
+                            <h6 class="text-xs font-semibold text-ink">Live Delivery Statistics</h6>
+                            <x-ui.delivery-statistics :stats="$item['stats']" />
+                        </div>
+                    @empty
+                        <p class="text-sm text-muted">No campaigns linked to this project.</p>
+                    @endforelse
+                </article>
             @empty
-                <p class="text-sm text-muted">No projects or campaigns are linked to this organization.</p>
+                <p class="text-sm text-muted">No projects linked to this organization.</p>
             @endforelse
         </section>
     @endif
-
     <!-- TAB 1: OVERVIEW -->
     @if($activeTab === 'overview')
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

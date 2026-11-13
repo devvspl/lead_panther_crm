@@ -24,6 +24,8 @@ class Lead extends Model
         'delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
         'delivery_pending' => 'boolean',
+        'delivery_config' => 'array',
+        'delivery_failed_at' => 'datetime',
     ];
 
     public static function usesSalesPanel(): bool

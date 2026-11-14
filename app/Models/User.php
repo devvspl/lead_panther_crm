@@ -18,11 +18,40 @@ class User extends Authenticatable
     use HasRoles {
         assignRole as spatieAssignRole;
         syncRoles as spatieSyncRoles;
+        removeRole as spatieRemoveRole;
+        givePermissionTo as spatieGivePermissionTo;
+        revokePermissionTo as spatieRevokePermissionTo;
+        syncPermissions as spatieSyncPermissions;
         hasRole as spatieHasRole;
         scopeRole as spatieScopeRole;
     }
 
     protected $guarded = [];
+    public array $auditAccessBefore = [];
+
+    private function captureAccessChange(string $relation, callable $change)
+    {
+        $previous = $this->auditAccessBefore[$relation] ?? null;
+        $this->auditAccessBefore[$relation] = $this->exists ? $this->{$relation}()->pluck($relation.'.id')->all() : [];
+        try { return $change(); }
+        finally {
+            if ($previous === null) unset($this->auditAccessBefore[$relation]);
+            else $this->auditAccessBefore[$relation] = $previous;
+        }
+    }
+
+    public function removeRole(...$roles) { return $this->captureAccessChange('roles', fn () => $this->spatieRemoveRole(...$roles)); }
+    public function givePermissionTo(...$permissions) { return $this->captureAccessChange('permissions', fn () => $this->spatieGivePermissionTo(...$permissions)); }
+    public function revokePermissionTo($permission) { return $this->captureAccessChange('permissions', fn () => $this->spatieRevokePermissionTo($permission)); }
+    public function syncPermissions(...$permissions)
+    {
+        $before = $this->exists ? $this->permissions()->pluck('permissions.id')->all() : [];
+        $result = $this->captureAccessChange('permissions', fn () => $this->spatieSyncPermissions(...$permissions));
+        $after = $this->exists ? $this->permissions()->pluck('permissions.id')->all() : [];
+        if ($before !== $after) \App\Models\AuditLog::create(['user_id' => auth()->id(), 'action' => 'access.permissions_synced', 'subject_type' => static::class, 'subject_id' => $this->id,
+            'organization_id' => $this->organization_id, 'from_value' => ['permissions' => $before], 'to_value' => ['permissions' => $after], 'context' => ['category' => 'access', 'status' => 'success'], 'created_at' => now()]);
+        return $result;
+    }
 
     public function organization(): BelongsTo
     {
@@ -152,7 +181,7 @@ class User extends Authenticatable
             ->unique()
             ->all();
 
-        return $this->spatieAssignRole($normalizedRoles);
+        return $this->captureAccessChange('roles', fn () => $this->spatieAssignRole($normalizedRoles));
     }
 
     public function syncRoles(...$roles)
@@ -163,7 +192,7 @@ class User extends Authenticatable
             ->unique()
             ->all();
 
-        return $this->spatieSyncRoles($normalizedRoles);
+        return $this->captureAccessChange('roles', fn () => $this->spatieSyncRoles($normalizedRoles));
     }
 
     public function hasRole($roles, ?string $guard = null): bool

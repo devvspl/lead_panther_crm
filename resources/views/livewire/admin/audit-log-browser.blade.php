@@ -34,6 +34,15 @@
         <!-- Filter Dropdown Slot -->
         <x-slot:filters>
             <div class="space-y-3">
+                <label class="block text-xs text-ink">Organization
+                    <select wire:model.live="organizationId" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All organizations</option>@foreach($organizations as $org)<option value="{{ $org->id }}">{{ $org->name }}</option>@endforeach</select>
+                </label>
+                <label class="block text-xs text-ink">Event Category
+                    <select wire:model.live="eventCategory" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All categories</option>@foreach(['model', 'request', 'livewire', 'api', 'webhook', 'notification', 'access'] as $category)<option value="{{ $category }}">{{ ucfirst($category) }}</option>@endforeach</select>
+                </label>
+                <label class="block text-xs text-ink">Result
+                    <select wire:model.live="eventStatus" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All results</option><option value="success">Success</option><option value="failure">Failure</option></select>
+                </label>
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Performing User</label>
                     <livewire:shared.searchable-select 
@@ -126,117 +135,47 @@
         </x-slot:action>
     </x-ui.advanced-table>
 
-    <!-- Inspection / Details Modal -->
-    <x-modal name="audit-log-details-modal" :show="$showDetailsModal" maxWidth="3xl">
+    <x-modal name="audit-log-details-modal" :show="$showDetailsModal" maxWidth="6xl">
         @if($selectedLog)
-            <div class="p-5 sm:p-6 space-y-5 max-h-[88vh] overflow-y-auto">
-                <!-- Modal Header -->
-                <div class="flex items-start justify-between gap-3 border-b border-border pb-4">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-base font-bold text-ink">
-                                    Audit Entry #{{ $selectedLog->id }}
-                                </h3>
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ str_contains($selectedLog->action, 'delete') || str_contains($selectedLog->action, 'failed') ? 'bg-red-50 text-red-700 border border-red-200' : (str_contains($selectedLog->action, 'create') || str_contains($selectedLog->action, 'login') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200') }}">
-                                    {{ $selectedLog->action }}
-                                </span>
-                            </div>
-                            <p class="text-xs text-muted">
-                                Recorded on {{ $selectedLog->created_at ? $selectedLog->created_at->format('M d, Y \a\t H:i:s T') : '—' }}
-                            </p>
-                        </div>
+            @php $inspection = $this->inspection; @endphp
+            <div class="p-5 sm:p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+                <header class="flex flex-wrap justify-between items-center gap-3 border-b border-border pb-4">
+                    <h2 class="text-lg font-bold text-ink">Audit Entry #{{ $selectedLog->id }}</h2>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <button type="button" x-data @click="navigator.clipboard.writeText(String(@js($selectedLog->id))).then(() => $dispatch('toast', {type:'success', message:'Audit ID copied'})).catch(() => $dispatch('toast', {type:'error', message:'Clipboard unavailable'}))" class="border border-border rounded-lg px-3 py-2">Copy Audit ID</button>
+                        <button type="button" x-data @click="navigator.clipboard.writeText(@js($this->formatPayload($inspection))).then(() => $dispatch('toast', {type:'success', message:'Sanitized JSON copied'})).catch(() => $dispatch('toast', {type:'error', message:'Clipboard unavailable'}))" class="border border-border rounded-lg px-3 py-2">Copy JSON</button>
+                        <button type="button" wire:click="closeDetails" class="border border-border rounded-lg px-3 py-2">Close</button>
                     </div>
-
-                    <button 
-                        type="button" 
-                        wire:click="closeDetails"
-                        class="text-muted hover:text-ink transition p-1.5 rounded-lg hover:bg-canvas cursor-pointer"
-                        title="Close Modal"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Metadata Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="p-3 rounded-xl bg-canvas/60 border border-border">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">Performing User</span>
-                        <div class="text-xs font-bold text-ink truncate">{{ $selectedLog->user?->name ?: 'System / Anonymous' }}</div>
-                        <div class="text-[11px] text-muted truncate">{{ $selectedLog->user?->email ?: ($selectedLog->user_id ? 'ID #' . $selectedLog->user_id : 'System Routine') }}</div>
+                </header>
+                <section class="space-y-2">
+                    <h3 class="font-semibold text-sm text-ink">Basic Information</h3>
+                    <dl class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                        @foreach($inspection['basic'] as $label => $value)
+                            <div class="border border-border rounded-lg p-3 min-w-0"><dt class="text-muted capitalize">{{ str_replace('_', ' ', $label) }}</dt><dd class="text-ink break-words font-medium mt-1">{{ is_array($value) ? implode(', ', $value) : ($value ?? 'Unavailable') }}</dd></div>
+                        @endforeach
+                    </dl>
+                </section>
+                <section class="space-y-2"><h3 class="font-semibold text-sm text-ink">Request Details</h3><x-ui.audit-json :value="$inspection['request']" /></section>
+                <section class="space-y-3">
+                    <h3 class="font-semibold text-sm text-ink">Change Details</h3>
+                    <p class="text-xs text-muted">Related entity: {{ $inspection['entity']['type'] ?? 'Unavailable' }} | Record ID: {{ $inspection['entity']['id'] ?? 'Unavailable' }}</p>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="space-y-2"><h4 class="text-xs font-semibold text-ink">Previous Values</h4><x-ui.audit-json :value="$inspection['before']" /></div>
+                        <div class="space-y-2"><h4 class="text-xs font-semibold text-ink">Updated Values</h4><x-ui.audit-json :value="$inspection['after']" /></div>
                     </div>
-
-                    <div class="p-3 rounded-xl bg-canvas/60 border border-border">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">Subject Entity</span>
-                        <div class="text-xs font-bold font-mono text-ink truncate">{{ $selectedLog->subject_type ? class_basename($selectedLog->subject_type) : '—' }}</div>
-                        <div class="text-[11px] text-muted font-mono truncate">{{ $selectedLog->subject_id ? 'ID #' . $selectedLog->subject_id : ($selectedLog->subject_type ? $selectedLog->subject_type : 'None') }}</div>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas/60 border border-border">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">IP Address</span>
-                        <div class="text-xs font-bold font-mono text-ink">{{ $selectedLog->ip_address ?: '127.0.0.1' }}</div>
-                        <div class="text-[11px] text-muted truncate">Client Remote IP</div>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-canvas/60 border border-border">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">User Agent</span>
-                        <div class="text-xs font-medium text-ink truncate" title="{{ $selectedLog->user_agent }}">{{ $selectedLog->user_agent ?: '—' }}</div>
-                        <div class="text-[11px] text-muted truncate">Client Agent</div>
-                    </div>
-                </div>
-
-                <!-- Payloads Section -->
-                <div class="space-y-4">
-                    @if($selectedLog->from_value)
-                        <div class="space-y-1.5">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold text-ink flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    <span>Previous State / Request Query Context</span>
-                                </span>
-                                <span class="text-[10px] text-muted uppercase font-mono">from_value</span>
-                            </div>
-                            <pre class="bg-canvas p-3.5 rounded-xl border border-border text-[11px] font-mono overflow-x-auto text-ink leading-relaxed max-h-56">{{ $this->formatPayload($selectedLog->from_value) }}</pre>
-                        </div>
+                    @if($inspection['changed_fields'])
+                        <div class="overflow-x-auto border border-border rounded-lg"><table class="w-full text-xs text-left"><thead class="bg-canvas text-muted"><tr><th class="p-3">Changed Field</th><th class="p-3">Before</th><th class="p-3">After</th></tr></thead><tbody>
+                        @foreach($inspection['changed_fields'] as $change)<tr class="border-t border-border"><td class="p-3 font-mono">{{ $change['field'] }}</td><td class="p-3"><x-ui.audit-json :value="$change['before']" /></td><td class="p-3"><x-ui.audit-json :value="$change['after']" /></td></tr>@endforeach
+                        </tbody></table></div>
+                    @else
+                        <p class="text-xs text-muted">No field comparison was recorded for this event.</p>
                     @endif
-
-                    @if($selectedLog->to_value)
-                        <div class="space-y-1.5">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold text-ink flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>New State / Invocation Payload</span>
-                                </span>
-                                <span class="text-[10px] text-muted uppercase font-mono">to_value</span>
-                            </div>
-                            <pre class="bg-canvas p-3.5 rounded-xl border border-border text-[11px] font-mono overflow-x-auto text-ink leading-relaxed max-h-72">{{ $this->formatPayload($selectedLog->to_value) }}</pre>
-                        </div>
-                    @endif
-
-                    @if(!$selectedLog->from_value && !$selectedLog->to_value)
-                        <div class="p-6 text-center rounded-xl bg-canvas/50 border border-dashed border-border text-xs text-muted">
-                            No additional payload or state snapshot was recorded for this entry.
-                        </div>
-                    @endif
-                </div>
-
-                <!-- Modal Footer -->
-                <div class="pt-3 border-t border-border flex items-center justify-end">
-                    <button 
-                        type="button" 
-                        wire:click="closeDetails"
-                        class="px-4 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-neutral-200 transition cursor-pointer"
-                    >
-                        Close
-                    </button>
-                </div>
+                </section>
+                <section class="space-y-2"><h3 class="font-semibold text-sm text-ink">System Details</h3><x-ui.audit-json :value="$inspection['system']" /></section>
+                <footer class="flex justify-between border-t border-border pt-4 text-xs">
+                    <div class="flex gap-2"><button type="button" wire:click="navigateRecord('previous')" class="border border-border px-3 py-2 rounded-lg">Previous record</button><button type="button" wire:click="navigateRecord('next')" class="border border-border px-3 py-2 rounded-lg">Next record</button></div>
+                    <button type="button" wire:click="closeDetails" class="bg-primary text-white px-4 py-2 rounded-lg">Close</button>
+                </footer>
             </div>
         @endif
     </x-modal>

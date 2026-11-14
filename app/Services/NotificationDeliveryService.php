@@ -14,6 +14,14 @@ class NotificationDeliveryService
 {
     public const WEB_CATEGORIES = ['assignment', 'followup', 'sla', 'replacement', 'delivery'];
 
+    public function managedNotifications(User $user)
+    {
+        if ($user->hasAnyRole(['Super Admin', 'super-admin'])) {
+            return \App\Models\SystemNotification::query()->whereIn('notifiable_type', [User::class, \App\Models\Client::class])->with(['recipient.roles', 'organization']);
+        }
+        return $this->inbox($user);
+    }
+
     public function inbox(User $user): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         $query = $user->notifications();

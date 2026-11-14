@@ -9,7 +9,7 @@ class NotificationController extends Controller
     public function open(string $notification)
     {
         $user = auth()->user();
-        $record = app(NotificationDeliveryService::class)->inbox($user)->whereKey($notification)->firstOrFail();
+        $record = app(NotificationDeliveryService::class)->managedNotifications($user)->whereKey($notification)->firstOrFail();
         $data = $record->data;
         $entity = $data['entity_type'] ?? (isset($data['lead_id']) ? 'lead' : null);
         $id = $data['entity_id'] ?? $data['lead_id'] ?? null;

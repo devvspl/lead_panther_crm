@@ -20,15 +20,22 @@ class AuditLogBrowser extends Component
 
     public bool $showDetailsModal = false;
     public ?AuditLog $selectedLog = null;
+    public ?int $organizationId = null;
+    public string $eventCategory = '';
+    public string $eventStatus = '';
+
+    protected function authorizeAdmin(): void { abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403); }
 
     public function mount(): void
     {
+        $this->authorizeAdmin();
         $this->loadColumnPreferences();
     }
 
     public function viewDetails(int $logId): void
     {
-        $this->selectedLog = AuditLog::with('user')->find($logId);
+        $this->authorizeAdmin();
+        $this->selectedLog = AuditLog::with(['user.roles', 'organization'])->findOrFail($logId);
         if ($this->selectedLog) {
             $this->showDetailsModal = true;
             $this->dispatch('open-modal', 'audit-log-details-modal');
@@ -44,6 +51,8 @@ class AuditLogBrowser extends Component
 
     public function formatPayload(mixed $payload): string
     {
+        $this->authorizeAdmin();
+        $payload = \App\Support\AuditRedactor::payload($payload);
         if (empty($payload)) {
             return '';
         }
@@ -103,7 +112,11 @@ class AuditLogBrowser extends Component
 
     protected function getFilteredQuery()
     {
-        $query = AuditLog::with('user');
+        $this->authorizeAdmin();
+        $query = AuditLog::with(['user.roles', 'organization']);
+        if ($this->organizationId) $query->where('organization_id', $this->organizationId);
+        if ($this->eventCategory) $query->where('context->category', $this->eventCategory);
+        if ($this->eventStatus) $query->where('context->status', $this->eventStatus);
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -178,7 +191,7 @@ class AuditLogBrowser extends Component
             }
         }
 
-        if (!empty($this->sortField)) {
+        if (in_array($this->sortField, ['id', 'created_at', 'action', 'subject_type', 'subject_id', 'ip_address'])) {
             $query->orderBy($this->sortField, $this->sortDirection);
         } else {
             $query->latest('id');
@@ -189,12 +202,13 @@ class AuditLogBrowser extends Component
 
     public function render()
     {
-        $logs = $this->getFilteredQuery()->paginate($this->perPage);
+        $logs = $this->getFilteredQuery()->paginate(max(1, min(100, $this->perPage)));
         $users = User::orderBy('name')->get();
 
         return view('livewire.admin.audit-log-browser', [
             'logs' => $logs,
             'users' => $users,
+            'organizations' => \App\Models\Organization::orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 
@@ -211,8 +225,8 @@ class AuditLogBrowser extends Component
             fn($l) => $l->action,
             fn($l) => class_basename($l->subject_type),
             'subject_id',
-            'from_value',
-            'to_value',
+            fn ($l) => $this->formatPayload($l->from_value),
+            fn ($l) => $this->formatPayload($l->to_value),
             'ip_address',
         ];
 
@@ -231,5 +245,40 @@ class AuditLogBrowser extends Component
             ),
             $filename
         );
+    }
+
+    public function navigateRecord(string $direction): void
+    {
+        $this->authorizeAdmin();
+        if (! $this->selectedLog || ! in_array($direction, ['previous', 'next'])) return;
+        $query = $this->getFilteredQuery()->reorder()->where('id', $direction === 'previous' ? '<' : '>', $this->selectedLog->id)
+            ->orderBy('id', $direction === 'previous' ? 'desc' : 'asc');
+        if ($record = $query->first()) $this->viewDetails($record->id);
+        else $this->dispatch('toast', type: 'info', message: 'No more matching audit records.');
+    }
+
+    public function getInspectionProperty(): array
+    {
+        $this->authorizeAdmin();
+        if (! $this->selectedLog) return [];
+        $log = AuditLog::with(['user.roles', 'organization'])->findOrFail($this->selectedLog->id);
+        $before = \App\Support\AuditRedactor::payload($log->from_value);
+        $after = \App\Support\AuditRedactor::payload($log->to_value);
+        $context = $log->context;
+        $changes = [];
+        foreach (array_unique(array_merge(array_keys(is_array($before) ? $before : []), array_keys(is_array($after) ? $after : []))) as $field) {
+            $old = is_array($before) ? ($before[$field] ?? null) : null;
+            $new = is_array($after) ? ($after[$field] ?? null) : null;
+            if ($old !== $new) $changes[] = ['field' => $field, 'before' => $old, 'after' => $new];
+        }
+        return ['basic' => ['audit_id' => $log->id, 'timestamp' => $log->created_at?->toIso8601String(), 'user_name' => $context['actor']['name'] ?? $log->user?->name,
+            'email' => $context['actor']['email'] ?? $log->user?->email, 'roles' => $context['actor']['roles'] ?? $log->user?->getRoleNames()->all(),
+            'organization' => $log->organization?->name, 'ip_address' => $log->ip_address, 'action' => $log->action, 'controller' => $context['controller'] ?? null, 'method' => $context['controller_method'] ?? null],
+            'request' => array_intersect_key($context, array_flip(['http_method', 'url', 'route', 'parameters', 'query', 'payload', 'request_id', 'session_reference', 'component'])) + ['user_agent' => \App\Support\AuditRedactor::clean($log->user_agent)],
+            'entity' => ['type' => $log->subject_type, 'id' => $context['record_id'] ?? $log->subject_id],
+            'before' => $before, 'after' => $after, 'changed_fields' => $changes,
+            'system' => ['category' => $context['category'] ?? null, 'status' => $context['status'] ?? (is_array($after) && isset($after['successful']) ? ($after['successful'] ? 'success' : 'failure') : null),
+                'error' => $after['error'] ?? null, 'http_status' => $context['http_status'] ?? null,
+                'notification_id' => $context['notification_id'] ?? null, 'lead_id' => $context['lead_id'] ?? null, 'project_id' => $context['project_id'] ?? null, 'campaign_id' => $context['campaign_id'] ?? null]];
     }
 }

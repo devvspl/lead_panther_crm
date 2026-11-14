@@ -45,6 +45,8 @@ class AuditActivityMiddleware
 
     public function handle(Request $request, Closure $next): Response
     {
+        $actor = auth()->user();
+        $request->attributes->set('audit_actor_snapshot', $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email, 'roles' => $actor->getRoleNames()->all(), 'organization_id' => $actor->organization_id] : null);
         $role = NavigationConfig::getRoleKey(auth()->user());
         if (in_array($role, ['builder', 'sales-executive'])) {
             foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*', 'credits*'] as $path) {
@@ -55,7 +57,16 @@ class AuditActivityMiddleware
             }
         }
         /** @var Response $response */
-        $response = $next($request);
+        try {
+            $response = $next($request);
+        } catch (Throwable $e) {
+            try {
+                AuditLog::create(['user_id' => auth()->id(), 'action' => 'request.failed', 'subject_type' => $request->route()?->getActionName(),
+                    'to_value' => ['error' => $e->getMessage(), 'exception' => get_class($e)], 'context' => ['category' => 'request', 'status' => 'failure', 'http_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500],
+                    'ip_address' => $request->ip(), 'user_agent' => $request->userAgent(), 'created_at' => now()]);
+            } catch (Throwable $auditError) { report($auditError); }
+            throw $e;
+        }
 
         $this->logActivitySafely($request, $response);
 
@@ -135,12 +146,14 @@ class AuditActivityMiddleware
             if (!empty($calls) && is_array($calls)) {
                 foreach ($calls as $call) {
                     $method = $call['method'] ?? 'unknown_method';
+                    if (in_array($method, ['$refresh', 'refreshNotifications'])) continue;
                     $rawParams = $call['params'] ?? [];
-                    $params = $this->sanitizePayload(is_array($rawParams) ? $rawParams : [$rawParams]);
+                    // Positional action arguments have no reliable secret field names.
+                    $params = array_map(fn ($value) => is_array($value) && ! array_is_list($value) ? $this->sanitizePayload($value) : '[redacted positional argument]', is_array($rawParams) ? $rawParams : [$rawParams]);
 
                     // Infer subject id from first parameter if numeric/id
                     $subjectId = null;
-                    if (!empty($rawParams) && is_array($rawParams) && is_numeric($rawParams[0] ?? null)) {
+                    if (in_array($method, ['openLead', 'viewDetails', 'inspect', 'reassignLead', 'openAssignModalForSingleLead']) && !empty($rawParams) && is_array($rawParams) && is_numeric($rawParams[0] ?? null)) {
                         $subjectId = (int) $rawParams[0];
                     }
 
@@ -157,6 +170,7 @@ class AuditActivityMiddleware
                         ]),
                         'ip_address' => $ip,
                         'user_agent' => $userAgent,
+                        'context' => ['category' => 'livewire', 'status' => $response->getStatusCode() >= 400 ? 'failure' : 'success', 'component' => $componentName, 'controller_method' => $method, 'parameters' => $params, 'http_status' => $response->getStatusCode()],
                         'created_at' => now(),
                     ]);
                 }
@@ -212,11 +226,14 @@ class AuditActivityMiddleware
         $sanitizedQuery = $this->sanitizePayload($request->query());
 
         $fromValue = !empty($sanitizedQuery) ? json_encode(['query' => $sanitizedQuery]) : null;
+        $failureDetails = $response->getStatusCode() >= 400 && $response instanceof \Illuminate\Http\JsonResponse
+            ? array_intersect_key((array) $response->getData(true), array_flip(['message', 'errors'])) : null;
         $toValue = json_encode([
             'http_method' => $request->method(),
-            'path' => '/' . $request->path(),
+            'path' => parse_url(\App\Support\AuditContext::current()['url'] ?? '/', PHP_URL_PATH),
             'status' => $response->getStatusCode(),
             'input' => $sanitizedInput,
+            'error' => $failureDetails,
         ]);
 
         AuditLog::create([
@@ -228,37 +245,14 @@ class AuditActivityMiddleware
             'to_value' => $toValue,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
+            'context' => ['category' => $request->is('api/*') ? ($request->is('api/*webhook*') ? 'webhook' : 'api') : 'request', 'status' => $response->getStatusCode() >= 400 ? 'failure' : 'success',
+                'http_status' => $response->getStatusCode(), 'controller' => $shortController, 'controller_method' => $controllerMethod],
             'created_at' => now(),
         ]);
     }
 
     protected function sanitizePayload(mixed $data): mixed
     {
-        if (!is_array($data)) {
-            return $data;
-        }
-
-        $cleaned = [];
-        foreach ($data as $key => $value) {
-            $lowerKey = strtolower((string) $key);
-            $isSensitive = false;
-
-            foreach ($this->sensitiveKeys as $sensitive) {
-                if (str_contains($lowerKey, $sensitive)) {
-                    $isSensitive = true;
-                    break;
-                }
-            }
-
-            if ($isSensitive) {
-                $cleaned[$key] = '********';
-            } elseif (is_array($value)) {
-                $cleaned[$key] = $this->sanitizePayload($value);
-            } else {
-                $cleaned[$key] = $value;
-            }
-        }
-
-        return $cleaned;
+        return \App\Support\AuditRedactor::clean($data);
     }
 }

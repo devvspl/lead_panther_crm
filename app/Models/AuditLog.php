@@ -12,7 +12,49 @@ class AuditLog extends Model
 
     protected $casts = [
         'created_at' => 'datetime',
+        'context' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function ($log) {
+            // Historical data migrations create audited models before the enrichment migration.
+            if (app()->runningInConsole() && ! \Illuminate\Support\Facades\Schema::hasColumn('audit_logs', 'context')) {
+                unset($log->organization_id, $log->context);
+                return;
+            }
+            $context = array_replace_recursive(\App\Support\AuditContext::current(), $log->context ?? []);
+            $payload = \App\Support\AuditRedactor::payload($log->to_value);
+            $context['category'] ??= str_starts_with($log->action, 'auth.') ? 'auth' : (str_contains($log->action, 'git') ? 'system' : 'business');
+            if (! isset($context['status']) && is_array($payload)) {
+                if (array_key_exists('successful', $payload)) $context['status'] = $payload['successful'] ? 'success' : 'failure';
+                elseif (in_array($payload['status'] ?? null, ['success', 'logged_out', 'password_reset_success'])) $context['status'] = 'success';
+                elseif (in_array($payload['status'] ?? null, ['failed_attempt', 'throttled_lockout'])) $context['status'] = 'failure';
+            }
+            $log->context = \App\Support\AuditRedactor::clean($context);
+            if ($log->organization_id === null) $log->organization_id = $context['actor']['organization_id'] ?? $log->user?->organization_id;
+        });
+        static::updating(fn () => throw new \LogicException('Audit records are append-only.'));
+        static::deleting(fn () => throw new \LogicException('Audit records are append-only.'));
+    }
+
+    public function newEloquentBuilder($query) { return new \App\Models\Builders\AppendOnlyAuditBuilder($query); }
+    public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
+
+    public function setFromValueAttribute($value): void { $this->attributes['from_value'] = $this->safePayload($value); }
+    public function setToValueAttribute($value): void { $this->attributes['to_value'] = $this->safePayload($value); }
+    public function getFromValueAttribute($value) { return $this->safePayload($value); }
+    public function getToValueAttribute($value) { return $this->safePayload($value); }
+    public function getContextAttribute($value): array { return (array) \App\Support\AuditRedactor::payload($value ?? []); }
+    public function setUserAgentAttribute($value): void { $this->attributes['user_agent'] = \App\Support\AuditRedactor::clean($value); }
+    public function getUserAgentAttribute($value) { return \App\Support\AuditRedactor::clean($value); }
+
+    private function safePayload($value): ?string
+    {
+        if ($value === null) return null;
+        $safe = \App\Support\AuditRedactor::payload($value);
+        return is_array($safe) ? json_encode($safe, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : (string) $safe;
+    }
 
     public function user(): BelongsTo
     {
@@ -42,7 +84,7 @@ class AuditLog extends Model
 
     public function getFormattedIpAttribute(): string
     {
-        return $this->ip_address ?: '127.0.0.1';
+        return $this->ip_address ?: 'Unavailable';
     }
 
     public function getDetailsSummaryAttribute(): string
@@ -87,6 +129,6 @@ class AuditLog extends Model
                 return $data['successful'] ? 'Success' : 'Failed';
             }
         }
-        return 'Success';
+        return $this->context['status'] ?? 'Unavailable';
     }
 }

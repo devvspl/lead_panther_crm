@@ -19,9 +19,10 @@ class NotificationBell extends Component
         $query = $this->notificationQuery()->whereNull('read_at');
         $count = (clone $query)->count();
         $ids = (clone $query)->limit(100)->pluck('id')->all();
-        $query->update(['read_at' => now()]);
+        $readAt = now();
+        $query->update(['read_at' => $readAt]);
         if ($count) \App\Models\AuditLog::create(['user_id' => auth()->id(), 'action' => 'notification.read_all', 'subject_type' => \Illuminate\Notifications\DatabaseNotification::class,
-            'from_value' => ['read_at' => null], 'to_value' => ['read_at' => now()->toIso8601String(), 'count' => $count],
+            'from_value' => ['read_at' => null], 'to_value' => ['read_at' => $readAt->toIso8601String(), 'count' => $count],
             'context' => ['notification_ids' => $ids, 'references_truncated' => $count > 100, 'category' => 'notification', 'status' => 'success'], 'created_at' => now()]);
         $this->notifyReadChange();
     }

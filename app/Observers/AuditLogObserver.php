@@ -78,8 +78,8 @@ class AuditLogObserver
                 'campaign_id' => $model instanceof \App\Models\Campaign ? $model->id : $model->getAttribute('campaign_id')],
             'from_value' => $fromValue,
             'to_value' => $toValue,
-            'ip_address' => request()?->ip(),
-            'user_agent' => request()?->userAgent(),
+            'ip_address' => request()->route() ? request()->ip() : null,
+            'user_agent' => request()->route() ? request()->userAgent() : null,
             'created_at' => now(),
         ]);
     }

@@ -19,6 +19,7 @@
             <label>Search<input wire:model.live.debounce.300ms="search" placeholder="Title, message, lead ID or code" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"></label>
             <div class="flex gap-2 items-end"><button class="px-3 py-2 bg-primary text-white rounded-lg">Apply Filters</button><button type="button" wire:click="resetFilters" class="px-3 py-2 border border-border rounded-lg">Reset</button></div>
             @error('dateTo')<span class="text-red-600">{{ $message }}</span>@enderror
+            @error('dateFrom')<span class="text-red-600">{{ $message }}</span>@enderror
         </form>
     @endif
     <section class="bg-surface border border-border rounded-xl overflow-hidden">

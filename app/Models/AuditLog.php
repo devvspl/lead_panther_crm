@@ -32,6 +32,10 @@ class AuditLog extends Model
                 elseif (in_array($payload['status'] ?? null, ['failed_attempt', 'throttled_lockout'])) $context['status'] = 'failure';
             }
             $log->context = \App\Support\AuditRedactor::clean($context);
+            if ($context['http_method'] ?? null) {
+                $log->ip_address ??= request()->ip();
+                $log->user_agent ??= request()->userAgent();
+            }
             if ($log->organization_id === null) $log->organization_id = $context['actor']['organization_id'] ?? $log->user?->organization_id;
         });
         static::updating(fn () => throw new \LogicException('Audit records are append-only.'));

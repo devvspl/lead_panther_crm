@@ -47,7 +47,7 @@ class NotificationCenter extends NotificationBell
 
     public function applyFilters(): void
     {
-        $this->validate(['dateFrom' => 'nullable|date', 'dateTo' => 'nullable|date|after_or_equal:dateFrom', 'perPage' => 'integer|in:10,20,50,100']);
+        $this->validate(['dateFrom' => 'nullable|date', 'dateTo' => 'nullable|date'.($this->dateFrom ? '|after_or_equal:dateFrom' : ''), 'perPage' => 'integer|in:10,20,50,100']);
         $this->resetPage();
     }
     public function resetFilters(): void { $this->reset(['search', 'organizationId', 'recipientId', 'roleFilter', 'typeFilter', 'readFilter', 'dateFrom', 'dateTo']); $this->resetPage(); }
@@ -59,7 +59,10 @@ class NotificationCenter extends NotificationBell
     {
         abort_unless($this->isSuperAdmin, 403);
         $this->applyFilters();
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(data: $this->notificationQuery()->latest()->get(), title: 'System Notifications', subtitle: 'Filtered database notifications',
+        $rows = $this->notificationQuery()->latest()->get();
+        \App\Models\AuditLog::create(['user_id' => auth()->id(), 'action' => 'notification.exported', 'subject_type' => \App\Models\SystemNotification::class,
+            'to_value' => ['record_count' => $rows->count(), 'format' => 'xlsx'], 'context' => ['category' => 'notification', 'status' => 'success', 'organization_filter' => $this->organizationId, 'recipient_filter' => $this->recipientId], 'created_at' => now()]);
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(data: $rows, title: 'System Notifications', subtitle: 'Filtered database notifications',
             headings: ['ID', 'Recipient', 'Organization', 'Type', 'Title', 'Message', 'Related Entity', 'Related ID', 'Status', 'Created At'],
             columns: ['id', fn ($n) => $n->recipient?->name, fn ($n) => $n->organization?->name, fn ($n) => $n->data['type'] ?? '', fn ($n) => $n->data['title'] ?? '', fn ($n) => $n->data['message'] ?? '', fn ($n) => $n->data['entity_type'] ?? '', fn ($n) => $n->data['entity_id'] ?? '', fn ($n) => $n->read_at ? 'Read' : 'Unread', fn ($n) => $n->created_at->toDateTimeString()], statusColumns: []), 'system-notifications.xlsx');
     }

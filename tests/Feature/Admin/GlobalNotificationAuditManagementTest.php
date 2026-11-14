@@ -67,6 +67,7 @@ class GlobalNotificationAuditManagementTest extends TestCase
             ->set('recipientId', $this->other->id)->assertSee('Own authorized notification')->assertDontSee('Foreign secret message');
         $this->actingAs($this->builder)->get(route('admin.audit-logs'))->assertForbidden();
         $this->get(route('notifications.open', $foreign->id))->assertNotFound();
+        Livewire::actingAs($this->builder)->test(NotificationCenter::class)->call('exportExcel')->assertForbidden();
         Livewire::actingAs($this->builder)->test(AuditLogBrowser::class)->assertForbidden();
     }
 
@@ -111,6 +112,11 @@ class GlobalNotificationAuditManagementTest extends TestCase
             'context' => ['payload' => ['Authorization' => 'Bearer auth-secret']], 'created_at' => now()]);
         $raw = DB::table('audit_logs')->where('id', $log->id)->first();
         foreach (['old-secret', 'new-secret', 'api-secret', '123456', 'refresh-secret', 'auth-secret'] as $secret) $this->assertStringNotContainsString($secret, json_encode($raw));
+        GeneralSetting::setValue($this->admin->id, 'integration_api_key', 'old-setting-secret');
+        GeneralSetting::setValue($this->admin->id, 'integration_api_key', 'new-setting-secret');
+        $settingAudit = AuditLog::where('subject_type', GeneralSetting::class)->where('action', 'generalsetting.updated')->latest('id')->firstOrFail();
+        $this->assertStringNotContainsString('old-setting-secret', $settingAudit->from_value);
+        $this->assertStringNotContainsString('new-setting-secret', $settingAudit->to_value);
         $legacyId = DB::table('audit_logs')->insertGetId(['action' => 'test.legacy-redaction', 'to_value' => json_encode(['client_secret' => 'legacy-secret']), 'created_at' => now()]);
         $component = Livewire::actingAs($this->admin)->test(AuditLogBrowser::class)->call('viewDetails', $legacyId)
             ->assertSee('Basic Information')->assertSee('Request Details')->assertSee('Change Details')->assertSee('System Details')->assertDontSee('legacy-secret');

@@ -215,6 +215,8 @@ class AuditLogBrowser extends Component
     public function exportExcel()
     {
         $data = $this->getFilteredQuery()->get();
+        AuditLog::create(['user_id' => auth()->id(), 'action' => 'audit.exported', 'subject_type' => AuditLog::class,
+            'to_value' => ['record_count' => $data->count(), 'format' => 'xlsx'], 'context' => ['category' => 'system', 'status' => 'success', 'organization_filter' => $this->organizationId], 'created_at' => now()]);
         $filename = "audit-logs_" . now()->format('Y-m-d') . ".xlsx";
 
         $headings = ['Log ID', 'Timestamp', 'User Name', 'Action', 'Subject Type', 'Subject ID', 'From Value', 'To Value', 'IP Address'];

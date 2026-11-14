@@ -8,6 +8,7 @@
         </div>
     </div>
     @if($this->isSuperAdmin)
+        <p class="text-xs text-muted">All organizations and recipients. Timestamps and date filters use {{ config('app.timezone') }}. Read-all applies to the current filters.</p>
         <form wire:submit="applyFilters" class="bg-surface border border-border rounded-xl p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             <label>Organization<select wire:model.live="organizationId" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All organizations</option>@foreach($organizations as $org)<option value="{{ $org->id }}">{{ $org->name }}</option>@endforeach</select></label>
             <label>User<select wire:model.live="recipientId" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All users</option>@foreach($recipients as $recipient)<option value="{{ $recipient->id }}">{{ $recipient->name }}</option>@endforeach</select></label>

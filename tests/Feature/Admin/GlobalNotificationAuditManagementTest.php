@@ -187,4 +187,29 @@ class GlobalNotificationAuditManagementTest extends TestCase
         $this->assertSame(422, $failed->context['http_status']);
         $this->assertStringNotContainsString('error-secret', $failed->to_value);
     }
+
+    public function test_notification_sidebar_targets_notifications_with_and_without_the_named_route(): void
+    {
+        $this->actingAs($this->admin)->get(route('notifications.index'))->assertOk()->assertSee('System Notifications');
+        $routes = new \Illuminate\Routing\RouteCollection;
+        foreach (Route::getRoutes() as $route) if ($route->getName() !== 'notifications.index') $routes->add($route);
+        app('router')->setRoutes($routes); app('url')->setRoutes($routes);
+        $items = collect(\App\Support\NavigationConfig::getNavItemsForUser($this->admin)['database'])->keyBy('key');
+        $this->assertSame(url('/notifications'), $items['notifications']['url']);
+        $this->assertNotSame(route('dashboard'), $items['notifications']['url']);
+    }
+
+    public function test_legacy_audit_enrichment_preserves_original_values_and_uses_available_request_details(): void
+    {
+        $migration = require base_path('database/migrations/2026_11_14_000001_enrich_audit_log_context.php');
+        $migration->down();
+        $payload = json_encode(['organization_id' => $this->org->id, 'http_method' => 'POST', 'status' => 200, 'input' => ['name' => 'Historical input']]);
+        $id = DB::table('audit_logs')->insertGetId(['action' => 'legacy.event', 'subject_type' => Organization::class, 'subject_id' => $this->org->id, 'to_value' => $payload, 'created_at' => now()]);
+        $migration->up();
+        $this->assertEquals($this->org->id, AuditLog::findOrFail($id)->organization_id);
+        $this->assertSame($payload, DB::table('audit_logs')->where('id', $id)->value('to_value'));
+        $component = Livewire::actingAs($this->admin)->test(AuditLogBrowser::class)->call('viewDetails', $id);
+        $this->assertSame('POST', $component->instance()->inspection['request']['http_method']);
+        $this->assertSame('Historical input', $component->instance()->inspection['request']['payload']['name']);
+    }
 }

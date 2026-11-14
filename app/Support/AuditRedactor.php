@@ -23,6 +23,7 @@ class AuditRedactor
         if (! is_string($value)) return $value;
         $decoded = json_decode($value, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) return json_encode(self::clean($decoded), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $value = preg_replace('~(/(?:reset-password|password/reset|invitations?|invite|token)/)[^?\s#]+~i', '$1********', $value);
         $value = preg_replace('/\bBearer\s+[^\s"\'<>]+/i', 'Bearer ********', $value);
         $value = preg_replace('/((?:password|passwd|secret|access[_-]?token|refresh[_-]?token|api[_-]?key|otp|token|signature|authorization)\s*[=:]\s*)[^\s&,;"\'<>]+/i', '$1********', $value);
         $value = preg_replace('/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/', '********', $value);

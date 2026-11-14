@@ -267,6 +267,13 @@ class AuditLogBrowser extends Component
         $before = \App\Support\AuditRedactor::payload($log->from_value);
         $after = \App\Support\AuditRedactor::payload($log->to_value);
         $context = $log->context;
+        if (is_array($after)) {
+            foreach (['http_method' => 'http_method', 'input' => 'payload', 'params' => 'parameters', 'method' => 'controller_method', 'path' => 'url'] as $field => $target) {
+                if (! isset($context[$target]) && isset($after[$field])) $context[$target] = $after[$field];
+            }
+            if (! isset($context['http_status']) && is_numeric($after['status'] ?? null)) $context['http_status'] = (int) $after['status'];
+            if (! isset($context['status']) && isset($context['http_status'])) $context['status'] = $context['http_status'] >= 400 ? 'failure' : 'success';
+        }
         $changes = [];
         foreach (array_unique(array_merge(array_keys(is_array($before) ? $before : []), array_keys(is_array($after) ? $after : []))) as $field) {
             $old = is_array($before) ? ($before[$field] ?? null) : null;

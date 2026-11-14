@@ -209,7 +209,7 @@ class NavigationConfig
             ],
             'notifications' => [
                 'key' => 'notifications', 'label' => 'Notifications',
-                'url' => \Illuminate\Support\Facades\Route::has('notifications.index') ? route('notifications.index') : route('dashboard'),
+                'url' => \Illuminate\Support\Facades\Route::has('notifications.index') ? route('notifications.index') : url('/notifications'),
                 'data_nav_route' => 'notifications', 'data_nav_exact' => 'true', 'section' => 'database',
                 'icon' => '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>',
             ],

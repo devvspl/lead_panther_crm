@@ -62,7 +62,7 @@ class AuditActivityMiddleware
         } catch (Throwable $e) {
             try {
                 AuditLog::create(['user_id' => auth()->id(), 'action' => 'request.failed', 'subject_type' => $request->route()?->getActionName(),
-                    'to_value' => ['error' => $e->getMessage(), 'exception' => get_class($e)], 'context' => ['category' => 'request', 'status' => 'failure', 'http_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500],
+                    'to_value' => ['error' => $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface ? $e->getMessage() : 'Error details withheld; consult protected logs using the request reference.', 'exception' => get_class($e)], 'context' => ['category' => 'request', 'status' => 'failure', 'http_status' => method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500],
                     'ip_address' => $request->ip(), 'user_agent' => $request->userAgent(), 'created_at' => now()]);
             } catch (Throwable $auditError) { report($auditError); }
             throw $e;
@@ -228,6 +228,7 @@ class AuditActivityMiddleware
         $fromValue = !empty($sanitizedQuery) ? json_encode(['query' => $sanitizedQuery]) : null;
         $failureDetails = $response->getStatusCode() >= 400 && $response instanceof \Illuminate\Http\JsonResponse
             ? array_intersect_key((array) $response->getData(true), array_flip(['message', 'errors'])) : null;
+        if ($response->getStatusCode() >= 500) $failureDetails = ['message' => 'Server error details withheld; consult protected logs using the request reference.'];
         $toValue = json_encode([
             'http_method' => $request->method(),
             'path' => parse_url(\App\Support\AuditContext::current()['url'] ?? '/', PHP_URL_PATH),

@@ -320,19 +320,6 @@
 
     @if($activeTab === 'campaigns')
         <section class="space-y-5" wire:poll.30s>
-            <div class="bg-surface border border-border rounded-xl p-5 space-y-3">
-                <h2 class="font-bold text-ink">Campaign Details & Lead Delivery</h2>
-                <p class="text-sm text-muted">Only campaigns with active integration mappings to this organization's clients are shown. Project defaults apply independently to each mapped campaign. Zero means unlimited leads or immediate delivery. Queued leads keep their saved configuration and scheduled time.</p>
-                <form wire:submit="saveDeliveryTimezone" class="flex flex-wrap items-end gap-3">
-                    <label class="text-xs text-ink">Organization delivery timezone
-                        <input wire:model="deliveryTimezone" list="delivery-timezones" class="block mt-1 rounded-lg border border-border bg-canvas p-2" required>
-                        <datalist id="delivery-timezones">@foreach(\DateTimeZone::listIdentifiers() as $zone)<option value="{{ $zone }}">@endforeach</datalist>
-                        @error('deliveryTimezone') <span class="text-red-600">{{ $message }}</span> @enderror
-                    </label>
-                    <button type="submit" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Timezone</button>
-                </form>
-                <p class="text-xs text-muted">Statistics use {{ $organization->delivery_timezone ?: config('app.timezone') }}. Only recorded successful deliveries consume daily capacity. Historical leads without delivery records are not assumed to have been delivered.</p>
-            </div>
             @forelse($this->deliveryProjects as $row)
                 @php
                     $project = $row['project'];

@@ -163,11 +163,12 @@ class LeadDistributionService
         }
     }
 
-    public function deliveryStatistics(Project $project, ?\App\Models\Campaign $campaign = null): array
+    public function deliveryStatistics(Project $project, ?\App\Models\Campaign $campaign = null, ?array $campaignIds = null): array
     {
         $timezone = User::find($project->client_id)?->organization?->delivery_timezone ?: config('app.timezone');
         [$start, $end] = $this->deliveryDay(now(), $timezone);
         $query = Lead::withoutGlobalScopes()->whereIn('campaign_id', \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->select('id'));
+        if ($campaignIds !== null) $query->whereIn('campaign_id', $campaignIds);
         if ($campaign) $query->where('campaign_id', $campaign->id);
         $successful = (clone $query)->whereNotIn('status', ['duplicate', 'rejected', 'invalid'])->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid']);
         $today = (clone $successful)->where('delivered_at', '>=', $start)->where('delivered_at', '<', $end)->count();
@@ -176,6 +177,7 @@ class LeadDistributionService
         $remaining = $limit ? max(0, $limit - $today) : null;
         if (! $campaign) {
             $capacities = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->get()
+                ->when($campaignIds !== null, fn ($items) => $items->whereIn('id', $campaignIds))
                 ->map(fn ($item) => $this->deliveryStatistics($project, $item)['remaining']);
             $remaining = $capacities->containsStrict(null) ? null : $capacities->sum();
         }

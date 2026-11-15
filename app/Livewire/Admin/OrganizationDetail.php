@@ -59,13 +59,33 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: 'Organization delivery timezone saved. Existing queued schedules are preserved.');
     }
 
+    protected function mappedDeliveryCampaigns()
+    {
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+        return Campaign::withoutGlobalScopes()
+            ->whereIn('project_id', Project::withoutGlobalScopes()->whereIn('client_id', clone $owners)->select('id'))
+            ->whereExists(function ($query) use ($owners) {
+                $query->selectRaw('1')->from('lead_form_mappings as mapping')
+                    ->join('portal_accounts as account', 'account.id', '=', 'mapping.portal_account_id')
+                    ->whereColumn('mapping.campaign_id', 'campaigns.id')
+                    ->whereIn('mapping.client_id', $owners)
+                    ->where('mapping.status', 'active')->where('account.status', 'active')
+                    ->where(fn ($q) => $q->whereNull('mapping.project_id')->orWhereColumn('mapping.project_id', 'campaigns.project_id'));
+            });
+    }
+
+    protected function mappedDeliveryProjects()
+    {
+        return Project::withoutGlobalScopes()->whereIn('id', $this->mappedDeliveryCampaigns()->select('project_id'));
+    }
+
     public function getDeliveryProjectsProperty()
     {
         $service = app(\App\Services\LeadDistributionService::class);
-        return Project::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $this->organization->id)->select('id'))
+        return $this->mappedDeliveryProjects()
             ->orderBy('name')->get()->map(function ($project) use ($service) {
-                $campaigns = \App\Models\Campaign::withoutGlobalScopes()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
-                return ['project' => $project, 'stats' => $service->deliveryStatistics($project),
+                $campaigns = $this->mappedDeliveryCampaigns()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
+                return ['project' => $project, 'stats' => $service->deliveryStatistics($project, null, $campaigns->modelKeys()),
                     'campaigns' => $campaigns->map(fn ($campaign) => ['campaign' => $campaign,
                         'effective' => $service->effectiveDeliveryConfig($campaign, $project),
                         'stats' => $service->deliveryStatistics($project, $campaign)])];
@@ -76,11 +96,7 @@ class OrganizationDetail extends Component
     {
         abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
         abort_unless(in_array($type, ['project', 'campaign']), 422);
-        $model = $type === 'project' ? Project::withoutGlobalScopes() : \App\Models\Campaign::withoutGlobalScopes();
-        $owners = User::where('organization_id', $this->organization->id)->select('id');
-        $projects = Project::withoutGlobalScopes()->whereIn('client_id', $owners)->select('id');
-        $record = $type === 'project' ? $model->whereIn('id', $projects)->findOrFail($id)
-            : $model->whereIn('project_id', $projects)->findOrFail($id);
+        $record = ($type === 'project' ? $this->mappedDeliveryProjects() : $this->mappedDeliveryCampaigns())->findOrFail($id);
         $key = $type.'_'.$id;
         $this->validate([
             "deliverySettings.$key.limit" => 'nullable|integer|min:0|max:100000',
@@ -153,9 +169,8 @@ class OrganizationDetail extends Component
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
         $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
-        $projectIds = Project::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $organization->id)->select('id'))->pluck('id');
-        foreach (['project' => Project::withoutGlobalScopes()->whereIn('id', $projectIds)->get(),
-            'campaign' => \App\Models\Campaign::withoutGlobalScopes()->whereIn('project_id', $projectIds)->get()] as $type => $records) {
+        foreach (['project' => $this->mappedDeliveryProjects()->get(),
+            'campaign' => $this->mappedDeliveryCampaigns()->get()] as $type => $records) {
             foreach ($records as $record) {
                 $this->deliverySettings[$type.'_'.$record->id] = [
                     'limit' => $record->delivery_daily_limit ?? ($type === 'project' ? 0 : null),

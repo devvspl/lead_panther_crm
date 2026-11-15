@@ -21,6 +21,8 @@ class LeadDeliveryScheduleTest extends TestCase
         $project = Project::create(['name' => 'Delivery fixture project', 'client_id' => $owner->id, 'status' => 'active', 'delivery_daily_limit' => $limit, 'delivery_interval_minutes' => $interval]);
         $source = LeadSource::create(['name' => 'Fixture source']);
         $campaign = Campaign::create(['name' => 'Fixture campaign', 'project_id' => $project->id, 'lead_source_id' => $source->id, 'status' => 'active']);
+        $account = \App\Models\PortalAccount::create(['name' => 'Fixture integration', 'type' => 'meta', 'status' => 'active']);
+        \App\Models\LeadFormMapping::create(['portal_account_id' => $account->id, 'form_id' => 'fixture-form', 'form_name' => 'Fixture form', 'client_id' => $owner->id, 'project_id' => $project->id, 'campaign_id' => $campaign->id, 'status' => 'active']);
         \App\Models\CreditWallet::create(['client_id' => $owner->id, 'balance' => 1000, 'opening_balance' => 1000]);
         return [$org, $owner, $project, $campaign];
     }
@@ -306,7 +308,9 @@ class LeadDeliveryScheduleTest extends TestCase
         $admin->assignRole('Super Admin');
         $project = Project::create(['name' => 'Delivery project', 'client_id' => $owner->id, 'status' => 'active']);
         $source = LeadSource::create(['name' => 'UI test']);
-        Campaign::create(['name' => 'Delivery campaign', 'project_id' => $project->id, 'lead_source_id' => $source->id, 'status' => 'active']);
+        $campaign = Campaign::create(['name' => 'Delivery campaign', 'project_id' => $project->id, 'lead_source_id' => $source->id, 'status' => 'active']);
+        $account = \App\Models\PortalAccount::create(['name'=>'Delivery integration','type'=>'meta','status'=>'active']);
+        \App\Models\LeadFormMapping::create(['portal_account_id'=>$account->id,'form_id'=>'delivery-form','form_name'=>'Delivery form','client_id'=>$owner->id,'project_id'=>$project->id,'campaign_id'=>$campaign->id,'status'=>'active']);
         \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org])
             ->call('setTab', 'campaigns')->assertSee('Delivery campaign')
             ->set('deliverySettings.project_'.$project->id.'.limit', 5)
@@ -317,5 +321,44 @@ class LeadDeliveryScheduleTest extends TestCase
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
         \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org])
             ->call('saveDeliverySettings', 'project', $other->id);
+    }
+
+    public function test_campaign_tab_is_empty_without_an_active_mapping_even_when_projects_exist(): void
+    {
+        [$org,$owner,$project,$campaign] = $this->deliveryFixture();
+        \App\Models\LeadFormMapping::query()->delete();
+        $admin=User::factory()->create();
+        \Spatie\Permission\Models\Role::firstOrCreate(['name'=>'Super Admin','guard_name'=>'web']); $admin->assignRole('Super Admin');
+        $component=\Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class,['organization'=>$org])->call('setTab','campaigns')->assertSee('No campaigns mapped to this organization');
+        $this->assertCount(0,$component->instance()->deliveryProjects);
+        $this->assertSame([],$component->get('deliverySettings'));
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $component->call('saveDeliverySettings','campaign',$campaign->id);
+    }
+
+    public function test_campaign_tab_uses_only_mapped_campaigns_and_their_actual_statistics(): void
+    {
+        [$org,$owner,$project,$campaign] = $this->deliveryFixture(0);
+        $unmapped=$campaign->replicate(); $unmapped->name='Unmapped historical campaign'; $unmapped->save();
+        $this->queuedLead($campaign); $this->queuedLead($unmapped);
+        $admin=User::factory()->create();
+        \Spatie\Permission\Models\Role::firstOrCreate(['name'=>'Super Admin','guard_name'=>'web']); $admin->assignRole('Super Admin');
+        $component=\Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class,['organization'=>$org])->call('setTab','campaigns')->assertSee('Fixture campaign')->assertDontSee('Unmapped historical campaign');
+        $rows=$component->instance()->deliveryProjects;
+        $this->assertCount(1,$rows); $this->assertCount(1,$rows[0]['campaigns']); $this->assertSame(1,$rows[0]['stats']['total']);
+        \App\Models\LeadFormMapping::query()->update(['status'=>'inactive']);
+        $component->call('$refresh')->assertSee('No campaigns mapped to this organization');
+    }
+
+    public function test_mapping_client_organization_takes_precedence_over_stale_project_ownership(): void
+    {
+        [$org,$owner,$project,$campaign] = $this->deliveryFixture();
+        $otherOrg=\App\Models\Organization::create(['name'=>'Other mapped organization']);
+        $other=User::factory()->create(['organization_id'=>$otherOrg->id]);
+        \App\Models\LeadFormMapping::query()->update(['client_id'=>$other->id]);
+        $admin=User::factory()->create();
+        \Spatie\Permission\Models\Role::firstOrCreate(['name'=>'Super Admin','guard_name'=>'web']); $admin->assignRole('Super Admin');
+        $component=\Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class,['organization'=>$org])->call('setTab','campaigns');
+        $this->assertCount(0,$component->instance()->deliveryProjects);
     }
 }

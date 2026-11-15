@@ -322,7 +322,7 @@
         <section class="space-y-5" wire:poll.30s>
             <div class="bg-surface border border-border rounded-xl p-5 space-y-3">
                 <h2 class="font-bold text-ink">Campaign Details & Lead Delivery</h2>
-                <p class="text-sm text-muted">Project defaults apply independently to each campaign. Zero means unlimited leads or immediate delivery. Queued leads keep their saved configuration and scheduled time; active/inactive controls pause releases.</p>
+                <p class="text-sm text-muted">Only campaigns with active integration mappings to this organization's clients are shown. Project defaults apply independently to each mapped campaign. Zero means unlimited leads or immediate delivery. Queued leads keep their saved configuration and scheduled time.</p>
                 <form wire:submit="saveDeliveryTimezone" class="flex flex-wrap items-end gap-3">
                     <label class="text-xs text-ink">Organization delivery timezone
                         <input wire:model="deliveryTimezone" list="delivery-timezones" class="block mt-1 rounded-lg border border-border bg-canvas p-2" required>
@@ -404,7 +404,7 @@
                     </div>
                 </article>
             @empty
-                <p class="text-sm text-muted">No projects linked to this organization.</p>
+                <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center space-y-2"><h3 class="text-sm font-semibold text-ink">No campaigns mapped to this organization</h3><p class="text-xs text-muted">Map a lead form to a campaign and a client in this organization under Integrations. Active mappings will appear here automatically.</p><a href="{{ route('settings.integrations') }}" class="inline-block text-xs font-semibold text-primary hover:underline">Manage Integration Mappings</a></div>
             @endforelse
         </section>
     @endif

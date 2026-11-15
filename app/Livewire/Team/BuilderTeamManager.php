@@ -23,6 +23,62 @@ class BuilderTeamManager extends Component
     public string $roleName = 'Executive';
     public string $password = '';
     public ?string $generatedInviteLink = null;
+    public ?int $teamId = null;
+    public string $teamName = '';
+    public ?int $teamLeaderId = null;
+    public ?int $existingMemberId = null;
+    public string $existingMemberRole = 'Executive';
+
+    private function guard(): void {
+        $user=auth()->user();
+        abort_unless($user?->is_active && $user->organization_id && ($user->hasAnyRole(['Super Admin','Builder/Developer','Builder','builder']) || (\App\Support\TeamAccess::isLeader($user) && $user->can('manage-team-members'))),403);
+    }
+    private function teams() {
+        $this->guard(); $user=auth()->user();
+        return \App\Support\TeamAccess::isLeader($user) ? \App\Support\TeamAccess::teams($user) : SalesTeam::where('ownable_type',Organization::class)->where('ownable_id',$user->organization_id);
+    }
+    public function mount(): void { $this->guard(); $this->teamId=$this->teams()->orderBy('id')->value('id'); $this->updatedTeamId(); }
+    public function updatedTeamId(): void {
+        $team=$this->teamId ? $this->teams()->findOrFail($this->teamId) : null;
+        $this->teamName=$team?->name ?? ''; $this->teamLeaderId=$team?->leader_id; $this->existingMemberId=null;
+    }
+    public function saveTeam(): void {
+        $this->guard(); $actor=auth()->user();
+        abort_if(\App\Support\TeamAccess::isLeader($actor),403);
+        abort_unless($actor->hasRole('Super Admin') || $actor->can('assign-team-leaders'),403);
+        $this->validate(['teamName'=>'required|string|max:120','teamLeaderId'=>'nullable|integer']);
+        if ($this->teamLeaderId) abort_unless(User::where('organization_id',$actor->organization_id)->where('status','active')->role('Team Leader')->whereKey($this->teamLeaderId)->exists(),403);
+        $team=$this->teamId ? $this->teams()->findOrFail($this->teamId) : new SalesTeam(['ownable_type'=>Organization::class,'ownable_id'=>$actor->organization_id]);
+        \Illuminate\Support\Facades\DB::transaction(function () use($team) {
+            $team->fill(['name'=>$this->teamName,'leader_id'=>$this->teamLeaderId])->save();
+            if ($this->teamLeaderId) SalesTeamMember::updateOrCreate(['sales_team_id'=>$team->id,'user_id'=>$this->teamLeaderId],['role'=>'Team Leader','is_active'=>true]);
+        });
+        $this->teamId=$team->id; $this->dispatch('toast',type:'success',message:'Team and leader saved.');
+    }
+    public function newTeam(): void { $this->guard(); abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403); $this->teamId=null; $this->teamName=''; $this->teamLeaderId=null; }
+    public function assignExistingMember(): void {
+        $this->guard(); $actor=auth()->user(); abort_if(\App\Support\TeamAccess::isLeader($actor),403);
+        $team=$this->teams()->findOrFail($this->teamId);
+        $this->validate(['existingMemberId'=>'required|integer','existingMemberRole'=>'required|in:Executive,Team Leader,Channel Partner']);
+        if ($this->existingMemberRole==='Team Leader') abort_unless($actor->hasRole('Super Admin') || $actor->can('assign-team-leaders'),403);
+        $member=User::where('organization_id',$actor->organization_id)->findOrFail($this->existingMemberId);
+        abort_if($member->hasAnyRole(['Super Admin','Builder/Developer','Builder']),403);
+        \Illuminate\Support\Facades\DB::transaction(function () use($member,$team) {
+            $member->syncRoles($this->existingMemberRole);
+            SalesTeamMember::updateOrCreate(['sales_team_id'=>$team->id,'user_id'=>$member->id],['role'=>$this->existingMemberRole,'is_active'=>true]);
+            if ($team->leader_id===$member->id && $this->existingMemberRole!=='Team Leader') $team->update(['leader_id'=>null]);
+            if ($this->existingMemberRole==='Team Leader') $team->update(['leader_id'=>$member->id]);
+        });
+        $this->updatedTeamId(); $this->dispatch('toast',type:'success',message:'Member role and team assignment updated.');
+    }
+    public function toggleMember(int $userId): void {
+        $this->guard(); $team=$this->teams()->findOrFail($this->teamId);
+        $member=User::where('organization_id',auth()->user()->organization_id)->findOrFail($userId);
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) abort_unless($member->hasRole('Executive') && ! $member->hasRole('Team Leader'),403);
+        $membership=SalesTeamMember::where('sales_team_id',$team->id)->where('user_id',$userId)->firstOrFail();
+        $membership->update(['is_active'=>! $membership->is_active]);
+        $this->dispatch('toast',type:'success',message:'Team membership status updated.');
+    }
 
     public function tableColumns(): array
     {
@@ -48,19 +104,24 @@ class BuilderTeamManager extends Component
 
     public function addMember(): void
     {
+        $this->guard();
         $this->validate([
             'memberName' => 'required|string|max:255',
             'memberEmail' => 'required|email|unique:users,email',
-            'roleName' => 'required|in:Executive,Channel Partner',
+            'roleName' => 'required|in:Executive,Channel Partner,Team Leader',
         ], [
             'memberName.required' => 'The member name field is required.',
             'memberEmail.required' => 'The member email field is required.',
             'memberEmail.unique' => 'This email is already registered.',
             'roleName.required' => 'Please select a role.',
-            'roleName.in' => 'The role must be Executive or Channel Partner.',
+            'roleName.in' => 'Choose Sales Executive, Team Leader or Channel Partner.',
         ]);
 
-        $orgId = auth()->user()?->organization_id ?? 1;
+        $orgId = auth()->user()->organization_id;
+        if ($this->roleName==='Team Leader') abort_unless(auth()->user()->hasRole('Super Admin') || auth()->user()->can('assign-team-leaders'),403);
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) abort_unless($this->roleName==='Executive',403);
+        $selectedTeam=$this->teamId ? $this->teams()->findOrFail($this->teamId) : null;
+        if (! $selectedTeam && \App\Support\TeamAccess::isLeader(auth()->user())) abort(403);
 
         $user = User::create([
             'name' => $this->memberName,
@@ -102,7 +163,7 @@ class BuilderTeamManager extends Component
             ]);
         }
 
-        $team = SalesTeam::firstOrCreate([
+        $team = $selectedTeam ?? SalesTeam::firstOrCreate([
             'ownable_type' => Organization::class,
             'ownable_id' => $orgId,
             'name' => 'Direct Builder Sales Team',
@@ -116,6 +177,8 @@ class BuilderTeamManager extends Component
             'is_active' => true,
         ]);
 
+        if ($this->roleName==='Team Leader') $team->update(['leader_id'=>$user->id]);
+        $this->teamId=$team->id;
         // Generate temporary password activation link
         $token = Password::createToken($user);
         $this->generatedInviteLink = url(route('password.reset', [
@@ -131,6 +194,7 @@ class BuilderTeamManager extends Component
 
     public function render()
     {
+        $this->guard();
         $orgId = auth()->user()?->organization_id;
         $query = User::where('organization_id', $orgId)
             ->withCount([
@@ -141,6 +205,11 @@ class BuilderTeamManager extends Component
                 'assignedLeads as bookings_count' => fn($q) => $q->where(fn($sq) => $sq->whereHas('bookings')->orWhereIn('current_stage', ['booking', 'closed_won'])),
             ]);
 
+        if ($this->teamId) {
+            $team=$this->teams()->findOrFail($this->teamId);
+            $query->whereIn('id',SalesTeamMember::where('sales_team_id',$team->id)->select('user_id'));
+        } elseif (\App\Support\TeamAccess::isLeader(auth()->user())) $query->whereRaw('1=0');
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) $query->whereIn('id',\App\Support\TeamAccess::executives(auth()->user(),false)->select('id'));
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
@@ -156,6 +225,10 @@ class BuilderTeamManager extends Component
 
         return view('livewire.team.builder-team-manager', [
             'members' => $members,
+            'teams'=>$this->teams()->pluck('name','id')->all(),
+            'leaders'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->where('status','active')->role('Team Leader')->pluck('name','id')->all(),
+            'organizationMembers'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->whereDoesntHave('roles',fn($q)=>$q->whereIn('name',['Super Admin','Builder/Developer','Builder','builder']))->pluck('name','id')->all(),
+            'roleOptions'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? ['Executive'=>'Sales Executive'] : ['Executive'=>'Sales Executive','Team Leader'=>'Team Leader','Channel Partner'=>'Channel Partner'],
         ])->layout('layouts.app');
     }
 }

@@ -398,7 +398,7 @@
                                                         </svg>
                                                     </button>
 @endif
-                                                    @if(!\App\Models\Lead::usesSalesPanel() || (!in_array(\App\Models\Lead::normalizeStage($row->current_stage),['closed_won','booking','payment_received','replaced','pending_credit']) && !in_array($row->replacement_status,['pending','approved'])))
+                                                    @if(!\App\Support\TeamAccess::isLeader($actionUser) && (!\App\Models\Lead::usesSalesPanel() || (!in_array(\App\Models\Lead::normalizeStage($row->current_stage),['closed_won','booking','payment_received','replaced','pending_credit']) && !in_array($row->replacement_status,['pending','approved']))))
 <button type="button"
                                                         @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadId }} })"
                                                         class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"

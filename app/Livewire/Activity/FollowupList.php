@@ -72,6 +72,7 @@ class FollowupList extends Component
 
     public function render()
     {
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) abort_unless(auth()->user()->can('view-team-followups'),403);
         $userId = auth()->id() ?? 1;
 
         $baseQuery = Followup::query()->with(['lead' => fn ($q) => $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()])]);

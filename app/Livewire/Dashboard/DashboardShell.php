@@ -1994,7 +1994,7 @@ class DashboardShell extends Component
         $user = auth()->user();
         $userId = $user?->id;
 
-        $leadsQuery = Lead::withoutGlobalScopes()->where('assigned_to', $userId);
+        $leadsQuery = \App\Support\TeamAccess::isLeader($user) ? Lead::panelQuery() : Lead::withoutGlobalScopes()->where('assigned_to', $userId);
 
         $totalLeads = (clone $leadsQuery)->count();
         $newLeads = (clone $leadsQuery)->whereIn('current_stage', array_merge(Lead::stageValues('new'), Lead::stageValues('assigned')))->count();

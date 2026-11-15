@@ -24,6 +24,7 @@ class ReportsContainer extends Component
 
     public function render()
     {
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) abort_unless(auth()->user()->can('view-team-reports'),403);
         return view('livewire.reports.reports-container')->layout('layouts.app');
     }
 }

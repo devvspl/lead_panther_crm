@@ -33,7 +33,7 @@ class Lead extends Model
 
     public static function usesSalesPanel(): bool
     {
-        return in_array(NavigationConfig::getRoleKey(auth()->user()), ['builder', 'sales-executive']);
+        return in_array(NavigationConfig::getRoleKey(auth()->user()), ['builder', 'sales-executive', 'team-leader']);
     }
 
     // Keep delivery slot allocation and insertion under the same project lock.
@@ -51,6 +51,7 @@ class Lead extends Model
             return $query->whereRaw('1 = 0');
         }
         $role = NavigationConfig::getRoleKey($user);
+        if ($role === 'team-leader') return \App\Support\TeamAccess::scopeLeads($query, $user);
         if (! $user->hasAnyRole(['Super Admin', 'super-admin'])) $query->where('internal_processing_pending', false);
         if (in_array($role, ['builder', 'sales-executive'])) {
             $query->where('delivery_pending', false);

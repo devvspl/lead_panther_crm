@@ -146,6 +146,7 @@ class User extends Authenticatable
                 'builder', 'builder/developer', 'builder developer' => 'Builder/Developer',
                 'channel partner' => 'Channel Partner',
                 'broker' => 'Broker',
+                'team leader' => 'Team Leader',
                 'executive', 'sales executive', 'account manager', 'client' => 'Executive',
                 default => $role,
             };

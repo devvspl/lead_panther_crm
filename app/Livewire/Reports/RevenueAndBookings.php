@@ -69,6 +69,7 @@ class RevenueAndBookings extends Component
             $clientsQuery->where('organization_id', $user->organization_id);
         }
 
+        if (\App\Support\TeamAccess::isLeader($user)) $clientsQuery->whereIn('id',Lead::panelQuery()->select('client_id'));
         $clients = $clientsQuery->get();
         $data = [];
 

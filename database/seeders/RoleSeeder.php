@@ -3,8 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -13,7 +11,7 @@ use App\Models\User;
 class RoleSeeder extends Seeder
 {
     /**
-     * Run the database seeds: Truncate roles table and keep only the 4 allowed roles.
+     * Add canonical roles and permissions without deleting existing access grants.
      */
     public function run(): void
     {
@@ -40,15 +38,6 @@ class RoleSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
-        // 3. Safely truncate/clear existing roles and role pivot relationships
-        Schema::disableForeignKeyConstraints();
-
-        DB::table('model_has_roles')->truncate();
-        DB::table('role_has_permissions')->truncate();
-        DB::table('roles')->truncate();
-
-        Schema::enableForeignKeyConstraints();
-
         // 4. Create ONLY the requested roles with their permissions
         $rolesWithPermissions = [
             'Super Admin' => Permission::all(),
@@ -69,11 +58,11 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($rolesWithPermissions as $roleName => $perms) {
-            $role = Role::create([
+            $role = Role::firstOrCreate([
                 'name' => $roleName,
                 'guard_name' => 'web',
             ]);
-            $role->syncPermissions($perms);
+            $role->givePermissionTo($perms);
         }
 
         // 5. Ensure protected admin user (admin@leadpanther.com) retains Super Admin role
@@ -82,22 +71,7 @@ class RoleSeeder extends Seeder
             $adminUser->assignRole('Super Admin');
         }
 
-        // Re-assign appropriate new roles to any remaining users in the system
-        foreach (User::where('email', '!=', 'admin@leadpanther.com')->get() as $user) {
-            $name = strtolower($user->name);
-            $email = strtolower($user->email);
-
-            if (str_contains($email, 'builder') || str_contains($name, 'builder')) {
-                $user->assignRole('Builder/Developer');
-            } elseif (str_contains($email, 'broker') || str_contains($name, 'broker')) {
-                $user->assignRole('Broker');
-            } elseif (str_contains($email, 'partner') || str_contains($email, 'cp.com') || str_contains($name, 'partner')) {
-                $user->assignRole('Channel Partner');
-            } else {
-                $user->assignRole('Executive');
-            }
-        }
-
+        $this->call(TeamLeaderRoleSeeder::class);
         // 6. Reset permission cache again to apply immediately
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }

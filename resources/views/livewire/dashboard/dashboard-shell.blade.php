@@ -1526,12 +1526,12 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-border">
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">Sales Executive Dashboard</h1>
+                        <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'Team Leader Dashboard' : 'Sales Executive Dashboard' }}</h1>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                             {{ auth()->user()->name }}
                         </span>
                     </div>
-                    <p class="text-xs text-muted mt-0.5">My assigned leads, scheduled calls &amp; daily follow-up queue</p>
+                    <p class="text-xs text-muted mt-0.5">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'Team leads, executive assignments and team follow-up queue' : 'My assigned leads, scheduled calls and daily follow-up queue' }}</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-surface border border-border rounded-full text-[11px] font-semibold text-ink shadow-2xs">

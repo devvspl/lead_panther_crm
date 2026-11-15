@@ -38,6 +38,7 @@ class UserInvite extends Component
 
     public function inviteUser(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         $this->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -66,6 +67,7 @@ class UserInvite extends Component
 
     public function render()
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         $query = User::where('organization_id', auth()->user()?->organization_id);
 
         if (!empty($this->search)) {

@@ -15,6 +15,18 @@ class ClientScope implements Scope
         }
 
         $user = auth()->user();
+        if ($model instanceof \App\Models\Lead && \App\Support\TeamAccess::isLeader($user)) {
+            \App\Support\TeamAccess::scopeLeads($builder, $user);
+            return;
+        }
+        if (\App\Support\TeamAccess::isLeader($user) && $model instanceof \App\Models\Campaign) {
+            $builder->whereIn('campaigns.id', \App\Models\Lead::panelQuery()->select('campaign_id'));
+            return;
+        }
+        if (\App\Support\TeamAccess::isLeader($user) && $model instanceof \App\Models\Project) {
+            $builder->whereIn('projects.id', \App\Models\Campaign::withoutGlobalScopes()->whereIn('id', \App\Models\Lead::panelQuery()->select('campaign_id'))->select('project_id'));
+            return;
+        }
         if ($model instanceof \App\Models\Lead && ! $user->hasAnyRole(['Super Admin', 'super-admin'])) $builder->where('leads.internal_processing_pending', false);
         if ($model instanceof \App\Models\Lead && \App\Models\Lead::usesSalesPanel()) {
             $builder->where('leads.delivery_pending', false);

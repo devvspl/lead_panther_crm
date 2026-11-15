@@ -16,6 +16,7 @@ class NavigationConfig
 
         if ($roles->contains('super-admin')) return 'super-admin';
         if ($roles->contains('builder-developer') || $roles->contains('builder') || $roles->contains('developer')) return 'builder';
+        if ($roles->contains('team-leader')) return 'team-leader';
         if ($roles->contains('broker')) return 'broker';
         if ($roles->contains('channel-partner') || $roles->contains('partner')) return 'channel-partner';
         if ($roles->contains('sales-executive') || $roles->contains('executive') || $roles->contains('sales')) return 'sales-executive';
@@ -37,6 +38,7 @@ class NavigationConfig
             'builder' => [
                 'dashboard', 'leads', 'team', 'replacements', 'reports'
             ],
+            'team-leader' => ['dashboard','leads','team','followups','reports','notifications'],
             'broker' => [
                 'dashboard', 'leads', 'credits', 'reports'
             ],
@@ -66,12 +68,14 @@ class NavigationConfig
             'broker' => route('broker.dashboard'),
             'channel-partner' => route('partner.dashboard'),
             'sales-executive' => route('sales.dashboard'),
+            'team-leader' => route('team-leader.dashboard'),
             'client' => route('client.dashboard'),
             default => route('dashboard'),
         };
 
         $teamRoute = match ($roleKey) {
             'builder' => route('builder.team'),
+            'team-leader' => route('team-leader.team'),
             'channel-partner' => route('partner.team'),
             default => route('dashboard'),
         };
@@ -101,7 +105,7 @@ class NavigationConfig
             ],
             'leads' => [
                 'key' => 'leads',
-                'label' => $isBuilderOrSales ? 'My Leads' : 'Leads',
+                'label' => $roleKey === 'team-leader' ? 'Team Leads' : ($isBuilderOrSales ? 'My Leads' : 'Leads'),
                 'url' => $leadsRoute,
                 'data_nav_route' => 'leads',
                 'data_nav_exact' => 'false',

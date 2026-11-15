@@ -68,6 +68,7 @@ class SalesExecutivePerformance extends Component
     {
         $user = auth()->user();
         $execsQuery = User::role('sales-executive');
+        if (\App\Support\TeamAccess::isLeader($user)) $execsQuery->whereIn('id',\App\Support\TeamAccess::executives($user)->select('id'));
 
         if ($user && $user->hasRole('Sales Executive')) {
             $execsQuery->where('id', $user->id);

@@ -32,6 +32,7 @@ new #[Layout('layouts.guest')]
         $targetRoute = match (true) {
             $user->hasRole('Super Admin') => route('admin.dashboard', absolute: false),
             $user->hasRole('Builder/Developer') || $user->hasRole('Builder') => route('builder.dashboard', absolute: false),
+            $user->hasRole('Team Leader') => route('team-leader.dashboard', absolute: false),
             $user->hasRole('Broker') => route('broker.dashboard', absolute: false),
             $user->hasRole('Channel Partner') => route('partner.dashboard', absolute: false),
             $user->hasRole('Executive') || $user->hasRole('Sales Executive') => route('sales.dashboard', absolute: false),

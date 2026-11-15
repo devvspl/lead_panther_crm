@@ -133,6 +133,10 @@ Route::get('/documents/download/{path}', [DocumentDownloadController::class, 'do
 Route::view('profile', 'profile')->middleware(['auth'])->name('profile');
 
 // Role-based Route Groups (Spatie Laravel-Permission)
+Route::middleware(['auth','role:Team Leader|team-leader'])->prefix('team-leader')->name('team-leader.')->group(function () {
+    Route::view('/dashboard','pages.dashboard',['role'=>'team-leader'])->name('dashboard');
+    Route::get('/team', BuilderTeamManager::class)->name('team');
+});
 Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/credits', AdminCredits::class)->name('credits');

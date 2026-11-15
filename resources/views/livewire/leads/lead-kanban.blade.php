@@ -11,7 +11,7 @@
             <div class="flex items-center gap-2">
                 <h1 class="text-lg font-bold tracking-tight text-ink">{{ ($isBuilder || $isSalesExecutive) ? 'My Leads' : 'Leads' }}</h1>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    {{ $isSalesExecutive ? 'My Assigned Pipeline' : ($isBuilder ? 'Organization Pipeline' : 'Live Pipeline') }}
+                    {{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Pipeline' : ($isSalesExecutive ? 'My Assigned Pipeline' : ($isBuilder ? 'Organization Pipeline' : 'Live Pipeline')) }}
                 </span>
             </div>
             <p class="text-xs text-muted mt-0.5">

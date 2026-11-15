@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->web(append: [
             AuditActivityMiddleware::class,
+            \App\Http\Middleware\TeamLeaderAccess::class,
         ]);
         $middleware->api(append: [
             AuditActivityMiddleware::class,

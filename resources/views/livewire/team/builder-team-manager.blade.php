@@ -2,11 +2,20 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Builder Direct Team Management</h1>
-            <p class="text-xs text-muted">Create and manage your organization's Executives and Channel Partners.</p>
+            <h1 class="text-xl font-bold tracking-tight text-ink">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Management' : 'Builder Direct Team Management' }}</h1>
+            <p class="text-xs text-muted">Manage team leadership, executive membership and assignments within your organization.</p>
         </div>
     </div>
 
+    <div class="bg-surface rounded-card border border-border p-5 space-y-4 text-xs">
+        <div class="flex items-end gap-3"><div class="flex-1"><label class="block font-semibold mb-1">Sales team</label><livewire:shared.searchable-select wire:model.live="teamId" :options="$teams" placeholder="Select team" class="block w-full" /></div>@unless(\App\Support\TeamAccess::isLeader(auth()->user()))<button wire:click="newTeam" class="border border-border rounded-lg px-3 py-2">New Team</button>@endunless</div>
+        @unless(\App\Support\TeamAccess::isLeader(auth()->user()))
+        <div class="grid sm:grid-cols-3 gap-3 items-end"><label>Team name<input wire:model="teamName" class="block w-full border border-border bg-canvas rounded-lg px-3 py-2 mt-1"></label><div><label class="block mb-1">Team Leader</label><livewire:shared.searchable-select wire:model.live="teamLeaderId" :options="$leaders" placeholder="Select Team Leader" class="block w-full" :key="'team-leader-'.$teamId" /></div><button wire:click="saveTeam" class="rounded-lg bg-ink text-white px-3 py-2">Save Team &amp; Leader</button></div>
+        @if($teamId)<div class="grid sm:grid-cols-3 gap-3 items-end border-t border-border pt-3"><div><label class="block mb-1">Existing organization member</label><livewire:shared.searchable-select wire:model.live="existingMemberId" :options="$organizationMembers" placeholder="Select member" class="block w-full" :key="'existing-member-'.$teamId" /></div><div><label class="block mb-1">Assign role</label><x-ui.themed-select wire:model="existingMemberRole" :options="$roleOptions" class="w-full" /></div><button wire:click="assignExistingMember" class="border border-border rounded-lg px-3 py-2">Update Role &amp; Add to Team</button></div>@endif
+        @endunless
+        @if($teamId)<div class="flex flex-wrap gap-2 border-t border-border pt-3">@foreach($members as $member)@if(!\App\Support\TeamAccess::isLeader(auth()->user()) || $member->hasRole('Executive'))<button wire:click="toggleMember({{ $member->id }})" class="border border-border rounded-lg px-2 py-1">{{ $member->name }}: {{ \App\Models\SalesTeamMember::where('sales_team_id',$teamId)->where('user_id',$member->id)->value('is_active') ? 'Deactivate membership' : 'Activate membership' }}</button>@endif @endforeach</div>@endif
+        @if($errors->any())<p class="text-red-600">{{ $errors->first() }}</p>@endif
+    </div>
     <!-- Add Member Form -->
     <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
         <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Add Team Member</h2>
@@ -38,7 +47,7 @@
                 <label class="font-bold text-ink">Role <span class="text-red-500">*</span></label>
                 <x-ui.themed-select 
                     wire:model="roleName" 
-                    :options="['Executive' => 'Executive', 'Channel Partner' => 'Channel Partner']" 
+                    :options="$roleOptions"
                     placeholder="Select Role" 
                     class="w-full mt-1" 
                 />

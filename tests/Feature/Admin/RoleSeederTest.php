@@ -13,7 +13,7 @@ class RoleSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_seeder_truncates_and_seeds_only_the_four_canonical_roles(): void
+    public function test_seeder_adds_canonical_roles_without_deleting_existing_roles(): void
     {
         // Pre-create extra dummy roles
         Role::create(['name' => 'Legacy Role A', 'guard_name' => 'web']);
@@ -29,14 +29,17 @@ class RoleSeederTest extends TestCase
 
         $roles = Role::pluck('name')->sort()->values()->toArray();
 
-        $this->assertEquals([
+        $this->assertEmpty(array_diff([
             'Builder/Developer',
+            'Broker',
             'Channel Partner',
             'Executive',
             'Super Admin',
-        ], $roles);
-
-        $this->assertEquals(4, Role::count());
+            'Team Leader',
+        ], $roles));
+        $this->assertContains('Legacy Role A',$roles);
+        $this->assertContains('Legacy Role B',$roles);
+        $this->assertContains('Sales Executive',$roles);
 
         $admin->refresh();
         $this->assertTrue($admin->hasRole('Super Admin'));
@@ -51,8 +54,8 @@ class RoleSeederTest extends TestCase
         $partner = Role::where('name', 'Channel Partner')->first();
         $executive = Role::where('name', 'Executive')->first();
 
-        $this->assertCount(12, $superAdmin->permissions);
-        $this->assertCount(9, $builder->permissions);
+        $this->assertTrue($superAdmin->hasPermissionTo('assign-team-leaders'));
+        $this->assertTrue($builder->hasPermissionTo('assign-team-leaders'));
         $this->assertCount(4, $partner->permissions);
         $this->assertCount(5, $executive->permissions);
 

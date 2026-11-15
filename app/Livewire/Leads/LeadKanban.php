@@ -565,6 +565,7 @@ class LeadKanban extends Component
 
     public function getAvailableTeams()
     {
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) return \App\Support\TeamAccess::teams(auth()->user())->get();
         $user = auth()->user();
         if (!$user) return collect();
 
@@ -659,6 +660,7 @@ class LeadKanban extends Component
         }
 
         return NavigationConfig::getRoleKey($user) === 'builder'
+            || NavigationConfig::getRoleKey($user) === 'team-leader'
             || $user->hasRole('builder')
             || $user->hasRole('Builder')
             || $user->hasRole('Builder/Developer')
@@ -1513,6 +1515,10 @@ class LeadKanban extends Component
             $eligibleAssignees = $this->isBuilder && $orgId ? User::where('organization_id', $orgId)->where('status', 'active')->get()->filter(fn ($member) => NavigationConfig::getRoleKey($member) === 'sales-executive')->filter(fn ($member) => ! $this->assignTeamId || SalesTeamMember::where('sales_team_id', $this->assignTeamId)->where('user_id', $member->id)->where('is_active', true)->exists()) : collect();
         }
 
+        if (\App\Support\TeamAccess::isLeader($user)) {
+            $assignTeams=\App\Support\TeamAccess::teams($user)->get();
+            $eligibleAssignees=\App\Support\TeamAccess::executives($user)->when($this->assignTeamId,fn($q)=>$q->whereIn('id',SalesTeamMember::where('sales_team_id',$this->assignTeamId)->where('is_active',true)->select('user_id')))->get();
+        }
         return view('livewire.leads.lead-kanban', [
             'canInternalQueue' => $canInternal,
             'isBuilder' => $this->isBuilder,
@@ -1652,6 +1658,7 @@ class LeadKanban extends Component
 
     public function submitReturnLead(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         if (Lead::usesSalesPanel()) {
             abort_unless($this->isBuilder, 403);
             $this->validate(['returnLeadId' => 'required|integer', 'returnReasonId' => 'required|exists:replacement_reasons,id', 'returnRemarks' => 'required|string|min:5|max:1000', 'returnSupportingInfo' => 'nullable|string|max:2000']);
@@ -1749,6 +1756,7 @@ class LeadKanban extends Component
 
     public function autoDistributeUnassignedLeads(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         if (Lead::usesSalesPanel()) {
             $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
 
@@ -1833,6 +1841,10 @@ class LeadKanban extends Component
         if ($this->isBuilder) {
             $this->validate(['selectedLeadIds' => 'required|array|min:1', 'selectedLeadIds.*' => 'integer|distinct', 'assignUserId' => 'required|integer']);
             $actor = auth()->user();
+            if (\App\Support\TeamAccess::isLeader($actor)) {
+                abort_unless($actor->can('assign-team-leads') && \App\Support\TeamAccess::executives($actor)->whereKey($this->assignUserId)->exists(),403);
+                if ($this->assignTeamId) abort_unless(\App\Support\TeamAccess::teams($actor)->whereKey($this->assignTeamId)->exists(),403);
+            }
             $assignee = User::whereNotNull('organization_id')->where('organization_id', $actor->organization_id)->where('status', 'active')->find($this->assignUserId);
             abort_unless($assignee, 403);
             abort_unless(NavigationConfig::getRoleKey($assignee) === 'sales-executive', 403);
@@ -2109,6 +2121,7 @@ class LeadKanban extends Component
 
     public function openPullLeadsModal(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         if (Lead::usesSalesPanel()) {
             $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
 
@@ -2130,6 +2143,7 @@ class LeadKanban extends Component
 
     public function pullMetaLeads(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         if (Lead::usesSalesPanel()) {
             $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
 
@@ -2192,6 +2206,7 @@ class LeadKanban extends Component
 
     public function createManualLead(): void
     {
+        abort_if(\App\Support\TeamAccess::isLeader(auth()->user()),403);
         if (Lead::usesSalesPanel()) {
             $this->dispatch('toast', type: 'error', message: 'This action is managed by Lead Panther.');
 

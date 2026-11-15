@@ -338,8 +338,12 @@
                     $project = $row['project'];
                     $projectKey = 'project_'.$project->id;
                 @endphp
-                <article id="delivery-project-{{ $project->id }}" class="bg-surface border border-border rounded-xl p-5 space-y-5" wire:key="delivery-project-{{ $project->id }}">
-                    <h3 class="font-bold text-ink">{{ $project->name }} <span class="text-xs text-muted">Project: {{ ucfirst($project->status) }}</span></h3>
+                <article id="delivery-project-{{ $project->id }}" class="bg-surface border border-border rounded-xl overflow-hidden" wire:key="delivery-project-{{ $project->id }}" x-data="{ open: false }" x-init="open = window.location.hash === '#' + $el.id || (!!window.location.hash && Array.from($el.querySelectorAll('[id]')).some(node => '#' + node.id === window.location.hash))">
+                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="delivery-project-content-{{ $project->id }}" class="flex w-full items-center justify-between gap-4 p-4 sm:p-5 text-left hover:bg-canvas/50 transition">
+                        <span class="min-w-0 space-y-2"><span class="block text-sm font-bold text-ink">{{ $project->name }}</span><span class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"><span>{{ ucfirst($project->status) }} · {{ count($row['campaigns']) }} campaigns</span><span>Daily limit: {{ $project->delivery_daily_limit ? number_format($project->delivery_daily_limit) : 'Unlimited' }}</span><span>Interval: {{ $project->delivery_interval_minutes ? $project->delivery_interval_minutes.' min' : 'Immediate' }}</span><span>Delivered today: {{ number_format($row['stats']['today']) }} · Pending: {{ number_format($row['stats']['pending']) }}</span></span></span>
+                        <span class="flex shrink-0 items-center gap-2 text-xs font-semibold text-primary"><span x-text="open ? 'Collapse' : 'Configure'"></span><svg class="h-4 w-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg></span>
+                    </button>
+                    <div id="delivery-project-content-{{ $project->id }}" x-show="open" x-cloak class="border-t border-border p-4 sm:p-5 space-y-5">
                     <h4 class="text-sm font-semibold text-ink">Project Default Settings</h4>
                     <form wire:submit="saveDeliverySettings('project', {{ $project->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                         <label class="text-xs text-ink">Daily Lead Limit (0 = unlimited)
@@ -355,8 +359,7 @@
                         </label>
                         <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
                     </form>
-                    <h4 class="text-sm font-semibold text-ink">Live Delivery Statistics <span class="font-normal text-muted">(project totals; capacity summed across campaigns)</span></h4>
-                    <x-ui.delivery-statistics :stats="$row['stats']" />
+                    <details class="rounded-lg border border-border p-3"><summary class="text-xs font-semibold text-ink cursor-pointer">Live Delivery Statistics <span class="font-normal text-muted">· Project totals</span></summary><div class="mt-3"><x-ui.delivery-statistics :stats="$row['stats']" /></div><p class="text-xs text-muted mt-2">Daily capacity is summed across campaigns.</p></details>
                     <h4 class="text-sm font-semibold text-ink border-t border-border pt-4">Campaign Override Settings</h4>
                     @forelse($row['campaigns'] as $item)
                         @php
@@ -364,9 +367,13 @@
                             $key = 'campaign_'.$campaign->id;
                             $effective = $item['effective'];
                         @endphp
-                        <div id="delivery-campaign-{{ $campaign->id }}" class="border border-border rounded-lg p-4 space-y-3" wire:key="delivery-campaign-{{ $campaign->id }}">
-                            <h5 class="font-semibold text-ink">{{ $campaign->name }}</h5>
-                            <p class="text-xs text-muted">Source: {{ $campaign->leadSource?->name ?? 'Not linked' }} | Campaign status: {{ ucfirst($campaign->status) }} | Delivery: {{ $project->delivery_enabled && $project->status === 'active' && $campaign->status === 'active' ? 'Active' : 'Paused' }}</p>
+                        <div id="delivery-campaign-{{ $campaign->id }}" class="border border-border rounded-lg overflow-hidden" wire:key="delivery-campaign-{{ $campaign->id }}" x-data="{ expanded: false }" x-init="expanded = window.location.hash === '#' + $el.id">
+                            <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()" aria-controls="delivery-campaign-content-{{ $campaign->id }}" class="flex items-center justify-between gap-3 w-full p-3 sm:p-4 text-left hover:bg-canvas/50 transition">
+                                <span class="min-w-0 space-y-1"><span class="block text-sm font-semibold text-ink">{{ $campaign->name }}</span><span class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted"><span>{{ $campaign->leadSource?->name ?? 'Not linked' }} · {{ $project->delivery_enabled && $project->status === 'active' && $campaign->status === 'active' ? 'Active' : 'Paused' }}</span><span>Daily: {{ $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']) }} ({{ $effective['limit_source'] }})</span><span>Interval: {{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' min' }} ({{ $effective['interval_source'] }})</span></span></span>
+                                <svg class="h-4 w-4 shrink-0 text-muted transition-transform" :class="expanded && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            <div id="delivery-campaign-content-{{ $campaign->id }}" x-show="expanded" x-cloak class="border-t border-border p-3 sm:p-4 space-y-3">
+                            <p class="text-xs text-muted">Campaign status: {{ ucfirst($campaign->status) }}</p>
                             <form wire:submit="saveDeliverySettings('campaign', {{ $campaign->id }})" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                                 <div class="text-xs text-ink">
                                     <label>Daily Lead Limit (0 = unlimited)
@@ -388,12 +395,13 @@
                                 Effective daily limit: <strong>{{ $effective['limit'] === 0 ? 'Unlimited' : $effective['limit'] }}</strong> ({{ $effective['limit_source'] }}) |
                                 Effective interval: <strong>{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' minutes' }}</strong> ({{ $effective['interval_source'] }})
                             </div>
-                            <h6 class="text-xs font-semibold text-ink">Live Delivery Statistics</h6>
-                            <x-ui.delivery-statistics :stats="$item['stats']" />
+                            <details class="rounded-lg border border-border p-3"><summary class="text-xs font-semibold text-ink cursor-pointer">Live Delivery Statistics · {{ number_format($item['stats']['today']) }} delivered today · {{ number_format($item['stats']['pending']) }} pending</summary><div class="mt-3"><x-ui.delivery-statistics :stats="$item['stats']" /></div></details>
+                            </div>
                         </div>
                     @empty
                         <p class="text-sm text-muted">No campaigns linked to this project.</p>
                     @endforelse
+                    </div>
                 </article>
             @empty
                 <p class="text-sm text-muted">No projects linked to this organization.</p>

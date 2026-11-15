@@ -1356,12 +1356,6 @@
                 @endif
             </div>
 
-                @if($creditTransactions->hasPages())
-                    <div class="p-3 border-t border-border bg-canvas/30">
-                        {{ $creditTransactions->links() }}
-                    </div>
-                @endif
-            </div>
         </div>
     @endif
 

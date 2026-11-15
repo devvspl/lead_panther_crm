@@ -1,4 +1,10 @@
 <div class="space-y-6">
+    @if($canInternalQueue)
+        <div class="flex gap-2 text-xs"><button wire:click="$set('queue', 'client')" class="rounded-lg border border-border px-4 py-2 {{ $queue !== 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Client Leads</button><button wire:click="$set('queue', 'internal')" class="rounded-lg border border-border px-4 py-2 {{ $queue === 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Internal Processing Queue</button></div>
+    @endif
+    @if($queue === 'internal' && $canInternalQueue)
+        <livewire:leads.internal-processing-queue />
+    @else
     <!-- 1. COMPACT PAGE HEADER -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
         <div>
@@ -1592,4 +1598,5 @@
 
     <!-- CDN Script for SortableJS (Kanban drag-and-drop) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    @endif
 </div>

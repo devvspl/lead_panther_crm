@@ -107,8 +107,8 @@ class LeadJourneyService
         }
 
         // 5. SLA Tracking Milestone
-        if ($lead->created_at) {
-            $created = Carbon::parse($lead->created_at);
+        if ($lead->created_at && ! $lead->internal_processing_pending) {
+            $created = Carbon::parse($lead->client_response_start);
             if ($lead->first_response_at) {
                 $firstResp = Carbon::parse($lead->first_response_at);
                 $diff = $created->diffInMinutes($firstResp);

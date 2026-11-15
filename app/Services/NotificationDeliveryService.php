@@ -81,6 +81,10 @@ class NotificationDeliveryService
     public function leadAlert(Lead $lead, string $type, string $title, string $message, string $eventKey,
         string $category = 'delivery', bool $important = false, bool $adminsOnly = false): void
     {
+        if ($lead->internal_processing_pending && $category === 'delivery') {
+            if ($record = \App\Models\InternalLeadProcessing::where('lead_id', $lead->id)->first()) app(LeadDistributionService::class)->internalAlert($record, $type, $title, $eventKey);
+            return;
+        }
         $orgId = User::find($lead->client_id)?->organization_id;
         foreach ($this->organizationRecipients($orgId, $lead->client_id, $lead->assigned_to, $adminsOnly) as $recipient) {
             if ($lead->delivery_pending && $category === 'delivery' && \App\Support\NavigationConfig::getRoleKey($recipient) === 'sales-executive') continue;

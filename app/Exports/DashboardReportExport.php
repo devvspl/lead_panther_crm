@@ -135,7 +135,7 @@ class DashboardReportExport implements WithMultipleSheets
                     fn($l) => $l->leadSource?->name ?: 'Direct',
                     fn($l) => ucfirst(str_replace('_', ' ', $l->current_stage ?: $l->status)),
                     fn($l) => $l->assignedTo?->name ?: 'Unassigned',
-                    fn($l) => $l->first_response_at ? 'Completed' : ($l->created_at && $l->created_at->diffInMinutes(now()) > 30 ? 'Breached' : 'Pending'),
+                    fn($l) => $l->first_response_at ? 'Completed' : ($l->created_at && $l->client_response_start->diffInMinutes(now()) > 30 ? 'Breached' : 'Pending'),
                     fn($l) => $l->created_at ? $l->created_at->format('M d, Y H:i') : '—',
                 ],
                 statusColumns: ['SLA Status']

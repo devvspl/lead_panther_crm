@@ -51,6 +51,8 @@ class LeadKanban extends Component
     // Global Filters (URL bound)
     #[Url]
     public string $search = '';
+    #[Url]
+    public string $queue = 'client';
 
     #[Url]
     public string $statusFilter = 'all';
@@ -225,6 +227,7 @@ class LeadKanban extends Component
 
     public function mount(): void
     {
+        if (! request()->has('queue') && ! auth()->user()->hasAnyRole(['Super Admin', 'super-admin']) && app(\App\Services\LeadDistributionService::class)->hasInternalQueueAccess(auth()->user())) $this->queue = 'internal';
         if ($notificationLead = request()->integer('notification_lead')) {
             $accessible = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->whereKey($notificationLead)->exists();
             if ($accessible) $this->dispatch('open-lead-detail', id: $notificationLead);
@@ -713,12 +716,14 @@ class LeadKanban extends Component
     {
         $user = auth()->user();
         $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::withoutGlobalScopes())
+            ->where('internal_processing_pending', false)
             ->with([
                 'client.organization',
                 'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()]) : $q->with('project'),
                 'leadSource',
                 'assignedTo.salesTeamMembers.salesTeam',
                 'metadata',
+                'internalProcessing',
                 'siteVisits',
                 'followups',
                 'replacements',
@@ -819,7 +824,7 @@ class LeadKanban extends Component
         // SLA Breached Toggle
         if ($this->sla_breached) {
             $query->whereNull('first_response_at')
-                  ->where('created_at', '<', now()->subMinutes(15));
+                  ->whereRaw(Lead::clientSlaStartExpression().' < ?', [now()->subMinutes(15)]);
         }
 
         // Stage Filter
@@ -857,7 +862,7 @@ class LeadKanban extends Component
             } elseif ($sf === 'pending_credit') {
                 $query->where('current_stage', 'pending_credit');
             } elseif ($sf === 'sla_breached') {
-                $query->whereNull('first_response_at')->where('created_at', '<', now()->subMinutes(15));
+                $query->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' < ?', [now()->subMinutes(15)]);
             } elseif ($sf === 'pending_response') {
                 $query->whereNotNull('assigned_to')->whereNull('first_response_at');
             } elseif ($sf === 'replacement_eligible') {
@@ -934,7 +939,7 @@ class LeadKanban extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads,
                 COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
             ", [Carbon::now()->subMinutes(15)])
             ->first();
@@ -956,7 +961,7 @@ class LeadKanban extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads,
                 COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
             ", [$prevStart, Carbon::now()->subDays(max(1, $start->diffInDays($end) + 1))->subMinutes(15)])
             ->first();
@@ -1238,7 +1243,7 @@ class LeadKanban extends Component
             }
 
             if ($l->first_response_at && $l->created_at) {
-                $diffMinutes = $l->created_at->diffInMinutes($l->first_response_at);
+                $diffMinutes = $l->client_response_start->diffInMinutes($l->first_response_at);
                 $grouped[$groupName]['sla_times'][] = $diffMinutes;
             }
         }
@@ -1339,8 +1344,8 @@ class LeadKanban extends Component
         $successRate = $totalLeads > 0 ? round(($assignedCount / $totalLeads) * 100, 1) : 0;
 
         // SLA
-        $withinSla = (int) (clone $query)->whereNotNull('first_response_at')->where('created_at', '<=', now()->subMinutes(15))->count();
-        $slaBreached = (int) (clone $query)->whereNull('first_response_at')->where('created_at', '<=', now()->subMinutes(15))->count();
+        $withinSla = (int) (clone $query)->whereNotNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [now()->subMinutes(15)])->count();
+        $slaBreached = (int) (clone $query)->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [now()->subMinutes(15)])->count();
         $pending1st = (int) (clone $query)->whereNull('first_response_at')->count();
 
         // Upcoming Follow-ups (due next 5)
@@ -1400,6 +1405,10 @@ class LeadKanban extends Component
 
     public function render()
     {
+        $canInternal = app(\App\Services\LeadDistributionService::class)->hasInternalQueueAccess(auth()->user());
+        if ($this->queue === 'internal' && $canInternal) {
+            return view('livewire.leads.lead-kanban', ['canInternalQueue' => true])->layout('layouts.app');
+        }
         $baseQuery = $this->getScopedQuery();
         $kpis = Lead::usesSalesPanel() ? [] : $this->leadKpis;
         $funnel = Lead::usesSalesPanel() ? [] : $this->leadFunnel;
@@ -1505,6 +1514,7 @@ class LeadKanban extends Component
         }
 
         return view('livewire.leads.lead-kanban', [
+            'canInternalQueue' => $canInternal,
             'isBuilder' => $this->isBuilder,
             'isSalesExecutive' => $this->isSalesExecutive,
             'builderKpis' => $this->builderLeadKpis,
@@ -1691,10 +1701,10 @@ class LeadKanban extends Component
         // SLA met calculation
         $slaMet = false;
         if ($lead->first_response_at && $lead->created_at) {
-            $diffMins = Carbon::parse($lead->created_at)->diffInMinutes(Carbon::parse($lead->first_response_at));
+            $diffMins = Carbon::parse($lead->client_response_start)->diffInMinutes(Carbon::parse($lead->first_response_at));
             $slaMet = ($diffMins <= 30);
         } else {
-            $diffMins = Carbon::parse($lead->created_at ?? now())->diffInMinutes(now());
+            $diffMins = Carbon::parse($lead->client_response_start ?? now())->diffInMinutes(now());
             $slaMet = ($diffMins <= 30);
         }
 
@@ -1936,6 +1946,16 @@ class LeadKanban extends Component
     }
 
     public function tableColumns(): array
+    {
+        $columns = $this->clientTableColumns();
+        if (Lead::usesSalesPanel()) array_splice($columns, max(0, count($columns) - 1), 0, [
+            ['key' => 'internal_verification', 'label' => 'Lead Panther Verification', 'type' => 'text', 'priority' => 2],
+            ['key' => 'internal_handover', 'label' => 'Client Handover', 'type' => 'text', 'priority' => 2],
+        ]);
+        return $columns;
+    }
+
+    protected function clientTableColumns(): array
     {
         if ($this->isSalesExecutive) {
             return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : ($key === 'lead_code' ? 'lead_id' : 'text'), 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);

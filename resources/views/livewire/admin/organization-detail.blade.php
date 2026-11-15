@@ -562,6 +562,8 @@
                     </div>
                 </div>
 
+                <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
+
                 <!-- Recent Members Quick Snapshot -->
                 <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">
                     <div class="flex items-center justify-between">

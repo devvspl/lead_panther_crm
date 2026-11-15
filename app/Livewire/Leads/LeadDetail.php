@@ -183,6 +183,7 @@ class LeadDetail extends Component
      */
     protected function hasLeadAccess(Lead $lead, $user): bool
     {
+        if ($lead->internal_processing_pending) return false;
         if (! $user) {
             return false;
         }
@@ -801,11 +802,11 @@ class LeadDetail extends Component
 
         $slaMet = true;
         if ($lead->created_at) {
-            $slaMet = Carbon::parse($lead->created_at)->diffInMinutes(now()) <= 30;
+            $slaMet = Carbon::parse($lead->client_response_start)->diffInMinutes(now()) <= 30;
         }
 
         if (Lead::usesSalesPanel()) {
-            $slaMet = $lead->first_response_at && Carbon::parse($lead->created_at)->diffInMinutes($lead->first_response_at) <= 30;
+            $slaMet = $lead->first_response_at && Carbon::parse($lead->client_response_start)->diffInMinutes($lead->first_response_at) <= 30;
         }
         $replacement = LeadReplacement::create([
             'lead_id' => $lead->id,

@@ -218,7 +218,7 @@ class DashboardShell extends Component
 
         if ($this->filterStatus) {
             if ($this->filterStatus === 'sla_breached') {
-                $query->whereNull('first_response_at')->where('created_at', '<=', Carbon::now()->subMinutes(30));
+                $query->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [Carbon::now()->subMinutes(30)]);
             } elseif ($this->filterStatus === 'unassigned') {
                 $query->whereNull('assigned_to');
             } elseif ($this->filterStatus === 'assigned') {
@@ -283,7 +283,7 @@ class DashboardShell extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads
+                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads
             ", [Carbon::now()->subMinutes(30)])
             ->first();
 
@@ -301,7 +301,7 @@ class DashboardShell extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') OR booking_status IN ('confirmed', 'booked') THEN 1 END) as converted_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND created_at <= ? THEN 1 END) as sla_breached_leads
+                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads
             ", [$prevStart, Carbon::now()->subDays(max(1, $start->diffInDays($end) + 1))->subMinutes(30)])
             ->first();
 
@@ -552,8 +552,8 @@ class DashboardShell extends Component
         // Calculate Average First Response Time
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $timeDiffSql = $isSqlite
-            ? 'AVG((strftime("%s", first_response_at) - strftime("%s", created_at)) / 60) as avg_min'
-            : 'AVG(TIMESTAMPDIFF(MINUTE, created_at, first_response_at)) as avg_min';
+            ? 'AVG((strftime("%s", first_response_at) - strftime("%s", '.Lead::clientSlaStartExpression().')) / 60) as avg_min'
+            : 'AVG(TIMESTAMPDIFF(MINUTE, '.Lead::clientSlaStartExpression().', first_response_at)) as avg_min';
 
         $avgResponseMin = Lead::withoutGlobalScopes()
             ->whereBetween('created_at', [$start, $end])
@@ -1001,7 +1001,7 @@ class DashboardShell extends Component
                     COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned,
                     COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned,
                     COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') THEN 1 END) as converted,
-                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= '{$slaThreshold}' THEN 1 END) as sla_breached
+                    COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= '{$slaThreshold}' THEN 1 END) as sla_breached
                 ")
                 ->first();
 
@@ -1057,7 +1057,7 @@ class DashboardShell extends Component
                     COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned,
                     COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned,
                     COUNT(CASE WHEN current_stage IN ('booking', 'payment', 'closed_won') THEN 1 END) as converted,
-                    COUNT(CASE WHEN first_response_at IS NULL AND created_at <= '{$slaThreshold}' THEN 1 END) as sla_breached
+                    COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= '{$slaThreshold}' THEN 1 END) as sla_breached
                 ")
                 ->first();
 
@@ -1524,7 +1524,7 @@ class DashboardShell extends Component
         if ($this->role === 'sales') {
             $myLeadsToday = Lead::where('assigned_to', $user?->id)->whereDate('created_at', today())->count();
             $followupsPending = Lead::where('assigned_to', $user?->id)->whereIn('current_stage', ['new', 'contacted', 'in_progress'])->count();
-            $slaCritical = Lead::where('assigned_to', $user?->id)->whereNull('first_response_at')->where('created_at', '<=', now()->subMinutes(15))->count();
+            $slaCritical = Lead::where('assigned_to', $user?->id)->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [now()->subMinutes(15)])->count();
             $myBookings = Lead::where('assigned_to', $user?->id)->whereIn('current_stage', ['site_visit', 'booking', 'closed_won'])->count();
 
             return [

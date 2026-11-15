@@ -47,7 +47,7 @@ class CreditTransaction extends Model
     {
         return DB::transaction(function () use ($lead) {
             // 1. Prevent duplicate deduction for the same lead
-            $alreadyCharged = static::where('lead_id', $lead->id)
+            $alreadyCharged = static::withoutGlobalScopes()->where('lead_id', $lead->id)
                 ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                 ->exists();
 
@@ -81,7 +81,7 @@ class CreditTransaction extends Model
             }
 
             // 3. Acquire pessimistic row lock on the client's wallet
-            $wallet = CreditWallet::where('client_id', $lead->client_id)->lockForUpdate()->first();
+            $wallet = CreditWallet::withoutGlobalScopes()->where('client_id', $lead->client_id)->lockForUpdate()->first();
 
             if (!$wallet) {
                 $wallet = CreditWallet::create([
@@ -102,7 +102,7 @@ class CreditTransaction extends Model
                 $after = max(0.00, $before - $cost);
 
                 $wallet->update(['balance' => $after]);
-                $lead->update(['lead_cost' => $cost]);
+                $lead->update(array_merge(['lead_cost' => $cost], $lead->current_stage === 'pending_credit' ? ['status' => 'new', 'current_stage' => 'new'] : []));
 
                 $tx = static::create([
                     'client_id' => $lead->client_id,

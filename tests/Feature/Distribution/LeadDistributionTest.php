@@ -62,6 +62,7 @@ class LeadDistributionTest extends TestCase
         $exec->assignRole('sales-executive');
 
         $org = Organization::create(['name' => 'Builder Org 2', 'type' => 'builder']);
+        $exec->update(['organization_id' => $org->id]);
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Builder Client 2']);
         $project = Project::create(['client_id' => $client->id, 'name' => 'Project RR']);
         $source = LeadSource::create(['name' => 'meta']);
@@ -88,6 +89,7 @@ class LeadDistributionTest extends TestCase
         $exec->assignRole('sales-executive');
 
         $org = Organization::create(['name' => 'Builder Org 3', 'type' => 'builder']);
+        $exec->update(['organization_id' => $org->id]);
         $client = Client::create(['organization_id' => $org->id, 'name' => 'Builder Client 3']);
         $project = Project::create(['client_id' => $client->id, 'name' => 'Project Assign']);
         $source = LeadSource::create(['name' => 'google']);

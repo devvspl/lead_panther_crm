@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 class LeadDistributionService
 {
+    use \App\Services\Concerns\ProcessesInternalLeads;
     public function effectiveDeliveryConfig(\App\Models\Campaign $campaign, ?Project $project = null): array
     {
         $project ??= Project::withoutGlobalScopes()->findOrFail($campaign->project_id);
@@ -49,10 +50,24 @@ class LeadDistributionService
         return $owner?->organization_id && $owner->organization_id == $recipient?->organization_id;
     }
 
-    public function scheduleDelivery(Lead $lead): void
+    public function scheduleDelivery(Lead $lead, bool $internalHandover = false): void
     {
+        $organization = User::find($lead->client_id)?->organization;
+        if (! $internalHandover && $organization?->internal_processing_enabled) {
+            $lead->internal_processing_pending = true;
+            $lead->delivery_pending = true;
+            $lead->delivery_at = null;
+            $lead->assigned_to = null;
+            return;
+        }
         $campaign = \App\Models\Campaign::withoutGlobalScopes()->find($lead->campaign_id);
-        if (! $campaign) return;
+        if (! $campaign) {
+            if ($internalHandover) {
+                $lead->delivery_at = now();
+                $lead->delivery_pending = true;
+            }
+            return;
+        }
         $project = Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first();
         if (! $project) return;
         if (! $this->deliveryRecipientBelongsToProject($lead, $project)) {
@@ -93,6 +108,10 @@ class LeadDistributionService
                 $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
                 $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
                 $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
+                if ($lead?->internal_processing_pending) {
+                    $processing = \App\Models\InternalLeadProcessing::where('lead_id', $lead->id)->lockForUpdate()->first();
+                    if (! $processing?->handover_requested_at || $processing->forwarded_at) return false;
+                }
                 if (! $lead || ! $lead->delivery_pending || $lead->delivery_at?->isFuture()) return false;
                 if ($project && ! $this->deliveryRecipientBelongsToProject($lead, $project)) {
                     $lead->update(['delivery_failed_at' => now(), 'delivery_error' => 'Lead recipient does not belong to the campaign organization.']);
@@ -118,9 +137,16 @@ class LeadDistributionService
                 }
                 if (! \App\Models\CreditTransaction::reserveForLead($lead)) {
                     $lead->update(['delivery_failed_at' => now(), 'delivery_error' => 'Credit reservation failed: check organization status and available balance.']);
+                    if (isset($processing)) $this->internalForwardingFailed($processing, $lead->delivery_error);
                     return false;
                 }
-                $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'delivery_failed_at' => null, 'delivery_error' => null]);
+                $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'delivery_failed_at' => null, 'delivery_error' => null, 'internal_processing_pending' => false]);
+                if (isset($processing)) {
+                    $processing->update(['forwarded_at' => now(), 'forwarded_by' => $processing->handover_requested_by, 'status_code' => 'forwarded_to_client', 'forwarding_error' => null]);
+                    $this->internalEvent($processing, 'forwarded', ['after' => ['forwarded_at' => $processing->forwarded_at->toIso8601String(), 'assigned_to' => $lead->assigned_to]], User::find($processing->forwarded_by));
+                    app(NotificationDeliveryService::class)->leadAlert($lead, 'internal_forwarded', 'Verified lead forwarded to your organization', "Lead {$lead->lead_code} was verified by Lead Panther and handed over.", 'internal-forwarded:'.$processing->id, 'delivery');
+                    $this->internalAlert($processing, 'internal_forwarded', 'Lead successfully handed over to client', 'forwarded:'.$processing->id);
+                }
                 if ($project && $config['limit'] && $successful + 1 >= $config['limit']) {
                     app(NotificationDeliveryService::class)->leadAlert($lead, 'daily_limit_reached', 'Daily delivery limit reached',
                         'Campaign daily delivery capacity has been used. Further leads will wait for the next available day.',
@@ -132,6 +158,7 @@ class LeadDistributionService
             Lead::withoutGlobalScopes()->whereKey($leadId)->where('delivery_pending', true)
                 ->update(['delivery_failed_at' => now(), 'delivery_error' => 'Delivery failed; see application log.']);
             report($e);
+            if ($record = \App\Models\InternalLeadProcessing::where('lead_id', $leadId)->whereNotNull('handover_requested_at')->whereNull('forwarded_at')->first()) $this->internalForwardingFailed($record, 'Forwarding failed. See delivery logs.');
             return false;
         }
     }
@@ -298,9 +325,7 @@ class LeadDistributionService
         $query = User::query()
             ->where('status', 'active');
 
-        if ($organizationId) {
-            $query->where('organization_id', $organizationId);
-        }
+        $query->where('organization_id', $organizationId);
 
         $salesRoles = ['sales-executive', 'Sales Executive', 'sales_executive', 'Executive', 'Channel Partner', 'Broker'];
 
@@ -308,23 +333,7 @@ class LeadDistributionService
             $q->whereIn('name', $salesRoles);
         })->get();
 
-        // Safe fallback if no dedicated sales agents exist in this org
-        if ($agents->isEmpty()) {
-            $agents = User::where('status', 'active')
-                ->whereHas('roles', fn($q) => $q->whereIn('name', $salesRoles))
-                ->get();
-        }
-
-        if ($agents->isEmpty() && $organizationId) {
-            $agents = User::where('status', 'active')
-                ->where('organization_id', $organizationId)
-                ->get();
-        }
-
-        if ($agents->isEmpty()) {
-            $agents = User::where('status', 'active')->get();
-        }
-
+        // No cross-organization fallback: keep the lead unassigned if this client has no agents.
         return $agents;
     }
 

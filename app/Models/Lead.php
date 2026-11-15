@@ -26,6 +26,7 @@ class Lead extends Model
         'delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
         'delivery_pending' => 'boolean',
+        'internal_processing_pending' => 'boolean',
         'delivery_config' => 'array',
         'delivery_failed_at' => 'datetime',
     ];
@@ -50,6 +51,7 @@ class Lead extends Model
             return $query->whereRaw('1 = 0');
         }
         $role = NavigationConfig::getRoleKey($user);
+        if (! $user->hasAnyRole(['Super Admin', 'super-admin'])) $query->where('internal_processing_pending', false);
         if (in_array($role, ['builder', 'sales-executive'])) {
             $query->where('delivery_pending', false);
         }
@@ -130,6 +132,7 @@ class Lead extends Model
     {
         return $this->belongsTo(User::class, 'client_id');
     }
+    public function internalProcessing() { return $this->hasOne(InternalLeadProcessing::class); }
 
     public function project(): HasOneThrough
     {
@@ -138,7 +141,8 @@ class Lead extends Model
 
     public function getProjectIdAttribute(): ?int
     {
-        return $this->campaign?->project_id;
+        $campaignId = $this->attributes['campaign_id'] ?? null;
+        return $campaignId ? Campaign::withoutGlobalScopes()->whereKey($campaignId)->value('project_id') : null;
     }
 
     public function setProjectIdAttribute($value): void
@@ -301,7 +305,7 @@ class Lead extends Model
 
         // 4. SLA First Response Speed (0-10 pts)
         if ($this->first_response_at && $this->created_at) {
-            $diffInMinutes = Carbon::parse($this->created_at)->diffInMinutes(Carbon::parse($this->first_response_at));
+            $diffInMinutes = Carbon::parse($this->client_response_start)->diffInMinutes(Carbon::parse($this->first_response_at));
             if ($diffInMinutes <= 15) {
                 $score += $weights['sla_speed']['under_15_min'] ?? 10;
             } elseif ($diffInMinutes <= 30) {
@@ -369,19 +373,26 @@ class Lead extends Model
 
     public function getSlaBadgeAttribute(): string
     {
+        if ($this->internal_processing_pending) return 'Internal Processing';
+        $start = $this->client_response_start;
         if ($this->first_response_at) {
-            if (static::usesSalesPanel() && $this->created_at->diffInMinutes($this->first_response_at) > 15) {
+            if (static::usesSalesPanel() && $start->diffInMinutes($this->first_response_at) > 15) {
                 return 'SLA Breached';
             }
 
             return 'SLA Met';
         }
-        if ($this->created_at && Carbon::parse($this->created_at)->diffInMinutes(now()) > 15) {
+        if ($start && Carbon::parse($start)->diffInMinutes(now()) > 15) {
             return 'SLA Breached';
         }
 
         return 'SLA Pending';
     }
+
+    public function getInternalVerificationAttribute(): string { return $this->internalProcessing?->forwarded_at ? ucfirst($this->internalProcessing->verification_status) : 'Direct delivery'; }
+    public function getInternalHandoverAttribute(): string { return $this->internalProcessing?->forwarded_at?->format('M d, Y H:i') ?? '—'; }
+    public function getClientResponseStartAttribute() { return $this->delivered_at ? ($this->internalProcessing?->forwarded_at ?? $this->created_at) : $this->created_at; }
+    public static function clientSlaStartExpression(): string { return '(CASE WHEN leads.internal_processing_pending = 1 THEN NULL ELSE COALESCE((SELECT forwarded_at FROM internal_lead_processing WHERE internal_lead_processing.lead_id = leads.id), leads.created_at) END)'; }
 
     public function getOrganizationNameAttribute(): string
     {

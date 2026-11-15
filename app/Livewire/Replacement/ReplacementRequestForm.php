@@ -49,7 +49,7 @@ class ReplacementRequestForm extends Component
         // SLA met calculation: first_response_at diff created_at <= 30 minutes
         $slaMet = false;
         if ($lead->first_response_at) {
-            $diffMins = Carbon::parse($lead->created_at)->diffInMinutes(Carbon::parse($lead->first_response_at));
+            $diffMins = Carbon::parse($lead->client_response_start)->diffInMinutes(Carbon::parse($lead->first_response_at));
             $slaMet = ($diffMins <= 30);
         }
 

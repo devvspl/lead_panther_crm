@@ -43,6 +43,14 @@
             <div class="p-5 flex-1 space-y-5 text-xs">
 
                 <!-- TABS NAVIGATION -->
+                @if($lead->internalProcessing?->forwarded_at)
+                    <section class="rounded-xl border border-border bg-canvas p-4 space-y-2 mb-4">
+                        <h3 class="text-sm font-semibold text-ink">Lead Panther Verification &amp; Handover</h3>
+                        <div class="grid grid-cols-2 gap-2 text-xs text-ink"><div>Verification: {{ ucfirst($lead->internalProcessing->verification_status) }}</div><div>Internal call attempts: {{ $lead->internalProcessing->call_attempts }}</div><div>Last contacted: {{ $lead->internalProcessing->last_contacted_at?->format('M d, Y H:i') ?? 'Unavailable' }}</div><div>Handed over: {{ $lead->internalProcessing->forwarded_at->format('M d, Y H:i') }}</div><div>Assigned client executive: {{ $lead->assignedTo?->name ?? 'Unassigned' }}</div><div>Client stage: {{ ucwords(str_replace('_', ' ', $lead->current_stage)) }}</div></div>
+                        <p class="text-xs text-muted font-semibold">Internal calling remarks</p><p class="text-xs text-ink whitespace-pre-wrap">{{ $lead->internalProcessing->calling_remarks ?? 'No remarks recorded.' }}</p>
+                        <details class="text-xs"><summary class="text-primary cursor-pointer">Preserved internal call history</summary>@foreach($lead->internalProcessing->events()->where('action', 'call')->orderBy('id')->get() as $internalCall)<div class="border-t border-border py-2 mt-2"><span class="text-muted">{{ $internalCall->created_at->format('M d, Y H:i') }} · {{ $internalCall->details['input']['calling_status'] ?? '' }}</span><p class="text-ink whitespace-pre-wrap">{{ $internalCall->details['input']['remarks'] ?? '' }}</p></div>@endforeach</details>
+                    </section>
+                @endif
                 <div class="border-b border-border flex space-x-6 font-semibold">
                     <button type="button" wire:click="$set('activeTab', 'stage_details')"
                         class="pb-2.5 border-b-2 text-xs transition cursor-pointer {{ $activeTab === 'stage_details' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink' }}">

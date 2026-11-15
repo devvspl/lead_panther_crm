@@ -57,7 +57,7 @@ class SlaDashboard extends Component
     protected function getSlaBuckets(): array
     {
         $user = auth()->user();
-        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query());
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('internal_processing_pending', false);
 
         if ($user && ! Lead::usesSalesPanel()) {
             if ($user->hasRole('Client')) {
@@ -77,9 +77,9 @@ class SlaDashboard extends Component
 
         foreach ($leads as $lead) {
             if (! $lead->first_response_at) {
-                $lead->created_at->diffInMinutes(now()) > 15 ? $breached++ : $acceptable++;
+                $lead->client_response_start->diffInMinutes(now()) > 15 ? $breached++ : $acceptable++;
             } else {
-                $lead->created_at->diffInMinutes($lead->first_response_at) <= 15 ? $excellent++ : $breached++;
+                $lead->client_response_start->diffInMinutes($lead->first_response_at) <= 15 ? $excellent++ : $breached++;
             }
         }
 
@@ -93,7 +93,7 @@ class SlaDashboard extends Component
     protected function getBreachedLeadsData(): array
     {
         $user = auth()->user();
-        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'assignedTo']);
+        $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('internal_processing_pending', false)->with(['client', 'assignedTo']);
 
         if ($user && ! Lead::usesSalesPanel()) {
             if ($user->hasRole('Client')) {
@@ -111,8 +111,8 @@ class SlaDashboard extends Component
 
         foreach ($leads as $l) {
             $mins = $l->first_response_at
-                ? Carbon::parse($l->created_at)->diffInMinutes(Carbon::parse($l->first_response_at))
-                : Carbon::parse($l->created_at)->diffInMinutes(now());
+                ? Carbon::parse($l->client_response_start)->diffInMinutes(Carbon::parse($l->first_response_at))
+                : Carbon::parse($l->client_response_start)->diffInMinutes(now());
 
             if ($mins > 15) {
                 $breachedList[] = [
@@ -120,7 +120,7 @@ class SlaDashboard extends Component
                     'name' => $l->name,
                     'client_name' => $l->client?->name ?: 'Standard Client',
                     'assigned_name' => $l->assignedTo?->name ?: 'Unassigned',
-                    'created_at' => Carbon::parse($l->created_at)->format('M d, H:i'),
+                    'created_at' => Carbon::parse($l->client_response_start)->format('M d, H:i'),
                     'first_response_at' => $l->first_response_at ? Carbon::parse($l->first_response_at)->format('M d, H:i') : 'None',
                     'minutes_over' => max(0, $mins - 15),
                     'status_label' => $l->first_response_at ? 'Responded Late' : 'Unresponded',

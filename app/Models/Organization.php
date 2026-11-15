@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 class Organization extends Model
 {
     protected $guarded = [];
+    protected $casts = ['internal_processing_enabled' => 'boolean', 'internal_processing_config' => 'array'];
 
     public function clients(): HasMany
     {

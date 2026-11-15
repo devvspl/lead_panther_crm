@@ -83,7 +83,7 @@ class SalesExecutivePerformance extends Component
             $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
             $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id);
             $assigned = (clone $query)->get();
-            $met = $assigned->filter(fn ($lead) => $lead->first_response_at && $lead->created_at->diffInMinutes($lead->first_response_at) <= 15)->count();
+            $met = $assigned->filter(fn ($lead) => $lead->first_response_at && $lead->client_response_start->diffInMinutes($lead->first_response_at) <= 15)->count();
             $slaRate = $assignedCount ? round($met / $assignedCount * 100, 1) : 0;
             $leadIds = (clone $query)->select('id');
             $siteVisits = SiteVisit::whereIn('lead_id', clone $leadIds)->where('attendance', 'attended')->count();

@@ -229,6 +229,8 @@ class RoleBasedLeadManagementTest extends TestCase
             'current_stage',
             'status',
             'next_followup',
+            'internal_verification',
+            'internal_handover',
             'actions',
         ], $colKeys);
     }

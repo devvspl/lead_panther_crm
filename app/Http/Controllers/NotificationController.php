@@ -14,7 +14,11 @@ class NotificationController extends Controller
         $entity = $data['entity_type'] ?? (isset($data['lead_id']) ? 'lead' : null);
         $id = $data['entity_id'] ?? $data['lead_id'] ?? null;
         $target = \Illuminate\Support\Facades\Route::has('notifications.index') ? route('notifications.index') : route('dashboard');
-        if ($entity === 'lead') {
+        if ($entity === 'internal_processing') {
+            $processing = \App\Models\InternalLeadProcessing::findOrFail($id);
+            abort_unless(app(\App\Services\LeadDistributionService::class)->canProcessInternal($processing, $user), 403);
+            $target = route('leads.index', ['queue' => 'internal', 'processing' => $processing->id]);
+        } elseif ($entity === 'lead') {
             $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->findOrFail($id);
             $target = route('leads.index', ['search' => $lead->lead_code, 'notification_lead' => $lead->id]);
         } elseif (in_array($entity, ['campaign', 'project'])) {

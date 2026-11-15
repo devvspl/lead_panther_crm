@@ -21,6 +21,10 @@ class CheckDueFollowupsCommand extends Command
             ->get();
 
         $count = 0;
+        \App\Models\InternalLeadProcessing::whereNull('handover_requested_at')->whereNull('forwarded_at')->where('next_followup_at', '<=', now())
+            ->chunkById(100, function ($records) {
+                foreach ($records as $record) app(\App\Services\LeadDistributionService::class)->internalAlert($record, 'internal_followup_due', 'Internal follow-up is due', 'followup:'.$record->id.':'.$record->next_followup_at->toIso8601String());
+            });
         foreach ($dueFollowups as $followup) {
             $lead = \App\Models\Lead::withoutGlobalScopes()->find($followup->lead_id);
             if (! $lead || $lead->delivery_pending) continue;

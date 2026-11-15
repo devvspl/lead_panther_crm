@@ -86,7 +86,7 @@ class LeadPricingService
      */
     public function resolveForLead(Lead $lead, ?SalesTeam $team = null): array
     {
-        $project = $lead->project ?: ($lead->project_id ? Project::with('client.organization')->find($lead->project_id) : null);
+        $project = $lead->project_id ? Project::withoutGlobalScopes()->with('client.organization')->find($lead->project_id) : null;
         $client = $lead->client ?: ($lead->client_id ? Client::with('organization')->find($lead->client_id) : null);
         $organization = $client?->organization;
 

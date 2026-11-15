@@ -15,6 +15,7 @@ class ClientScope implements Scope
         }
 
         $user = auth()->user();
+        if ($model instanceof \App\Models\Lead && ! $user->hasAnyRole(['Super Admin', 'super-admin'])) $builder->where('leads.internal_processing_pending', false);
         if ($model instanceof \App\Models\Lead && \App\Models\Lead::usesSalesPanel()) {
             $builder->where('leads.delivery_pending', false);
         }

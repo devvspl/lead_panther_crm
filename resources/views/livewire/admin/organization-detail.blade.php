@@ -302,6 +302,10 @@
                 </span>
             </a>
 
+
+            <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'campaigns']) }}"
+                wire:click.prevent="setTab('campaigns')"
+                class="py-3 px-2 border-b-2 whitespace-nowrap {{ $activeTab === 'campaigns' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted' }}">Campaign Details & Delivery</a>
             <!-- Tab 6: Activity Log -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'activity']) }}"
                 wire:click.prevent="setTab('activity')"
@@ -312,9 +316,6 @@
                 </svg>
                 <span>Activity & Audit</span>
             </a>
-            <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'campaigns']) }}"
-                wire:click.prevent="setTab('campaigns')"
-                class="py-3 px-2 border-b-2 whitespace-nowrap {{ $activeTab === 'campaigns' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted' }}">Campaign Details & Delivery</a>
         </nav>
     </div>
 

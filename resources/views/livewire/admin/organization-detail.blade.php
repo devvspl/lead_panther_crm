@@ -1013,54 +1013,6 @@
                 </div>
             </div>
 
-            <!-- Clients Per-Lead Pricing Setting Card (Within Credits Tab) -->
-            <div class="p-5 rounded-2xl bg-surface border border-purple-200 dark:border-purple-900/40 shadow-2xs space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-sm font-bold text-ink flex items-center gap-1.5">
-                                <span>Clients Lead Cost Configuration</span>
-                            </h3>
-                            @if($organization->lead_cost !== null)
-                                <span
-                                    class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-950 border border-purple-300">
-                                    Override Active: {{ number_format($organization->lead_cost, 2) }} Cr
-                                </span>
-                            @else
-                                <span
-                                    class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
-                                    Inheriting Global Default: {{ number_format($globalDefaultLeadCost, 2) }} Cr
-                                </span>
-                            @endif
-                        </div>
-                        <p class="text-[11px] text-muted mt-1">
-                            Pricing hierarchy: <strong class="text-ink">1. Project Override</strong> → <strong
-                                class="text-ink">2. Team Override</strong> → <strong class="text-ink">3. Clients
-                                Override</strong> → <strong class="text-ink">4. Global Default
-                                ({{ number_format($globalDefaultLeadCost, 2) }} Credits)</strong>
-                        </p>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <div class="relative w-40">
-                            <input type="number" step="0.01" min="0.01" wire:model="orgLeadCost" placeholder="e.g. 15.00"
-                                class="w-full h-8 px-2.5 text-xs bg-canvas border border-border rounded-lg text-ink font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
-                        </div>
-                        <button type="button" wire:click="updateOrgLeadCost"
-                            class="h-8 px-3.5 bg-ink hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer shrink-0">
-                            Save Rate
-                        </button>
-                        @if($orgLeadCost !== null)
-                            <button type="button" wire:click="$set('orgLeadCost', null); updateOrgLeadCost()"
-                                class="h-8 px-2.5 border border-border bg-surface hover:bg-canvas text-xs font-semibold text-muted hover:text-ink rounded-lg transition cursor-pointer shrink-0"
-                                title="Reset to global default">
-                                Reset
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
             <section class="bg-surface rounded-2xl border border-border p-5 space-y-4">
                 <h3 class="text-sm font-bold text-ink">Project-wise Lead Pricing</h3>
                 <p class="text-xs text-muted">Set a project override or leave it blank to inherit organization pricing. Team pricing, when configured for delivery, follows the existing pricing hierarchy. Wallets belong to billing clients.</p>

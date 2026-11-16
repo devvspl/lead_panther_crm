@@ -35,7 +35,6 @@ class OrganizationDetail extends Component
 
     public array $projectRates = [];
     public string $mappingProjectName = '';
-    public ?int $mappingClientId = null;
 
     private function billingClients()
     {
@@ -47,10 +46,18 @@ class OrganizationDetail extends Component
     public function saveProjectMapping(): void
     {
         abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
-        $this->validate(['mappingProjectName' => 'required|string|max:255', 'mappingClientId' => 'required|integer']);
-        $client = $this->billingClients()->findOrFail($this->mappingClientId);
+        $this->mappingProjectName = trim($this->mappingProjectName);
+        $this->validate(['mappingProjectName' => 'required|string|max:255']);
+        $owners = User::where('organization_id', $this->organization->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin']))->select('id');
+        $client = $this->billingClients()->whereIn('id', $owners)->orderBy('id')->first()
+            ?? $this->billingClients()->orderBy('id')->first();
+        if (! $client) {
+            $this->addError('mappingProjectName', 'This organization needs a billing owner before a project can be mapped.');
+            return;
+        }
         Project::withoutGlobalScopes()->firstOrCreate(['client_id' => $client->id, 'name' => trim($this->mappingProjectName)], ['status' => 'active']);
-        $this->reset('mappingProjectName', 'mappingClientId');
+        $this->reset('mappingProjectName');
         $this->dispatch('toast', type: 'success', message: 'Project mapping saved.');
     }
 

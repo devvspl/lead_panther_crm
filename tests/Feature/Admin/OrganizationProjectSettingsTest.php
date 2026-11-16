@@ -23,9 +23,10 @@ class OrganizationProjectSettingsTest extends TestCase
         $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
         $component->set('activeTab', 'clients')->assertSee('Project Mapping (0)')
             ->assertViewHas('clients', fn ($clients) => $clients->modelKeys() === [$owner->id])
-            ->set('mappingProjectName', 'Mapped Project')->set('mappingClientId', $owner->id)
+            ->set('mappingProjectName', 'Mapped Project')
             ->call('saveProjectMapping')->assertHasNoErrors();
         $project = Project::withoutGlobalScopes()->where('name', 'Mapped Project')->firstOrFail();
+        $this->assertEquals($owner->id, $project->client_id);
         $component->set('activeTab', 'credits')->assertSee('Project-wise Lead Pricing')
             ->set('projectRates.'.$project->id, '23.50')->call('saveProjectRate', $project->id)->assertHasNoErrors();
         $this->assertEquals(23.5, $project->fresh()->lead_cost);

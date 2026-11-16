@@ -902,14 +902,18 @@
     @if($activeTab === 'clients')
         <div class="space-y-6">
             <div class="p-5 rounded-2xl bg-surface border border-border space-y-4">
-                <h3 class="text-sm font-bold text-ink">Project Mapping ({{ $totalProjectsCount }})</h3>
-                <x-ui.export-button target="exportTabExcel('clients')" label="Export Project Mappings" />
-                <p class="text-xs text-muted">Map a project to a billing client in this organization. Team members are managed in Team Members.</p>
-                <form wire:submit="saveProjectMapping" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                    <div><label class="block text-xs mb-2">Project name</label><input wire:model="mappingProjectName" class="w-full rounded-lg border border-border bg-canvas p-2 text-xs" required />@error('mappingProjectName')<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
-                    <div><label class="block text-xs mb-2">Billing client</label><x-ui.themed-select wire:model="mappingClientId" :options="$clients->pluck('name','id')->all()" placeholder="Select billing client" :searchable="true" />@error('mappingClientId')<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
-                    <button type="submit" class="rounded-lg bg-ink text-white px-4 py-2 text-xs font-semibold">Save Project Mapping</button>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-ink">Project Mapping ({{ $totalProjectsCount }})</h3>
+                        <p class="text-xs text-muted mt-1">Projects are automatically assigned to {{ $organization->name }}'s billing owner.</p>
+                    </div>
+                    <x-ui.export-button target="exportTabExcel('clients')" label="Export Project Mappings" class="justify-center" />
+                </div>
+                <form wire:submit="saveProjectMapping" class="flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div class="flex-1 min-w-0"><label for="mapping-project-name" class="block text-xs mb-2">Project name</label><input id="mapping-project-name" wire:model="mappingProjectName" class="w-full h-9 rounded-lg border border-border bg-canvas px-3 text-xs" required /></div>
+                    <button type="submit" wire:loading.attr="disabled" wire:target="saveProjectMapping" class="h-9 shrink-0 rounded-lg bg-ink text-white px-5 text-xs font-semibold disabled:opacity-50">Save Project Mapping</button>
                 </form>
+                @error('mappingProjectName')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             <div class="bg-surface rounded-2xl border border-border overflow-x-auto">
                 <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th></tr></thead><tbody class="divide-y divide-border">

@@ -1,4 +1,27 @@
-<div class="relative" wire:poll.15s x-data="notificationInbox(@js(auth()->id()))" @keydown.escape.window="$wire.isOpen = false" @click.outside="$wire.isOpen = false">
+<div class="relative" wire:poll.15s x-data="{
+    channel: @js('App.Models.User.'.auth()->id()),
+    subscribed: false,
+    echoReady: null,
+    connect() {
+        if (!window.Echo || this.subscribed) return;
+        try {
+            window.Echo.private(this.channel)
+                .listen('.notifications.changed', () => window.Livewire?.dispatch('notifications-refresh'));
+            this.subscribed = true;
+        } catch (error) {
+            // The Livewire polling fallback remains active if broadcasting is unavailable.
+        }
+    },
+    init() {
+        this.echoReady = () => this.connect();
+        window.addEventListener('notifications-echo-ready', this.echoReady);
+        this.connect();
+    },
+    destroy() {
+        window.removeEventListener('notifications-echo-ready', this.echoReady);
+        if (this.subscribed &amp;&amp; window.Echo) window.Echo.leave(this.channel);
+    }
+}" @keydown.escape.window="$wire.isOpen = false" @click.outside="$wire.isOpen = false">
     <button type="button" wire:click="toggleDropdown" aria-label="Notifications" aria-expanded="{{ $isOpen ? 'true' : 'false' }}" class="relative p-2 text-muted hover:text-ink rounded-lg hover:bg-canvas">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3A6 6 0 006 11v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
         @if($unreadCount)<span class="absolute -top-1 -right-1 min-w-4 px-1 rounded-full bg-primary text-white text-[10px] font-bold" aria-label="{{ $unreadCount }} unread notifications">{{ $unreadCount > 99 ? '99+' : $unreadCount }}</span>@endif

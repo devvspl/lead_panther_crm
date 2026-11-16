@@ -14,16 +14,9 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
     });
 }
 
-window.notificationInbox = (userId) => ({
-    channel: `App.Models.User.${userId}`,
-    init() {
-        if (window.Echo) {
-            this.subscription = window.Echo.private(this.channel)
-                .listen('.notifications.changed', () => window.Livewire?.dispatch('notifications-refresh'));
-        }
-    },
-    destroy() { if (window.Echo) window.Echo.leave(this.channel); },
-});
+// The bell may initialize before this deferred module or after Livewire navigation.
+// It also works without the asset bundle through its Livewire polling fallback.
+window.dispatchEvent(new Event('notifications-echo-ready'));
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';

@@ -27,6 +27,22 @@ class TeamLeaderTest extends TestCase {
     private function lead(User $assignee, string $code): Lead {
         return Lead::withoutGlobalScopes()->create(['lead_code'=>$code,'lead_source_id'=>LeadSource::firstOrCreate(['name'=>'Team test source'])->id,'client_id'=>$this->builder->id,'assigned_to'=>$assignee->id,'name'=>$code,'mobile'=>'9000000000','status'=>'assigned','current_stage'=>'assigned','delivery_pending'=>false]);
     }
+    public function test_leader_can_use_the_actual_livewire_update_route(): void {
+        $this->actingAs($this->leader);
+        $this->get('/leads')->assertOk();
+        $component = Livewire::test(LeadKanban::class);
+        $snapshot = $component->snapshot;
+        $response = $this->postJson(route('default.livewire.update'), [
+            '_token' => csrf_token(),
+            'components' => [[
+                'snapshot' => json_encode($snapshot),
+                'updates' => ['search' => 'team filter'],
+                'calls' => [],
+            ]],
+        ]);
+        $response->assertOk()->assertJsonStructure(['components']);
+        $this->get('/admin/users')->assertForbidden();
+    }
     public function test_demo_seeding_is_idempotent_and_preserves_passwords_and_existing_roles(): void {
         $this->leader->update(['password'=>Hash::make('changed-password')]); $hash=$this->leader->fresh()->password;
         $admin=User::factory()->create(); $admin->assignRole('Super Admin');

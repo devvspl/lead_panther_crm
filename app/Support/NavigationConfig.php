@@ -38,7 +38,7 @@ class NavigationConfig
             'builder' => [
                 'dashboard', 'leads', 'team', 'replacements', 'reports'
             ],
-            'team-leader' => ['dashboard','leads','team','followups','reports','notifications'],
+            'team-leader' => ['dashboard','leads','team','followups','reports'],
             'broker' => [
                 'dashboard', 'leads', 'credits', 'reports'
             ],

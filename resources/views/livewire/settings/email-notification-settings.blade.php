@@ -2,7 +2,7 @@
     <div><h2 class="text-sm font-bold text-ink">Notifications & Email Design</h2><p class="text-xs text-muted mt-1">System-wide settings for all panels. Notification category preferences still apply to each recipient.</p></div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
         <div class="border border-border rounded-lg p-3"><strong>In-app notifications</strong><p class="text-muted mt-1">Database inbox and polling enabled. Broadcasting: {{ $broadcastEnabled ? 'configured' : 'not configured' }}.</p></div>
-        <div class="border border-border rounded-lg p-3"><strong>Browser push</strong><p class="text-muted mt-1">Not configured. Notifications outside the open app require a push provider and browser subscription.</p></div>
+        <div class="border border-border rounded-lg p-3"><strong>Browser push</strong><p class="text-muted mt-1">{{ $pushConfigured ? 'Server configured. Enable this browser from the notification bell to receive push alerts.' : 'Server setup needed: run php artisan webpush:configure. Users can then enable push from the notification bell.' }} A queue worker is required.</p></div>
         <div class="border border-border rounded-lg p-3"><strong>Email transport</strong><p class="text-muted mt-1">{{ $mailer }} {{ in_array($mailer, ['log', 'array']) ? '(does not deliver to mailboxes)' : '(configured; use test to verify)' }}. Queue: {{ $queueDriver }}.</p>@if($pendingEmailJobs !== null)<p class="text-muted mt-1">{{ $pendingEmailJobs }} event email jobs waiting in the queue.</p>@endif</div>
     </div>
     <form wire:submit="save" class="space-y-5">
@@ -36,6 +36,20 @@
             ]"
             :rows="$deliveryLogs" :showSearch="false" :showFilterDropdown="false" :showConfigurations="false"
             tableName="email-delivery-attempts" emptyTitle="No Email Attempts" emptyMessage="Delivery results will appear after an email job runs."
+        />
+    </div>
+    <div class="space-y-3" wire:poll.15s>
+        <h3 class="text-sm font-semibold">Recent Browser Push Attempts</h3>
+        <x-ui.advanced-table
+            :columns="[
+                ['key' => 'id', 'label' => 'Log ID', 'sortable' => false],
+                ['key' => 'user_id', 'label' => 'Recipient ID', 'sortable' => false],
+                ['key' => 'status', 'label' => 'Status', 'sortable' => false],
+                ['key' => 'attempts', 'label' => 'Attempts', 'sortable' => false],
+                ['key' => 'sent_at', 'label' => 'Accepted At', 'sortable' => false],
+            ]"
+            :rows="$pushDeliveryLogs" :showSearch="false" :showFilterDropdown="false" :showConfigurations="false"
+            tableName="browser-push-attempts" emptyTitle="No Browser Push Attempts" emptyMessage="Enable a browser and use Test Push from the notification bell."
         />
     </div>
 </section>

@@ -71,6 +71,8 @@ class EmailNotificationSettings extends Component
             'designs' => EmailDesignService::DESIGNS,
             'mailer' => config('mail.default'),
             'broadcastEnabled' => ! in_array(config('broadcasting.default'), [null, 'null', 'log']),
+            'pushConfigured' => app(\App\Services\BrowserPushService::class)->configured(),
+            'pushDeliveryLogs' => \App\Models\BrowserPushDelivery::latest('id')->take(10)->get(),
             'queueDriver' => config('queue.default'),
             'pendingEmailJobs' => config('queue.default') === 'database'
                 ? DB::table(config('queue.connections.database.table', 'jobs'))->where('payload', 'like', '%SendNotificationEmail%')->count() : null,

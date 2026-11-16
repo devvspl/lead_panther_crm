@@ -27,6 +27,10 @@ class AuditActivityMiddleware
         '_token',
         'cookie',
         'authorization',
+        'endpoint',
+        'p256dh',
+        'auth',
+        'keys',
         'two_factor_code',
     ];
 

@@ -39,10 +39,10 @@ class NotificationDeliveryService
     }
 
     public function sendWeb(User $recipient, string $type, string $title, string $message, string $eventKey,
-        string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false): void
+        string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false, bool $sendEmail = true, bool $sendPush = true): ?\Illuminate\Notifications\DatabaseNotification
     {
-        if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && $recipient->organization_id != $organizationId) return;
-        if ($recipient->status !== 'active' || ! $this->webAllowed($recipient, $category, $important)) return;
+        if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && $recipient->organization_id != $organizationId) return null;
+        if ($recipient->status !== 'active' || ! $this->webAllowed($recipient, $category, $important)) return null;
         $hash = hash('sha256', $recipient->id.'|'.$eventKey);
         $id = substr($hash, 0, 8).'-'.substr($hash, 8, 4).'-'.substr($hash, 12, 4).'-'.substr($hash, 16, 4).'-'.substr($hash, 20, 12);
         $payload = ['type' => $type, 'title' => $title, 'message' => $message, 'category' => $category,
@@ -56,7 +56,16 @@ class NotificationDeliveryService
             'notifiable_id' => $recipient->id, 'organization_id' => $organizationId, 'event_key' => $hash, 'data' => $payload,
         ]);
         if ($notification->wasRecentlyCreated) {
-            if (app(EmailDesignService::class)->enabled()) {
+            if ($sendPush && app(BrowserPushService::class)->configured()) {
+                \Illuminate\Support\Facades\DB::afterCommit(function () use ($notification, $recipient) {
+                    try {
+                        foreach (\App\Models\BrowserPushSubscription::where('user_id', $recipient->id)->where('organization_id', $recipient->organization_id)->pluck('id') as $subscriptionId) {
+                            \App\Jobs\SendBrowserPush::dispatch($notification->id, $subscriptionId);
+                        }
+                    } catch (\Throwable $e) { report($e); }
+                });
+            }
+            if ($sendEmail && app(EmailDesignService::class)->enabled()) {
                 \Illuminate\Support\Facades\DB::afterCommit(function () use ($notification) {
                     try { \App\Jobs\SendNotificationEmail::dispatch($notification->id); }
                     catch (\Throwable $e) { report($e); } // Email outages must not fail the business action.
@@ -67,6 +76,7 @@ class NotificationDeliveryService
                 catch (\Throwable $e) { report($e); } // Persistence/polling survive a broadcast outage.
             });
         }
+        return $notification;
     }
 
     public function organizationRecipients(?int $organizationId, ?int $ownerId = null, ?int $executiveId = null, bool $adminsOnly = false)
@@ -179,13 +189,14 @@ class NotificationDeliveryService
         // 3. Dispatch Delivery via Channel Driver
         $deliveryResult = $channel === self::CHANNEL_CRM
             ? $this->deliverCrmLog($log, $subject, $body)
-            : $this->dispatchToChannel($channel, $recipient, $subject, $body, $tokens);
+            : ($channel === self::CHANNEL_PUSH ? $this->deliverPushLog($log, $recipient, $subject, $body)
+                : $this->dispatchToChannel($channel, $recipient, $subject, $body, $tokens));
 
         // 4. Update Status & Timestamps
         if ($deliveryResult['success']) {
             $log->update([
-                'status' => $channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED,
-                'sent_at' => now(),
+                'status' => !empty($deliveryResult['queued']) ? self::STATUS_PENDING : ($channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED),
+                'sent_at' => !empty($deliveryResult['queued']) ? null : now(),
             ]);
         } else {
             $log->update([
@@ -232,11 +243,12 @@ class NotificationDeliveryService
 
         $deliveryResult = $log->channel === self::CHANNEL_CRM
             ? $this->deliverCrmLog($log, $subject, $body)
-            : $this->dispatchToChannel($log->channel, $recipient, $subject, $body, $tokens);
+            : ($log->channel === self::CHANNEL_PUSH ? $this->deliverPushLog($log, $recipient, $subject, $body)
+                : $this->dispatchToChannel($log->channel, $recipient, $subject, $body, $tokens));
 
         if ($deliveryResult['success']) {
             $log->update([
-                'status' => $log->channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED,
+                'status' => !empty($deliveryResult['queued']) ? self::STATUS_PENDING : ($log->channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED),
                 'retries' => ($log->retries ?? 0) + 1,
                 'last_error' => null,
                 'sent_at' => now(),
@@ -286,7 +298,7 @@ class NotificationDeliveryService
                     return ['success' => true];
 
                 case self::CHANNEL_PUSH:
-                    return ['success' => false, 'error' => 'Browser push is not configured. In-app notifications remain available.'];
+                    return ['success' => false, 'error' => 'Browser push requires an explicit authorized recipient.'];
 
                 default:
                     return ['success' => false, 'error' => "Unsupported channel [{$channel}]"];
@@ -295,6 +307,26 @@ class NotificationDeliveryService
             if ($channel === self::CHANNEL_EMAIL) report($e);
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    private function deliverPushLog(NotificationLog $log, string $recipient, string $title, string $message): array
+    {
+        if (! app(BrowserPushService::class)->configured()) return ['success' => false, 'error' => 'Browser push is not configured.'];
+        $user = in_array($log->notifiable_type, [User::class, \App\Models\Client::class]) ? User::find($log->notifiable_id) : null;
+        if (! $user && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin'])) {
+            $user = ctype_digit($recipient) ? User::find($recipient) : User::where('email', $recipient)->first();
+        }
+        if (! $user || ! in_array($recipient, [(string) $user->id, $user->email], true)) return ['success' => false, 'error' => 'Push requires an explicit authorized user ID or email.'];
+        $subscriptions = \App\Models\BrowserPushSubscription::where('user_id', $user->id)->where('organization_id', $user->organization_id)->pluck('id');
+        if ($subscriptions->isEmpty()) return ['success' => false, 'error' => 'Browser push is not configured for this recipient. Enable a browser first.'];
+        $notification = $this->sendWeb($user, 'push_message', $title, $message, 'push-log:'.$log->id, 'delivery', $user->organization_id, sendEmail: false, sendPush: false);
+        if (! $notification) return ['success' => false, 'error' => 'Recipient preferences or status prevented push delivery.'];
+        $payload = json_decode($log->payload ?? '{}', true);
+        $log->update(['payload' => json_encode(array_merge($payload, ['notification_id' => $notification->id]))]);
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($notification, $subscriptions) {
+            foreach ($subscriptions as $id) \App\Jobs\SendBrowserPush::dispatch($notification->id, $id);
+        });
+        return ['success' => true, 'queued' => true];
     }
 
     private function deliverCrmLog(NotificationLog $log, string $title, string $message): array

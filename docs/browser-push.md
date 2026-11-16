@@ -1,0 +1,29 @@
+# Browser push notifications
+
+Browser push is integrated with the existing database notification events. In-app polling and broadcasting remain available. No permission prompt runs automatically: signed-in users open the notification bell, choose **Enable on this browser**, and approve the browser prompt. They can disable only their own browser subscription or use **Test Push**.
+
+## Deployment
+
+1. Deploy code and built assets, run `composer install --no-dev --optimize-autoloader`, and run `php artisan migrate --force`.
+2. Run `php artisan webpush:configure` once on the server. It writes encrypted VAPID keys to the configured private local storage disk. It does not print private keys or replace existing keys. Preserve this file and APP_KEY across deployments. Alternatively provide both WEB_PUSH_PUBLIC_KEY and WEB_PUSH_PRIVATE_KEY, plus a valid WEB_PUSH_SUBJECT, through protected environment configuration. All application/worker nodes must use the same keys.
+3. Serve the application over HTTPS (localhost is supported for development). APP_URL must match the public application origin. Deploy `public/browser-push-sw.js` at the application's public base path and retain the normal JavaScript MIME type.
+4. Run the existing queue worker, for example `php artisan queue:work --tries=3 --timeout=60`, and restart workers after deploying. Keep queue retry_after longer than the worker timeout. Allow outbound HTTPS to the browser push vendors.
+5. Open the bell, enable this browser, and click Test Push. Test Push contacts the provider immediately; ordinary event push is queued. A provider acceptance is not proof that an operating system displayed the notification. Browser/OS notification permissions, focus modes and platform restrictions still apply.
+
+On Windows, PHP's OpenSSL P-256 configuration must be available **before PHP starts**. In the local XAMPP environment used here, setting OPENSSL_CONF to `C:/xampp/php/extras/ssl/openssl.cnf` before launching the command allowed key generation. Launch the local PHP server and queue worker with that environment too. WEB_PUSH_OPENSSL_CONF supports an explicit trusted configuration path; no vendor files are patched. Linux hosting normally has the OpenSSL configuration already installed.
+
+## Data and security
+
+`browser_push_subscriptions` stores an encrypted subscription and a unique endpoint hash with recipient and organization ownership. The authenticated subscribe/unsubscribe routes enforce active users, ownership, encryption key sizes, per-user device limits and rate limits. Only HTTPS browser-vendor endpoints are accepted, with no credentials or arbitrary ports. Redirects are disabled for outbound push calls. Subscription keys/endpoints are masked from general request audit payloads; enable/disable actions record an audit reference without secrets.
+
+Successful business notification creation queues one job per subscribed browser only after commit. Deterministic existing notification IDs, unique delivery records and a per-message/subscription lock suppress successful retry duplicates. Expired 404/410 subscriptions are removed. Temporary provider failures retry with backoff; provider acceptance, failure and expiry are recorded in `browser_push_deliveries`. Super Admin sees recent attempts in notification settings. The older push channel now routes explicit authorized recipients through these subscriptions and reports queued status instead of fictional delivery.
+
+The encrypted push envelope contains only a notification reference and same-origin retrieval URL. The service worker fetches details using the **current authenticated session** before displaying anything, preventing an old subscription from revealing another account's contents. It does not cache CRM pages or responses. Logging out removes the current browser's server subscription while preserving other browsers. Clicks use the existing authenticated notification/entity resolver. If the session expired or the current account cannot read the notification, private contents are not displayed; in-app polling remains available on login.
+
+## Verification and limits
+
+Locally, the migration and encrypted key generation completed. 37 PHP tests / 184 assertions passed across browser push, email, inbox and real commit/rollback suites. Coverage includes recipient isolation, Team Leader routes, encrypted subscription storage, endpoint validation, duplicate suppression, logout cleanup, expired subscriptions, retry failures, and real Web Push encryption/provider response parsing using a fake HTTP client. Three Node tests check service worker display/click behavior and block unauthorized or foreign-origin data. Production assets built successfully.
+
+No live device subscription or real external push delivery was performed: that final browser permission and device display check must be completed on the deployed HTTPS site using Enable and Test Push. Existing users are not silently subscribed and past inbox records are not bulk pushed.
+
+Implementation uses the maintained [Web Push PHP library](https://github.com/web-push-libs/web-push-php) with standard VAPID authentication. The application cannot force a browser to grant notifications or guarantee display when a browser/OS suppresses them.

@@ -42,6 +42,7 @@
             @if(\Illuminate\Support\Facades\Route::has('notifications.index'))
                 <a href="{{ route('notifications.index') }}" class="block text-center p-3 text-xs font-semibold text-primary border-t border-border">View All Notifications & Preferences</a>
             @endif
+            <x-ui.browser-push />
         </section>
     @endif
 </div>

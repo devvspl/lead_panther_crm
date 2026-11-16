@@ -36,6 +36,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\RateLimiter::for('browser-push-subscribe', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by('push-subscribe:'.$request->user()?->id));
+        \Illuminate\Support\Facades\RateLimiter::for('browser-push-test', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(2)->by('push-test:'.$request->user()?->id));
         // Super Admin Gate Bypass
         \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
             return ($user->hasRole('Super Admin') || $user->hasRole('super-admin')) ? true : null;
@@ -128,5 +130,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Security & Auth Events Audit Subscriber
         \Illuminate\Support\Facades\Event::subscribe(\App\Listeners\AuditAuthSubscriber::class);
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function ($event) {
+            if (request()->hasSession() && ($hash = request()->session()->get('browser_push_endpoint_hash'))) {
+                \App\Models\BrowserPushSubscription::where('user_id', $event->user?->id)->where('endpoint_hash', $hash)->delete();
+                request()->session()->forget('browser_push_endpoint_hash');
+            }
+        });
     }
 }

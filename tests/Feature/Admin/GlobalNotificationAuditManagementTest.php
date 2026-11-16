@@ -59,6 +59,23 @@ class GlobalNotificationAuditManagementTest extends TestCase
         Livewire::actingAs($this->admin)->test(NotificationBell::class)->assertViewHas('unreadCount', 0);
     }
 
+    public function test_shared_date_range_filters_reset_pagination_and_organization_limits_user_options(): void
+    {
+        $recent = $this->notice($this->builder, 'delivery_failed', 'recent-ui', 'Recent UI notification');
+        $older = $this->notice($this->other, 'followup_due', 'older-ui', 'Previous period notification');
+        $older->update(['created_at' => now()->subDays(45)]);
+        $component = Livewire::actingAs($this->admin)->test(NotificationCenter::class)
+            ->set('dateRange', 'today')->assertSee('Recent UI notification')->assertDontSee('Previous period notification')
+            ->assertSet('dateFrom', now()->toDateString())->assertSet('dateTo', now()->toDateString())
+            ->set('dateRange', 'custom')->set('dateFrom', now()->subDays(60)->toDateString())->set('dateTo', now()->subDays(30)->toDateString())
+            ->call('applyFilters')->assertSee('Previous period notification')->assertDontSee('Recent UI notification')
+            ->call('resetFilters')->assertSet('dateRange', 'all')->assertSet('dateFrom', '')->assertSet('dateTo', '')
+            ->set('organizationId', $this->org->id)
+            ->assertViewHas('recipients', fn ($users) => $users->contains('id', $this->builder->id) && ! $users->contains('id', $this->other->id))
+            ->call('setPage', 2)->set('search', 'Recent UI')->assertSet('paginators.page', 1)
+            ->assertSee('Recent UI notification');
+    }
+
     public function test_normal_users_cannot_expand_their_inbox_or_open_other_organizations_logs(): void
     {
         $this->notice($this->builder, 'own', 'own', 'Own authorized notification');

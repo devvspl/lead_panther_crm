@@ -183,4 +183,13 @@ Route::middleware(['auth'])->prefix('settings/theme')->name('settings.theme.')->
     Route::post('/reset', [ThemeSettingsController::class, 'reset'])->name('reset');
 });
 
+Route::middleware(['auth', 'throttle:60,1'])->prefix('notifications/push')->name('notifications.push.')->group(function () {
+    Route::get('/config', [\App\Http\Controllers\BrowserPushController::class, 'config'])->name('config');
+    Route::post('/status', [\App\Http\Controllers\BrowserPushController::class, 'status'])->name('status');
+    Route::post('/subscribe', [\App\Http\Controllers\BrowserPushController::class, 'store'])->middleware('throttle:browser-push-subscribe')->name('subscribe');
+    Route::post('/unsubscribe', [\App\Http\Controllers\BrowserPushController::class, 'destroy'])->name('unsubscribe');
+    Route::post('/test', [\App\Http\Controllers\BrowserPushController::class, 'test'])->middleware('throttle:browser-push-test')->name('test');
+    Route::get('/message/{id}', [\App\Http\Controllers\BrowserPushController::class, 'message'])->name('message');
+});
+
 require __DIR__ . '/auth.php';

@@ -17,11 +17,52 @@ class NotificationCenter extends NotificationBell
     public string $readFilter = 'all';
     public string $dateFrom = '';
     public string $dateTo = '';
+    public string $dateRange = 'all';
     public int $perPage = 20;
     #[\Livewire\Attributes\Locked]
     public ?string $selectedNotificationId = null;
 
     public function getIsSuperAdminProperty(): bool { return auth()->user()->hasAnyRole(['Super Admin', 'super-admin']); }
+
+    public function notificationColumns(): array
+    {
+        $columns = [];
+        foreach (['summary' => 'Type / Title & Message', 'recipient_info' => 'Recipient / Role', 'organization_info' => 'Organization',
+            'related_record' => 'Related To', 'timestamp' => 'Timestamp', 'read_status' => 'Status', 'notice_actions' => 'Actions'] as $key => $label) {
+            $columns[] = ['key' => $key, 'label' => $label, 'sortable' => false,
+                'render' => fn ($notification) => view('components.ui.notification-table-cell', ['notification' => $notification, 'column' => $key])->render()];
+        }
+        return $columns;
+    }
+
+    public function updated(string $property): void
+    {
+        if (in_array($property, ['organizationId', 'recipientId', 'roleFilter', 'typeFilter', 'readFilter', 'dateRange', 'dateFrom', 'dateTo', 'search', 'perPage'])) $this->resetPage();
+    }
+
+    public function updatedOrganizationId(): void { $this->recipientId = null; $this->resetPage(); }
+
+    public function updatedDateRange(): void
+    {
+        $now = now();
+        $range = match ($this->dateRange) {
+            'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            'yesterday' => [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()],
+            'week' => [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()],
+            'last7' => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+            'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
+            'lastMonth' => [$now->copy()->subMonthNoOverflow()->startOfMonth(), $now->copy()->subMonthNoOverflow()->endOfMonth()],
+            'quarter' => [$now->copy()->startOfQuarter(), $now->copy()->endOfQuarter()],
+            'year' => [$now->copy()->startOfYear(), $now->copy()->endOfYear()],
+            'custom' => null,
+            default => ['', ''],
+        };
+        if ($range !== null) {
+            $this->dateFrom = $range[0] ? $range[0]->toDateString() : '';
+            $this->dateTo = $range[1] ? $range[1]->toDateString() : '';
+        }
+        $this->resetPage();
+    }
 
     protected function notificationQuery()
     {
@@ -50,7 +91,7 @@ class NotificationCenter extends NotificationBell
         $this->validate(['dateFrom' => 'nullable|date', 'dateTo' => 'nullable|date'.($this->dateFrom ? '|after_or_equal:dateFrom' : ''), 'perPage' => 'integer|in:10,20,50,100']);
         $this->resetPage();
     }
-    public function resetFilters(): void { $this->reset(['search', 'organizationId', 'recipientId', 'roleFilter', 'typeFilter', 'readFilter', 'dateFrom', 'dateTo']); $this->resetPage(); }
+    public function resetFilters(): void { $this->reset(['search', 'organizationId', 'recipientId', 'roleFilter', 'typeFilter', 'readFilter', 'dateFrom', 'dateTo', 'dateRange']); $this->resetPage(); }
     public function inspect(string $id): void { $this->notificationQuery()->whereKey($id)->firstOrFail(); $this->selectedNotificationId = $id; $this->dispatch('open-modal', 'system-notification-details'); }
     public function closeInspection(): void { $this->selectedNotificationId = null; $this->dispatch('close-modal', 'system-notification-details'); }
     public function getSelectedNotificationProperty() { return $this->selectedNotificationId ? app(NotificationDeliveryService::class)->managedNotifications(auth()->user())->whereKey($this->selectedNotificationId)->first() : null; }
@@ -89,7 +130,7 @@ class NotificationCenter extends NotificationBell
         $admin = $this->isSuperAdmin;
         return view('livewire.shared.notification-center', ['notifications' => $query->latest()->paginate(in_array($this->perPage, [10,20,50,100]) ? $this->perPage : 20),
             'organizations' => $admin ? \App\Models\Organization::orderBy('name')->get() : collect(),
-            'recipients' => $admin ? \App\Models\User::orderBy('name')->get() : collect(),
+            'recipients' => $admin ? \App\Models\User::when($this->organizationId, fn ($q) => $q->where('organization_id', $this->organizationId))->orderBy('name')->get() : collect(),
             'roles' => $admin ? \Spatie\Permission\Models\Role::orderBy('name')->pluck('name') : collect(),
             'types' => $admin ? \App\Models\SystemNotification::query()->select('data->type as notification_type')->distinct()->get()->pluck('notification_type')->filter()->sort()->values() : collect(),
         ])->layout('layouts.app');

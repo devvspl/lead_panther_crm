@@ -4,48 +4,45 @@
         <div class="flex items-center gap-4 text-xs">
             @unless($this->isSuperAdmin)<label class="flex gap-2 items-center"><input type="checkbox" wire:model.live="unreadOnly">Unread only</label>@endunless
             <button wire:click="markAllAsRead" class="rounded-lg border border-border bg-surface text-ink px-3 py-2">{{ $this->isSuperAdmin ? 'Mark filtered as read' : 'Mark all as read' }}</button>
-            @if($this->isSuperAdmin)<button wire:click="exportExcel" class="rounded-lg border border-border bg-surface text-ink px-3 py-2">Export to Excel</button>@endif
+            @if($this->isSuperAdmin)<x-ui.export-button target="exportExcel" />@endif
         </div>
     </div>
     @if($this->isSuperAdmin)
         <p class="text-xs text-muted">All organizations and recipients. Timestamps and date filters use {{ config('app.timezone') }}. Read-all applies to the current filters.</p>
-        <form wire:submit="applyFilters" class="bg-surface border border-border rounded-xl p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <label>Organization<select wire:model.live="organizationId" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All organizations</option>@foreach($organizations as $org)<option value="{{ $org->id }}">{{ $org->name }}</option>@endforeach</select></label>
-            <label>User<select wire:model.live="recipientId" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All users</option>@foreach($recipients as $recipient)<option value="{{ $recipient->id }}">{{ $recipient->name }}</option>@endforeach</select></label>
-            <label>Role<select wire:model.live="roleFilter" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All roles</option>@foreach($roles as $role)<option value="{{ $role }}">{{ $role }}</option>@endforeach</select></label>
-            <label>Notification Type<select wire:model.live="typeFilter" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="">All types</option>@foreach($types as $type)<option value="{{ $type }}">{{ ucwords(str_replace('_', ' ', $type)) }}</option>@endforeach</select></label>
-            <label>Read Status<select wire:model.live="readFilter" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"><option value="all">Read and unread</option><option value="unread">Unread</option><option value="read">Read</option></select></label>
-            <label>From<input type="date" wire:model.live="dateFrom" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"></label>
-            <label>To<input type="date" wire:model.live="dateTo" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"></label>
-            <label>Search<input wire:model.live.debounce.300ms="search" placeholder="Title, message, lead ID or code" class="block w-full border border-border rounded-lg bg-canvas p-2 mt-1"></label>
-            <div class="flex gap-2 items-end"><button class="px-3 py-2 bg-primary text-white rounded-lg">Apply Filters</button><button type="button" wire:click="resetFilters" class="px-3 py-2 border border-border rounded-lg">Reset</button></div>
+        <form wire:submit="applyFilters" class="bg-surface border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-end gap-4 text-xs">
+            <div><x-input-label value="Organization" class="mb-1 !text-xs" /><x-ui.themed-select wire:model.live="organizationId" :options="['' => 'All organizations'] + $organizations->pluck('name', 'id')->all()" placeholder="All organizations" :searchable="true" /></div>
+            <div><x-input-label value="User" class="mb-1 !text-xs" /><x-ui.themed-select wire:model.live="recipientId" :options="['' => 'All users'] + $recipients->pluck('name', 'id')->all()" placeholder="All users" :searchable="true" /></div>
+            <div><x-input-label value="Role" class="mb-1 !text-xs" /><x-ui.themed-select wire:model.live="roleFilter" :options="['' => 'All roles'] + $roles->mapWithKeys(fn ($role) => [$role => $role])->all()" placeholder="All roles" :searchable="true" /></div>
+            <div><x-input-label value="Notification Type" class="mb-1 !text-xs" /><x-ui.themed-select wire:model.live="typeFilter" :options="['' => 'All types'] + $types->mapWithKeys(fn ($type) => [$type => ucwords(str_replace('_', ' ', $type))])->all()" placeholder="All types" :searchable="true" /></div>
+            <div><x-input-label value="Read Status" class="mb-1 !text-xs" /><x-ui.themed-select wire:model.live="readFilter" :options="['all' => 'Read and unread', 'unread' => 'Unread', 'read' => 'Read']" placeholder="Read and unread" /></div>
+            <div class="min-w-0"><x-input-label value="Date Range" class="mb-1 !text-xs" /><x-ui.date-range-picker wire:model.live="dateRange" wire:custom-from="dateFrom" wire:custom-to="dateTo" class="w-full" placeholder="All Time" /></div>
+            <div class="min-w-0"><x-input-label for="notification-search" value="Search" class="mb-1 !text-xs" /><x-text-input id="notification-search" wire:model.live.debounce.300ms="search" placeholder="Title, message, lead ID or code" class="block w-full h-8 px-2.5 !text-xs !bg-canvas !shadow-none font-semibold placeholder:font-normal" /></div>
+            <div class="flex items-center gap-2 h-8" role="group" aria-label="Filter actions"><button type="submit" class="h-8 px-3.5 bg-primary text-white rounded-lg font-semibold whitespace-nowrap">Apply Filters</button><button type="button" wire:click="resetFilters" class="h-8 px-3.5 border border-border bg-surface rounded-lg font-semibold whitespace-nowrap">Reset</button></div>
             @error('dateTo')<span class="text-red-600">{{ $message }}</span>@enderror
             @error('dateFrom')<span class="text-red-600">{{ $message }}</span>@enderror
         </form>
     @endif
-    <section class="bg-surface border border-border rounded-xl overflow-hidden">
-        @if($this->isSuperAdmin)
-            <div class="overflow-x-auto"><table class="w-full text-xs text-left"><thead class="bg-canvas text-muted"><tr><th class="p-3">Type / Title & Message</th><th class="p-3">Recipient / Role</th><th class="p-3">Organization</th><th class="p-3">Related To</th><th class="p-3">Timestamp</th><th class="p-3">Status</th><th class="p-3">Actions</th></tr></thead><tbody>
+    @if($this->isSuperAdmin)
+        <x-ui.advanced-table
+            :columns="$this->notificationColumns()"
+            :rows="$notifications"
+            :showSearch="false"
+            :showFilterDropdown="false"
+            :showConfigurations="false"
+            tableName="system-notifications"
+            emptyTitle="No Notifications"
+            emptyMessage="No notifications match the current filters."
+        />
+    @else
+        <section class="bg-surface border border-border rounded-xl overflow-hidden">
             @forelse($notifications as $notification)
-                <tr wire:key="system-notice-{{ $notification->id }}" class="border-t border-border {{ $notification->read_at ? '' : 'bg-primary/5' }}">
-                    <td class="p-3 min-w-64"><p class="text-primary">{{ ucwords(str_replace('_', ' ', $notification->data['type'] ?? $notification->type)) }}</p><strong class="text-ink">{{ $notification->data['title'] ?? '' }}</strong><p class="text-muted mt-1">{{ $notification->data['message'] ?? '' }}</p></td>
-                    <td class="p-3 text-ink">{{ $notification->recipient?->name ?? 'Recipient unavailable' }}<p class="text-muted">{{ $notification->recipient?->getRoleNames()->implode(', ') }}</p></td>
-                    <td class="p-3 text-ink">{{ $notification->organization?->name ?? 'System / Unavailable' }}</td>
-                    <td class="p-3"><button wire:click="markAsReadAndNavigate('{{ $notification->id }}')" class="text-primary">{{ ucfirst($notification->data['entity_type'] ?? 'Notification') }} {{ $notification->data['entity_id'] ?? '' }}</button></td>
-                    <td class="p-3 whitespace-nowrap text-muted">{{ $notification->created_at->format('M d, Y H:i:s') }}</td><td class="p-3">{{ $notification->read_at ? 'Read' : 'Unread' }}</td>
-                    <td class="p-3 whitespace-nowrap"><button wire:click="inspect('{{ $notification->id }}')" class="text-primary mr-2">Inspect</button>@unless($notification->read_at)<button wire:click="markAsRead('{{ $notification->id }}')" class="text-primary">Mark read</button>@endunless</td>
-                </tr>
-            @empty<tr><td colspan="7" class="p-8 text-center text-muted">No notifications match the current filters.</td></tr>@endforelse
-            </tbody></table></div>
-        @else
-        @forelse($notifications as $notification)
-            <x-ui.notification-item :notification="$notification" />
-        @empty
-            <p class="p-8 text-center text-sm text-muted">No notifications to show. Updates will appear here when they happen.</p>
-        @endforelse
-        @endif
-        <div class="p-4">{{ $notifications->links() }}</div>
-    </section>
+                <x-ui.notification-item :notification="$notification" />
+            @empty
+                <p class="p-8 text-center text-sm text-muted">No notifications to show. Updates will appear here when they happen.</p>
+            @endforelse
+            <div class="p-4">{{ $notifications->links() }}</div>
+        </section>
+    @endif
     <x-modal name="system-notification-details" :show="$selectedNotificationId !== null" maxWidth="3xl">
         @if($this->selectedNotification)
             @php $notice = $this->selectedNotification; @endphp

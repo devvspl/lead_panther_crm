@@ -1,17 +1,19 @@
 <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="min-w-0">
             <h2 class="text-lg font-bold text-ink">Lead Source Performance</h2>
             <p class="text-xs text-muted">Actual lead counts, recorded credit charges, and closed-won conversion rates for the selected period.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-3 shrink-0">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto shrink-0">
+            <div class="w-full sm:w-44 shrink-0">
             <x-ui.themed-select 
                 wire:model.live="days"
                 :options="['7' => 'Last 7 Days', '30' => 'Last 30 Days', '90' => 'Last 90 Days']"
                 placeholder="Last 30 Days"
                 searchable="true"
             />
-            <x-ui.export-button target="exportExcel" />
+            </div>
+            <x-ui.export-button target="exportExcel" class="justify-center w-full sm:w-auto" />
         </div>
     </div>
 

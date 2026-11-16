@@ -33,6 +33,36 @@ class OrganizationDetail extends Component
 
     public Organization $organization;
 
+    public array $projectRates = [];
+    public string $mappingProjectName = '';
+    public ?int $mappingClientId = null;
+
+    private function billingClients()
+    {
+        return Client::where('organization_id', $this->organization->id)
+            ->whereIn('id', User::where('organization_id', $this->organization->id)
+                ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client', 'Broker', 'broker', 'Channel Partner', 'channel-partner']))->select('id'));
+    }
+
+    public function saveProjectMapping(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $this->validate(['mappingProjectName' => 'required|string|max:255', 'mappingClientId' => 'required|integer']);
+        $client = $this->billingClients()->findOrFail($this->mappingClientId);
+        Project::withoutGlobalScopes()->firstOrCreate(['client_id' => $client->id, 'name' => trim($this->mappingProjectName)], ['status' => 'active']);
+        $this->reset('mappingProjectName', 'mappingClientId');
+        $this->dispatch('toast', type: 'success', message: 'Project mapping saved.');
+    }
+
+    public function saveProjectRate(int $projectId): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $project = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->findOrFail($projectId);
+        $this->validate(["projectRates.$projectId" => 'nullable|numeric|min:0.01|max:999999.99']);
+        $project->update(['lead_cost' => ($this->projectRates[$projectId] ?? null) === '' ? null : ($this->projectRates[$projectId] ?? null)]);
+        $this->dispatch('toast', type: 'success', message: 'Project pricing saved.');
+    }
+
     // Active Navigation Tab: 'overview' | 'team' | 'clients' | 'credits' | 'activity'
     #[Url(as: 'tab', history: true, keep: true)]
     public string $activeTab = 'overview';
@@ -165,6 +195,7 @@ class OrganizationDetail extends Component
     public function mount(Organization $organization): void
     {
         $this->organization = $organization;
+        $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
         $this->deliveryTimezone = $organization->delivery_timezone ?: config('app.timezone');
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
@@ -487,7 +518,7 @@ class OrganizationDetail extends Component
 
     public function openCreateLeadModal(): void
     {
-        $firstClient = Client::where('organization_id', $this->organization->id)->first();
+        $firstClient = $this->billingClients()->first();
         $this->newLeadClientId = $firstClient?->id;
         $this->newLeadProjectId = $firstClient ? Project::where('client_id', $firstClient->id)->first()?->id : null;
         $this->newLeadAssignedTo = User::where('organization_id', $this->organization->id)->first()?->id;
@@ -526,7 +557,7 @@ class OrganizationDetail extends Component
         ]);
 
         // Verify client belongs to this organization
-        $client = Client::where('organization_id', $this->organization->id)->findOrFail($this->newLeadClientId);
+        $client = $this->billingClients()->findOrFail($this->newLeadClientId);
 
         // Ensure a project exists for client (create default project if client has none)
         $projectId = $this->newLeadProjectId;
@@ -595,7 +626,7 @@ class OrganizationDetail extends Component
 
     public function openCreditModal(?int $clientId = null, string $type = 'recharge'): void
     {
-        $firstClient = Client::where('organization_id', $this->organization->id)->first();
+        $firstClient = $this->billingClients()->first();
         $this->selectedCreditClientId = $clientId ?: $firstClient?->id;
         $this->creditAmount = 100.00;
         $this->creditAdjustmentType = in_array($type, ['recharge', 'opening_credit', 'refund', 'manual_adjustment', 'deduct']) ? $type : 'recharge';
@@ -626,7 +657,7 @@ class OrganizationDetail extends Component
             'creditReason' => 'required|string|min:3',
         ]);
 
-        $client = Client::where('organization_id', $this->organization->id)->findOrFail($this->selectedCreditClientId);
+        $client = $this->billingClients()->findOrFail($this->selectedCreditClientId);
 
         DB::transaction(function () use ($client) {
             $wallet = CreditWallet::where('client_id', $client->id)->lockForUpdate()->first();
@@ -706,7 +737,7 @@ class OrganizationDetail extends Component
         $date = now()->format('Y-m-d');
         $exportedAt = now()->format('d M Y, H:i T');
 
-        $clientIds = Client::where('organization_id', $org->id)->pluck('id')->toArray();
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
         $userIds = User::where('organization_id', $org->id)->pluck('id')->toArray();
 
         if ($tab === 'team') {
@@ -730,26 +761,16 @@ class OrganizationDetail extends Component
         }
 
         if ($tab === 'clients') {
-            $data = Client::where('organization_id', $org->id)->with(['projects', 'wallet'])->withCount(['projects', 'leads'])->orderBy('name')->get();
-            $filename = "organization_{$slug}_clients_projects_{$date}.xlsx";
+            $data = Project::withoutGlobalScopes()->whereIn('client_id', $clientIds)->with('client')->orderBy('name')->get();
             return Excel::download(new BaseStyledExport(
                 data: $data,
-                title: 'Projects',
+                title: 'Project Mappings',
                 subtitle: "Projects | {$org->name} | {$exportedAt}",
-                headings: ['Client ID', 'Client Name', 'Billing Email', 'Status', 'Projects Count', 'Wallet Balance', 'Created Date'],
-                columns: [
-                    'id',
-                    'name',
-                    fn($c) => $c->billing_email ?: '—',
-                    'status',
-                    'projects_count',
-                    fn($c) => (float) ($c->wallet?->balance ?? 0),
-                    fn($c) => $c->created_at ? $c->created_at->format('M d, Y H:i') : '—',
-                ],
+                headings: ['Project ID', 'Project', 'Mapped Client', 'Status', 'Project Rate Override'],
+                columns: ['id', 'name', fn($p) => $p->client?->name ?? '', 'status', fn($p) => $p->lead_cost ?? 'Inherit'],
                 statusColumns: ['status']
-            ), $filename);
+            ), "organization_{$slug}_project_mappings_{$date}.xlsx");
         }
-
         if ($tab === 'leads') {
             $data = Lead::withoutGlobalScopes()
                 ->where(function ($q) use ($clientIds, $userIds) {
@@ -857,7 +878,7 @@ class OrganizationDetail extends Component
     public function render()
     {
         $orgId = $this->organization->id;
-        $clientIds = Client::where('organization_id', $orgId)->pluck('id')->toArray();
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
         $userIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
 
         // 1. Team Members Query
@@ -880,7 +901,7 @@ class OrganizationDetail extends Component
         $teamMembers = $usersQuery->orderBy('name')->get();
 
         // 2. Clients Query
-        $clients = Client::where('organization_id', $orgId)
+        $clients = $this->billingClients()
             ->with(['projects', 'wallet'])
             ->withCount(['projects', 'leads'])
             ->orderBy('name')
@@ -890,6 +911,7 @@ class OrganizationDetail extends Component
         $projects = DB::table('projects')
             ->join('users', 'projects.client_id', '=', 'users.id')
             ->where('users.organization_id', $orgId)
+            ->whereIn('projects.client_id', $clientIds)
             ->select('projects.*', 'users.name as client_name')
             ->orderBy('projects.name')
             ->get();

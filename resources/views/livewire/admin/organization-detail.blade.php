@@ -283,7 +283,7 @@
                 <span>Projects</span>
                 <span
                     class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
-                    {{ $totalClientsCount }}
+                    {{ $totalProjectsCount }}
                 </span>
             </a>
 
@@ -898,115 +898,30 @@
         </div>
     @endif
 
-    <!-- TAB 3: CLIENTS & PROJECTS -->
+    <!-- TAB 3: PROJECT MAPPINGS -->
     @if($activeTab === 'clients')
         <div class="space-y-6">
-            <!-- Header bar for clients -->
-            <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between">
-                <div>
-                    <h3 class="text-sm font-bold text-ink">Registered Clients ({{ $totalClientsCount }})</h3>
-                    <p class="text-xs text-muted">Clients managed under {{ $organization->name }} with their credit wallets
-                        & projects.</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" wire:click="exportTabExcel('clients')"
-                        class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
-                        title="Export Projects to Excel">
-                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        <span>Export Tab</span>
-                    </button>
-
-                    <button type="button" wire:click="openCreateClientModal"
-                        class="px-3.5 py-2 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span>Register Client</span>
-                    </button>
-                </div>
+            <div class="p-5 rounded-2xl bg-surface border border-border space-y-4">
+                <h3 class="text-sm font-bold text-ink">Project Mapping ({{ $totalProjectsCount }})</h3>
+                <x-ui.export-button target="exportTabExcel('clients')" label="Export Project Mappings" />
+                <p class="text-xs text-muted">Map a project to a billing client in this organization. Team members are managed in Team Members.</p>
+                <form wire:submit="saveProjectMapping" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <div><label class="block text-xs mb-2">Project name</label><input wire:model="mappingProjectName" class="w-full rounded-lg border border-border bg-canvas p-2 text-xs" required />@error('mappingProjectName')<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                    <div><label class="block text-xs mb-2">Billing client</label><x-ui.themed-select wire:model="mappingClientId" :options="$clients->pluck('name','id')->all()" placeholder="Select billing client" :searchable="true" />@error('mappingClientId')<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                    <button type="submit" class="rounded-lg bg-ink text-white px-4 py-2 text-xs font-semibold">Save Project Mapping</button>
+                </form>
             </div>
-
-            <!-- Clients Grid Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                @forelse($clients as $client)
-                    <div
-                        class="p-5 rounded-2xl bg-surface border border-border shadow-2xs space-y-4 hover:border-ink/20 transition">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0">
-                                <h4 class="text-sm font-bold text-ink truncate">{{ $client->name }}</h4>
-                                <div class="text-[11px] text-muted font-mono truncate">
-                                    {{ $client->billing_email ?: 'No billing email' }}
-                                </div>
-                            </div>
-                            <span
-                                class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 {{ $client->status === 'active' ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-red-100 text-red-950 border border-red-300' }}">
-                                {{ $client->status }}
-                            </span>
-                        </div>
-
-                        <!-- Stats Strip -->
-                        <div class="grid grid-cols-3 gap-2 p-3 bg-canvas/50 rounded-xl border border-border text-center">
-                            <div>
-                                <div class="text-[10px] font-bold text-muted uppercase">Projects</div>
-                                <div class="text-xs font-bold font-mono text-ink">{{ $client->projects_count }}</div>
-                            </div>
-                            <div>
-                                <div class="text-[10px] font-bold text-muted uppercase">Leads</div>
-                                <div class="text-xs font-bold font-mono text-ink">{{ number_format($client->leads_count) }}
-                                </div>
-                            </div>
-                            <div>
-                                <div class="text-[10px] font-bold text-muted uppercase">Credits</div>
-                                <div class="text-xs font-bold font-mono text-primary">
-                                    {{ number_format($client->wallet?->balance ?? 0) }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Client Projects preview list -->
-                        @if($client->projects->isNotEmpty())
-                            <div class="space-y-1.5 pt-1">
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-muted">Projects:</div>
-                                <div class="flex flex-wrap gap-1.5">
-                                    @foreach($client->projects->take(4) as $proj)
-                                        <span
-                                            class="px-2 py-0.5 text-[10px] font-semibold bg-canvas border border-border rounded-md text-ink">
-                                            {{ $proj->name }}
-                                        </span>
-                                    @endforeach
-                                    @if($client->projects->count() > 4)
-                                        <span class="px-1.5 py-0.5 text-[10px] text-muted">+{{ $client->projects->count() - 4 }}
-                                            more</span>
-                                    @endif
-                                </div>
-                            </div>
-                        @endif
-
-                        <div class="pt-2 border-t border-border flex items-center justify-between text-xs">
-                            <button type="button" wire:click="openCreditModal({{ $client->id }})"
-                                class="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                <span>Adjust Credits</span>
-                            </button>
-                            <span class="text-[10px] text-muted font-mono">ID: #{{ $client->id }}</span>
-                        </div>
-                    </div>
-                @empty
-                    <div class="col-span-3 p-12 text-center text-xs text-muted border border-dashed border-border rounded-2xl">
-                        No clients registered under this clients yet. Click "Register Client" to create one.
-                    </div>
-                @endforelse
+            <div class="bg-surface rounded-2xl border border-border overflow-x-auto">
+                <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th></tr></thead><tbody class="divide-y divide-border">
+                    @forelse($projects as $project)
+                        <tr><td class="p-4 font-bold">{{ $project->name }}</td><td class="p-4">{{ $project->client_name }}</td><td class="p-4">{{ ucfirst($project->status) }}</td><td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 2) }} Cr</td></tr>
+                    @empty
+                        <tr><td colspan="4" class="p-8 text-center text-muted">No projects mapped to this organization.</td></tr>
+                    @endforelse
+                </tbody></table>
             </div>
         </div>
     @endif
-
     <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
         <div class="space-y-6">
@@ -1141,6 +1056,19 @@
                 </div>
             </div>
 
+            <section class="bg-surface rounded-2xl border border-border p-5 space-y-4">
+                <h3 class="text-sm font-bold text-ink">Project-wise Lead Pricing</h3>
+                <p class="text-xs text-muted">Set a project override or leave it blank to inherit organization pricing. Team pricing, when configured for delivery, follows the existing pricing hierarchy. Wallets belong to billing clients.</p>
+                @forelse($projects as $project)
+                    <form wire:submit="saveProjectRate({{ $project->id }})" wire:key="project-rate-{{ $project->id }}" class="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-border pt-3">
+                        <div class="flex-1"><strong class="text-xs">{{ $project->name }}</strong><p class="text-xs text-muted">{{ $project->client_name }} · {{ $project->lead_cost !== null ? 'Project override' : 'Inherited organization/global rate' }}: {{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 2) }} Cr</p></div>
+                        <div><input type="number" step="0.01" min="0.01" wire:model="projectRates.{{ $project->id }}" aria-label="Lead cost for {{ $project->name }}" placeholder="Inherit organization rate" class="w-full sm:w-48 rounded-lg border border-border bg-canvas p-2 text-xs" />@error('projectRates.'.$project->id)<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                        <button type="submit" class="rounded-lg bg-ink text-white px-4 py-2 text-xs font-semibold">Save Rate</button>
+                    </form>
+                @empty
+                    <p class="text-xs text-muted">Map projects in the Projects tab to configure project pricing.</p>
+                @endforelse
+            </section>
             <!-- Client Wallets Breakdown Table (Opening vs Available Balances) -->
             <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
                 <div class="p-4 border-b border-border flex items-center justify-between">

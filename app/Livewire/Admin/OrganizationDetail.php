@@ -36,6 +36,19 @@ class OrganizationDetail extends Component
     public array $projectRates = [];
     public string $mappingProjectName = '';
 
+    public function auditTableColumns(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'Audit ID', 'sortable' => false],
+            ['key' => 'action', 'label' => 'Action', 'sortable' => false, 'class' => 'font-mono text-xs'],
+            ['key' => 'subject_summary', 'label' => 'Related Record', 'sortable' => false],
+            ['key' => 'user_name', 'label' => 'Performed By', 'sortable' => false],
+            ['key' => 'formatted_ip', 'label' => 'IP Address', 'sortable' => false],
+            ['key' => 'created_at', 'label' => 'Timestamp', 'sortable' => false,
+                'formatter' => fn ($value) => $value ? Carbon::parse($value)->format('M d, Y h:i A') : '—'],
+        ];
+    }
+
     private function billingClients()
     {
         return Client::where('organization_id', $this->organization->id)
@@ -1036,8 +1049,7 @@ class OrganizationDetail extends Component
                     }
                 })
                 ->latest('created_at')
-                ->take(20)
-                ->get();
+                ->paginate(20, ['*'], 'auditPage');
         } catch (Throwable $e) {
         }
 

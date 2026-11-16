@@ -21,6 +21,8 @@ class OrganizationProjectSettingsTest extends TestCase
         $owner = User::where('email', 'deltek@deltek.leadpanther.test')->firstOrFail();
         $org = Organization::findOrFail($owner->organization_id);
         $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+        $component->set('activeTab', 'activity')->assertSee('Performed By')->assertSee('IP Address')
+            ->assertViewHas('auditLogs', fn ($logs) => $logs instanceof \Illuminate\Pagination\LengthAwarePaginator);
         $component->set('activeTab', 'clients')->assertSee('Project Mapping (0)')
             ->assertViewHas('clients', fn ($clients) => $clients->modelKeys() === [$owner->id])
             ->set('mappingProjectName', 'Mapped Project')

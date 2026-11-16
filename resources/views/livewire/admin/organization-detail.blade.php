@@ -1259,34 +1259,16 @@
                 </button>
             </div>
 
-            <div class="bg-surface rounded-2xl border border-border shadow-2xs divide-y divide-border overflow-hidden">
-                @forelse($auditLogs as $log)
-                    <div
-                        class="p-4 hover:bg-canvas/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                        <div class="space-y-1 min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span
-                                    class="px-2 py-0.5 rounded-md text-[10px] font-bold font-mono uppercase bg-canvas border border-border text-ink">
-                                    {{ $log->action }}
-                                </span>
-                                <span class="font-bold text-ink truncate">{{ $log->subject_summary }}</span>
-                            </div>
-                            <div class="text-muted text-[11px] truncate">
-                                By <strong class="text-ink font-semibold">{{ $log->user_name }}</strong> • IP:
-                                {{ $log->formatted_ip }}
-                            </div>
-                        </div>
-
-                        <div class="text-right text-[11px] font-mono text-muted shrink-0">
-                            {{ $log->created_at ? $log->created_at->format('M d, Y • h:i A') : '—' }}
-                        </div>
-                    </div>
-                @empty
-                    <div class="p-12 text-center text-xs text-muted">
-                        No audit events recorded for this clients yet.
-                    </div>
-                @endforelse
-            </div>
+            <x-ui.advanced-table
+                :columns="$this->auditTableColumns()"
+                :rows="$auditLogs"
+                :showSearch="false"
+                :showFilterDropdown="false"
+                :showConfigurations="false"
+                tableName="organization-audit"
+                emptyTitle="No Audit Events"
+                emptyMessage="No audit events recorded for this organization."
+            />
         </div>
     @endif
 

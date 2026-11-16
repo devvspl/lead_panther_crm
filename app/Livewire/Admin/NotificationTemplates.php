@@ -101,7 +101,7 @@ class NotificationTemplates extends Component
                 ]
             );
 
-            $this->dispatch('toast', type: 'success', message: "Test notification dispatched via " . strtoupper($this->testChannel) . " (Status: " . strtoupper($log->status) . ")!");
+            $this->dispatch('toast', type: $log->status === 'failed' ? 'error' : 'success', message: "Test notification via " . strtoupper($this->testChannel) . " (Status: " . strtoupper($log->status) . ").");
         } catch (\Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Failed to send test notification: ' . $e->getMessage());
         }
@@ -111,7 +111,7 @@ class NotificationTemplates extends Component
     {
         try {
             $log = app(NotificationDeliveryService::class)->retry($logId);
-            $this->dispatch('toast', type: 'success', message: "Notification #{$log->id} re-delivered successfully (Status: {$log->status}, Retries: {$log->retries}).");
+            $this->dispatch('toast', type: $log->status === 'failed' ? 'error' : ($log->status === 'pending' ? 'info' : 'success'), message: "Notification #{$log->id} retry status: {$log->status}. Failed attempts: {$log->retries}.");
         } catch (\Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Retry failed: ' . $e->getMessage());
         }

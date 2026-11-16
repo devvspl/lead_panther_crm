@@ -56,6 +56,12 @@ class NotificationDeliveryService
             'notifiable_id' => $recipient->id, 'organization_id' => $organizationId, 'event_key' => $hash, 'data' => $payload,
         ]);
         if ($notification->wasRecentlyCreated) {
+            if (app(EmailDesignService::class)->enabled()) {
+                \Illuminate\Support\Facades\DB::afterCommit(function () use ($notification) {
+                    try { \App\Jobs\SendNotificationEmail::dispatch($notification->id); }
+                    catch (\Throwable $e) { report($e); } // Email outages must not fail the business action.
+                });
+            }
             \Illuminate\Support\Facades\DB::afterCommit(function () use ($recipient) {
                 try { event(new \App\Events\WebNotificationsChanged($recipient->id)); }
                 catch (\Throwable $e) { report($e); } // Persistence/polling survive a broadcast outage.
@@ -147,7 +153,8 @@ class NotificationDeliveryService
             ->where('channel', $channel)
             ->first();
 
-        $subject = $template?->subject ? $template->render($tokens) : "Notification: " . ucwords(str_replace('_', ' ', $templateKey));
+        $subject = $template?->subject ?: "Notification: " . ucwords(str_replace('_', ' ', $templateKey));
+        foreach ($tokens as $key => $value) $subject = str_replace('{{'.$key.'}}', (string) $value, $subject);
         $body = $template ? $template->render($tokens) : $this->generateFallbackBody($templateKey, $tokens);
 
         // 2. Initial Pending Log
@@ -177,7 +184,7 @@ class NotificationDeliveryService
         // 4. Update Status & Timestamps
         if ($deliveryResult['success']) {
             $log->update([
-                'status' => self::STATUS_DELIVERED,
+                'status' => $channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED,
                 'sent_at' => now(),
             ]);
         } else {
@@ -212,6 +219,10 @@ class NotificationDeliveryService
     public function retry(int $logId): NotificationLog
     {
         $log = NotificationLog::findOrFail($logId);
+        if ($log->channel === self::CHANNEL_EMAIL && $log->email_notification_id) {
+            if ($log->status !== self::STATUS_SENT) \App\Jobs\SendNotificationEmail::dispatch($log->email_notification_id)->afterCommit();
+            return $log->fresh();
+        }
         $payload = json_decode($log->payload ?? '{}', true);
 
         $recipient = $payload['recipient'] ?? 'unknown';
@@ -225,7 +236,7 @@ class NotificationDeliveryService
 
         if ($deliveryResult['success']) {
             $log->update([
-                'status' => self::STATUS_DELIVERED,
+                'status' => $log->channel === self::CHANNEL_EMAIL ? self::STATUS_SENT : self::STATUS_DELIVERED,
                 'retries' => ($log->retries ?? 0) + 1,
                 'last_error' => null,
                 'sent_at' => now(),
@@ -264,8 +275,10 @@ class NotificationDeliveryService
                     return ['success' => true];
 
                 case self::CHANNEL_EMAIL:
-                    // In a production setup, Mail::raw or Mailable is called. Logged here cleanly.
-                    Log::info("[EMAIL SENT] To: {$recipient} | Sub: {$subject}");
+                    if (! app(EmailDesignService::class)->enabled()) return ['success' => false, 'error' => 'Email notifications are disabled.'];
+                    if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return ['success' => false, 'error' => 'Invalid email address.'];
+                    if (in_array(config('mail.default'), ['log', 'array'])) return ['success' => false, 'error' => 'A real mail transport is not configured.'];
+                    \Illuminate\Support\Facades\Mail::to($recipient)->send(new \App\Mail\BrandedNotificationMail($subject, $body));
                     return ['success' => true];
 
                 case self::CHANNEL_CRM:
@@ -273,14 +286,13 @@ class NotificationDeliveryService
                     return ['success' => true];
 
                 case self::CHANNEL_PUSH:
-                    // WebPush / FCM Push notification
-                    Log::info("[PUSH SENT] To: {$recipient} | Sub: {$subject}");
-                    return ['success' => true];
+                    return ['success' => false, 'error' => 'Browser push is not configured. In-app notifications remain available.'];
 
                 default:
                     return ['success' => false, 'error' => "Unsupported channel [{$channel}]"];
             }
         } catch (\Throwable $e) {
+            if ($channel === self::CHANNEL_EMAIL) report($e);
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -310,6 +322,7 @@ class NotificationDeliveryService
         $agent = $tokens['assigned_to'] ?? 'Agent';
 
         return match ($key) {
+            'email_test' => "Hello " . ($tokens['recipient_name'] ?? 'there') . ",\n\nYour Lead Panther test email reached the configured mail transport. This message uses the active email design.",
             'lead_assigned' => "Hello {$agent}, you have been assigned lead {$leadName} ({$code}). Please contact them within 15 minutes to meet SLA.",
             'lead_status_changed' => "Lead {$code} status updated to " . ($tokens['new_status'] ?? 'Updated') . ".",
             'lead_replacement_requested' => "Replacement request received for lead {$code}. Reason: " . ($tokens['reason'] ?? 'N/A') . ".",

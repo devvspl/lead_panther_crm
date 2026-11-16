@@ -140,4 +140,7 @@
             </div>
         </form>
     </div>
+    @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']))
+        <livewire:settings.email-notification-settings />
+    @endif
 </div>

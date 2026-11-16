@@ -1,4 +1,6 @@
-# Team Leader support and Deltek demo
+# Team Leader support and Deltek accounts
+
+The current seeder is `DeltekSeeder` and uses `@deltek.leadpanther.test` addresses. See [tracked seeding and revert](seeder-revert.md) for the naming upgrade and rollback workflow. Older names below document the original implementation.
 
 ## Architecture and access
 

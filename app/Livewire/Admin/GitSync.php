@@ -60,6 +60,23 @@ class GitSync extends Component
     public bool $isFollowupRunning = false;
     public ?array $lastFollowupResult = null;
     public string $selectedSeederClass = '';
+    public ?array $seederRevertPreview = null;
+    #[\Livewire\Attributes\Locked] public ?int $pendingSeederRevertRunId = null;
+    public function previewSeederRevert(int $id): void {
+        abort_unless(auth()->user()?->is_active && auth()->user()->hasAnyRole(['Super Admin','super-admin']),403);
+        $this->seederRevertPreview=app(\App\Services\SeederRunService::class)->preview($id,auth()->user());
+        $this->pendingSeederRevertRunId=$id;
+        $this->dispatch('open-modal','revert-seeder-run');
+    }
+    public function confirmSeederRevert(int $id): void {
+        abort_unless(auth()->user()?->is_active && auth()->user()->hasAnyRole(['Super Admin','super-admin']),403);
+        abort_unless($this->pendingSeederRevertRunId===$id,409);
+        try {
+            app(\App\Services\SeederRunService::class)->revert($id,auth()->user());
+            $this->seederRevertPreview=null; $this->pendingSeederRevertRunId=null; $this->dispatch('close-modal','revert-seeder-run');
+            $this->dispatch('toast',type:'success',message:'Seeded changes reverted. Existing unrelated data and audit history were preserved.');
+        } catch(\DomainException $e) { $this->dispatch('toast',type:'error',message:$e->getMessage()); $this->seederRevertPreview=app(\App\Services\SeederRunService::class)->preview($id,auth()->user()); }
+    }
 
     // Database Migrations, Seeders & Test Suite Manager
     public string $dbManagerTab = 'migrations'; // 'migrations' | 'seeders' | 'tests'
@@ -594,6 +611,7 @@ class GitSync extends Component
             foreach ($logs as $log) {
                 $from = is_array($log->from_value) ? $log->from_value : json_decode($log->from_value, true);
                 $targetClass = $from['class'] ?? ($from['target_class'] ?? null);
+                if ($targetClass==='DeltekDemoSeeder') $targetClass='DeltekSeeder';
                 if ($targetClass && !isset($lastRuns[$targetClass])) {
                     $lastRuns[$targetClass] = [
                         'timestamp' => $log->created_at,
@@ -603,15 +621,20 @@ class GitSync extends Component
             }
         } catch (Throwable $e) {}
 
+        $tracked=\Illuminate\Support\Facades\Schema::hasTable('seeder_runs')
+            ? \App\Models\SeederRun::with('user')->latest('id')->get()->groupBy('seeder_class') : collect();
+
         foreach ($files as $file) {
             $filename = $file->getFilename();
             $className = str_replace('.php', '', $filename);
+            if ($className==='DeltekDemoSeeder') continue;
 
             if (!str_ends_with($filename, 'Seeder.php')) {
                 continue;
             }
 
             $category = match (true) {
+                $className === 'DeltekSeeder' => 'Client Accounts',
                 $className === 'DatabaseSeeder' => 'Master Orchestrator',
                 str_contains($className, 'Role') || str_contains($className, 'Permission') => 'Roles & Security',
                 str_contains($className, 'User') || str_contains($className, 'Account') => 'Users & Auth',
@@ -624,6 +647,9 @@ class GitSync extends Component
             };
 
             $lastRun = $lastRuns[$className] ?? null;
+            $history=$tracked->get($className,collect());
+            $latest=$history->first();
+            $revertible=$history->first(fn($r)=>$r->status==='completed' && $r->change_count>0);
 
             if (!empty($this->dbSearch)) {
                 $search = strtolower(trim($this->dbSearch));
@@ -641,9 +667,11 @@ class GitSync extends Component
                 'title' => ucwords(str_replace('Seeder', ' Seeder', $className)),
                 'category' => $category,
                 'is_master' => $className === 'DatabaseSeeder',
-                'last_run' => $lastRun ? $lastRun['timestamp']->format('M d, Y H:i') : null,
-                'last_user' => $lastRun['user'] ?? null,
-                'status' => $lastRun ? 'Executed' : 'Available',
+                'last_run' => $latest?->started_at?->format('M d, Y H:i') ?? ($lastRun ? $lastRun['timestamp']->format('M d, Y H:i') : null),
+                'last_user' => $latest?->user?->name ?? ($lastRun['user'] ?? null),
+                'status' => $latest ? ucfirst($latest->status) : ($lastRun ? 'Executed' : 'Available'),
+                'revert_run_id'=>$revertible?->id,
+                'history'=>$history->take(10)->map(fn($r)=>['id'=>$r->id,'status'=>$r->status,'changes'=>$r->change_count,'time'=>$r->started_at->format('M d, Y H:i')])->all(),
             ];
         }
 
@@ -696,6 +724,7 @@ class GitSync extends Component
 
     public function runSingleSeeder(string $className, GitSyncService $gitService): void
     {
+        abort_unless(auth()->user()?->is_active && auth()->user()->hasAnyRole(['Super Admin','super-admin']),403);
         $safeClass = preg_replace('/[^a-zA-Z0-9_\\\\]/', '', (string) $className);
 
         if (empty($safeClass)) {
@@ -1152,7 +1181,7 @@ class GitSync extends Component
 
         foreach ($files as $file) {
             $className = basename($file, '.php');
-            if ($className !== 'DatabaseSeeder') {
+            if (!in_array($className,['DatabaseSeeder','DeltekDemoSeeder'])) {
                 $seeders[] = $className;
             }
         }

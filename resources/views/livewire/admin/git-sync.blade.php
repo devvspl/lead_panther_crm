@@ -786,6 +786,7 @@
                                                     @endif
                                                 </div>
                                                 <div class="text-[11px] text-muted">{{ $s['title'] }}</div>
+                                                @if($s['history'])<details class="text-[10px] text-muted mt-1"><summary class="cursor-pointer">Tracked run history</summary>@foreach($s['history'] as $run)<div class="py-1">#{{ $run['id'] }} · {{ $run['time'] }} · {{ ucfirst($run['status']) }} · {{ $run['changes'] }} changes @if($run['status']==='completed' && $run['changes']>0)<button type="button" wire:click="previewSeederRevert({{ $run['id'] }})" class="text-primary underline">Preview Revert</button>@endif</div>@endforeach</details>@elseif($s['last_run'])<p class="text-[10px] text-muted mt-1">Previous run has no rollback manifest.</p>@endif
                                             </td>
                                             <td class="py-2.5 px-3.5">
                                                 <span
@@ -805,8 +806,7 @@
                                                 @if($s['last_run'])
                                                     <span
                                                         class="px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                                        ✓ Executed
-                                                    </span>
+                                                        {{ $s['status'] }}</span>
                                                 @else
                                                     <span
                                                         class="px-2 py-0.5 rounded-pill bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
@@ -843,6 +843,7 @@
                                                         Seeding...
                                                     </span>
                                                 </button>
+                                                @if($s['revert_run_id'])<button type="button" wire:click="previewSeederRevert({{ $s['revert_run_id'] }})" wire:loading.attr="disabled" class="ml-2 border border-red-200 bg-red-50 text-red-700 rounded-lg px-3 py-1.5 text-xs font-semibold">Revert Data</button>@endif
                                             </td>
                                         </tr>
                                     @empty
@@ -1735,4 +1736,16 @@
             </div>
         </div>
     @endif
+    <x-modal name="revert-seeder-run" :show="$seederRevertPreview !== null" maxWidth="2xl">
+        @if($seederRevertPreview)
+        <div class="p-6 space-y-4">
+            <h3 class="font-bold text-ink">Revert Seeder Data</h3>
+            <p class="text-sm text-muted">{{ $seederRevertPreview['class'] }} · Run #{{ $seederRevertPreview['id'] }} · {{ $seederRevertPreview['changes'] }} changes</p>
+            <p class="text-xs text-muted">Records created by this run will be removed. Its updates and deletions will be restored. Audit history is retained. Revert stops if affected records have changed or gained dependencies.</p>
+            <table class="w-full text-xs text-left"><thead><tr class="border-b border-border"><th class="py-2">Table</th><th>Change</th><th>Records</th></tr></thead><tbody>@foreach($seederRevertPreview['tables'] as $table)<tr class="border-b border-border"><td class="py-2 font-mono">{{ $table['table_name'] }}</td><td>{{ ucfirst($table['operation']) }}</td><td>{{ $table['count'] }}</td></tr>@endforeach</tbody></table>
+            @foreach($seederRevertPreview['conflicts'] as $issue)<p class="text-xs text-red-600">{{ $issue }}</p>@endforeach
+            <div class="flex justify-end gap-3"><button type="button" wire:click="$set('seederRevertPreview', null)" @click="$dispatch('close-modal', 'revert-seeder-run')" class="border border-border rounded-lg px-3 py-2 text-xs">Cancel</button>@if(!$seederRevertPreview['conflicts'])<button type="button" wire:click="confirmSeederRevert({{ $seederRevertPreview['id'] }})" wire:confirm="Revert the database changes listed for this seeder run?" wire:loading.attr="disabled" class="bg-red-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">Confirm Revert</button>@endif</div>
+        </div>
+        @endif
+    </x-modal>
 </div>

@@ -832,6 +832,19 @@ class GitSyncService
      */
     public function runFollowupAction(string $actionType, ?int $userId = null, ?string $class = null): array
     {
+        if (in_array($actionType,['seed','db_seed','seeder'])) {
+            $actor=$userId ? \App\Models\User::findOrFail($userId) : auth()->user();
+            try {
+                $run=app(SeederRunService::class)->run($class ?: 'DatabaseSeeder',$actor);
+                $res=['successful'=>true,'stdout'=>"Seeder {$run->seeder_class} completed. Run #{$run->id}: {$run->change_count} reversible database changes.",'stderr'=>''];
+            } catch(\Throwable $e) {
+                $message=$e instanceof \DomainException || $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Seeder failed; database changes were rolled back. Check the application log.';
+                report($e);
+                $res=['successful'=>false,'stdout'=>'','stderr'=>\App\Support\AuditRedactor::clean($message)];
+            }
+            $this->logAudit($userId,'git_followup_'.$actionType,['action'=>$actionType,'class'=>$class ?: 'DatabaseSeeder'],$res);
+            return array_merge(['action'=>$actionType],$res);
+        }
         $safeClass = !empty($class) ? preg_replace('/[^a-zA-Z0-9_\\\\]/', '', (string) $class) : null;
         $safePath = !empty($class) ? preg_replace('/[^a-zA-Z0-9_\\/\\\\.-]/', '', (string) $class) : null;
 

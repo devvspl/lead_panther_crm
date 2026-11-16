@@ -8,17 +8,17 @@ use App\Support\{TeamAccess, NavigationConfig};
 use App\Livewire\Team\BuilderTeamManager;
 use App\Livewire\Leads\LeadKanban;
 use Livewire\{Livewire, Volt\Volt};
-use Database\Seeders\{DeltekDemoSeeder, TeamLeaderRoleSeeder};
+use Database\Seeders\{DeltekSeeder, TeamLeaderRoleSeeder};
 
 class TeamLeaderTest extends TestCase {
     use RefreshDatabase;
     private User $builder; private User $leader; private User $exec; private User $outside;
     private SalesTeam $team;
     protected function setUp(): void {
-        parent::setUp(); $this->seed(DeltekDemoSeeder::class);
-        $this->builder=User::where('email','deltek@demo.leadpanther.test')->firstOrFail();
-        $this->leader=User::where('email','brijesh@demo.leadpanther.test')->firstOrFail();
-        $this->exec=User::where('email','se1@demo.leadpanther.test')->firstOrFail();
+        parent::setUp(); $this->seed(DeltekSeeder::class);
+        $this->builder=User::where('email','deltek@deltek.leadpanther.test')->firstOrFail();
+        $this->leader=User::where('email','brijesh@deltek.leadpanther.test')->firstOrFail();
+        $this->exec=User::where('email','se1@deltek.leadpanther.test')->firstOrFail();
         $this->team=SalesTeam::where('leader_id',$this->leader->id)->firstOrFail();
         $this->outside=User::factory()->create(['organization_id'=>$this->builder->organization_id,'status'=>'active','name'=>'Other team executive']); $this->outside->assignRole('Executive');
         $other=SalesTeam::create(['ownable_type'=>Organization::class,'ownable_id'=>$this->builder->organization_id,'name'=>'Other private team']);
@@ -31,13 +31,13 @@ class TeamLeaderTest extends TestCase {
         $this->leader->update(['password'=>Hash::make('changed-password')]); $hash=$this->leader->fresh()->password;
         $admin=User::factory()->create(); $admin->assignRole('Super Admin');
         $count=User::count(); $members=SalesTeamMember::count();
-        $this->seed(DeltekDemoSeeder::class);
+        $this->seed(DeltekSeeder::class);
         $this->assertSame($count,User::count()); $this->assertSame($members,SalesTeamMember::count());
         $this->assertSame($hash,$this->leader->fresh()->password); $this->assertTrue($admin->fresh()->hasRole('Super Admin'));
         $this->assertSame(10,TeamAccess::executives($this->leader)->count());
     }
     public function test_all_twelve_accounts_login_and_open_role_dashboards(): void {
-        foreach(User::where('email','like','%@demo.leadpanther.test')->get() as $user) {
+        foreach(User::where('email','like','%@deltek.leadpanther.test')->get() as $user) {
             Auth::logout();
             $route=match(NavigationConfig::getRoleKey($user)) {'builder'=>'builder.dashboard','team-leader'=>'team-leader.dashboard',default=>'sales.dashboard'};
             Volt::test('pages.auth.login')->set('form.email',$user->email)->set('form.password','password')->call('login')->assertHasNoErrors()->assertRedirect(route($route,absolute:false));
@@ -58,7 +58,7 @@ class TeamLeaderTest extends TestCase {
     }
     public function test_leader_reassigns_only_within_own_team(): void {
         $lead=$this->lead($this->exec,'LP-TEAM-ASSIGN');
-        $second=User::where('email','se2@demo.leadpanther.test')->firstOrFail();
+        $second=User::where('email','se2@deltek.leadpanther.test')->firstOrFail();
         Livewire::actingAs($this->leader)->test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$second->id)->call('executeAssignment')->assertHasNoErrors();
         $this->assertEquals($second->id,$lead->fresh()->assigned_to);
         Livewire::test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$this->outside->id)->call('executeAssignment')->assertForbidden();

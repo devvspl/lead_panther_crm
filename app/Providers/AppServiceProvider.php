@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(\App\Services\SeederRunService::class);
         $this->app->bind(WhatsAppGateway::class, LogWhatsAppGateway::class);
         $this->app->bind(SmsGateway::class, LogSmsGateway::class);
     }

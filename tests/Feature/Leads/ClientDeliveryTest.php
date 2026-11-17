@@ -278,6 +278,23 @@ class ClientDeliveryTest extends TestCase
         $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
     }
 
+    public function test_empty_cycle_opens_existing_leads_for_confirmation_then_the_client_sees_delivery(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(2); // Existing intake predates the saved plan, as in organization 38.
+        $plan = $this->plan(['frequency' => 'immediate']);
+        $this->assertSame(0, $plan->items()->count());
+        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->assertSee('Push Existing Leads')->call('runNow')
+            ->assertSet('showConfiguration', true)->assertSet('selectedLeadIds', $ids);
+        $this->assertSame(0, $plan->items()->count()); // Opening the confirmation does not share data or charge.
+        $component->call('pushLeads')->assertHasNoErrors();
+        $run = $plan->runs()->firstOrFail();
+        (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(2, Lead::panelQuery()->whereIn('id', $ids)->count());
+    }
+
     public function test_empty_push_does_not_save_a_plan_or_change_delivery_routing(): void
     {
         Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->call('pushLeads')->assertHasErrors('selectedLeadIds');

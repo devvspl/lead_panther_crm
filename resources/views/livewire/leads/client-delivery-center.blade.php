@@ -5,12 +5,15 @@
             <div class="flex flex-wrap gap-2 text-xs">
                 <button type="button" wire:click="$set('showConfiguration', true)" class="h-8 px-3 rounded-lg border border-border bg-surface font-semibold">Configure Delivery</button>
                 @if($plan)
-                    <button type="button" wire:click="runNow" wire:confirm="Start one delivery cycle using the saved limits and working hours?" class="h-8 px-3 rounded-lg bg-ink text-white font-semibold">Send Cycle Now</button>
+                    <button type="button" wire:click="runNow" @if($stats['Pending'] > 0) wire:confirm="Start one delivery cycle using the saved limits and working hours?" @endif class="h-8 px-3 rounded-lg bg-ink text-white font-semibold">{{ $stats['Pending'] == 0 && $stats['Eligible'] > 0 ? 'Push Existing Leads' : 'Send Cycle Now' }}</button>
                     @if($plan->state === 'active')<button type="button" wire:click="control('pause')" class="h-8 px-3 rounded-lg border border-border bg-surface">Pause</button>@else<button type="button" wire:click="control('resume')" class="h-8 px-3 rounded-lg border border-border bg-surface">Resume</button>@endif
                     <button type="button" wire:click="control('stop')" wire:confirm="Stop this delivery? Unsent leads will remain in the pending queue." class="h-8 px-3 rounded-lg border border-red-200 text-red-700 bg-surface">Stop</button>
                 @endif
             </div>
         </div>
+        @if($stats['Eligible'] > 0 && $stats['Pending'] == 0)
+            <p class="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink">{{ $stats['Eligible'] }} existing lead(s) have not been queued for this delivery plan. Saving settings does not send them. Use Push Existing Leads to confirm the transfer.</p>
+        @endif
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             @foreach($stats as $label => $value)<div class="rounded-lg bg-surface border border-border p-3"><div class="text-[10px] uppercase font-semibold text-muted">{{ $label }}</div><div class="mt-1 text-xs font-bold text-ink break-words">{{ $value }}</div></div>@endforeach
         </div>

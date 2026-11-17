@@ -113,7 +113,21 @@ class ClientDeliveryCenter extends Component
             $this->dispatch('toast', type: 'success', message: 'Delivery cycle queued. Progress updates automatically.');
         } else $this->dispatch('toast', type: 'info', message: 'No delivery can start now. Check pending leads, state, working dates/hours and remaining daily capacity.');
     }
-    public function runNow(): void { if ($plan = $this->plan()) $this->launchCycle($plan, true); }
+    public function runNow(): void
+    {
+        $plan = $this->plan();
+        if (!$plan) { $this->showConfiguration = true; return; }
+        $ready = $plan->items()->whereIn('status', ['pending', 'queued'])->whereHas('lead', fn ($q) => $q->whereNotNull('delivery_consent_at'))->exists();
+        if (!$ready) {
+            $ids = app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->pluck('id')->all();
+            if ($ids) {
+                $this->openPush($this->organizationId, $ids);
+                $this->dispatch('toast', type: 'info', message: 'These existing leads are not queued yet. Confirm Push Leads to enroll them for delivery.');
+                return;
+            }
+        }
+        $this->launchCycle($plan, true);
+    }
     public function control(string $action): void
     {
         if ($plan = $this->plan()) app(LeadDistributionService::class)->controlClientDelivery($plan, $action, auth()->user());

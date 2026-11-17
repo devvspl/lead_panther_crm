@@ -135,36 +135,21 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink">Target Project (Required) *</label>
-                    <livewire:shared.searchable-select 
-                        :model="\App\Models\Project::class"
-                        :searchable="true"
-                        placeholder="-- Select Target Project --"
-                        wire:model="projectId"
-                        key="upload-project"
-                    />
+                    <x-ui.themed-select :options="$projects->pluck('name', 'id')->all()" :searchable="true" placeholder="-- Select Target Project --" wire:model.live="projectId" class="w-full" />
+                    @error('projectId')<span class="text-xs text-red-600">{{ $message }}</span>@enderror
                 </div>
 
-                <div class="space-y-1">
+                <div class="space-y-1" wire:key="upload-campaign-{{ $organizationId }}-{{ $projectId }}">
                     <label class="text-xs font-bold text-ink">Campaign (Optional)</label>
-                    <livewire:shared.searchable-select 
-                        :model="\App\Models\Campaign::class"
-                        :searchable="true"
-                        placeholder="-- Select Campaign --"
-                        wire:model="campaignId"
-                        key="upload-campaign"
-                    />
+                    <x-ui.themed-select :options="$campaigns->pluck('name', 'id')->all()" :searchable="true" placeholder="-- Select Campaign --" wire:model.live="campaignId" class="w-full" :key="'import-campaign-'.$projectId" />
+                    @error('campaignId')<span class="text-xs text-red-600">{{ $message }}</span>@enderror
                 </div>
 
                 @canViewLeadSource
-<div class="space-y-1">
+<div class="space-y-1" wire:key="upload-source-{{ $organizationId }}-{{ $projectId }}-{{ $campaignId }}">
                     <label class="text-xs font-bold text-ink">Lead Source (Optional)</label>
-                    <livewire:shared.searchable-select 
-                        :model="\App\Models\LeadSource::class"
-                        :searchable="true"
-                        placeholder="-- Select Lead Source --"
-                        wire:model="leadSourceId"
-                        key="upload-source"
-                    />
+                    <x-ui.themed-select :options="$sources->pluck('name', 'id')->all()" :searchable="true" placeholder="-- Select Lead Source --" wire:model.live="leadSourceId" class="w-full" :key="'import-source-'.$projectId.'-'.$campaignId" />
+                    @error('leadSourceId')<span class="text-xs text-red-600">{{ $message }}</span>@enderror
                 </div>
 @endcanViewLeadSource
             </div>

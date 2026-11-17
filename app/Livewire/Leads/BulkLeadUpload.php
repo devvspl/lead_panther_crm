@@ -196,6 +196,7 @@ class BulkLeadUpload extends Component
 
         if ($this->organizationId) {
             abort_unless(Project::whereHas('client', fn ($q) => $q->where('organization_id', $this->organizationId))->whereKey($this->projectId)->exists(), 403);
+            $this->validate(['leadSourceId' => ['nullable', \Illuminate\Validation\Rule::in($this->attributionSources()->pluck('id')->all())]]);
         }
 
         try {
@@ -346,11 +347,40 @@ class BulkLeadUpload extends Component
         return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LeadImportTemplateExport(), 'Lead_Import_Template.xlsx');
     }
 
+    public function updatedProjectId(): void
+    {
+        $this->campaignId = null;
+        $this->leadSourceId = null;
+    }
+
+    public function updatedCampaignId(): void { $this->leadSourceId = null; }
+
+    protected function attributionProjects()
+    {
+        return Project::when($this->organizationId, fn ($q) => $q->whereHas('client', fn ($owner) => $owner->where('organization_id', $this->organizationId)));
+    }
+
+    protected function attributionCampaigns()
+    {
+        return Campaign::whereIn('project_id', $this->attributionProjects()->select('id'))
+            ->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
+    }
+
+    protected function attributionSources()
+    {
+        if (!$this->organizationId) return LeadSource::query();
+        $campaigns = $this->attributionCampaigns()->when($this->campaignId, fn ($q) => $q->whereKey($this->campaignId));
+        $campaignSourceIds = (clone $campaigns)->pluck('lead_source_id');
+        $leadSourceIds = Lead::whereIn('campaign_id', (clone $campaigns)->select('id'))
+            ->whereHas('client', fn ($q) => $q->where('organization_id', $this->organizationId))->pluck('lead_source_id');
+        return LeadSource::whereIn('id', $campaignSourceIds->merge($leadSourceIds)->filter()->unique());
+    }
+
     public function render()
     {
-        $projects = Project::when($this->organizationId, fn ($q) => $q->whereHas('client', fn ($owner) => $owner->where('organization_id', $this->organizationId)))->get();
-        $campaigns = Campaign::whereIn('project_id', $projects->pluck('id'))->get();
-        $sources = LeadSource::all();
+        $projects = $this->attributionProjects()->orderBy('name')->get();
+        $campaigns = $this->attributionCampaigns()->orderBy('name')->get();
+        $sources = $this->attributionSources()->orderBy('name')->get();
 
         return view('livewire.leads.bulk-lead-upload', [
             'projects' => $projects,

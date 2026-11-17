@@ -44,6 +44,25 @@ class ClientLeadManagerTest extends TestCase
         return Livewire::test(ClientLeadManager::class, ['organizationId' => $this->organization->id]);
     }
 
+    public function test_import_dropdowns_only_list_related_client_projects_campaigns_and_sources(): void
+    {
+        $foreignProject = Project::create(['client_id' => $this->other->client_id, 'name' => 'Private foreign project']);
+        $foreignSource = LeadSource::create(['name' => 'Private foreign source']);
+        Campaign::create(['project_id' => $foreignProject->id, 'name' => 'Private foreign campaign', 'lead_source_id' => $foreignSource->id]);
+        $secondProject = Project::create(['client_id' => $this->owner->id, 'name' => 'Second client project']);
+        $secondSource = LeadSource::create(['name' => 'Second project source']);
+        $secondCampaign = Campaign::create(['project_id' => $secondProject->id, 'name' => 'Second client campaign', 'lead_source_id' => $secondSource->id]);
+        $import = Livewire::test(BulkLeadUpload::class, ['organizationId' => $this->organization->id])->set('step', 2)
+            ->assertSee('Scoped project')->assertSee('Second client project')->assertDontSee('Private foreign project')
+            ->assertDontSee('Private foreign campaign')->assertDontSee('Private foreign source');
+        $import->set('projectId', $this->project->id)->assertSee('Scoped campaign')->assertSee('Actual source')
+            ->assertDontSee('Second client campaign')->assertDontSee('Second project source');
+        $import->set('campaignId', $this->ours->campaign_id)->set('leadSourceId', $this->ours->lead_source_id)
+            ->set('projectId', $secondProject->id)->assertSet('campaignId', null)->assertSet('leadSourceId', null)
+            ->assertSee('Second client campaign')->assertSee('Second project source')->assertDontSee('Scoped campaign');
+        $import->set('leadSourceId', $foreignSource->id)->set('columnMapping.mobile', '0')->call('processBatch')->assertHasErrors('leadSourceId');
+    }
+
     public function test_tab_table_kanban_metrics_and_export_are_client_scoped(): void
     {
         $this->get(route('admin.organizations.show', ['organization' => $this->organization->id, 'tab' => 'leads']))->assertOk()->assertSee('Client Leads Management');

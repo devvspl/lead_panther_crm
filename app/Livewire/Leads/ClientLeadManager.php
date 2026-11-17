@@ -90,11 +90,15 @@ class ClientLeadManager extends LeadKanban
     {
         $this->queue = 'client';
         $this->pullMode = 'manual';
+        $sourceIds = $this->contextLeads()->pluck('lead_source_id')->merge(
+            Campaign::withoutGlobalScopes()->whereIn('project_id', $this->contextProjects()->select('id'))->pluck('lead_source_id')
+        )->filter()->unique();
         return parent::render()->with([
             'canInternalQueue' => false,
             'allOrganizations' => Organization::whereKey($this->clientOrganizationId)->get(),
             'allProjects' => $this->contextProjects()->orderBy('name')->get(),
             'allCampaigns' => Campaign::withoutGlobalScopes()->whereIn('project_id', $this->contextProjects()->select('id'))->orderBy('name')->get(),
+            'allLeadSources' => \App\Models\LeadSource::whereIn('id', $sourceIds)->orderBy('name')->get(),
             'eligibleAssignees' => User::whereIn('id', $this->ownerIds())->where('status', 'active')->when($this->assignTeamId, fn ($q) => $q->whereHas('salesTeamMembers', fn ($m) => $m->where('sales_team_id', $this->assignTeamId)->where('is_active', true)))->orderBy('name')->get(),
             'assignTeams' => $this->getAvailableTeams(),
             'clientStatusOptions' => $this->contextLeads()->distinct()->pluck('status')->mapWithKeys(fn ($status) => [$status => ucwords(str_replace('_', ' ', $status))])->all(),

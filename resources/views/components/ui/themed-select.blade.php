@@ -29,7 +29,7 @@
     x-data="{ 
         open: false, 
         search: '',
-        value: @if($wireModel) ($wire.entangle('{{ $wireModel }}') ?? '') @else '{{ $attributes->get('value', '') }}' @endif,
+        value: @if($wireModel) ($wire.entangle('{{ $wireModel }}'){{ $attributes->wire('model')->hasModifier('live') ? '.live' : '' }} ?? '') @else '{{ $attributes->get('value', '') }}' @endif,
         options: {{ json_encode($normalizedOptions) }},
         get filteredOptions() {
             if (!this.search || !this.search.trim()) return this.options || [];

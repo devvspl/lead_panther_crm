@@ -96,6 +96,30 @@ class NotificationCenter extends NotificationBell
     public function closeInspection(): void { $this->selectedNotificationId = null; $this->dispatch('close-modal', 'system-notification-details'); }
     public function getSelectedNotificationProperty() { return $this->selectedNotificationId ? app(NotificationDeliveryService::class)->managedNotifications(auth()->user())->whereKey($this->selectedNotificationId)->first() : null; }
 
+
+    public function getDeliveryFailureDetailsProperty(): ?array
+    {
+        $notice = $this->selectedNotification;
+        if (!$notice || ($notice->data['type'] ?? null) !== 'delivery_failed' || !$this->isSuperAdmin) return null;
+        $data = $notice->data;
+        $id = $data['lead_id'] ?? (($data['entity_type'] ?? null) === 'lead' ? ($data['entity_id'] ?? null) : null);
+        $code = $data['lead_code'] ?? null;
+        // Older alerts linked to a campaign; resolve only their explicit CRM lead code.
+        if (!$id && !$code && preg_match('/\bLP-\d{4}-\d+\b/', $data['message'] ?? '', $match)) $code = $match[0];
+        $lead = $id ? \App\Models\Lead::withoutGlobalScopes()->find($id) : ($code ? \App\Models\Lead::withoutGlobalScopes()->where('lead_code', $code)->first() : null);
+        if (!$lead) return null;
+        $item = \App\Models\LeadDeliveryItem::where('lead_id', $lead->id)->first();
+        $delivered = (bool) $lead->delivered_at && !$lead->delivery_pending;
+        $owner = \App\Models\User::find($lead->client_id);
+        return ['lead_code' => $lead->lead_code, 'delivered' => $delivered,
+            'status' => $delivered ? 'Delivered' : ($item ? ucwords($item->status) : 'Not delivered — not enrolled in a client batch'),
+            'reason' => $item?->failure_reason ?: ($lead->delivery_error ?: ($data['failure_reason'] ?? 'No detailed failure reason was stored.')),
+            'last_failure_at' => $lead->delivery_failed_at?->format('d M Y H:i T'),
+            'delivered_at' => $lead->delivered_at?->format('d M Y H:i T'),
+            'wallet_balance' => \App\Models\CreditWallet::withoutGlobalScopes()->where('client_id', $lead->client_id)->value('balance'),
+            'client_leads_url' => $owner?->organization_id ? route('admin.organizations.show', ['organization' => $owner->organization_id, 'tab' => 'leads', 'search' => $lead->lead_code]) : null];
+    }
+
     public function exportExcel()
     {
         abort_unless($this->isSuperAdmin, 403);

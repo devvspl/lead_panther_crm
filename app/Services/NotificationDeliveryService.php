@@ -61,7 +61,7 @@ class NotificationDeliveryService
     }
 
     public function sendWeb(User $recipient, string $type, string $title, string $message, string $eventKey,
-        string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false, bool $sendEmail = true, bool $sendPush = true): ?\Illuminate\Notifications\DatabaseNotification
+        string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false, bool $sendEmail = true, bool $sendPush = true, array $context = []): ?\Illuminate\Notifications\DatabaseNotification
     {
         if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && $recipient->organization_id != $organizationId) return null;
         if (! $recipient->hasAnyRole(['Super Admin', 'super-admin'])) {
@@ -75,6 +75,7 @@ class NotificationDeliveryService
             'organization_id' => $organizationId, 'recipient_user_id' => $recipient->id,
             'entity_type' => $entityType, 'entity_id' => $entityId,
             'action_url' => '/notifications/'.$id.'/open', 'important' => $important];
+        $payload += \Illuminate\Support\Arr::only($context, ['lead_id', 'lead_code', 'failure_reason', 'failed_at']);
         // Write in the business transaction; rollbacks remove the notification too.
         // Deterministic primary/event keys protect against concurrent queue retries.
         $notification = \Illuminate\Notifications\DatabaseNotification::firstOrCreate(['id' => $id], [
@@ -130,8 +131,10 @@ class NotificationDeliveryService
         $orgId = User::find($lead->client_id)?->organization_id;
         foreach ($this->organizationRecipients($orgId, $lead->client_id, $lead->assigned_to, $adminsOnly) as $recipient) {
             if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && ($lead->delivery_pending || $lead->internal_processing_pending || ! $lead->delivered_at)) continue;
-            $queued = $lead->delivery_pending && $category === 'delivery' && $lead->campaign_id;
-            $this->sendWeb($recipient, $type, $title, $message, $eventKey, $category, $orgId, $queued ? 'campaign' : 'lead', $queued ? $lead->campaign_id : $lead->id, $important);
+            $queued = $type !== 'delivery_failed' && $lead->delivery_pending && $category === 'delivery' && $lead->campaign_id;
+            $context = ['lead_id' => $lead->id, 'lead_code' => $lead->lead_code];
+            if ($type === 'delivery_failed') $context += ['failure_reason' => $lead->delivery_error, 'failed_at' => $lead->delivery_failed_at?->toIso8601String()];
+            $this->sendWeb($recipient, $type, $title, $message, $eventKey, $category, $orgId, $queued ? 'campaign' : 'lead', $queued ? $lead->campaign_id : $lead->id, $important, context: $context);
         }
     }
 

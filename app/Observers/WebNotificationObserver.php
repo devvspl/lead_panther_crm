@@ -36,7 +36,8 @@ class WebNotificationObserver
                 }
             }
             if (! $created && $model->wasChanged('delivery_failed_at') && $model->delivery_failed_at) {
-                $service->leadAlert($model, 'delivery_failed', 'Lead delivery failed', "Delivery of {$model->lead_code} failed. Check the delivery queue and available credits.", 'failed:'.$model->id.':'.now()->toDateString(), 'delivery', true);
+                $reason = $model->delivery_error ?: 'Open the lead to inspect the delivery attempt.';
+                $service->leadAlert($model, 'delivery_failed', 'Lead delivery failed', "Delivery of {$model->lead_code} failed. {$reason}", 'failed:'.$model->id.':'.now()->toDateString(), 'delivery', true);
             }
             if (! $created && $model->wasChanged(['current_stage', 'status'])) {
                 $stage = Lead::normalizeStage($model->wasChanged('current_stage') ? $model->current_stage : $model->status);

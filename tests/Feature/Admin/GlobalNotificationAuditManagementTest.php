@@ -35,6 +35,12 @@ class GlobalNotificationAuditManagementTest extends TestCase
 
     private function notice(User $user, string $type, string $key, string $message): SystemNotification
     {
+        if (in_array($type, NotificationDeliveryService::ADMIN_DELIVERY_TYPES, true)) {
+            // Historical client alerts remain available to the global browser; new sends are admin-only.
+            return SystemNotification::create(['id' => (string) \Illuminate\Support\Str::uuid(), 'type' => \App\Notifications\WebNotification::class,
+                'notifiable_type' => User::class, 'notifiable_id' => $user->id, 'organization_id' => $user->organization_id,
+                'event_key' => hash('sha256', $user->id.'|'.$key), 'data' => ['type' => $type, 'title' => $message, 'message' => $message]]);
+        }
         app(NotificationDeliveryService::class)->sendWeb($user, $type, $message, $message, $key, 'delivery', $user->organization_id);
         return SystemNotification::where('event_key', hash('sha256', $user->id.'|'.$key))->firstOrFail();
     }

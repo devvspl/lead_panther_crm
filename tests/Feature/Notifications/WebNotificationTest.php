@@ -86,6 +86,27 @@ class WebNotificationTest extends TestCase
         $this->assertSame(0, $service->inbox($this->builder)->where('data->type', 'delivery_failed')->count());
     }
 
+    public function test_delivery_failure_exposes_the_real_reason_and_legacy_alert_shows_current_status(): void
+    {
+        CreditWallet::where('client_id', $this->builder->id)->update(['balance' => 0]);
+        $lead = $this->lead();
+        $this->assertFalse(app(LeadDistributionService::class)->releaseDelivery($lead->id));
+        $notice = $this->admin->notifications()->where('data->type', 'delivery_failed')->firstOrFail();
+        $this->assertSame('lead', $notice->data['entity_type']);
+        $this->assertSame($lead->id, $notice->data['lead_id']);
+        $this->assertStringContainsString('Credit reservation failed', $notice->data['message']);
+        $this->assertSame($lead->fresh()->delivery_error, $notice->data['failure_reason']);
+        $legacy = DatabaseNotification::create(['id' => (string) \Illuminate\Support\Str::uuid(), 'type' => \App\Notifications\WebNotification::class,
+            'notifiable_type' => User::class, 'notifiable_id' => $this->builder->id, 'organization_id' => $this->org->id,
+            'data' => ['type' => 'delivery_failed', 'title' => 'Lead delivery failed', 'message' => 'Delivery of '.$lead->lead_code.' failed. Check the delivery queue and available credits.', 'entity_type' => 'campaign', 'entity_id' => $lead->campaign_id]]);
+        CreditWallet::where('client_id', $this->builder->id)->update(['balance' => 1100]);
+        $component = Livewire::actingAs($this->admin)->test(NotificationCenter::class)->call('inspect', $legacy->id)
+            ->assertSee('Current delivery status:')->assertSee('Credit reservation failed')->assertSee('1,100.00 credits');
+        $this->assertTrue(app(LeadDistributionService::class)->releaseDelivery($lead->id));
+        $component->call('$refresh')->assertSee('Current delivery status: Delivered')->assertSee('This is an earlier failure alert.');
+        $this->assertSame('delivery_failed', $legacy->fresh()->data['type']); // Preserve the historical record.
+    }
+
     public function test_notifications_roll_back_with_business_transaction(): void
     {
         try {

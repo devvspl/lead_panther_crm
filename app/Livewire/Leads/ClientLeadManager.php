@@ -34,6 +34,19 @@ class ClientLeadManager extends LeadKanban
 
     public function isClientContext(): bool { return true; }
 
+    public function pushSelectedToClient(): void
+    {
+        $this->validate(['selectedRows' => 'required|array|min:1', 'selectedRows.*' => 'integer|distinct']);
+        $this->assertSelectedLeads($this->selectedRows);
+        $this->dispatch('client-push-selected', organizationId: $this->clientOrganizationId, leadIds: $this->selectedRows)->to(ClientDeliveryCenter::class);
+    }
+
+    public function pushLeadToClient(int $id): void
+    {
+        $this->assertSelectedLeads([$id]);
+        $this->dispatch('client-push-selected', organizationId: $this->clientOrganizationId, leadIds: [$id])->to(ClientDeliveryCenter::class);
+    }
+
     protected function ownerIds()
     {
         return User::where('organization_id', $this->clientOrganizationId)->select('id');
@@ -122,6 +135,7 @@ class ClientLeadManager extends LeadKanban
     public function tableColumns(): array
     {
         return array_merge(parent::tableColumns(), [
+            ['key' => 'client_push', 'label' => 'Push to Client', 'type' => 'client_push'],
             ['key' => 'delivered_at', 'label' => 'Delivery', 'formatter' => fn ($value, $lead) => $lead->internal_processing_pending ? 'Internal processing' : ($lead->delivery_failed_at ? 'Failed' : ($lead->delivery_pending ? 'Pending' : ($value ? 'Delivered '.Carbon::parse($value)->format('d M Y H:i') : 'No delivery recorded')))],
             ['key' => 'internalProcessing.forwarded_at', 'label' => 'Client Handover', 'formatter' => fn ($value) => $value ? Carbon::parse($value)->format('d M Y H:i') : 'Not recorded'],
             ['key' => 'replacements', 'label' => 'Replacement', 'formatter' => fn ($value) => $value?->last()?->status ?? 'None'],
@@ -216,7 +230,7 @@ class ClientLeadManager extends LeadKanban
         DB::transaction(function () {
             foreach ($this->contextLeads()->whereIn('id', $this->selectedRows)->orderBy('id')->lockForUpdate()->get() as $lead) {
                 // Preserve financial references; deletion must not erase billing evidence.
-                if (CreditTransaction::where('lead_id', $lead->id)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['selectedRows' => 'Leads with credit transactions cannot be deleted.']);
+                if (CreditTransaction::where('lead_id', $lead->id)->exists() || \App\Models\LeadDeliveryItem::where('lead_id', $lead->id)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['selectedRows' => 'Leads with credit transactions or transfer history cannot be deleted.']);
                 AuditLog::create(['user_id' => auth()->id(), 'action' => 'lead.deleted', 'subject_type' => Lead::class, 'subject_id' => $lead->id, 'from_value' => json_encode($lead->getAttributes()), 'created_at' => now()]);
                 $lead->delete();
             }

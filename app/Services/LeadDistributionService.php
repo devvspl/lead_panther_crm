@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 class LeadDistributionService
 {
     use \App\Services\Concerns\ProcessesInternalLeads;
+    use \App\Services\Concerns\ProcessesClientDelivery;
     public function effectiveDeliveryConfig(\App\Models\Campaign $campaign, ?Project $project = null): array
     {
         $project ??= Project::withoutGlobalScopes()->findOrFail($campaign->project_id);
@@ -55,6 +56,14 @@ class LeadDistributionService
         $organization = User::find($lead->client_id)?->organization;
         if (! $internalHandover && $organization?->internal_processing_enabled) {
             $lead->internal_processing_pending = true;
+            $lead->delivery_pending = true;
+            $lead->delivery_at = null;
+            $lead->assigned_to = null;
+            return;
+        }
+        if (!$internalHandover && !$lead->exists && $organization && ($plan = \App\Models\LeadDeliveryPlan::where('organization_id', $organization->id)->first())) {
+            // New intake must not bypass this organization's configured batch/manual schedule.
+            $lead->delivery_plan_id = $plan->id;
             $lead->delivery_pending = true;
             $lead->delivery_at = null;
             $lead->assigned_to = null;
@@ -100,14 +109,15 @@ class LeadDistributionService
         $lead->delivery_pending = true;
     }
 
-    public function releaseDelivery(int $leadId): bool
+    public function releaseDelivery(int $leadId, ?int $deliveryRunId = null): bool
     {
         try {
-            return DB::transaction(function () use ($leadId) {
+            return DB::transaction(function () use ($leadId, $deliveryRunId) {
                 $candidate = Lead::withoutGlobalScopes()->find($leadId);
                 $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
                 $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
                 $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
+                if ($lead && !$this->plannedReleaseAllowed($lead, $deliveryRunId)) return false;
                 if ($lead?->internal_processing_pending) {
                     $processing = \App\Models\InternalLeadProcessing::where('lead_id', $lead->id)->lockForUpdate()->first();
                     if (! $processing?->handover_requested_at || $processing->forwarded_at) return false;

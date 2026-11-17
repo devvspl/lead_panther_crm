@@ -1,0 +1,285 @@
+<?php
+namespace App\Services\Concerns;
+
+use App\Models\{AuditLog, Campaign, CreditTransaction, Lead, LeadDeliveryPlan, LeadDeliveryRun, LeadDeliveryItem, Organization, Project, User};
+use Carbon\Carbon;
+use Illuminate\Support\Facades\{DB, Validator};
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+trait ProcessesClientDelivery
+{
+    public const DELIVERY_FREQUENCIES = ['immediate', '15_minutes', '30_minutes', 'hourly', 'daily', 'weekly', 'manual'];
+
+    protected function deliveryAdmin(User $actor): void
+    {
+        abort_unless($actor->status === 'active' && $actor->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
+    public function clientDeliveryRecipients()
+    {
+        $roles = ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client', 'Broker', 'broker', 'Channel Partner', 'channel-partner'];
+        return User::where('status', 'active')->whereHas('organization', fn ($q) => $q->where('status', 'active'))
+            ->where(fn ($q) => $q->whereHas('roles', fn ($r) => $r->whereIn('name', $roles))
+                ->orWhereIn('id', \App\Models\Client::whereHas('roles', fn ($r) => $r->whereIn('name', $roles))->select('id')));
+    }
+
+    protected function deliveryAudit(string $action, $record, array $before, array $after, ?int $actorId): void
+    {
+        AuditLog::create(['user_id' => $actorId, 'action' => $action, 'subject_type' => get_class($record), 'subject_id' => $record->id,
+            'from_value' => json_encode($before), 'to_value' => json_encode($after), 'created_at' => now()]);
+    }
+
+    public function saveClientDeliveryPlan(Organization $source, array $input, User $actor): LeadDeliveryPlan
+    {
+        $this->deliveryAdmin($actor);
+        $data = Validator::make($input, [
+            'client_id' => 'required|integer|exists:users,id', 'project_id' => 'required|integer|exists:projects,id', 'campaign_id' => 'required|integer|exists:campaigns,id',
+            'frequency' => ['required', Rule::in(self::DELIVERY_FREQUENCIES)],
+            'quantity_mode' => ['required', Rule::in(['fixed', 'all'])], 'quantity' => 'required_if:quantity_mode,fixed|nullable|integer|min:1|max:1000000',
+            'max_cycle' => 'nullable|integer|min:1|max:1000000', 'daily_enabled' => 'required|boolean', 'daily_limit' => 'required_if:daily_enabled,true|nullable|integer|min:1|max:1000000',
+            'automatic' => 'required|boolean', 'timezone' => 'required|timezone', 'start_date' => 'nullable|date_format:Y-m-d', 'end_date' => 'nullable|date_format:Y-m-d|after_or_equal:start_date',
+            'window_start' => 'required|date_format:H:i', 'window_end' => 'required|date_format:H:i|after:window_start',
+            'daily_time' => 'required|date_format:H:i', 'weekly_day' => 'required|integer|min:0|max:6',
+            'working_days' => 'required|array|min:1', 'working_days.*' => 'integer|min:0|max:6|distinct',
+            'confirmed_send_all' => 'accepted_if:quantity_mode,all', 'confirmed_unlimited' => 'accepted_if:daily_enabled,false',
+        ])->validate();
+        $owner = User::with('organization')->findOrFail($data['client_id']);
+        if (!$this->clientDeliveryRecipients()->whereKey($owner->id)->exists()) {
+            throw ValidationException::withMessages(['client_id' => 'Choose an active billing client in an active organization.']);
+        }
+        $project = Project::withoutGlobalScopes()->where('client_id', $owner->id)->findOrFail($data['project_id']);
+        Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->findOrFail($data['campaign_id']);
+        if (in_array($data['frequency'], ['daily', 'weekly']) && ($data['daily_time'] < $data['window_start'] || $data['daily_time'] > $data['window_end'])) throw ValidationException::withMessages(['daily_time' => 'The scheduled time must be inside the delivery window.']);
+        if ($data['frequency'] === 'weekly' && !in_array((int) $data['weekly_day'], array_map('intval', $data['working_days']))) throw ValidationException::withMessages(['weekly_day' => 'The weekly day must also be a working day.']);
+        unset($data['client_id'], $data['project_id'], $data['campaign_id'], $data['confirmed_send_all'], $data['confirmed_unlimited']);
+        return DB::transaction(function () use ($source, $input, $data, $actor) {
+            Organization::whereKey($source->id)->lockForUpdate()->firstOrFail();
+            $plan = LeadDeliveryPlan::firstOrNew(['organization_id' => $source->id]);
+            $before = $plan->exists ? $plan->getAttributes() : [];
+            $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
+            if (!$plan->exists) $plan->state = 'active';
+            $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, now()) : null;
+            $plan->save();
+            $this->deliveryAudit('delivery.plan_configured', $plan, $before, $plan->getAttributes(), $actor->id);
+            return $plan;
+        }, 3);
+    }
+
+    /** Returns the next permitted calendar slot; application timestamps remain in the application timezone. */
+    public function nextClientDeliveryAt(LeadDeliveryPlan $plan, Carbon $after): ?Carbon
+    {
+        $s = $plan->settings;
+        if ($s['frequency'] === 'manual') return null;
+        $local = $after->copy()->setTimezone($s['timezone']);
+        if (!empty($s['start_date']) && $local->toDateString() < $s['start_date']) $local = Carbon::parse($s['start_date'], $s['timezone'])->startOfDay();
+        for ($day = 0; $day <= 370; $day++) {
+            $date = $local->copy()->startOfDay()->addDays($day);
+            if (!empty($s['end_date']) && $date->toDateString() > $s['end_date']) return null;
+            if (!in_array($date->dayOfWeek, array_map('intval', $s['working_days']))) continue;
+            if ($s['frequency'] === 'weekly' && $date->dayOfWeek !== (int) $s['weekly_day']) continue;
+            $start = $date->copy()->setTimeFromTimeString($s['window_start']);
+            $end = $date->copy()->setTimeFromTimeString($s['window_end']);
+            $at = in_array($s['frequency'], ['daily', 'weekly']) ? $date->copy()->setTimeFromTimeString($s['daily_time']) : $start->max($local);
+            if ($at->lt($local) || $at->lt($start) || $at->gt($end)) continue;
+            return $at->setTimezone(config('app.timezone'));
+        }
+        return null;
+    }
+
+    protected function insideClientDeliveryWindow(LeadDeliveryPlan $plan): bool
+    {
+        $s = $plan->settings;
+        $now = now()->setTimezone($s['timezone']);
+        return (empty($s['start_date']) || $now->toDateString() >= $s['start_date']) && (empty($s['end_date']) || $now->toDateString() <= $s['end_date'])
+            && in_array($now->dayOfWeek, array_map('intval', $s['working_days'])) && $now->format('H:i') >= $s['window_start'] && $now->format('H:i') <= $s['window_end'];
+    }
+
+    public function eligibleClientDeliveryLeads(int $sourceOrganizationId)
+    {
+        return Lead::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $sourceOrganizationId)->select('id'))
+            ->whereNull('delivered_at')->where('internal_processing_pending', false)
+            ->where(fn ($q) => $q->whereNull('delivery_plan_id')->orWhere(fn ($waiting) => $waiting->whereNull('delivery_consent_at')->whereIn('delivery_plan_id', LeadDeliveryPlan::where('organization_id', $sourceOrganizationId)->select('id'))))
+            ->whereNotIn('id', CreditTransaction::withoutGlobalScopes()->whereNotNull('lead_id')->select('lead_id'))
+            ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
+            ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']);
+    }
+
+    public function captureClientDeliveryLead(Lead $lead): void
+    {
+        $plan = LeadDeliveryPlan::findOrFail($lead->delivery_plan_id);
+        $item = LeadDeliveryItem::firstOrCreate(['lead_id' => $lead->id], [
+            'plan_id' => $plan->id, 'source_client_id' => $lead->client_id, 'source_campaign_id' => $lead->campaign_id,
+            'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $plan->campaign_id,
+            'requested_by' => $plan->created_by, 'status' => 'pending',
+        ]);
+        if ($item->wasRecentlyCreated) $this->deliveryAudit('delivery.intake_captured', $item, [], $item->getAttributes(), $plan->created_by);
+        if ($lead->delivery_consent_at && $plan->state === 'active' && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') {
+            DB::afterCommit(function () use ($plan) {
+                if ($run = $this->startClientDeliveryCycle($plan->id)) \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id);
+            });
+        }
+    }
+
+    public function enqueueClientLeads(LeadDeliveryPlan $plan, array $ids, bool $consentConfirmed, User $actor): array
+    {
+        $this->deliveryAdmin($actor);
+        Validator::make(['ids' => $ids, 'consent' => $consentConfirmed], ['ids' => 'required|array|min:1', 'ids.*' => 'required|integer|distinct', 'consent' => 'accepted'])->validate();
+        return DB::transaction(function () use ($plan, $ids, $actor) {
+            $plan = LeadDeliveryPlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
+            $sourceIds = User::where('organization_id', $plan->organization_id)->select('id');
+            $owned = Lead::withoutGlobalScopes()->whereIn('id', $ids)->whereIn('client_id', $sourceIds)->count();
+            abort_unless($owned === count($ids), 403);
+            $eligibleIds = $this->eligibleClientDeliveryLeads($plan->organization_id)->whereIn('id', $ids)->pluck('id');
+            $count = 0;
+            foreach (Lead::withoutGlobalScopes()->whereIn('id', $eligibleIds)->orderBy('id')->lockForUpdate()->get() as $lead) {
+                if ($item = LeadDeliveryItem::where('lead_id', $lead->id)->first()) {
+                    if ($item->plan_id === $plan->id && $item->status === 'pending' && !$lead->delivery_consent_at) {
+                        $lead->update(['delivery_consent_at' => now(), 'delivery_consent_by' => $actor->id]);
+                        $this->deliveryAudit('delivery.consent_confirmed', $item, [], ['lead_id' => $lead->id, 'confirmed_by' => $actor->id], $actor->id);
+                        $count++;
+                    }
+                    continue;
+                }
+                if (!$this->eligibleClientDeliveryLeads($plan->organization_id)->whereKey($lead->id)->exists() || LeadDeliveryItem::where('lead_id', $lead->id)->exists() || CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->exists()) continue;
+                $item = LeadDeliveryItem::create(['plan_id' => $plan->id, 'lead_id' => $lead->id, 'source_client_id' => $lead->client_id, 'source_campaign_id' => $lead->campaign_id,
+                    'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $plan->campaign_id, 'requested_by' => $actor->id, 'status' => 'pending']);
+                $lead->update(['delivery_plan_id' => $plan->id, 'delivery_pending' => true, 'delivery_consent_at' => now(), 'delivery_consent_by' => $actor->id]);
+                $this->deliveryAudit('delivery.enqueued', $item, [], $item->getAttributes(), $actor->id);
+                $count++;
+            }
+            return ['queued' => $count, 'skipped' => count($ids) - $count];
+        }, 3);
+    }
+
+    public function remainingClientDeliveryCapacity(LeadDeliveryPlan $plan): ?int
+    {
+        if (!$plan->settings['daily_enabled']) return null;
+        [$start, $end] = $this->deliveryDay(now(), $plan->settings['timezone']);
+        $sent = $plan->items()->where('sent_at', '>=', $start)->where('sent_at', '<', $end)->count();
+        return max(0, (int) $plan->settings['daily_limit'] - $sent);
+    }
+
+    public function startClientDeliveryCycle(int $planId, bool $manual = false): ?LeadDeliveryRun
+    {
+        return DB::transaction(function () use ($planId, $manual) {
+            $plan = LeadDeliveryPlan::whereKey($planId)->lockForUpdate()->firstOrFail();
+            if ($plan->state !== 'active' || !$this->insideClientDeliveryWindow($plan)) return null;
+            if (!$manual && (!$plan->settings['automatic'] || !$plan->next_run_at || $plan->next_run_at->isFuture())) return null;
+            if ($existing = $plan->runs()->whereIn('status', ['queued', 'running', 'paused'])->first()) return $existing;
+            $s = $plan->settings;
+            $capacity = $this->remainingClientDeliveryCapacity($plan);
+            $pending = $plan->items()->where('status', 'pending')->whereHas('lead', fn ($q) => $q->whereNotNull('delivery_consent_at'));
+            $quantity = $s['quantity_mode'] === 'all' ? (clone $pending)->count() : min((int) $s['quantity'], (int) ($s['max_cycle'] ?: $s['quantity']));
+            if ($capacity !== null) $quantity = min($quantity, $capacity);
+            if ($quantity < 1) { $this->advanceClientDelivery($plan, $capacity === 0); return null; }
+            $ids = (clone $pending)->orderBy('id')->limit($quantity)->pluck('id');
+            if ($ids->isEmpty()) { $this->advanceClientDelivery($plan); return null; }
+            $run = $plan->runs()->create(['status' => 'queued', 'settings' => $s, 'total' => $ids->count()]);
+            $plan->items()->whereIn('id', $ids)->update(['run_id' => $run->id, 'status' => 'queued', 'failure_reason' => null]);
+            $this->deliveryAudit('delivery.cycle_started', $run, [], ['total' => $run->total, 'manual' => $manual], $plan->created_by);
+            return $run;
+        }, 3);
+    }
+
+    protected function advanceClientDelivery(LeadDeliveryPlan $plan, bool $dailyExhausted = false): void
+    {
+        $s = $plan->settings;
+        $minutes = match ($s['frequency']) { '15_minutes' => 15, '30_minutes' => 30, 'hourly' => 60, default => 1 };
+        $after = now()->addMinutes($minutes);
+        if ($dailyExhausted) $after = now()->setTimezone($s['timezone'])->addDay()->startOfDay()->setTimezone(config('app.timezone'));
+        $plan->update(['next_run_at' => $s['automatic'] ? $this->nextClientDeliveryAt($plan, $after) : null]);
+    }
+
+    /** Called in the existing release transaction, under the plan lock held by processClientDeliveryRun. */
+    protected function plannedReleaseAllowed(Lead $lead, ?int $runId): bool
+    {
+        if (!$lead->delivery_plan_id) return true;
+        if (!$runId) return false;
+        $run = LeadDeliveryRun::find($runId);
+        $plan = LeadDeliveryPlan::find($lead->delivery_plan_id);
+        return $run && $plan && $run->plan_id === $plan->id && in_array($run->status, ['queued', 'running']) && $plan->state === 'active'
+            && $this->insideClientDeliveryWindow($plan) && $this->remainingClientDeliveryCapacity($plan) !== 0
+            && $lead->delivery_consent_at && $plan->items()->where('run_id', $runId)->where('lead_id', $lead->id)->where('status', 'queued')->exists();
+    }
+
+    public function processClientDeliveryRun(int $runId, int $chunkSize = 100): bool
+    {
+        for ($i = 0; $i < $chunkSize; $i++) {
+            $progressed = DB::transaction(function () use ($runId) {
+                $ref = LeadDeliveryRun::findOrFail($runId);
+                $plan = LeadDeliveryPlan::whereKey($ref->plan_id)->lockForUpdate()->firstOrFail();
+                $run = LeadDeliveryRun::whereKey($runId)->lockForUpdate()->firstOrFail();
+                if ($plan->state !== 'active' || !in_array($run->status, ['queued', 'running'])) return false;
+                if (!$this->insideClientDeliveryWindow($plan) || $this->remainingClientDeliveryCapacity($plan) === 0) {
+                    $run->items()->where('status', 'queued')->update(['status' => 'pending', 'run_id' => null]);
+                    $run->update(['status' => 'completed', 'finished_at' => now()]);
+                    $this->advanceClientDelivery($plan, $this->remainingClientDeliveryCapacity($plan) === 0);
+                    return false;
+                }
+                $item = $run->items()->where('status', 'queued')->orderBy('id')->lockForUpdate()->first();
+                if (!$item) {
+                    $run->update(['status' => 'completed', 'finished_at' => now()]);
+                    $this->advanceClientDelivery($plan);
+                    return false;
+                }
+                $run->update(['status' => 'running', 'started_at' => $run->started_at ?: now()]);
+                $client = User::with('organization')->whereKey($item->client_id)->lockForUpdate()->first();
+                $project = Project::withoutGlobalScopes()->whereKey($item->project_id)->lockForUpdate()->first();
+                $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->first();
+                $reason = null;
+                if (!$client || !$this->clientDeliveryRecipients()->whereKey($item->client_id)->exists()) $reason = 'Destination client is ineligible or its organization is inactive.';
+                elseif (!$project || $project->client_id !== $client->id || !Campaign::withoutGlobalScopes()->whereKey($item->campaign_id)->where('project_id', $project->id)->exists()) $reason = 'Destination project or campaign mapping is invalid.';
+                elseif (!$lead || !$lead->delivery_consent_at || $lead->internal_processing_pending || $lead->delivered_at) $reason = 'Lead is already delivered, lacks consent, or awaits internal verification.';
+                elseif (in_array($lead->status, ['duplicate', 'rejected', 'invalid', 'lost', 'closed_won', 'replaced'])) $reason = 'Lead is no longer eligible.';
+                elseif (Lead::withoutGlobalScopes()->where('client_id', $client->id)->whereNotNull('delivered_at')->where('id', '!=', $lead->id)->where(function ($q) use ($lead) {
+                    $digits = preg_replace('/\D/', '', $lead->mobile ?? '');
+                    $q->whereIn('mobile', [$lead->mobile, $digits, '+'.$digits, '+91'.substr($digits, -10), substr($digits, -10)]);
+                    if ($lead->email) $q->orWhere('email', $lead->email);
+                })->exists()) $reason = 'A matching customer lead was already delivered to this client.';
+                if (!$reason) {
+                    $lead->update(['client_id' => $item->client_id, 'campaign_id' => $item->campaign_id, 'assigned_to' => null, 'delivery_at' => now(),
+                        'delivery_config' => ['limit' => 0, 'interval' => 0, 'timezone' => $plan->settings['timezone']], 'delivery_failed_at' => null, 'delivery_error' => null]);
+                    if (!$this->releaseDelivery($lead->id, $run->id)) $reason = $lead->fresh()->delivery_error ?: 'Delivery held: check active project/campaign, eligibility and available credits.';
+                }
+                $item->update(['status' => $reason ? 'failed' : 'sent', 'failure_reason' => $reason, 'attempts' => $item->attempts + 1, 'sent_at' => $reason ? null : now()]);
+                $item->attemptHistory()->create(['run_id' => $run->id, 'status' => $item->status, 'failure_reason' => $reason]);
+                $this->deliveryAudit('delivery.'.$item->status, $item, [], ['lead_id' => $item->lead_id, 'run_id' => $run->id, 'reason' => $reason], $item->requested_by);
+                if (!$reason) $this->distribute($lead->fresh());
+                return true;
+            }, 3);
+            if (!$progressed) return false;
+        }
+        return LeadDeliveryRun::whereKey($runId)->whereIn('status', ['queued', 'running'])->exists();
+    }
+
+    public function controlClientDelivery(LeadDeliveryPlan $plan, string $action, User $actor): void
+    {
+        $this->deliveryAdmin($actor);
+        abort_unless(in_array($action, ['pause', 'resume', 'stop']), 422);
+        DB::transaction(function () use ($plan, $action, $actor) {
+            $plan = LeadDeliveryPlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
+            $before = $plan->state;
+            $plan->update(['state' => match ($action) { 'pause' => 'paused', 'stop' => 'stopped', default => 'active' }]);
+            foreach ($plan->runs()->whereIn('status', ['queued', 'running', 'paused'])->get() as $run) {
+                if ($action === 'stop') $run->items()->where('status', 'queued')->update(['status' => 'pending', 'run_id' => null]);
+                $run->update(['status' => match ($action) { 'pause' => 'paused', 'stop' => 'stopped', default => 'queued' }]);
+                if ($action === 'resume') \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id)->afterCommit();
+            }
+            $plan->update(['next_run_at' => $action === 'resume' && $plan->settings['automatic'] ? $this->nextClientDeliveryAt($plan, now()) : null]);
+            $this->deliveryAudit('delivery.'.$action, $plan, ['state' => $before], ['state' => $plan->state], $actor->id);
+        }, 3);
+    }
+
+    public function retryClientDelivery(LeadDeliveryItem $item, User $actor): void
+    {
+        $this->deliveryAdmin($actor);
+        DB::transaction(function () use ($item, $actor) {
+            LeadDeliveryPlan::whereKey($item->plan_id)->lockForUpdate()->firstOrFail();
+            $item = LeadDeliveryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            if ($item->status !== 'failed') throw ValidationException::withMessages(['delivery' => 'Only failed transfers can be retried.']);
+            $item->update(['status' => 'pending', 'run_id' => null, 'failure_reason' => null]);
+            $this->deliveryAudit('delivery.retry_requested', $item, ['status' => 'failed'], ['status' => 'pending'], $actor->id);
+        });
+    }
+}

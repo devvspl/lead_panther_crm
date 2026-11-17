@@ -288,6 +288,11 @@
                                     <td @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['cellClass'] ?? '' }}">
                                         @if(isset(${'cell_' . $colKey}))
                                             {{ ${'cell_' . $colKey}($row) }}
+                                        @elseif($type === 'client_push')
+                                            <button type="button" wire:click="pushLeadToClient({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
+                                        @elseif($type === 'delivery_item_actions')
+                                            <button type="button" wire:click="inspectAttempts({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">History</button>
+                                            @if($row->status === 'failed')<button type="button" wire:click="retry({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Retry</button>@elseif($row->status === 'sent')<button type="button" wire:click="accept({{ $row->id }})" wire:confirm="Record that the client has accepted this lead?" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark Accepted</button>@else<span class="text-xs text-muted">—</span>@endif
                                         @elseif($type === 'lead_id')
                                             <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
                                                 class="font-mono font-bold text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"
@@ -759,6 +764,10 @@
                                 <div>
                                     @if(isset(${'cell_' . $colKey}))
                                         {{ ${'cell_' . $colKey} }}
+                                    @elseif($type === 'client_push')
+                                        <button type="button" wire:click="pushLeadToClient({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
+                                    @elseif($type === 'delivery_item_actions')
+                                        <div class="flex flex-wrap gap-2"><button type="button" wire:click="inspectAttempts({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">History</button>@if($row->status === 'failed')<button type="button" wire:click="retry({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Retry</button>@elseif($row->status === 'sent')<button type="button" wire:click="accept({{ $row->id }})" wire:confirm="Record client acceptance?" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark Accepted</button>@endif</div>
                                     @elseif($type === 'lead_id')
                                         <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ $rowId }} })"
                                             class="font-mono font-bold text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"

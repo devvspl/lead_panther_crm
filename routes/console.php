@@ -50,6 +50,17 @@ Schedule::call(function () {
 
 Schedule::command('credits:check-low-balances')->hourly();
 
+// Recover queued/running cycles as well as starting plans due now. Per-plan DB locks prevent duplicate cycles.
+Schedule::call(function () {
+    $service = app(\App\Services\LeadDistributionService::class);
+    \App\Models\LeadDeliveryPlan::where('state', 'active')->chunkById(100, function ($plans) use ($service) {
+        foreach ($plans as $plan) {
+            $run = $plan->runs()->whereIn('status', ['queued', 'running'])->first() ?? $service->startClientDeliveryCycle($plan->id);
+            if ($run) \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id);
+        }
+    });
+})->name('client-delivery-cycles')->everyMinute()->withoutOverlapping();
+
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
 Schedule::command('followups:check-due')->everyFifteenMinutes();
 Schedule::command('notifications:check-operational')->everyFiveMinutes()->withoutOverlapping();

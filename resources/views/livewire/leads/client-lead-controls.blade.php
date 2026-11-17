@@ -3,6 +3,8 @@
         <div><h2 class="text-sm font-bold text-ink">Client Leads Management</h2><p class="text-xs text-muted mt-1">Includes delivery queues, internal processing and client handovers for this organization.</p></div>
         <div class="flex items-center gap-2"><button type="button" wire:click="resetFilters" class="px-3 h-8 rounded-lg border border-border text-xs font-semibold text-ink">Reset Filters</button><button type="button" wire:click="$toggle('showClientImport')" class="px-3 h-8 rounded-lg border border-border text-xs font-semibold text-ink">Import Excel / CSV</button></div>
     </div>
+    <div class="flex flex-wrap items-center gap-2"><button type="button" wire:click="pushSelectedToClient" class="h-8 px-3 bg-ink text-white rounded-lg text-xs font-semibold">Push to Client ({{ count($selectedRows) }} selected)</button><span class="text-xs text-muted">Select one or more table rows, or use a lead's Push button.</span>@error('selectedRows')<span class="text-xs text-red-600">{{ $message }}</span>@enderror</div>
+    <livewire:leads.client-delivery-center :organization-id="$this->clientOrganizationId" :key="'delivery-center-'.$this->clientOrganizationId" />
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <div><label class="block text-xs text-muted mb-1">Project</label><x-ui.themed-select wire:model.live="project" :options="$allProjects->pluck('name', 'id')->all()" placeholder="All Projects" class="w-full" /></div>
         <div><label class="block text-xs text-muted mb-1">Campaign</label><x-ui.themed-select wire:model.live="campaign" :options="$allCampaigns->when($project, fn ($rows) => $rows->where('project_id', $project))->pluck('name', 'id')->all()" placeholder="All Campaigns" class="w-full" /></div>

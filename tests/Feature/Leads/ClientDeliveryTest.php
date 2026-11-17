@@ -1,0 +1,180 @@
+<?php
+namespace Tests\Feature\Leads;
+
+use App\Livewire\Leads\ClientDeliveryCenter;
+use App\Models\{Campaign, Client, CreditTransaction, CreditWallet, Lead, LeadDeliveryItem, LeadDeliveryPlan, LeadSource, Organization, Project, User};
+use App\Services\LeadDistributionService;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
+use Tests\TestCase;
+
+class ClientDeliveryTest extends TestCase
+{
+    use RefreshDatabase;
+    private User $admin;
+    private Client $source;
+    private Client $destination;
+    private Project $project;
+    private Campaign $campaign;
+    private Campaign $sourceCampaign;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-17 10:00:00', 'UTC'));
+        $this->seed(RoleSeeder::class);
+        $this->admin = User::factory()->create(['status' => 'active']); $this->admin->assignRole('Super Admin');
+        $this->actingAs($this->admin);
+        $a = Organization::create(['name' => 'Source client', 'status' => 'active', 'auto_assign_enabled' => false]);
+        $b = Organization::create(['name' => 'Destination client', 'status' => 'active', 'auto_assign_enabled' => false]);
+        $this->source = Client::create(['name' => 'Source owner', 'organization_id' => $a->id, 'status' => 'active']);
+        $this->destination = Client::create(['name' => 'Destination owner', 'organization_id' => $b->id, 'status' => 'active']);
+        User::findOrFail($this->source->id)->assignRole('Builder/Developer');
+        User::findOrFail($this->destination->id)->assignRole('Builder/Developer');
+        $source = LeadSource::create(['name' => 'Actual campaign source']);
+        $this->project = Project::create(['client_id' => $this->destination->id, 'name' => 'Destination project', 'status' => 'active', 'delivery_enabled' => true]);
+        $this->campaign = Campaign::create(['project_id' => $this->project->id, 'name' => 'Destination campaign', 'lead_source_id' => $source->id, 'status' => 'active']);
+        $sourceProject = Project::create(['client_id' => $this->source->id, 'name' => 'Source project', 'status' => 'active']);
+        $this->sourceCampaign = Campaign::create(['project_id' => $sourceProject->id, 'name' => 'Source campaign', 'lead_source_id' => $source->id, 'status' => 'active']);
+        CreditWallet::create(['client_id' => $this->destination->id, 'balance' => 10000, 'opening_balance' => 10000]);
+    }
+
+    private function service(): LeadDistributionService { return app(LeadDistributionService::class); }
+    private function settings(array $overrides = []): array
+    {
+        return array_merge(['client_id' => $this->destination->id, 'project_id' => $this->project->id, 'campaign_id' => $this->campaign->id,
+            'frequency' => '30_minutes', 'quantity_mode' => 'fixed', 'quantity' => 2, 'max_cycle' => null, 'daily_enabled' => true, 'daily_limit' => 5,
+            'automatic' => true, 'timezone' => 'UTC', 'start_date' => null, 'end_date' => null, 'window_start' => '00:00', 'window_end' => '23:59',
+            'daily_time' => '10:00', 'weekly_day' => 2, 'working_days' => [0,1,2,3,4,5,6], 'confirmed_send_all' => true, 'confirmed_unlimited' => true], $overrides);
+    }
+    private function plan(array $overrides = []): LeadDeliveryPlan
+    {
+        return $this->service()->saveClientDeliveryPlan($this->source->organization, $this->settings($overrides), $this->admin);
+    }
+    private function leads(int $count): array
+    {
+        $ids = [];
+        for ($n = 0; $n < $count; $n++) $ids[] = Lead::create(['client_id' => $this->source->id, 'campaign_id' => $this->sourceCampaign->id, 'lead_source_id' => $this->sourceCampaign->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(), 'name' => 'Customer '.Lead::withoutGlobalScopes()->count(), 'mobile' => '9'.str_pad((string) (Lead::withoutGlobalScopes()->count() + 1), 9, '0', STR_PAD_LEFT), 'status' => 'new', 'current_stage' => 'new'])->id;
+        return $ids;
+    }
+    private function enroll(LeadDeliveryPlan $plan, int $count): array
+    {
+        $ids = $this->leads($count);
+        $this->service()->enqueueClientLeads($plan, $ids, true, $this->admin);
+        return $ids;
+    }
+    private function cycle(LeadDeliveryPlan $plan, bool $manual = true)
+    {
+        $run = $this->service()->startClientDeliveryCycle($plan->id, $manual);
+        if ($run) $this->service()->processClientDeliveryRun($run->id);
+        return $run?->fresh();
+    }
+
+    public function test_manual_bulk_cycles_daily_limit_and_duplicate_protection(): void
+    {
+        $plan = $this->plan(); $ids = $this->enroll($plan, 7);
+        $this->assertFalse($this->service()->releaseDelivery($ids[0]));
+        $this->assertSame(['queued' => 0, 'skipped' => 7], $this->service()->enqueueClientLeads($plan, $ids, true, $this->admin));
+        $this->assertSame('completed', $this->cycle($plan)->status);
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(30)->minutes(); $this->cycle($plan, false);
+        $this->assertSame(4, $plan->items()->where('status', 'sent')->count());
+        $this->travel(30)->minutes(); $this->cycle($plan, false);
+        $this->assertSame(5, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(2, $plan->items()->where('status', 'pending')->count());
+        $this->assertSame(0, $this->service()->remainingClientDeliveryCapacity($plan));
+        $this->assertSame(5, CreditTransaction::where('client_id', $this->destination->id)->count());
+        $this->travel(1)->days(); $this->cycle($plan);
+        $this->assertSame(7, $plan->items()->where('status', 'sent')->count());
+    }
+
+    public function test_send_all_bypasses_quantity_and_max_cycle_but_respects_separate_daily_limit(): void
+    {
+        $plan = $this->plan(['quantity_mode' => 'all', 'quantity' => 1, 'max_cycle' => 1, 'daily_enabled' => false]);
+        $this->enroll($plan, 6); $run = $this->cycle($plan);
+        $this->assertSame(6, $run->total);
+        $this->assertSame(6, $plan->items()->where('status', 'sent')->count());
+        $this->assertNull($this->service()->remainingClientDeliveryCapacity($plan));
+        $plan = $this->plan(['quantity_mode' => 'all', 'max_cycle' => 1, 'daily_limit' => 8]);
+        $this->enroll($plan, 4); $run = $this->cycle($plan);
+        $this->assertSame(2, $run->total);
+        $this->assertSame(2, $plan->items()->where('status', 'pending')->count());
+    }
+
+    public function test_pause_resume_stop_and_changes_preserve_unsent_leads(): void
+    {
+        Queue::fake();
+        $plan = $this->plan(['quantity_mode' => 'all', 'daily_enabled' => false]); $this->enroll($plan, 5);
+        $run = $this->service()->startClientDeliveryCycle($plan->id, true);
+        $this->assertTrue($this->service()->processClientDeliveryRun($run->id, 1));
+        $this->service()->controlClientDelivery($plan, 'pause', $this->admin);
+        $this->assertFalse($this->service()->processClientDeliveryRun($run->id));
+        $this->assertSame(1, $plan->items()->where('status', 'sent')->count());
+        $this->service()->controlClientDelivery($plan, 'resume', $this->admin);
+        $this->service()->processClientDeliveryRun($run->id, 1);
+        $this->service()->controlClientDelivery($plan, 'stop', $this->admin);
+        $this->assertSame(3, $plan->items()->where('status', 'pending')->count());
+        $plan = $this->plan(['frequency' => 'hourly', 'quantity' => 1]);
+        $this->assertSame(3, $plan->items()->where('status', 'pending')->count());
+        $this->service()->controlClientDelivery($plan, 'resume', $this->admin); $this->cycle($plan);
+        $this->assertSame(3, $plan->items()->where('status', 'sent')->count());
+    }
+
+    public function test_failure_retry_consent_and_client_visibility(): void
+    {
+        $plan = $this->plan(['frequency' => 'manual', 'automatic' => false]); $ids = $this->enroll($plan, 1);
+        CreditWallet::where('client_id', $this->destination->id)->update(['balance' => 0]);
+        $this->cycle($plan);
+        $item = $plan->items()->firstOrFail();
+        $this->assertSame('failed', $item->status); $this->assertNotEmpty($item->failure_reason);
+        $this->assertSame(5, $this->service()->remainingClientDeliveryCapacity($plan));
+        $this->actingAs(User::findOrFail($this->destination->id)); $this->assertFalse(Lead::panelQuery()->whereKey($ids[0])->exists());
+        $this->actingAs($this->admin);
+        CreditWallet::where('client_id', $this->destination->id)->update(['balance' => 1000]);
+        $this->service()->retryClientDelivery($item, $this->admin); $this->cycle($plan);
+        $this->assertSame('sent', $item->fresh()->status);
+        $this->assertSame(2, $item->attemptHistory()->count());
+        $this->actingAs(User::findOrFail($this->destination->id)); $this->assertTrue(Lead::panelQuery()->whereKey($ids[0])->exists());
+    }
+
+    public function test_calendar_daily_weekly_dates_and_working_hours(): void
+    {
+        $plan = $this->plan(['frequency' => 'daily', 'daily_time' => '11:00', 'window_start' => '09:00', 'window_end' => '17:00']);
+        $this->assertSame('2026-11-17 11:00', $plan->next_run_at->format('Y-m-d H:i'));
+        $this->enroll($plan, 1); $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(1)->hours(); $this->cycle($plan, false);
+        $this->assertSame('2026-11-18 11:00', $plan->fresh()->next_run_at->format('Y-m-d H:i'));
+        $plan = $this->plan(['frequency' => 'weekly', 'weekly_day' => 4, 'daily_time' => '12:00', 'timezone' => 'Asia/Kolkata']);
+        $this->assertSame(4, $plan->next_run_at->copy()->setTimezone('Asia/Kolkata')->dayOfWeek);
+        $plan = $this->plan(['start_date' => '2026-12-01', 'end_date' => '2026-12-02']);
+        $this->assertSame('2026-12-01', $plan->next_run_at->toDateString());
+        $this->assertNull($this->service()->nextClientDeliveryAt($plan, now()->addMonth()));
+    }
+
+    public function test_ui_history_export_acceptance_and_role_isolation(): void
+    {
+        $plan = $this->plan(); $this->enroll($plan, 1); $this->cycle($plan);
+        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->assertSee('Client Delivery')->assertSee('Destination owner');
+        $item = $plan->items()->first(); $component->call('inspectAttempts', $item->id)->assertSee('Actual attempt records')->call('accept', $item->id)->assertHasNoErrors();
+        $this->assertSame('accepted', $item->fresh()->status);
+        Excel::fake(); $component->set('historyStatus', 'accepted')->call('exportHistory');
+        Excel::assertDownloaded('client-delivery-history-'.$this->source->organization_id.'.xlsx', fn ($export) => $export->collection()->count() === 1);
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->destination->organization_id])->call('retry', $item->id)->assertNotFound();
+        $this->actingAs($this->destination); Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->assertForbidden();
+    }
+
+    public function test_opt_in_confirmations_and_consent_are_required(): void
+    {
+        try { $this->plan(['quantity_mode' => 'all', 'confirmed_send_all' => false]); $this->fail('Send All requires confirmation.'); } catch (ValidationException $e) { $this->assertArrayHasKey('confirmed_send_all', $e->errors()); }
+        try { $this->plan(['daily_enabled' => false, 'confirmed_unlimited' => false]); $this->fail('Unlimited requires confirmation.'); } catch (ValidationException $e) { $this->assertArrayHasKey('confirmed_unlimited', $e->errors()); }
+        $plan = $this->plan();
+        $this->expectException(ValidationException::class);
+        $this->service()->enqueueClientLeads($plan, $this->leads(1), false, $this->admin);
+    }
+}

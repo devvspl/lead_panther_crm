@@ -48,13 +48,20 @@ trait ProcessesClientDelivery
             'daily_time' => 'required|date_format:H:i', 'weekly_day' => 'required|integer|min:0|max:6',
             'working_days' => 'required|array|min:1', 'working_days.*' => 'integer|min:0|max:6|distinct',
             'confirmed_send_all' => 'accepted_if:quantity_mode,all', 'confirmed_unlimited' => 'accepted_if:daily_enabled,false',
+        ], [
+            'quantity.required_if' => 'Enter how many leads to send.',
+            'daily_limit.required_if' => 'Enter a daily limit, or turn the daily limit off.',
+        ], [
+            'client_id' => 'client', 'project_id' => 'project', 'campaign_id' => 'campaign', 'quantity' => 'lead quantity',
+            'daily_limit' => 'daily limit', 'window_start' => 'start time', 'window_end' => 'end time', 'daily_time' => 'scheduled time', 'working_days' => 'working days',
         ])->validate();
         $owner = User::with('organization')->findOrFail($data['client_id']);
         if (!$this->clientDeliveryRecipients()->whereKey($owner->id)->exists()) {
             throw ValidationException::withMessages(['client_id' => 'Choose an active billing client in an active organization.']);
         }
-        $project = Project::withoutGlobalScopes()->where('client_id', $owner->id)->findOrFail($data['project_id']);
-        Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->findOrFail($data['campaign_id']);
+        $project = Project::withoutGlobalScopes()->where('client_id', $owner->id)->find($data['project_id']);
+        if (!$project) throw ValidationException::withMessages(['project_id' => 'Choose a project belonging to this client.']);
+        if (!Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->whereKey($data['campaign_id'])->exists()) throw ValidationException::withMessages(['campaign_id' => 'Choose a campaign for this project.']);
         if (in_array($data['frequency'], ['daily', 'weekly']) && ($data['daily_time'] < $data['window_start'] || $data['daily_time'] > $data['window_end'])) throw ValidationException::withMessages(['daily_time' => 'The scheduled time must be inside the delivery window.']);
         if ($data['frequency'] === 'weekly' && !in_array((int) $data['weekly_day'], array_map('intval', $data['working_days']))) throw ValidationException::withMessages(['weekly_day' => 'The weekly day must also be a working day.']);
         unset($data['client_id'], $data['project_id'], $data['campaign_id'], $data['confirmed_send_all'], $data['confirmed_unlimited']);

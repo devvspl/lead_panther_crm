@@ -23,8 +23,8 @@
         <summary class="text-sm font-semibold text-ink cursor-pointer">Delivery History & Reports</summary>
         <div class="mt-4 space-y-3">
             <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                <div><label>From</label><x-text-input type="date" wire:model.live="historyFrom" class="w-full h-8 text-xs" /></div>
-                <div><label>To</label><x-text-input type="date" wire:model.live="historyTo" class="w-full h-8 text-xs" /></div>
+                <div><label>From</label><x-text-input variant="compact" type="date" wire:model.live="historyFrom" /></div>
+                <div><label>To</label><x-text-input variant="compact" type="date" wire:model.live="historyTo" /></div>
                 <div><label>Client</label><x-ui.themed-select wire:model.live="historyClient" :options="$historyClients->pluck('name','id')->all()" placeholder="All Clients" :searchable="true" /></div>
                 <div><label>Project</label><x-ui.themed-select wire:model.live="historyProject" :options="$historyProjects->pluck('name','id')->all()" placeholder="All Projects" :searchable="true" /></div>
                 <div><label>Campaign</label><x-ui.themed-select wire:model.live="historyCampaign" :options="$historyCampaigns->pluck('name','id')->all()" placeholder="All Campaigns" :searchable="true" /></div>
@@ -36,7 +36,7 @@
         </div>
     </details>
 
-    <x-ui.offcanvas wire:model="showConfiguration" name="client-delivery-configuration" title="Push Leads to Client" subtitle="Select the destination, delivery quantity and schedule. Unsent leads carry forward automatically." maxWidth="2xl">
+    <x-ui.offcanvas wire:model="showConfiguration" name="client-delivery-configuration" title="Push Leads to Client" subtitle="Choose where to send the leads and when." maxWidth="2xl">
         <div class="space-y-5 text-xs">
             @if($selectedLeadIds)<p class="rounded-lg border border-border bg-canvas p-3 font-semibold">{{ count($selectedLeadIds) }} lead(s) selected</p>@endif
             <div class="grid sm:grid-cols-3 gap-3">
@@ -47,28 +47,29 @@
             <div class="grid sm:grid-cols-2 gap-3">
                 <div><label>Delivery Frequency</label><x-ui.themed-select wire:model.live="settings.frequency" :options="['immediate'=>'Immediately','15_minutes'=>'Every 15 minutes','30_minutes'=>'Every 30 minutes','hourly'=>'Hourly','daily'=>'Daily','weekly'=>'Weekly','manual'=>'Manual Only']" :searchable="true" /></div>
                 <div><label>Lead Quantity</label><x-ui.themed-select wire:model.live="settings.quantity_mode" :options="['fixed'=>'Fixed Batch Quantity','all'=>'Send All Available Leads']" /></div>
-                @if($settings['quantity_mode'] === 'fixed')<div><label>Leads per Cycle *</label><x-text-input type="number" min="1" wire:model="settings.quantity" class="w-full h-8" /></div><div><label>Maximum per Cycle (optional)</label><x-text-input type="number" min="1" wire:model="settings.max_cycle" class="w-full h-8" /></div>@else<div class="sm:col-span-2 rounded-lg border border-border bg-canvas p-3"><label class="flex gap-2"><input type="checkbox" wire:model="confirmSendAll">I confirm Send All bypasses both batch quantity and maximum-per-cycle restrictions. The separate daily limit still applies when enabled.</label></div>@endif
-                <label class="flex items-center gap-2"><input type="checkbox" wire:model.live="settings.daily_enabled">Enable maximum total leads per day</label>
-                @if($settings['daily_enabled'])<div><label>Daily Lead Limit *</label><x-text-input type="number" min="1" wire:model="settings.daily_limit" class="w-full h-8" /></div>@else<label class="flex items-center gap-2"><input type="checkbox" wire:model="confirmUnlimited">I confirm delivery has no daily quantity limit.</label>@endif
-                <div><label>Start Date</label><x-text-input type="date" wire:model="settings.start_date" class="w-full h-8" /></div>
-                <div><label>End Date</label><x-text-input type="date" wire:model="settings.end_date" class="w-full h-8" /></div>
-                <div><label>Daily Window Start</label><x-text-input type="time" wire:model="settings.window_start" class="w-full h-8" /></div>
-                <div><label>Daily Window End</label><x-text-input type="time" wire:model="settings.window_end" class="w-full h-8" /></div>
-                @if(in_array($settings['frequency'], ['daily','weekly']))<div><label>Scheduled Time</label><x-text-input type="time" wire:model="settings.daily_time" class="w-full h-8" /></div>@endif
+                @if($settings['quantity_mode'] === 'fixed')<div><label>Leads to Send *</label><x-text-input variant="compact" type="number" min="1" wire:model="settings.quantity" /></div>@endif
+                <div class="space-y-2"><label class="flex items-center gap-2 h-8"><input type="checkbox" wire:model.live="settings.daily_enabled">Set a daily limit</label>@if($settings['daily_enabled'])<x-text-input variant="compact" type="number" min="1" wire:model="settings.daily_limit" placeholder="Maximum leads per day" />@endif</div>
+                @if(in_array($settings['frequency'], ['daily','weekly']))<div><label>Scheduled Time</label><x-text-input variant="compact" type="time" wire:model="settings.daily_time" /></div>@endif
                 @if($settings['frequency'] === 'weekly')<div><label>Weekly Day</label><x-ui.themed-select wire:model="settings.weekly_day" :options="[0=>'Sunday',1=>'Monday',2=>'Tuesday',3=>'Wednesday',4=>'Thursday',5=>'Friday',6=>'Saturday']" /></div>@endif
-                <div><label>Timezone *</label><x-ui.themed-select wire:model="settings.timezone" :options="array_combine(\DateTimeZone::listIdentifiers(), \DateTimeZone::listIdentifiers())" :searchable="true" /></div>
-                <label class="flex items-center gap-2"><input type="checkbox" wire:model="settings.automatic">Enable Automatic Delivery</label>
             </div>
-            <fieldset><legend class="font-semibold mb-2">Working Days</legend><div class="flex flex-wrap gap-3">@foreach([0=>'Sun',1=>'Mon',2=>'Tue',3=>'Wed',4=>'Thu',5=>'Fri',6=>'Sat'] as $day => $label)<label class="flex items-center gap-1"><input type="checkbox" wire:model="settings.working_days" value="{{ $day }}">{{ $label }}</label>@endforeach</div></fieldset>
-            <p class="text-muted">This plan controls batch frequency and daily capacity for its queued leads. Destination project/campaign activation, credits, consent, duplicate checks and internal verification remain enforced. Schedule changes preserve pending leads and saved destinations.</p>
+            <details class="rounded-lg border border-border p-3"><summary class="font-semibold text-ink cursor-pointer">Advanced scheduling (optional)</summary>
+                <div class="grid sm:grid-cols-2 gap-3 mt-4">
+                    <div><label>Start Date</label><x-text-input variant="compact" type="date" wire:model="settings.start_date" /></div>
+                    <div><label>End Date</label><x-text-input variant="compact" type="date" wire:model="settings.end_date" /></div>
+                    <div><label>Daily Start Time</label><x-text-input variant="compact" type="time" wire:model="settings.window_start" /></div>
+                    <div><label>Daily End Time</label><x-text-input variant="compact" type="time" wire:model="settings.window_end" /></div>
+                    <div><label>Timezone</label><x-ui.themed-select wire:model="settings.timezone" :options="array_combine(\DateTimeZone::listIdentifiers(), \DateTimeZone::listIdentifiers())" :searchable="true" /></div>
+                    @if($settings['quantity_mode'] === 'fixed')<div><label>Maximum per Cycle (optional)</label><x-text-input variant="compact" type="number" min="1" wire:model="settings.max_cycle" /></div>@endif
+                </div>
+                <fieldset class="mt-4"><legend class="font-semibold mb-2">Working Days</legend><div class="flex flex-wrap gap-3">@foreach([0=>'Sun',1=>'Mon',2=>'Tue',3=>'Wed',4=>'Thu',5=>'Fri',6=>'Sat'] as $day => $label)<label class="flex items-center gap-1"><input type="checkbox" wire:model="settings.working_days" value="{{ $day }}">{{ $label }}</label>@endforeach</div></fieldset>
+            </details>
+            <p class="text-muted">{{ $settings['frequency'] === 'manual' ? 'Push sends one cycle now. New leads wait until you push them.' : 'Delivery runs automatically at the selected frequency.' }} {{ $settings['daily_enabled'] ? 'The daily limit applies.' : 'No daily limit.' }} Existing queues and duplicate protection are preserved.</p>
             @if($errors->any())<div role="alert" class="rounded-lg border border-red-200 p-3 text-red-700">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
-            <label class="flex gap-2 rounded-lg border border-border bg-canvas p-3"><input type="checkbox" wire:model="consentConfirmed">I confirm that the selected leads have valid consent to share their details with the destination client. This confirmation is recorded in the audit history.</label>
             <div class="flex flex-wrap gap-2 border-t border-border pt-4">
-                <button type="button" wire:click="saveSettings" class="px-4 h-9 rounded-lg border border-border font-semibold">Save Settings</button>
-                <button type="button" wire:click="queueSelected" wire:confirm="Queue the selected leads for this destination? Existing transfers will not be duplicated." class="px-4 h-9 rounded-lg bg-ink text-white font-semibold">Push Selected to Client</button>
-                <button type="button" wire:click="queueSelected(true)" wire:confirm="Queue all eligible undelivered leads in this source organization, with the confirmed consent and destination?" class="px-4 h-9 rounded-lg border border-border font-semibold">Queue All Eligible</button>
+                <button type="button" wire:click="saveSettings" @if($settings['quantity_mode'] === 'all' || !$settings['daily_enabled']) wire:confirm="Save these settings? {{ $settings['quantity_mode'] === 'all' ? 'Send All is selected.' : '' }} {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" @endif class="px-4 h-9 rounded-lg border border-border font-semibold">Save Settings</button>
+                <button type="button" wire:click="pushLeads" wire:confirm="Push the selected leads to this client? Confirm that you have permission to share them. {{ $settings['quantity_mode'] === 'all' ? 'Send All is selected.' : '' }} {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" class="px-4 h-9 rounded-lg bg-ink text-white font-semibold">Push Leads</button>
+                <button type="button" wire:click="pushLeads(true)" wire:confirm="Queue all eligible leads for this client? Confirm that you have permission to share them. {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" class="px-4 h-9 rounded-lg border border-border font-semibold">Queue All Eligible</button>
             </div>
-            <p class="text-muted">Automatic schedules require the existing Laravel scheduler and queue worker to be running. Manual Only queues wait for Send Cycle Now.</p>
         </div>
     </x-ui.offcanvas>
     <x-ui.offcanvas wire:model="showAttempts" name="delivery-attempt-history" title="Transfer History" subtitle="Actual attempt records are retained across retries and batch changes." maxWidth="xl">

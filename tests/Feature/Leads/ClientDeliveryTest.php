@@ -221,6 +221,69 @@ class ClientDeliveryTest extends TestCase
         $this->assertSame(1, $plan->items()->where('status', 'pending')->count());
     }
 
+    public function test_simple_push_prefills_the_destination_and_delivers_through_the_queue_job(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(2);
+        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->assertSet('settings.client_id', $this->source->id)
+            ->assertSet('settings.project_id', $this->sourceCampaign->project_id)
+            ->assertSet('settings.campaign_id', $this->sourceCampaign->id)
+            ->call('openPush', $this->source->organization_id, $ids)->assertSet('settings.quantity', 2)
+            ->set('settings.client_id', $this->destination->id)
+            ->assertSet('settings.project_id', $this->project->id)->assertSet('settings.campaign_id', $this->campaign->id)
+            ->call('pushLeads')->assertHasNoErrors()->assertSet('showConfiguration', false);
+        $plan = LeadDeliveryPlan::where('organization_id', $this->source->organization_id)->firstOrFail();
+        $run = $plan->runs()->firstOrFail();
+        Queue::assertPushed(\App\Jobs\ProcessClientDeliveryRun::class, fn ($job) => $job->runId === $run->id);
+        (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(2, CreditTransaction::where('client_id', $this->destination->id)->count());
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(2, Lead::panelQuery()->whereIn('id', $ids)->count());
+    }
+
+    public function test_manual_push_starts_a_cycle_without_an_extra_send_button(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(1);
+        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->call('openPush', $this->source->organization_id, $ids)->set('settings.client_id', $this->destination->id)
+            ->set('settings.frequency', 'manual')->call('pushLeads')->assertHasNoErrors();
+        $plan = LeadDeliveryPlan::where('organization_id', $this->source->organization_id)->firstOrFail();
+        $this->assertFalse($plan->settings['automatic']);
+        $run = $plan->runs()->firstOrFail();
+        (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
+        $this->assertSame('sent', $plan->items()->firstOrFail()->status);
+        $nextIds = $this->leads(1);
+        $this->service()->enqueueClientLeads($plan, $nextIds, true, $this->admin);
+        $component->call('openPush', $this->source->organization_id, $ids)->call('pushLeads')->assertHasNoErrors();
+        $this->assertSame(1, $plan->runs()->count());
+        $this->assertSame(1, $plan->items()->where('status', 'pending')->count());
+        Queue::assertPushed(\App\Jobs\ProcessClientDeliveryRun::class, 1);
+    }
+
+    public function test_simple_scheduled_settings_enable_automation_and_send_all_needs_no_checkbox(): void
+    {
+        $ids = $this->leads(3);
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->call('openPush', $this->source->organization_id, $ids)->set('settings.client_id', $this->destination->id)
+            ->set('settings.frequency', '30_minutes')->set('settings.quantity_mode', 'all')
+            ->call('pushLeads')->assertHasNoErrors();
+        $plan = LeadDeliveryPlan::where('organization_id', $this->source->organization_id)->firstOrFail();
+        $this->assertTrue($plan->settings['automatic']);
+        $this->assertFalse($plan->settings['daily_enabled']);
+        $this->cycle($plan, false);
+        $this->assertSame(3, $plan->items()->where('status', 'sent')->count());
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+    }
+
+    public function test_empty_push_does_not_save_a_plan_or_change_delivery_routing(): void
+    {
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->call('pushLeads')->assertHasErrors('selectedLeadIds');
+        $this->assertSame(0, LeadDeliveryPlan::count());
+    }
+
     public function test_configuration_and_selected_push_use_real_records(): void
     {
         Queue::fake();

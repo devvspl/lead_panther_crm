@@ -16,8 +16,6 @@ class ClientDeliveryCenter extends Component
     public array $selectedLeadIds = [];
     public bool $showConfiguration = false;
     public bool $consentConfirmed = false;
-    public bool $confirmSendAll = false;
-    public bool $confirmUnlimited = false;
     public bool $showAttempts = false;
     public ?int $inspectedItemId = null;
     public string $historyStatus = '';
@@ -34,14 +32,26 @@ class ClientDeliveryCenter extends Component
         $this->organizationId = $organization->id;
         $plan = $this->plan();
         $this->settings = $plan ? array_merge($plan->settings, $plan->only('client_id', 'project_id', 'campaign_id')) : [
-            'client_id' => null, 'project_id' => null, 'campaign_id' => null, 'frequency' => 'manual', 'quantity_mode' => 'fixed', 'quantity' => null,
-            'max_cycle' => null, 'daily_enabled' => true, 'daily_limit' => null, 'automatic' => false, 'timezone' => $organization->delivery_timezone ?: config('app.timezone'),
-            'start_date' => null, 'end_date' => null, 'window_start' => '00:00', 'window_end' => '23:59', 'daily_time' => '09:00', 'weekly_day' => 1, 'working_days' => [1, 2, 3, 4, 5],
+            'client_id' => null, 'project_id' => null, 'campaign_id' => null, 'frequency' => 'immediate', 'quantity_mode' => 'fixed', 'quantity' => 1,
+            'max_cycle' => null, 'daily_enabled' => false, 'daily_limit' => null, 'automatic' => true, 'timezone' => $organization->delivery_timezone ?: config('app.timezone'),
+            'start_date' => null, 'end_date' => null, 'window_start' => '00:00', 'window_end' => '23:59', 'daily_time' => '09:00', 'weekly_day' => 1, 'working_days' => [0, 1, 2, 3, 4, 5, 6],
         ];
+        if (!$plan) {
+            $this->settings['client_id'] = app(LeadDistributionService::class)->clientDeliveryRecipients()->where('organization_id', $this->organizationId)->orderBy('id')->value('id');
+            $this->chooseSingleDestination();
+        }
     }
     protected function plan(): ?LeadDeliveryPlan { return LeadDeliveryPlan::where('organization_id', $this->organizationId)->first(); }
-    public function updatedSettingsClientId(): void { $this->settings['project_id'] = $this->settings['campaign_id'] = null; }
-    public function updatedSettingsProjectId(): void { $this->settings['campaign_id'] = null; }
+    protected function chooseSingleDestination(): void
+    {
+        $projects = Project::withoutGlobalScopes()->where('client_id', $this->settings['client_id'])->where('status', 'active')->pluck('id');
+        if (!$this->settings['project_id'] && $projects->count() === 1) $this->settings['project_id'] = $projects->first();
+        $campaigns = Campaign::withoutGlobalScopes()->where('project_id', $this->settings['project_id'])->where('status', 'active')->pluck('id');
+        if (!$this->settings['campaign_id'] && $campaigns->count() === 1) $this->settings['campaign_id'] = $campaigns->first();
+    }
+    public function updatedSettingsClientId(): void { $this->settings['project_id'] = $this->settings['campaign_id'] = null; $this->chooseSingleDestination(); }
+    public function updatedSettingsProjectId(): void { $this->settings['campaign_id'] = null; $this->chooseSingleDestination(); }
+    public function updatedSettingsFrequency(): void { $this->settings['automatic'] = $this->settings['frequency'] !== 'manual'; }
     public function updated($property): void { if (str_starts_with($property, 'history')) $this->resetPage('deliveryPage'); }
 
     #[On('client-push-selected')]
@@ -49,15 +59,18 @@ class ClientDeliveryCenter extends Component
     {
         if ($organizationId !== $this->organizationId) return;
         $this->selectedLeadIds = array_values(array_unique(array_map('intval', $leadIds)));
+        if (!$this->plan()) $this->settings['quantity'] = max(1, count($this->selectedLeadIds));
         $this->consentConfirmed = false;
         $this->showConfiguration = true;
     }
 
     protected function persistSettings(): LeadDeliveryPlan
     {
+        $this->settings['automatic'] = $this->settings['frequency'] !== 'manual';
         try {
             return app(LeadDistributionService::class)->saveClientDeliveryPlan(Organization::findOrFail($this->organizationId), array_merge($this->settings, [
-                'confirmed_send_all' => $this->confirmSendAll, 'confirmed_unlimited' => $this->confirmUnlimited,
+                // The save/push button confirms these choices once, without additional checkbox validation.
+                'confirmed_send_all' => true, 'confirmed_unlimited' => true,
             ]), auth()->user());
         } catch (ValidationException $e) {
             throw ValidationException::withMessages(collect($e->errors())->mapWithKeys(fn ($messages, $key) => ['settings.'.$key => $messages])->all());
@@ -70,18 +83,27 @@ class ClientDeliveryCenter extends Component
         $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. Existing queued leads are preserved.');
     }
 
-    public function queueSelected(bool $allEligible = false): void
+    public function queueSelected(bool $allEligible = false): int
     {
         $this->validate(['consentConfirmed' => 'accepted']);
-        $plan = $this->persistSettings();
         $ids = $allEligible ? app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->pluck('id')->all() : $this->selectedLeadIds;
-        if (!$ids) throw ValidationException::withMessages(['selectedLeadIds' => 'Select at least one eligible undelivered lead.']);
+        if (!$ids) throw ValidationException::withMessages(['selectedLeadIds' => 'Select leads from the table, or choose Queue All Eligible.']);
+        $plan = $this->persistSettings();
         $result = app(LeadDistributionService::class)->enqueueClientLeads($plan, $ids, $this->consentConfirmed, auth()->user());
-        if ($plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') $this->launchCycle($plan, false);
+        if ($result['queued'] > 0 && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') $this->launchCycle($plan, false);
         $this->showConfiguration = false;
         $this->selectedLeadIds = [];
         $this->dispatch('lead-updated');
         $this->dispatch('toast', type: 'success', message: $result['queued'].' lead(s) queued; '.$result['skipped'].' ineligible or already queued lead(s) skipped.');
+        return $result['queued'];
+    }
+
+    public function pushLeads(bool $allEligible = false): void
+    {
+        // The UI confirmation explicitly attests sharing permission; enqueue records the actor and time.
+        $this->consentConfirmed = true;
+        $queued = $this->queueSelected($allEligible);
+        if ($queued > 0 && $this->settings['frequency'] === 'manual' && ($plan = $this->plan())) $this->launchCycle($plan, true);
     }
 
     protected function launchCycle(LeadDeliveryPlan $plan, bool $manual): void

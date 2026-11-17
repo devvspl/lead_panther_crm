@@ -48,6 +48,8 @@ class LeadKanban extends Component
 {
     use HasAdvancedTable;
 
+    public function isClientContext(): bool { return false; }
+
     // Global Filters (URL bound)
     #[Url]
     public string $search = '';
@@ -718,7 +720,7 @@ class LeadKanban extends Component
     {
         $user = auth()->user();
         $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::withoutGlobalScopes())
-            ->where('internal_processing_pending', false)
+            ->when(! $this->isClientContext(), fn ($q) => $q->where('internal_processing_pending', false))
             ->with([
                 'client.organization',
                 'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()]) : $q->with('project'),
@@ -1414,10 +1416,11 @@ class LeadKanban extends Component
             return view('livewire.leads.lead-kanban', ['canInternalQueue' => true])->layout('layouts.app');
         }
         $baseQuery = $this->getScopedQuery();
-        $kpis = Lead::usesSalesPanel() ? [] : $this->leadKpis;
-        $funnel = Lead::usesSalesPanel() ? [] : $this->leadFunnel;
-        $analytics = Lead::usesSalesPanel() ? [] : $this->leadAnalytics;
-        $monitoring = Lead::usesSalesPanel() ? [] : $this->monitoringStats;
+        $compact = Lead::usesSalesPanel() || $this->isClientContext();
+        $kpis = $compact ? [] : $this->leadKpis;
+        $funnel = $compact ? [] : $this->leadFunnel;
+        $analytics = $compact ? [] : $this->leadAnalytics;
+        $monitoring = $compact ? [] : $this->monitoringStats;
         $availableTeams = $this->getAvailableTeams();
 
         $stageLeads = [];
@@ -2214,9 +2217,10 @@ class LeadKanban extends Component
 
             return;
         }
+        $this->manualMobile = preg_replace('/[^0-9]/', '', $this->manualMobile);
         $this->validate([
             'manualName' => 'required|string|max:255',
-            'manualMobile' => 'required|string|min:10',
+            'manualMobile' => 'required|string|min:10|max:15',
             'manualEmail' => 'nullable|email',
             'manualProjectId' => 'required|exists:projects,id',
         ], [
@@ -2225,8 +2229,9 @@ class LeadKanban extends Component
             'manualProjectId.required' => 'Please select an associated project.',
         ]);
 
-        $client = Client::first();
-        $clientId = $client?->id ?: 1;
+        $project = Project::findOrFail($this->manualProjectId);
+        $clientId = $project->client_id;
+        $this->validate(['manualCampaignId' => ['nullable', Rule::exists('campaigns', 'id')->where('project_id', $project->id)], 'manualLeadSourceId' => 'nullable|exists:lead_sources,id']);
         $leadSourceId = $this->manualLeadSourceId ?: (LeadSource::firstOrCreate(['name' => 'direct'])->id);
 
         $mobile = preg_replace('/[^0-9]/', '', $this->manualMobile);
@@ -2236,7 +2241,7 @@ class LeadKanban extends Component
         $existingLead = Lead::where('client_id', $clientId)
             ->where('created_at', '>=', now()->subDays(90))
             ->where(function ($q) use ($mobile, $email) {
-                $q->where('mobile', $mobile);
+                $q->whereIn('mobile', [$mobile, '+'.$mobile, '+91'.substr($mobile, -10), substr($mobile, -10)]);
                 if ($email) {
                     $q->orWhere('email', $email);
                 }
@@ -2271,10 +2276,10 @@ class LeadKanban extends Component
             'lead_source_id' => $leadSourceId,
             'name' => $this->manualName,
             'mobile' => $mobile,
-            'email' => $email ?: 'direct_entry@leadpanther.com',
-            'city' => $this->manualCity ?: 'Mumbai',
-            'budget' => $this->manualBudget ?: '₹75.0L',
-            'property_type' => $this->manualPropertyType ?: '2 BHK',
+            'email' => $email,
+            'city' => $this->manualCity ?: null,
+            'budget' => $this->manualBudget ?: null,
+            'property_type' => $this->manualPropertyType ?: null,
             'requirement' => $this->manualRequirement ?: 'Manual lead entry via Lead Manager',
             'status' => 'new',
             'current_stage' => 'new',

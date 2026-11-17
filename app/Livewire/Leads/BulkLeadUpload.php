@@ -17,6 +17,14 @@ class BulkLeadUpload extends Component
 {
     use WithFileUploads;
 
+    #[\Livewire\Attributes\Locked]
+    public ?int $organizationId = null;
+
+    public function boot(): void
+    {
+        if ($this->organizationId) abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
     public $file = null;
     public int $step = 1;
 
@@ -44,8 +52,12 @@ class BulkLeadUpload extends Component
         'requirement' => 'Requirement / Notes',
     ];
 
-    public function mount(): void
+    public function mount(?int $organizationId = null): void
     {
+        if ($organizationId) {
+            abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+            $this->organizationId = \App\Models\Organization::findOrFail($organizationId)->id;
+        }
         $this->resetMappingDefaults();
     }
 
@@ -61,13 +73,22 @@ class BulkLeadUpload extends Component
     public function updatedFile(): void
     {
         $this->resetMappingDefaults();
+        $this->headers = $this->previewRows = $this->allCsvRows = [];
 
         $this->validate([
             'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
+        $localFile = null;
         try {
-            $path = $this->file->getRealPath();
+            // Read through Livewire's storage API, then use a short local path for ZIP readers.
+            // This also supports remote temporary-upload disks and long Windows filenames.
+            $localFile = tmpfile();
+            $input = method_exists($this->file, 'readStream') ? $this->file->readStream() : fopen($this->file->getRealPath(), 'rb');
+            if (!$localFile || !$input) throw new \RuntimeException('Cannot read the uploaded file.');
+            stream_copy_to_stream($input, $localFile);
+            fclose($input);
+            $path = stream_get_meta_data($localFile)['uri'];
             $extension = strtolower($this->file->getClientOriginalExtension());
             $rows = [];
 
@@ -124,6 +145,8 @@ class BulkLeadUpload extends Component
             }
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', message: 'Failed to parse file: ' . $e->getMessage());
+        } finally {
+            if (is_resource($localFile)) fclose($localFile);
         }
     }
 
@@ -154,7 +177,7 @@ class BulkLeadUpload extends Component
 
     public function proceedToAttribution(): void
     {
-        if (empty($this->columnMapping['mobile'])) {
+        if (!isset($this->columnMapping['mobile']) || $this->columnMapping['mobile'] === '') {
             $this->dispatch('toast', type: 'error', message: 'Please map a column to Mobile Number (Required).');
             return;
         }
@@ -166,14 +189,23 @@ class BulkLeadUpload extends Component
     {
         $this->validate([
             'projectId' => 'required|exists:projects,id',
+            'campaignId' => ['nullable', \Illuminate\Validation\Rule::exists('campaigns', 'id')->where('project_id', $this->projectId)],
+            'leadSourceId' => 'nullable|exists:lead_sources,id',
+            'columnMapping.mobile' => 'required|integer|min:0',
         ]);
 
+        if ($this->organizationId) {
+            abort_unless(Project::whereHas('client', fn ($q) => $q->where('organization_id', $this->organizationId))->whereKey($this->projectId)->exists(), 403);
+        }
+
         try {
-            $project = Project::findOrFail($this->projectId);
+            \Illuminate\Support\Facades\DB::transaction(function () {
+            $project = Project::whereKey($this->projectId)->lockForUpdate()->firstOrFail();
 
             if (empty($this->allCsvRows) && $this->file) {
                 $this->updatedFile();
             }
+            if (empty($this->allCsvRows)) throw new \RuntimeException('No data rows were found. Upload a valid file before importing.');
 
             $totalRows = 0;
             $importedCount = 0;
@@ -187,7 +219,7 @@ class BulkLeadUpload extends Component
                 // Map Row Data
                 $rowData = [];
                 foreach ($this->columnMapping as $field => $colIdx) {
-                    if (isset($row[$colIdx])) {
+                    if ($colIdx !== '' && isset($row[$colIdx])) {
                         $rowData[$field] = trim($row[$colIdx]);
                     }
                 }
@@ -197,7 +229,7 @@ class BulkLeadUpload extends Component
                 $cleanMobile = preg_replace('/[^0-9]/', '', $mobile);
 
                 // Row Validation
-                if (empty($cleanMobile) || strlen($cleanMobile) < 10) {
+                if (empty($cleanMobile) || strlen($cleanMobile) < 10 || strlen($cleanMobile) > 15) {
                     $failedCount++;
                     $errorLog[] = [
                         'row' => $totalRows,
@@ -209,9 +241,22 @@ class BulkLeadUpload extends Component
 
                 $formattedMobile = (strlen($cleanMobile) === 10) ? '+91' . $cleanMobile : '+' . $cleanMobile;
 
+                $validation = \Illuminate\Support\Facades\Validator::make($rowData, [
+                    'name' => 'nullable|string|max:255', 'email' => 'nullable|email|max:255',
+                    'city' => 'nullable|string|max:255', 'property_type' => 'nullable|string|max:255',
+                ]);
+                if ($validation->fails()) {
+                    $failedCount++;
+                    $errorLog[] = ['row' => $totalRows, 'data' => implode(', ', $row), 'reason' => implode(' ', $validation->errors()->all())];
+                    continue;
+                }
+
                 // 90-Day Duplicate Check Pipeline
-                $isDuplicate = Lead::whereHas('campaign', fn($q) => $q->where('project_id', $this->projectId))
-                    ->where('mobile', $formattedMobile)
+                $isDuplicate = Lead::where('client_id', $project->client_id)
+                    ->where(function ($q) use ($formattedMobile, $cleanMobile, $rowData) {
+                        $q->whereIn('mobile', [$formattedMobile, $cleanMobile, substr($cleanMobile, -10)]);
+                        if (!empty($rowData['email'])) $q->orWhere('email', $rowData['email']);
+                    })
                     ->where('created_at', '>=', now()->subDays(90))
                     ->exists();
 
@@ -221,8 +266,9 @@ class BulkLeadUpload extends Component
                 }
 
                 // Create Inbound Lead
-                $effectiveSourceId = $this->leadSourceId ?? (LeadSource::first()?->id ?? LeadSource::create(['name' => 'csv_import'])->id);
+                $effectiveSourceId = $this->leadSourceId ?? LeadSource::firstOrCreate(['name' => 'csv_import'])->id;
                 $effectiveCampaignId = $this->campaignId ?: Campaign::where('project_id', $this->projectId)->value('id');
+                if (!$effectiveCampaignId) $effectiveCampaignId = Campaign::firstOrCreate(['project_id' => $project->id, 'name' => 'General Campaign'], ['lead_source_id' => $effectiveSourceId, 'status' => 'active'])->id;
 
                 $lead = Lead::create([
                     'lead_code' => Lead::generateUniqueLeadCode(),
@@ -236,14 +282,16 @@ class BulkLeadUpload extends Component
                     'budget' => !empty($rowData['budget']) ? (float) preg_replace('/[^0-9.]/', '', $rowData['budget']) : null,
                     'property_type' => $rowData['property_type'] ?? null,
                     'requirement' => $rowData['requirement'] ?? null,
-                    'status' => 'assigned',
-                    'current_stage' => 'assigned',
-                    'assigned_to' => auth()->id(),
+                    'status' => $this->organizationId ? 'new' : 'assigned',
+                    'current_stage' => $this->organizationId ? 'new' : 'assigned',
+                    'assigned_to' => $this->organizationId ? null : auth()->id(),
                 ]);
 
                 $importedCount++;
 
-                if (auth()->user()) {
+                if ($this->organizationId) {
+                    event(new \App\Events\LeadCreated($lead));
+                } elseif (auth()->user()) {
                     event(new LeadAssigned($lead, auth()->user()));
                 }
             }
@@ -265,7 +313,9 @@ class BulkLeadUpload extends Component
             ]);
 
             $this->step = 3;
+            $this->dispatch('lead-updated');
             $this->dispatch('toast', type: 'success', message: "Batch import completed! Imported {$importedCount} leads, skipped {$skippedCount} duplicates, {$failedCount} failed validation.");
+            });
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', message: "Import execution error: {$e->getMessage()}");
         }
@@ -274,6 +324,7 @@ class BulkLeadUpload extends Component
     public function downloadErrorCsv(int $batchId): StreamedResponse
     {
         $batch = UploadBatch::findOrFail($batchId);
+        if ($this->organizationId) abort_unless(Project::whereHas('client', fn ($q) => $q->where('organization_id', $this->organizationId))->whereKey($batch->project_id)->exists(), 403);
         $errors = $batch->error_log ?? [];
 
         $filename = "upload_errors_batch_{$batchId}.csv";
@@ -297,8 +348,8 @@ class BulkLeadUpload extends Component
 
     public function render()
     {
-        $projects = Project::all();
-        $campaigns = Campaign::all();
+        $projects = Project::when($this->organizationId, fn ($q) => $q->whereHas('client', fn ($owner) => $owner->where('organization_id', $this->organizationId)))->get();
+        $campaigns = Campaign::whereIn('project_id', $projects->pluck('id'))->get();
         $sources = LeadSource::all();
 
         return view('livewire.leads.bulk-lead-upload', [

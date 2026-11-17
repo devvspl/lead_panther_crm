@@ -287,6 +287,10 @@
                 </span>
             </a>
 
+            <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'leads']) }}"
+                wire:click.prevent="setTab('leads')"
+                class="py-3 px-2 border-b-2 transition flex items-center gap-2 whitespace-nowrap {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink' }}">Leads</a>
+
             <!-- Tab 4: Credits & Wallet -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'credits']) }}"
                 wire:click.prevent="setTab('credits')"
@@ -318,6 +322,10 @@
             </a>
         </nav>
     </div>
+
+    @if($activeTab === 'leads')
+        <livewire:leads.client-lead-manager :organization-id="$organization->id" :key="'client-leads-'.$organization->id" />
+    @endif
 
     @if($activeTab === 'campaigns')
         <section class="space-y-5" wire:poll.30s>

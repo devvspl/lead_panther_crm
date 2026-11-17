@@ -41,6 +41,9 @@
         </div>
     </div>
 
+    @if($this->isClientContext())
+        @include('livewire.leads.client-lead-controls')
+    @else
     <!-- 2. COMPACT GLOBAL FILTERS -->
     <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
         <div class="flex items-center justify-between">
@@ -358,8 +361,9 @@
         @endif
     </div>
 
+    @endif
     @if($isSalesExecutive)<div class="flex gap-2 text-xs items-center"><label for="lead-followup-filter">Follow-ups</label><select id="lead-followup-filter" wire:model.live="followupFilter" class="rounded-lg border-border"><option value="">All</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option></select></div>@endif
-    @if($isBuilder)
+    @if($isBuilder || $this->isClientContext())
         <!-- 3. BUILDER COMPACT 8 OPERATIONAL KPI CARDS -->
         <div class="space-y-2">
             <div class="flex items-center justify-between">
@@ -475,7 +479,7 @@
 
     @endif
 
-    @if(!$isBuilder && !$isSalesExecutive)
+    @if(!$isBuilder && !$isSalesExecutive && !$this->isClientContext())
     <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
     <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
@@ -897,7 +901,7 @@
                                     <span>Assign Selected ({{ count($selectedRows) }})</span>
                                 </button>
                             @endif
-                            @if(!$isBuilder)
+                            @if(!$isBuilder && !$this->isClientContext())
                             <button type="button" wire:click="autoDistributeUnassignedLeads"
                                 class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
                                 title="Distribute unassigned leads using the Super Admin configured distribution rule">
@@ -1179,6 +1183,7 @@
         </x-slot:headerIcon>
 
         <!-- Segmented Mode Control -->
+        @if(!$this->isClientContext())
         <div class="inline-flex p-1 bg-canvas rounded-lg border border-border w-full mb-4">
             <button type="button" wire:click="$set('pullMode', 'meta')"
                 class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'meta' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
@@ -1189,6 +1194,7 @@
                 Single Manual Entry
             </button>
         </div>
+        @endif
 
         @if($pullMode === 'meta')
             <div class="space-y-4 text-xs">
@@ -1332,7 +1338,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="font-bold text-ink">Associated Project <span class="text-rose-500">*</span></label>
-                        <select wire:model="manualProjectId" class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <select wire:model.live="manualProjectId" class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                             <option value="">Select Project</option>
                             @foreach($allProjects as $p)
                                 <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -1353,6 +1359,9 @@
 @endcanViewLeadSource
                 </div>
 
+                @if($this->isClientContext())
+                    <div><label class="font-bold text-ink">Campaign</label><x-ui.themed-select wire:model="manualCampaignId" :options="$allCampaigns->where('project_id', $manualProjectId)->pluck('name', 'id')->all()" placeholder="Use project campaign" class="w-full mt-1" />@error('manualCampaignId')<span class="text-xs text-red-600">{{ $message }}</span>@enderror</div>
+                @endif
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                         <label class="font-bold text-ink">City</label>

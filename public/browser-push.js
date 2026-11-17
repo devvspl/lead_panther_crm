@@ -57,9 +57,13 @@ async function request(node, action, body) {
 }
 
 function show(node, text, enabled = false, ready = false) {
+    if (node.isConnected === false) return;
+    const status = node.querySelector('[data-push-status]');
+    const enable = node.querySelector('[data-push-action="enable"]');
+    if (!status || !enable) { node.pushInitializedV2 = false; return; }
     node.pushEnabled = enabled;
-    node.querySelector('[data-push-status]').textContent = text;
-    node.querySelector('[data-push-action="enable"]').disabled = !ready || enabled;
+    status.textContent = text;
+    enable.disabled = !ready || enabled;
     const disable = node.querySelector('[data-push-action="disable"]');
     const test = node.querySelector('[data-push-action="test"]');
     if (disable) disable.disabled = !enabled;
@@ -85,6 +89,7 @@ async function refresh(node) {
 function initialize() {
     document.querySelectorAll('[data-browser-push]').forEach(node => {
         if (node.pushInitializedV2) return;
+        if (!node.querySelector('[data-push-status]') || !node.querySelector('[data-push-action="enable"]')) return;
         node.pushInitializedV2 = true;
         node.pushInitialized = true;
         refresh(node).catch(error => show(node, error.message || 'Unable to check push status. Refresh the page.'));
@@ -95,13 +100,15 @@ document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-push-action]');
     const node = button?.closest('[data-browser-push]');
     if (!node || button.disabled) return;
+    const status = node.querySelector('[data-push-status]');
+    if (!status) return;
     const action = button.dataset.pushAction;
     if (action === 'dismiss') { closePrompt(node); return; }
     node.querySelectorAll('button').forEach(item => item.disabled = true);
     try {
         if (action === 'enable') {
             // Request permission directly from the user gesture, never on page load.
-            node.querySelector('[data-push-status]').textContent = 'Allow notifications in the browser prompt...';
+            status.textContent = 'Allow notifications in the browser prompt...';
             if (await Notification.requestPermission() !== 'granted') { await refresh(node); return; }
             const config = node.pushConfig || await request(node, 'config');
             if (!config.configured) throw new Error('Server setup required.');
@@ -127,7 +134,7 @@ document.addEventListener('click', async (event) => {
             } else {
                 const result = await request(node, 'test', { endpoint: subscription.endpoint });
                 await refresh(node);
-                node.querySelector('[data-push-status]').textContent = result.message;
+                status.textContent = result.message;
                 return;
             }
         }

@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const settle = () => new Promise(resolve => setTimeout(resolve, 25));
 
-function page({ timeout = false, denied = false, mounted = true, prompt = false, subscribed = false, configured = true, dismissed = false } = {}) {
+function page({ timeout = false, denied = false, mounted = true, prompt = false, subscribed = false, configured = true, dismissed = false, missingEnable = false } = {}) {
     const handlers = {}, observers = [], status = { textContent: 'Checking...' };
     const buttons = Object.fromEntries((prompt ? ['enable', 'dismiss'] : ['enable', 'disable', 'test']).map(action => [action, { disabled: action !== 'dismiss', dataset: { pushAction: action } }]));
     const node = { dataset: { base: 'https://crm.example.com/notifications/push' },
-        querySelector(selector) { return selector === '[data-push-status]' ? status : buttons[selector.match(/"(.*?)"/)[1]]; },
+        querySelector(selector) { return selector === '[data-push-status]' ? status : (missingEnable && selector.includes('"enable"') ? null : buttons[selector.match(/"(.*?)"/)[1]]); },
         querySelectorAll() { return Object.values(buttons); },
     };
     if (prompt) Object.assign(node.dataset, { pushPrompt: 'browser-push-enable-prompt', promptKey: 'prompt-user-session' });
@@ -42,6 +42,7 @@ function page({ timeout = false, denied = false, mounted = true, prompt = false,
     return { status, buttons, modalEvents, requests: () => requests, permissionRequests: () => permissionRequests,
         async click(action) { await handlers.click({ target: buttons[action] }); },
         mount() { nodes = [node]; observers.forEach(fn => fn()); },
+        restoreEnable() { missingEnable = false; observers.forEach(fn => fn()); },
     };
 }
 
@@ -91,4 +92,11 @@ test('enabled browsers and unconfigured servers do not get an enable prompt', as
     const unconfigured = page({ prompt: true, configured: false }); await settle();
     assert.equal(enabled.modalEvents.filter(event => event.type === 'open-modal').length, 0);
     assert.equal(unconfigured.modalEvents.length, 0);
+});
+test('partially rendered controls wait for the Enable button instead of setting disabled on null', async () => {
+    const instance = page({ missingEnable: true }); await settle();
+    assert.equal(instance.requests(), 0);
+    instance.restoreEnable(); await settle();
+    assert.equal(instance.buttons.enable.disabled, false);
+    assert.equal(instance.status.textContent, 'Not enabled on this browser');
 });

@@ -1,6 +1,6 @@
 @auth
 <div wire:ignore data-browser-push data-push-prompt="browser-push-enable-prompt" data-base="{{ url('/notifications/push') }}" data-prompt-key="push-prompt-{{ auth()->id() }}-{{ substr(hash('sha256', session()->getId()), 0, 12) }}">
-    <x-ui.modal name="browser-push-enable-prompt" maxWidth="md">
+    <x-ui.modal name="browser-push-enable-prompt" maxWidth="md" :centered="true">
         <div role="dialog" aria-modal="true" aria-labelledby="push-prompt-title" aria-describedby="push-prompt-description">
             <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
                 <h2 id="push-prompt-title" class="text-sm font-bold text-ink">Enable browser notifications?</h2>

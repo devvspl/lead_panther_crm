@@ -50,7 +50,7 @@ class BrowserPushTest extends TestCase {
     }
     public function test_authenticated_layout_loads_push_controls_independently_of_vite(): void {
         $this->actingAs($this->user)->get('/notifications')->assertOk()->assertSee('browser-push.js?v=', false)
-            ->assertSee('Enable browser notifications?')->assertSee('Not Now');
+            ->assertSee('Enable browser notifications?')->assertSee('Not Now')->assertSee('min-h-[calc(100vh-3rem)]', false);
     }
     public function test_subscription_rejects_private_endpoints_and_invalid_keys(): void {
         $data = $this->data(); $data['endpoint'] = 'https://127.0.0.1/private';

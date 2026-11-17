@@ -1,7 +1,8 @@
 @props([
     'name',
     'show' => false,
-    'maxWidth' => '2xl'
+    'maxWidth' => '2xl',
+    'centered' => false,
 ])
 
 @php
@@ -29,7 +30,9 @@ $maxWidthClass = match ($maxWidth) {
         <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
     </div>
 
-    <div x-show="show" class="mb-6 bg-white rounded-xl overflow-hidden shadow-xl transform transition-all sm:w-full {{ $maxWidthClass }} sm:mx-auto">
-        {{ $slot }}
+    <div class="{{ $centered ? 'relative flex min-h-[calc(100vh-3rem)] items-center justify-center' : '' }}" @if($centered) x-on:click.self="show = false" @endif>
+        <div x-show="show" class="{{ $centered ? 'relative w-full max-h-[calc(100vh-3rem)] overflow-y-auto' : 'mb-6 overflow-hidden' }} bg-white rounded-xl shadow-xl transform transition-all sm:w-full {{ $maxWidthClass }} sm:mx-auto">
+            {{ $slot }}
+        </div>
     </div>
 </div>

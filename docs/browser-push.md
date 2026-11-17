@@ -2,6 +2,8 @@
 
 Browser push is integrated with the existing database notification events. In-app polling and broadcasting remain available. No permission prompt runs automatically: signed-in users open the notification bell, choose **Enable on this browser**, and approve the browser prompt. They can disable only their own browser subscription or use **Test Push**.
 
+The controls load from the versioned standalone `public/browser-push.js` script, independently of the Vite bundle, including when fallback assets are used. Deploy this file together with the updated shared asset view. Server and worker status checks have timeouts, and **Check Again** retries a failed setup check. A denied browser permission shows site-settings instructions instead of repeatedly requesting permission. After updating an older deployment, clear Laravel's view/config caches and hard-refresh the page.
+
 ## Deployment
 
 1. Deploy code and built assets, run `composer install --no-dev --optimize-autoloader`, and run `php artisan migrate --force`.

@@ -48,6 +48,9 @@ class BrowserPushTest extends TestCase {
         $this->actingAs($this->user)->postJson(route('notifications.push.unsubscribe'), ['endpoint' => $this->data()['endpoint']])->assertOk();
         $this->assertDatabaseCount('browser_push_subscriptions', 0);
     }
+    public function test_authenticated_layout_loads_push_controls_independently_of_vite(): void {
+        $this->actingAs($this->user)->get('/notifications')->assertOk()->assertSee('browser-push.js?v=', false);
+    }
     public function test_subscription_rejects_private_endpoints_and_invalid_keys(): void {
         $data = $this->data(); $data['endpoint'] = 'https://127.0.0.1/private';
         $this->actingAs($this->user)->postJson(route('notifications.push.subscribe'), $data)->assertStatus(422);

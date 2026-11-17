@@ -1,3 +1,5 @@
+{{-- Push setup must work even with an older or missing compiled app bundle. --}}
+<script src="{{ asset('browser-push.js') }}?v={{ filemtime(public_path('browser-push.js')) }}" defer data-navigate-once></script>
 @if(file_exists(public_path('build/manifest.json')))
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 @else

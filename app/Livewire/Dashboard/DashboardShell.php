@@ -208,7 +208,7 @@ class DashboardShell extends Component
             $query->whereIn('assigned_to', $teamUserIds);
         }
 
-        if ($this->filterLeadSourceId) {
+        if (\App\Support\LeadSourceVisibility::allowed() && $this->filterLeadSourceId) {
             $query->where('lead_source_id', $this->filterLeadSourceId);
         }
 
@@ -852,7 +852,7 @@ class DashboardShell extends Component
         }
 
         // 2. Lead Source Performance (with percentages for Donut chart)
-        $sources = LeadSource::all();
+        $sources = \App\Support\LeadSourceVisibility::allowed() ? LeadSource::all() : collect();
         $sourceLabels = [];
         $sourceCounts = [];
         $sourceWon = [];
@@ -1744,7 +1744,7 @@ class DashboardShell extends Component
             $currQuery->where('assigned_to', $this->filterAssignedUserId);
             $prevQuery->where('assigned_to', $this->filterAssignedUserId);
         }
-        if ($this->filterLeadSourceId) {
+        if (\App\Support\LeadSourceVisibility::allowed() && $this->filterLeadSourceId) {
             $currQuery->where('lead_source_id', $this->filterLeadSourceId);
             $prevQuery->where('lead_source_id', $this->filterLeadSourceId);
         }
@@ -2041,7 +2041,7 @@ class DashboardShell extends Component
         if (Lead::usesSalesPanel()) {
             $this->role = NavigationConfig::getRoleKey(auth()->user()) === 'builder' ? 'builder' : 'sales';
         }
-        $sourceOptions = LeadSource::pluck('name', 'id')->map(fn($name) => ucfirst($name))->toArray();
+        $sourceOptions = \App\Support\LeadSourceVisibility::allowed() ? LeadSource::pluck('name', 'id')->map(fn($name) => ucfirst($name))->toArray() : [];
 
         $user = auth()->user();
         $orgId = $user?->organization_id;

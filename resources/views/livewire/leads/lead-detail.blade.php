@@ -121,7 +121,8 @@
                     <!-- ========================================================= -->
                     <!-- SECTION 3: LEAD SOURCE & META INTELLIGENCE               -->
                     <!-- ========================================================= -->
-                    <div class="p-4 bg-canvas rounded-xl border border-border space-y-2">
+                    @canViewLeadSource
+<div class="p-4 bg-canvas rounded-xl border border-border space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">2 &bull; Lead Source &amp; Ingestion</span>
                             <span class="text-[10px] font-mono text-muted">Received: {{ $lead->created_at?->format('M d, Y H:i') }}</span>
@@ -159,6 +160,7 @@
                             </div>
                         @endif
                     </div>
+@endcanViewLeadSource
 
                     <!-- ========================================================= -->
                     <!-- SECTION 4: ASSIGNMENT INFORMATION                         -->

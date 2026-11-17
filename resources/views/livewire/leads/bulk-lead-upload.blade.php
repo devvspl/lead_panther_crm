@@ -155,7 +155,8 @@
                     />
                 </div>
 
-                <div class="space-y-1">
+                @canViewLeadSource
+<div class="space-y-1">
                     <label class="text-xs font-bold text-ink">Lead Source (Optional)</label>
                     <livewire:shared.searchable-select 
                         :model="\App\Models\LeadSource::class"
@@ -165,6 +166,7 @@
                         key="upload-source"
                     />
                 </div>
+@endcanViewLeadSource
             </div>
 
             <div class="flex items-center justify-between pt-4 border-t border-border">

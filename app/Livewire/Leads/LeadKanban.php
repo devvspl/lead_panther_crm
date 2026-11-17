@@ -814,7 +814,7 @@ class LeadKanban extends Component
         }
 
         // Lead Source Filter
-        if (!empty($this->source)) {
+        if (\App\Support\LeadSourceVisibility::allowed() && !empty($this->source)) {
             $query->where('lead_source_id', $this->source);
         }
 
@@ -1209,6 +1209,7 @@ class LeadKanban extends Component
         }
 
         // 3. Performance Breakdown Table & Chart based on active breakdownTab
+        if ($this->breakdownTab === 'source' && ! \App\Support\LeadSourceVisibility::allowed()) $this->breakdownTab = 'project';
         $allLeads = (clone $analyticsQuery)->get();
         $grouped = [];
 
@@ -1407,6 +1408,7 @@ class LeadKanban extends Component
 
     public function render()
     {
+        if (! \App\Support\LeadSourceVisibility::allowed()) $this->source = '';
         $canInternal = app(\App\Services\LeadDistributionService::class)->hasInternalQueueAccess(auth()->user());
         if ($this->queue === 'internal' && $canInternal) {
             return view('livewire.leads.lead-kanban', ['canInternalQueue' => true])->layout('layouts.app');
@@ -1458,7 +1460,7 @@ class LeadKanban extends Component
         $portalAccounts = PortalAccount::where('status', 'active')->get();
         $allProjects = Project::orderBy('name')->get();
         $allCampaigns = Campaign::orderBy('name')->get();
-        $allLeadSources = LeadSource::orderBy('name')->get();
+        $allLeadSources = \App\Support\LeadSourceVisibility::allowed() ? LeadSource::orderBy('name')->get() : collect();
         $allOrganizations = Organization::orderBy('name')->get();
         $activeFormMappings = $this->selectedPortalAccountId
             ? LeadFormMapping::where('portal_account_id', $this->selectedPortalAccountId)->where('status', 'active')->orderBy('form_name')->get()
@@ -2016,7 +2018,7 @@ class LeadKanban extends Component
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
                 ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
-                ['key' => 'lead_source_name', 'label' => 'Lead Source', 'type' => 'text', 'priority' => 2],
+                ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Lead Source', 'type' => 'text', 'priority' => 2]] : []),
                 ['key' => 'created_at', 'label' => 'Received Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
                 ['key' => 'assigned_to_user', 'label' => 'Assigned Team Member', 'type' => 'avatar-stack', 'priority' => 1],
                 ['key' => 'current_stage', 'label' => 'Current Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
@@ -2055,7 +2057,7 @@ class LeadKanban extends Component
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
             ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
-            ['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2],
+            ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2]] : []),
             ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted text-xs'],
             ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2, 'class' => 'text-ink text-xs'],
             ['key' => 'team_name', 'label' => 'Team', 'type' => 'text', 'priority' => 3, 'class' => 'text-muted text-xs'],
@@ -2322,6 +2324,7 @@ class LeadKanban extends Component
         ];
 
         $subtitle = 'Exported '.now()->format('d M Y, H:i T').($this->search ? " | Search: {$this->search}" : '').($this->project ? " | ProjectID: {$this->project}" : '');
+        if (! \App\Support\LeadSourceVisibility::allowed()) { unset($headings[9], $columns[9]); $headings = array_values($headings); $columns = array_values($columns); }
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 

@@ -58,7 +58,7 @@ class LeadPresenter
     {
         $shouldMask = static::shouldMaskPii($user);
 
-        return [
+        $data = [
             'id' => $lead->id,
             'lead_code' => $lead->lead_code,
             'name' => $lead->name,
@@ -78,5 +78,7 @@ class LeadPresenter
             'created_at' => $lead->created_at?->format('M d, Y H:i'),
             'is_masked' => $shouldMask,
         ];
+        if (! LeadSourceVisibility::allowed($user)) unset($data['source_name']);
+        return $data;
     }
 }

@@ -33,7 +33,7 @@ class LeadJourneyService
             'category' => 'Ingestion',
             'timestamp' => $lead->created_at ? Carbon::parse($lead->created_at) : now(),
             'title' => 'Lead Ingested & Captured',
-            'details' => "Lead {$lead->lead_code} was captured for Project '{$lead->projectName}' via Source '{$lead->leadSourceName}'. Initial Requirement: " . ($lead->requirement ?: 'Standard inquiry') . ".",
+            'details' => "Lead {$lead->lead_code} was captured for Project '{$lead->projectName}'" . (\App\Support\LeadSourceVisibility::allowed() ? " via Source '{$lead->leadSourceName}'" : '') . '. Initial Requirement: ' . ($lead->requirement ?: 'Standard inquiry') . '.',
             'icon' => 'sparkles',
             'color' => 'bg-blue-100 text-blue-900 border-blue-300',
             'badge' => 'Ingested',

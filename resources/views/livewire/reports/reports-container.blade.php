@@ -7,12 +7,14 @@
 
     <!-- Navigation Tabs -->
     <div class="border-b border-border flex flex-wrap items-center gap-2 pb-1">
-        <button 
+        @canViewLeadSource
+        <button
             wire:click="setTab('source')" 
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap {{ $activeTab === 'source' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"
         >
             Source Performance
         </button>
+@endcanViewLeadSource
         <button 
             wire:click="setTab('sla')" 
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap flex items-center space-x-1.5 {{ $activeTab === 'sla' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"

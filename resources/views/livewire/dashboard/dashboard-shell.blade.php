@@ -112,7 +112,8 @@
                 </div>
 
                 <!-- 5. Lead Source -->
-                <div class="flex flex-col space-y-1 w-full">
+                @canViewLeadSource
+<div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="filterLeadSourceId" 
@@ -122,6 +123,7 @@
                         :key="'dash-filter-src-'.($filterLeadSourceId ?? 'none')" 
                     />
                 </div>
+@endcanViewLeadSource
 
                 <!-- 6. Assigned Agent -->
                 <div class="flex flex-col space-y-1 w-full">
@@ -179,7 +181,7 @@
                             <button type="button" wire:click="$set('filterTeamId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                         </span>
                     @endif
-                    @if($filterLeadSourceId)
+                    @if(\App\Support\LeadSourceVisibility::allowed() && $filterLeadSourceId)
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
                             {{ $sourceOptions[$filterLeadSourceId] ?? $filterLeadSourceId }}
                             <button type="button" wire:click="$set('filterLeadSourceId', null)" class="text-muted hover:text-ink cursor-pointer">&times;</button>
@@ -436,7 +438,8 @@
                 </div>
 
                 <!-- Lead Source Performance Donut (1 Col) -->
-                <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+                @canViewLeadSource
+<div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
                     <div class="border-b border-border/70 pb-2">
                         <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Sources</h2>
                     </div>
@@ -457,6 +460,7 @@
                         @endforeach
                     </div>
                 </div>
+@endcanViewLeadSource
             </div>
 
             <!-- Row 2: Status Distribution (1 Col) + Organization Comparison (1 Col) + Top Sales Agents (1 Col) -->
@@ -767,9 +771,11 @@
                                         <a href="{{ route('leads.index') }}" wire:navigate class="hover:text-blue-600 transition">
                                             #{{ $lead->lead_code }} &bull; {{ $lead->name }}
                                         </a>
-                                        <span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-canvas border border-border text-muted">
+                                        @canViewLeadSource
+<span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-medium bg-canvas border border-border text-muted">
                                             {{ ucfirst($lead->leadSource?->name ?: 'Direct') }}
                                         </span>
+@endcanViewLeadSource
                                     </div>
                                     <div class="text-[11px] text-muted">
                                         {{ $lead->client?->organization?->name ?: 'HQ' }} &bull; {{ substr($lead->mobile, 0, 4) . '***' . substr($lead->mobile, -3) }}

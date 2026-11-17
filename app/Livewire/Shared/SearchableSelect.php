@@ -82,6 +82,7 @@ class SearchableSelect extends Component
         $selectedLabel = null;
 
         if ($this->model && class_exists($this->model)) {
+            abort_if($this->model === \App\Models\LeadSource::class && ! \App\Support\LeadSourceVisibility::allowed(), 403);
             $query = $this->model::query();
 
             // Org Scoping for User model if non-super-admin user has organization_id

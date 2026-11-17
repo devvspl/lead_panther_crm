@@ -21,6 +21,15 @@ class Lead extends Model
     // Transient service context: the assignment observer has already written the inbox alert.
     public bool $webAssignmentRecorded = false;
 
+    public function toArray(): array
+    {
+        $data = parent::toArray();
+        if (! \App\Support\LeadSourceVisibility::allowed()) {
+            foreach (['lead_source_id', 'lead_source', 'leadSource', 'lead_source_name', 'source_name', 'source', 'metadata', 'meta'] as $key) unset($data[$key]);
+        }
+        return $data;
+    }
+
     protected $casts = [
         'first_response_at' => 'datetime',
         'delivery_at' => 'datetime',

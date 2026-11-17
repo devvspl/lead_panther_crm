@@ -36,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Blade::if('canViewLeadSource', fn () => \App\Support\LeadSourceVisibility::allowed());
         \Illuminate\Support\Facades\RateLimiter::for('browser-push-subscribe', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by('push-subscribe:'.$request->user()?->id));
         \Illuminate\Support\Facades\RateLimiter::for('browser-push-test', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(2)->by('push-test:'.$request->user()?->id));
         // Super Admin Gate Bypass

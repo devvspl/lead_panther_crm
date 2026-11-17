@@ -124,7 +124,8 @@
                 </div>
 
                 <!-- 3. Lead Source -->
-                <div class="flex flex-col space-y-1 w-full">
+                @canViewLeadSource
+<div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="source" 
@@ -134,6 +135,7 @@
                         :key="'b-leads-src-'.($source ?? 'none')" 
                     />
                 </div>
+@endcanViewLeadSource
 
                 <!-- 4. Team Member / Assigned -->
                 <div class="flex flex-col space-y-1 w-full">
@@ -213,7 +215,8 @@
             </div>
 
             <!-- 4. Lead Source -->
-            <div class="flex flex-col space-y-1 w-full">
+            @canViewLeadSource
+<div class="flex flex-col space-y-1 w-full">
                 <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
                 <livewire:shared.searchable-select 
                     wire:model.live="source" 
@@ -223,6 +226,7 @@
                     :key="'leads-filter-src-'.($source ?? 'none')" 
                 />
             </div>
+@endcanViewLeadSource
 
             <!-- 5. Sales Team -->
             <div class="flex flex-col space-y-1 w-full">
@@ -323,7 +327,7 @@
                         <button type="button" wire:click="$set('project', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
-                @if($source)
+                @if(\App\Support\LeadSourceVisibility::allowed() && $source)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
                         Source: #{{ $source }}
                         <button type="button" wire:click="$set('source', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
@@ -559,6 +563,7 @@
                     'organization' => 'By Org',
                     'overview' => 'By Type',
                 ] as $tabKey => $tabLabel)
+                    @continue($tabKey === 'source' && ! \App\Support\LeadSourceVisibility::allowed())
                     <button type="button" wire:click="$set('breakdownTab', '{{ $tabKey }}')"
                         class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $breakdownTab === $tabKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
                         {{ $tabLabel }}
@@ -1037,9 +1042,11 @@
                                                         {{ $lead->campaign->name }}
                                                     </span>
                                                 @endif
-                                                <span class="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-canvas text-muted border border-border">
+                                                @canViewLeadSource
+<span class="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-canvas text-muted border border-border">
                                                     {{ $lead->leadSource?->name ?: 'Direct' }}
                                                 </span>
+@endcanViewLeadSource
                                             </div>
                                         </div>
 
@@ -1333,7 +1340,8 @@
                         </select>
                         @error('manualProjectId') <span class="text-rose-500 text-[10px]">{{ $message }}</span> @enderror
                     </div>
-                    <div>
+                    @canViewLeadSource
+<div>
                         <label class="font-bold text-ink">Lead Source</label>
                         <select wire:model="manualLeadSourceId" class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                             <option value="">Direct Entry</option>
@@ -1342,6 +1350,7 @@
                             @endforeach
                         </select>
                     </div>
+@endcanViewLeadSource
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -15,6 +15,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SourcePerformance extends Component
 {
+    public function boot(): void { abort_unless(\App\Support\LeadSourceVisibility::allowed(), 403); }
     use WithPagination;
 
     public int $days = 30;

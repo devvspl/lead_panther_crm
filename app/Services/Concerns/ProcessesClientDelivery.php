@@ -268,7 +268,16 @@ trait ProcessesClientDelivery
             }, 3);
             if (!$progressed) return false;
         }
-        return LeadDeliveryRun::whereKey($runId)->whereIn('status', ['queued', 'running'])->exists();
+        return DB::transaction(function () use ($runId) {
+            $ref = LeadDeliveryRun::findOrFail($runId);
+            $plan = LeadDeliveryPlan::whereKey($ref->plan_id)->lockForUpdate()->firstOrFail();
+            $run = LeadDeliveryRun::whereKey($runId)->lockForUpdate()->firstOrFail();
+            if ($plan->state !== 'active' || !in_array($run->status, ['queued', 'running'])) return false;
+            if ($run->items()->where('status', 'queued')->exists()) return true;
+            $run->update(['status' => 'completed', 'finished_at' => now()]);
+            $this->advanceClientDelivery($plan);
+            return false;
+        }, 3);
     }
 
     public function controlClientDelivery(LeadDeliveryPlan $plan, string $action, User $actor): void

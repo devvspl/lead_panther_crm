@@ -108,9 +108,17 @@ class ClientDeliveryCenter extends Component
 
     protected function launchCycle(LeadDeliveryPlan $plan, bool $manual): void
     {
-        if ($run = app(LeadDistributionService::class)->startClientDeliveryCycle($plan->id, $manual)) {
-            \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id);
-            $this->dispatch('toast', type: 'success', message: 'Delivery cycle queued. Progress updates automatically.');
+        $service = app(LeadDistributionService::class);
+        if ($run = $service->startClientDeliveryCycle($plan->id, $manual)) {
+            // Give explicit user actions immediate progress without draining a large batch in HTTP.
+            $remaining = $service->processClientDeliveryRun($run->id, 1);
+            if ($remaining) \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id);
+            $failed = $run->items()->where('status', 'failed')->exists();
+            $sent = $run->items()->where('status', 'sent')->count();
+            $this->dispatch('lead-updated');
+            $this->dispatch('toast', type: $failed ? 'error' : 'success', message: $failed
+                ? 'A delivery failed. Open Delivery History for the reason and retry.'
+                : ($sent.' lead(s) delivered.'.($remaining ? ' Remaining leads are queued for background delivery.' : '')));
         } else $this->dispatch('toast', type: 'info', message: 'No delivery can start now. Check pending leads, state, working dates/hours and remaining daily capacity.');
     }
     public function runNow(): void

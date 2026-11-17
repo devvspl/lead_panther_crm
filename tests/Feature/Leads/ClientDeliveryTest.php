@@ -236,6 +236,7 @@ class ClientDeliveryTest extends TestCase
         $plan = LeadDeliveryPlan::where('organization_id', $this->source->organization_id)->firstOrFail();
         $run = $plan->runs()->firstOrFail();
         Queue::assertPushed(\App\Jobs\ProcessClientDeliveryRun::class, fn ($job) => $job->runId === $run->id);
+        $this->assertSame(1, $plan->items()->where('status', 'sent')->count());
         (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
         $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
         $this->assertSame(2, CreditTransaction::where('client_id', $this->destination->id)->count());
@@ -253,14 +254,33 @@ class ClientDeliveryTest extends TestCase
         $plan = LeadDeliveryPlan::where('organization_id', $this->source->organization_id)->firstOrFail();
         $this->assertFalse($plan->settings['automatic']);
         $run = $plan->runs()->firstOrFail();
-        (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
+        $this->assertSame('completed', $run->status);
         $this->assertSame('sent', $plan->items()->firstOrFail()->status);
         $nextIds = $this->leads(1);
         $this->service()->enqueueClientLeads($plan, $nextIds, true, $this->admin);
         $component->call('openPush', $this->source->organization_id, $ids)->call('pushLeads')->assertHasNoErrors();
         $this->assertSame(1, $plan->runs()->count());
         $this->assertSame(1, $plan->items()->where('status', 'pending')->count());
-        Queue::assertPushed(\App\Jobs\ProcessClientDeliveryRun::class, 1);
+        Queue::assertNotPushed(\App\Jobs\ProcessClientDeliveryRun::class);
+    }
+
+    public function test_send_cycle_now_recovers_a_queued_run_and_makes_the_lead_visible_without_a_worker(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(1);
+        $plan = $this->plan(['frequency' => 'immediate', 'quantity' => 1]);
+        $this->service()->enqueueClientLeads($plan, $ids, true, $this->admin);
+        $run = $this->service()->startClientDeliveryCycle($plan->id, true);
+        $this->assertSame('queued', $run->status);
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->call('runNow')->assertHasNoErrors();
+        $this->assertSame('completed', $run->fresh()->status);
+        $this->assertSame(1, $plan->items()->where('status', 'sent')->count());
+        Queue::assertNotPushed(\App\Jobs\ProcessClientDeliveryRun::class);
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(1, Lead::panelQuery()->whereIn('id', $ids)->count());
+        $this->service()->processClientDeliveryRun($run->id, 1);
+        $this->assertSame(1, CreditTransaction::where('client_id', $this->destination->id)->count());
     }
 
     public function test_simple_scheduled_settings_enable_automation_and_send_all_needs_no_checkbox(): void

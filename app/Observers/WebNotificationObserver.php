@@ -32,7 +32,7 @@ class WebNotificationObserver
                     $key = 'direct-assignment:'.$model->id.':'.\Illuminate\Support\Str::uuid();
                     $service->leadAlert($model, 'lead_assigned', 'Lead reassigned', "Assignment updated for lead {$model->lead_code}.", $key, 'assignment');
                     $old = User::find($model->getOriginal('assigned_to'));
-                    if ($old) $service->sendWeb($old, 'lead_reassigned', 'Lead reassigned', "Lead {$model->lead_code} has been reassigned.", $key.':old', 'assignment', User::find($model->client_id)?->organization_id);
+                    if ($old) $service->sendWeb($old, 'lead_reassigned', 'Lead reassigned', "Lead {$model->lead_code} has been reassigned.", $key.':old', 'assignment', User::find($model->client_id)?->organization_id, 'lead', $model->id);
                 }
             }
             if (! $created && $model->wasChanged('delivery_failed_at') && $model->delivery_failed_at) {
@@ -72,7 +72,7 @@ class WebNotificationObserver
             $service->leadAlert($lead, 'lead_assigned', 'Lead assigned', "Lead {$lead->lead_code} was assigned to {$new?->name}.", 'assignment:'.$model->id, 'assignment');
             if ($oldId && $oldId != $model->assigned_to && ($old = User::find($oldId))) {
                 $service->sendWeb($old, 'lead_reassigned', 'Lead reassigned', "Lead {$lead->lead_code} has been reassigned to another team member.", 'unassigned:'.$model->id,
-                    'assignment', User::find($lead->client_id)?->organization_id);
+                    'assignment', User::find($lead->client_id)?->organization_id, 'lead', $lead->id);
             }
         }
         if ($model instanceof LeadReplacement) {

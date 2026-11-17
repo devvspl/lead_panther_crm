@@ -1568,13 +1568,13 @@
                     <label class="block text-xs font-semibold text-ink mb-1">
                         Replacement Reason <span class="text-rose-500">*</span>
                     </label>
-                    <select wire:model="returnReasonId"
-                        class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition cursor-pointer">
-                        <option value="">-- Select Reason --</option>
-                        @foreach($replacementReasons as $reason)
-                            <option value="{{ $reason->id }}">{{ $reason->label }}</option>
-                        @endforeach
-                    </select>
+                    <x-ui.themed-select
+                        wire:model="returnReasonId"
+                        :options="$replacementReasons->pluck('label', 'id')->all()"
+                        :searchable="true"
+                        placeholder="-- Select Reason --"
+                        class="w-full"
+                    />
                     @error('returnReasonId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
 

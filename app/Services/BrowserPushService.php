@@ -37,6 +37,7 @@ class BrowserPushService
     }
 
     public function authorized(SystemNotification $notification, User $user): bool {
+        if (! app(NotificationDeliveryService::class)->inbox($user)->whereKey($notification->id)->exists()) return false;
         return in_array($notification->notifiable_type, [User::class, \App\Models\Client::class])
             && (int) $notification->notifiable_id === $user->id && $user->status === 'active'
             && ($user->hasAnyRole(['Super Admin', 'super-admin']) || $user->organization_id == $notification->organization_id)

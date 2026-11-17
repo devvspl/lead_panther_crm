@@ -61,7 +61,29 @@ class WebNotificationTest extends TestCase
         $this->assertFalse(app(LeadDistributionService::class)->releaseDelivery($lead->id));
         $this->assertSame(1, $this->builder->notifications()->where('data->type', 'lead_delivered')->count());
         $this->lead(); $this->lead();
-        $this->assertSame(1, $this->builder->notifications()->where('data->type', 'delivery_queued')->count());
+        $this->assertSame(0, $this->builder->notifications()->where('data->type', 'delivery_queued')->count());
+        $this->assertSame(1, $this->admin->notifications()->where('data->type', 'delivery_queued')->count());
+    }
+
+    public function test_pending_leads_do_not_notify_clients_and_old_premature_alerts_are_hidden(): void
+    {
+        $lead = $this->lead();
+        $lead->update(['delivery_failed_at' => now(), 'assigned_to' => $this->executive->id]);
+        $service = app(NotificationDeliveryService::class);
+        $this->assertSame(0, $this->builder->notifications()->count());
+        $this->assertSame(0, $this->executive->notifications()->count());
+        $this->assertSame(1, $this->admin->notifications()->where('data->type', 'delivery_failed')->count());
+        foreach (['delivery_failed', 'lead_assigned'] as $type) {
+            DatabaseNotification::create(['id' => (string) \Illuminate\Support\Str::uuid(), 'type' => \App\Notifications\WebNotification::class,
+                'notifiable_type' => User::class, 'notifiable_id' => $this->builder->id, 'organization_id' => $this->org->id,
+                'data' => ['type' => $type, 'entity_type' => $type === 'delivery_failed' ? 'campaign' : 'lead', 'entity_id' => $type === 'delivery_failed' ? $lead->campaign_id : $lead->id, 'title' => 'Premature notification', 'message' => $lead->lead_code]]);
+        }
+        $this->assertSame(0, $service->inbox($this->builder)->count());
+        Livewire::actingAs($this->builder)->test(NotificationBell::class)->assertDontSee('Premature notification');
+        $this->actingAs($this->admin);
+        $this->assertTrue(app(LeadDistributionService::class)->releaseDelivery($lead->id));
+        $this->assertSame(1, $service->inbox($this->builder)->where('data->type', 'lead_delivered')->count());
+        $this->assertSame(0, $service->inbox($this->builder)->where('data->type', 'delivery_failed')->count());
     }
 
     public function test_notifications_roll_back_with_business_transaction(): void
@@ -168,7 +190,8 @@ class WebNotificationTest extends TestCase
         $lead = $this->lead();
         $this->assertFalse(app(LeadDistributionService::class)->releaseDelivery($lead->id));
         $this->assertFalse(app(LeadDistributionService::class)->releaseDelivery($lead->id));
-        $this->assertSame(1, $this->builder->notifications()->where('data->type', 'delivery_failed')->count());
+        $this->assertSame(0, $this->builder->notifications()->where('data->type', 'delivery_failed')->count());
+        $this->assertSame(1, $this->admin->notifications()->where('data->type', 'delivery_failed')->count());
         $this->assertSame(0, $this->builder->notifications()->where('data->type', 'lead_delivered')->count());
         CreditWallet::where('client_id', $this->builder->id)->update(['balance' => 1000]);
         $this->assertTrue(app(LeadDistributionService::class)->releaseDelivery($lead->id));
@@ -190,7 +213,8 @@ class WebNotificationTest extends TestCase
         $other = User::factory()->create(['organization_id' => $this->org->id, 'status' => 'active']); $other->assignRole('sales-executive');
         $lead->update(['assigned_to' => $other->id]);
         $this->assertSame(1, $other->notifications()->where('data->type', 'lead_assigned')->count());
-        $this->assertSame(1, $this->executive->notifications()->where('data->type', 'lead_reassigned')->count());
+        // The former assignee no longer has access to this lead.
+        $this->assertSame(0, $this->executive->notifications()->where('data->type', 'lead_reassigned')->count());
         $this->assertSame(0, $this->outsider->notifications()->where('organization_id', $this->org->id)->count());
     }
 
@@ -232,7 +256,7 @@ class WebNotificationTest extends TestCase
         $lead->refresh()->update(['assigned_to' => $other->id]);
         $lead->update(['assigned_to' => $this->executive->id]);
         $this->assertSame(2, $this->executive->notifications()->where('data->type', 'lead_assigned')->count());
-        $this->assertSame(1, $other->notifications()->where('data->type', 'lead_reassigned')->count());
+        $this->assertSame(0, $other->notifications()->where('data->type', 'lead_reassigned')->count());
     }
 
     public function test_existing_crm_delivery_channel_creates_a_real_inbox_entry_and_retries_do_not_duplicate_it(): void

@@ -13,6 +13,20 @@ use Illuminate\Support\Facades\Log;
 class NotificationDeliveryService
 {
     public const WEB_CATEGORIES = ['assignment', 'followup', 'sla', 'replacement', 'delivery'];
+    public const ADMIN_DELIVERY_TYPES = ['delivery_failed', 'delivery_queued', 'daily_limit_reached', 'delivery_limit_reached'];
+
+    protected function deliveredLeadsFor(User $user)
+    {
+        $query = Lead::withoutGlobalScopes()->where('delivery_pending', false)
+            ->where('internal_processing_pending', false)->whereNotNull('delivered_at');
+        $role = \App\Support\NavigationConfig::getRoleKey($user);
+        if ($role === 'team-leader') return \App\Support\TeamAccess::scopeLeads($query, $user);
+        if ($role === 'sales-executive') return $query->where('assigned_to', $user->id);
+        return $query->where(function ($q) use ($user, $role) {
+            $q->where('client_id', $user->id);
+            if ($role === 'builder' && $user->organization_id) $q->orWhereHas('client', fn ($owner) => $owner->where('organization_id', $user->organization_id));
+        });
+    }
 
     public function managedNotifications(User $user)
     {
@@ -28,6 +42,14 @@ class NotificationDeliveryService
         if (! $user->hasAnyRole(['Super Admin', 'super-admin'])) {
             $query->where('organization_id', $user->organization_id);
             $query->where(fn ($row) => $row->whereNull('data->quarantined')->orWhere('data->quarantined', false));
+            $query->where(fn ($row) => $row->whereNull('data->type')->orWhereNotIn('data->type', self::ADMIN_DELIVERY_TYPES));
+            $query->where(function ($row) use ($user) {
+                $row->where(function ($unrelated) {
+                    $unrelated->where(fn ($entity) => $entity->whereNull('data->entity_type')->orWhereNotIn('data->entity_type', ['lead', Lead::class]))->whereNull('data->lead_id');
+                })->orWhere(function ($lead) use ($user) {
+                    $lead->whereIn('data->entity_type', ['lead', Lead::class])->whereIn('data->entity_id', $this->deliveredLeadsFor($user)->select('leads.id'));
+                })->orWhereIn('data->lead_id', $this->deliveredLeadsFor($user)->select('leads.id'));
+            });
         }
         return $query;
     }
@@ -42,6 +64,10 @@ class NotificationDeliveryService
         string $category, ?int $organizationId, ?string $entityType = null, ?int $entityId = null, bool $important = false, bool $sendEmail = true, bool $sendPush = true): ?\Illuminate\Notifications\DatabaseNotification
     {
         if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && $recipient->organization_id != $organizationId) return null;
+        if (! $recipient->hasAnyRole(['Super Admin', 'super-admin'])) {
+            if (in_array($type, self::ADMIN_DELIVERY_TYPES, true)) return null;
+            if (in_array($entityType, ['lead', Lead::class], true) && ! $this->deliveredLeadsFor($recipient)->whereKey($entityId)->exists()) return null;
+        }
         if ($recipient->status !== 'active' || ! $this->webAllowed($recipient, $category, $important)) return null;
         $hash = hash('sha256', $recipient->id.'|'.$eventKey);
         $id = substr($hash, 0, 8).'-'.substr($hash, 8, 4).'-'.substr($hash, 12, 4).'-'.substr($hash, 16, 4).'-'.substr($hash, 20, 12);
@@ -103,7 +129,7 @@ class NotificationDeliveryService
         }
         $orgId = User::find($lead->client_id)?->organization_id;
         foreach ($this->organizationRecipients($orgId, $lead->client_id, $lead->assigned_to, $adminsOnly) as $recipient) {
-            if ($lead->delivery_pending && $category === 'delivery' && \App\Support\NavigationConfig::getRoleKey($recipient) === 'sales-executive') continue;
+            if (! $recipient->hasAnyRole(['Super Admin', 'super-admin']) && ($lead->delivery_pending || $lead->internal_processing_pending || ! $lead->delivered_at)) continue;
             $queued = $lead->delivery_pending && $category === 'delivery' && $lead->campaign_id;
             $this->sendWeb($recipient, $type, $title, $message, $eventKey, $category, $orgId, $queued ? 'campaign' : 'lead', $queued ? $lead->campaign_id : $lead->id, $important);
         }

@@ -24,6 +24,7 @@ class SendNotificationEmail implements ShouldQueue
             if (! $notification || ! app(EmailDesignService::class)->enabled()) return;
             if (! in_array($notification->notifiable_type, [User::class, \App\Models\Client::class])) return;
             $user = User::find($notification->notifiable_id);
+            if ($user && ! app(NotificationDeliveryService::class)->inbox($user)->whereKey($notification->id)->exists()) return;
             $data = $notification->data;
             if (! $user || $user->status !== 'active' || ! filter_var($user->email, FILTER_VALIDATE_EMAIL) || ($data['quarantined'] ?? false)) return;
             if (! $user->hasAnyRole(['Super Admin', 'super-admin']) && $user->organization_id != $notification->organization_id) return;

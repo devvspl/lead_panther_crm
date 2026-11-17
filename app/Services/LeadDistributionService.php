@@ -485,14 +485,6 @@ class LeadDistributionService
 
             $assignerId = auth()->id() ?? User::where('id', 1)->value('id') ?? User::value('id') ?? $user->id;
 
-            // Create assignment record
-            LeadAssignment::create([
-                'lead_id' => $lead->id,
-                'assigned_to' => $user->id,
-                'assigned_by' => $assignerId,
-                'assigned_at' => now(),
-            ]);
-
             $newStage = ($oldStage === 'new' || empty($oldStage)) ? 'assigned' : $oldStage;
 
             $lead->webAssignmentRecorded = true;
@@ -505,6 +497,14 @@ class LeadDistributionService
             } finally {
                 $lead->webAssignmentRecorded = false;
             }
+
+            // Persist the recipient before the assignment observer checks lead access.
+            LeadAssignment::create([
+                'lead_id' => $lead->id,
+                'assigned_to' => $user->id,
+                'assigned_by' => $assignerId,
+                'assigned_at' => now(),
+            ]);
 
             // Status transition history
             LeadStatusHistory::create([

@@ -4,6 +4,5 @@
         <button type="button" data-push-action="enable" class="rounded-lg bg-ink px-3 py-2 text-white disabled:opacity-50" disabled>Enable on this browser</button>
         <button type="button" data-push-action="disable" class="rounded-lg border border-border px-3 py-2 disabled:opacity-50" disabled>Disable</button>
         <button type="button" data-push-action="test" class="rounded-lg border border-border px-3 py-2 disabled:opacity-50" disabled>Test Push</button>
-        <button type="button" data-push-action="retry" class="rounded-lg border border-border px-3 py-2 disabled:opacity-50">Check Again</button>
     </div>
 </div>

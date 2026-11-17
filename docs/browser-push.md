@@ -2,7 +2,9 @@
 
 Browser push is integrated with the existing database notification events. In-app polling and broadcasting remain available. No permission prompt runs automatically: signed-in users open the notification bell, choose **Enable on this browser**, and approve the browser prompt. They can disable only their own browser subscription or use **Test Push**.
 
-The controls load from the versioned standalone `public/browser-push.js` script, independently of the Vite bundle, including when fallback assets are used. Deploy this file together with the updated shared asset view. Server and worker status checks have timeouts, and **Check Again** retries a failed setup check. A denied browser permission shows site-settings instructions instead of repeatedly requesting permission. After updating an older deployment, clear Laravel's view/config caches and hard-refresh the page.
+Authenticated CRM pages also check browser subscription status on entry. If push is configured on the server and this browser is not subscribed, an in-app modal offers **Enable Notifications** and **Not Now**. This reuses the existing modal component and push subscription flow. Only clicking Enable requests the native browser permission. Once displayed/dismissed, the prompt is remembered in sessionStorage using a user/login-session-specific key, avoiding repeated prompts during navigation. Already-enabled browsers, unsupported contexts and unconfigured servers do not get the prompt. Blocked permissions display browser site-settings guidance; the app cannot override a browser denial.
+
+The controls load from the versioned standalone `public/browser-push.js` script, independently of the Vite bundle, including when fallback assets are used. Deploy this file together with the updated shared asset view. Server and worker status checks have timeouts and show refresh guidance if they fail. A denied browser permission shows site-settings instructions instead of repeatedly requesting permission. After updating an older deployment, clear Laravel's view/config caches and hard-refresh the page.
 
 ## Deployment
 

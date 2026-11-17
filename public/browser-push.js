@@ -3,6 +3,30 @@ if (window.leadPantherPushLoaded) return;
 window.leadPantherPushLoaded = true;
 const supported = () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const decodeKey = (key) => Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4)), c => c.charCodeAt(0));
+const shownPrompts = new Set();
+const pendingPrompts = new Set();
+let modalReady = document.readyState === 'complete';
+
+function closePrompt(node) {
+    if (node.dataset.pushPrompt) window.dispatchEvent(new CustomEvent('close-modal', { detail: node.dataset.pushPrompt }));
+}
+
+function maybePrompt(node) {
+    if (!node.dataset.pushPrompt || !node.pushConfig?.configured || node.pushEnabled || node.isConnected === false) return;
+    if (!modalReady) { pendingPrompts.add(node); return; }
+    const key = node.dataset.promptKey;
+    if (shownPrompts.has(key)) return;
+    try { if (window.sessionStorage.getItem(key)) return; } catch {}
+    shownPrompts.add(key);
+    try { window.sessionStorage.setItem(key, '1'); } catch {}
+    window.dispatchEvent(new CustomEvent('open-modal', { detail: node.dataset.pushPrompt }));
+}
+
+function modalsInitialized() {
+    modalReady = true;
+    pendingPrompts.forEach(maybePrompt);
+    pendingPrompts.clear();
+}
 
 async function bounded(promise, message, milliseconds = 12000) {
     let timer;
@@ -27,27 +51,33 @@ async function request(node, action, body) {
     if (!response.ok) throw new Error(result.message || 'Browser notification request failed.');
     return result;
     } catch (error) {
-        if (error.name === 'AbortError') throw new Error('Push server did not respond. Click Check Again to retry.');
+        if (error.name === 'AbortError') throw new Error('Push server did not respond. Refresh the page to retry.');
         throw error;
     } finally { clearTimeout(timer); }
 }
 
 function show(node, text, enabled = false, ready = false) {
+    node.pushEnabled = enabled;
     node.querySelector('[data-push-status]').textContent = text;
     node.querySelector('[data-push-action="enable"]').disabled = !ready || enabled;
-    node.querySelector('[data-push-action="disable"]').disabled = !enabled;
-    node.querySelector('[data-push-action="test"]').disabled = !enabled;
-    node.querySelector('[data-push-action="retry"]').disabled = false;
+    const disable = node.querySelector('[data-push-action="disable"]');
+    const test = node.querySelector('[data-push-action="test"]');
+    if (disable) disable.disabled = !enabled;
+    if (test) test.disabled = !enabled;
+    const dismiss = node.querySelector('[data-push-action="dismiss"]');
+    if (dismiss) dismiss.disabled = false;
+    if (enabled) closePrompt(node);
+    else if (ready || (typeof Notification !== 'undefined' && Notification.permission === 'denied')) maybePrompt(node);
 }
 
 async function refresh(node) {
     if (!supported()) { show(node, 'Requires HTTPS and a supported browser.'); return; }
-    if (Notification.permission === 'denied') { show(node, 'Blocked. Allow notifications in browser site settings.'); return; }
     const config = await request(node, 'config');
     node.pushConfig = config;
     if (!config.configured) { show(node, 'Server setup required.'); return; }
-    const registration = await bounded(navigator.serviceWorker.getRegistration(config.workerUrl), 'Browser worker status timed out. Click Check Again.');
-    const subscription = registration ? await bounded(registration.pushManager.getSubscription(), 'Browser subscription check timed out. Click Check Again.') : null;
+    if (Notification.permission === 'denied') { show(node, 'Blocked. Allow notifications in browser site settings.'); return; }
+    const registration = await bounded(navigator.serviceWorker.getRegistration(config.workerUrl), 'Browser worker status timed out. Refresh the page.');
+    const subscription = registration ? await bounded(registration.pushManager.getSubscription(), 'Browser subscription check timed out. Refresh the page.') : null;
     const enabled = subscription ? (await request(node, 'status', { endpoint: subscription.endpoint })).subscribed : false;
     show(node, enabled ? 'Enabled on this browser' : 'Not enabled on this browser', enabled, true);
 }
@@ -57,7 +87,7 @@ function initialize() {
         if (node.pushInitializedV2) return;
         node.pushInitializedV2 = true;
         node.pushInitialized = true;
-        refresh(node).catch(error => show(node, error.message || 'Unable to check push status. Click Check Again.'));
+        refresh(node).catch(error => show(node, error.message || 'Unable to check push status. Refresh the page.'));
     });
 }
 
@@ -66,9 +96,9 @@ document.addEventListener('click', async (event) => {
     const node = button?.closest('[data-browser-push]');
     if (!node || button.disabled) return;
     const action = button.dataset.pushAction;
+    if (action === 'dismiss') { closePrompt(node); return; }
     node.querySelectorAll('button').forEach(item => item.disabled = true);
     try {
-        if (action === 'retry') { await refresh(node); return; }
         if (action === 'enable') {
             // Request permission directly from the user gesture, never on page load.
             node.querySelector('[data-push-status]').textContent = 'Allow notifications in the browser prompt...';
@@ -103,11 +133,13 @@ document.addEventListener('click', async (event) => {
         }
         await refresh(node);
     } catch (error) {
-        show(node, error.message || 'Could not update browser notifications. Click Check Again.');
+        show(node, error.message || 'Could not update browser notifications. Refresh the page to retry.');
     }
 }, true);
 
 document.addEventListener('DOMContentLoaded', initialize);
+document.addEventListener('DOMContentLoaded', () => setTimeout(modalsInitialized, 0));
+document.addEventListener('livewire:initialized', modalsInitialized);
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'notifications-refresh') window.Livewire?.dispatch('notifications-refresh');
 });

@@ -290,6 +290,7 @@
 
         <!-- Global Reusable Confirmation Modal -->
         <x-ui.confirmation-modal />
+        <x-ui.browser-push-prompt />
 
         @livewireScripts
     </body>

@@ -27,18 +27,23 @@ trait ProcessesClientDelivery
     protected function deliveryAudit(string $action, $record, array $before, array $after, ?int $actorId): void
     {
         AuditLog::create(['user_id' => $actorId, 'action' => $action, 'subject_type' => get_class($record), 'subject_id' => $record->id,
+            'organization_id' => $record instanceof LeadDeliveryPlan ? $record->organization_id : LeadDeliveryPlan::find($record->plan_id)?->organization_id,
+            'context' => ['category' => 'lead_delivery', 'status' => str_ends_with($action, '.failed') ? 'failure' : 'success'],
             'from_value' => json_encode($before), 'to_value' => json_encode($after), 'created_at' => now()]);
     }
 
     public function saveClientDeliveryPlan(Organization $source, array $input, User $actor): LeadDeliveryPlan
     {
         $this->deliveryAdmin($actor);
+        // Inactive caps are ignored, including their stale form values.
+        if (($input['quantity_mode'] ?? null) === 'all') $input['quantity'] = $input['max_cycle'] = null;
+        if (array_key_exists('daily_enabled', $input) && !filter_var($input['daily_enabled'], FILTER_VALIDATE_BOOLEAN)) $input['daily_limit'] = null;
         $data = Validator::make($input, [
             'client_id' => 'required|integer|exists:users,id', 'project_id' => 'required|integer|exists:projects,id', 'campaign_id' => 'required|integer|exists:campaigns,id',
             'frequency' => ['required', Rule::in(self::DELIVERY_FREQUENCIES)],
             'quantity_mode' => ['required', Rule::in(['fixed', 'all'])], 'quantity' => 'required_if:quantity_mode,fixed|nullable|integer|min:1|max:1000000',
             'max_cycle' => 'nullable|integer|min:1|max:1000000', 'daily_enabled' => 'required|boolean', 'daily_limit' => 'required_if:daily_enabled,true|nullable|integer|min:1|max:1000000',
-            'automatic' => 'required|boolean', 'timezone' => 'required|timezone', 'start_date' => 'nullable|date_format:Y-m-d', 'end_date' => 'nullable|date_format:Y-m-d|after_or_equal:start_date',
+            'automatic' => 'required|boolean', 'timezone' => 'required|timezone', 'start_date' => 'nullable|date_format:Y-m-d', 'end_date' => 'nullable|date_format:Y-m-d'.(!empty($input['start_date']) ? '|after_or_equal:start_date' : ''),
             'window_start' => 'required|date_format:H:i', 'window_end' => 'required|date_format:H:i|after:window_start',
             'daily_time' => 'required|date_format:H:i', 'weekly_day' => 'required|integer|min:0|max:6',
             'working_days' => 'required|array|min:1', 'working_days.*' => 'integer|min:0|max:6|distinct',
@@ -145,7 +150,7 @@ trait ProcessesClientDelivery
                 $item = LeadDeliveryItem::create(['plan_id' => $plan->id, 'lead_id' => $lead->id, 'source_client_id' => $lead->client_id, 'source_campaign_id' => $lead->campaign_id,
                     'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $plan->campaign_id, 'requested_by' => $actor->id, 'status' => 'pending']);
                 $lead->update(['delivery_plan_id' => $plan->id, 'delivery_pending' => true, 'delivery_consent_at' => now(), 'delivery_consent_by' => $actor->id]);
-                $this->deliveryAudit('delivery.enqueued', $item, [], $item->getAttributes(), $actor->id);
+                $this->deliveryAudit('delivery.enqueued', $item, [], array_merge($item->getAttributes(), ['consent_confirmed_by' => $actor->id, 'consent_confirmed_at' => now()->toIso8601String()]), $actor->id);
                 $count++;
             }
             return ['queued' => $count, 'skipped' => count($ids) - $count];
@@ -245,6 +250,12 @@ trait ProcessesClientDelivery
                 $item->update(['status' => $reason ? 'failed' : 'sent', 'failure_reason' => $reason, 'attempts' => $item->attempts + 1, 'sent_at' => $reason ? null : now()]);
                 $item->attemptHistory()->create(['run_id' => $run->id, 'status' => $item->status, 'failure_reason' => $reason]);
                 $this->deliveryAudit('delivery.'.$item->status, $item, [], ['lead_id' => $item->lead_id, 'run_id' => $run->id, 'reason' => $reason], $item->requested_by);
+                if ($reason && $lead && !$lead->fresh()->delivery_failed_at) {
+                    foreach (app(\App\Services\NotificationDeliveryService::class)->organizationRecipients($plan->organization_id, null, null, true) as $admin) {
+                        app(\App\Services\NotificationDeliveryService::class)->sendWeb($admin, 'delivery_failed', 'Client lead transfer failed',
+                            $lead->lead_code.': '.$reason, 'client-transfer-failed:'.$item->id.':'.$item->attempts, 'delivery', $plan->organization_id, 'lead', $lead->id, true);
+                    }
+                }
                 if (!$reason) $this->distribute($lead->fresh());
                 return true;
             }, 3);

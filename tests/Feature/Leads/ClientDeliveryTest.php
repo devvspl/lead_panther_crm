@@ -96,7 +96,7 @@ class ClientDeliveryTest extends TestCase
 
     public function test_send_all_bypasses_quantity_and_max_cycle_but_respects_separate_daily_limit(): void
     {
-        $plan = $this->plan(['quantity_mode' => 'all', 'quantity' => 1, 'max_cycle' => 1, 'daily_enabled' => false]);
+        $plan = $this->plan(['quantity_mode' => 'all', 'quantity' => 0, 'max_cycle' => 0, 'daily_enabled' => false, 'daily_limit' => 0]);
         $this->enroll($plan, 6); $run = $this->cycle($plan);
         $this->assertSame(6, $run->total);
         $this->assertSame(6, $plan->items()->where('status', 'sent')->count());
@@ -167,6 +167,70 @@ class ClientDeliveryTest extends TestCase
         Excel::assertDownloaded('client-delivery-history-'.$this->source->organization_id.'.xlsx', fn ($export) => $export->collection()->count() === 1);
         Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->destination->organization_id])->call('retry', $item->id)->assertNotFound();
         $this->actingAs($this->destination); Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->assertForbidden();
+    }
+
+    public function test_new_intake_waits_for_consent_and_manual_release(): void
+    {
+        $plan = $this->plan(['frequency' => 'manual', 'automatic' => false]);
+        $ids = $this->leads(2);
+        $this->assertSame(2, $plan->items()->where('status', 'pending')->count());
+        $this->assertFalse($this->service()->releaseDelivery($ids[0]));
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id, true));
+        $this->assertSame(['queued' => 2, 'skipped' => 0], $this->service()->enqueueClientLeads($plan, $ids, true, $this->admin));
+        $run = $this->cycle($plan);
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $this->assertFalse($this->service()->processClientDeliveryRun($run->id));
+        $this->assertSame(2, CreditTransaction::where('client_id', $this->destination->id)->count());
+    }
+
+    public function test_daily_capacity_resets_at_the_selected_timezone_midnight(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-17 18:20:00', 'UTC'));
+        $plan = $this->plan(['timezone' => 'Asia/Kolkata', 'daily_limit' => 1]);
+        $this->enroll($plan, 2); $this->cycle($plan);
+        $this->assertSame(0, $this->service()->remainingClientDeliveryCapacity($plan));
+        $this->travel(11)->minutes();
+        $this->assertSame(1, $this->service()->remainingClientDeliveryCapacity($plan));
+        $this->cycle($plan);
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+    }
+
+    public function test_immediate_fixed_cycle_maximum_and_queue_job(): void
+    {
+        $plan = $this->plan(['frequency' => 'immediate', 'quantity' => 5, 'max_cycle' => 1]);
+        $this->enroll($plan, 3);
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertSame(1, $run->total);
+        (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
+        $this->assertSame(1, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(2, $plan->items()->where('status', 'pending')->count());
+        $this->assertSame('completed', $run->fresh()->status);
+    }
+
+    public function test_rejected_internal_and_unconsented_leads_cannot_be_sent(): void
+    {
+        $plan = $this->plan(['quantity_mode' => 'all', 'daily_enabled' => false]);
+        $ids = $this->enroll($plan, 3);
+        Lead::withoutGlobalScopes()->find($ids[0])->update(['status' => 'invalid']);
+        Lead::withoutGlobalScopes()->find($ids[1])->update(['internal_processing_pending' => true]);
+        Lead::withoutGlobalScopes()->find($ids[2])->update(['delivery_consent_at' => null]);
+        $this->cycle($plan);
+        $this->assertSame(0, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(2, $plan->items()->where('status', 'failed')->count());
+        $this->assertSame(1, $plan->items()->where('status', 'pending')->count());
+    }
+
+    public function test_configuration_and_selected_push_use_real_records(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(1);
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
+            ->call('openPush', $this->source->organization_id, $ids)->assertSet('showConfiguration', true)
+            ->set('settings', $this->settings(['automatic' => false, 'frequency' => 'manual']))->set('consentConfirmed', true)
+            ->call('queueSelected')->assertHasNoErrors()->assertSet('showConfiguration', false);
+        $this->assertDatabaseHas('lead_delivery_items', ['lead_id' => $ids[0], 'client_id' => $this->destination->id, 'status' => 'pending']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'delivery.enqueued']);
     }
 
     public function test_opt_in_confirmations_and_consent_are_required(): void

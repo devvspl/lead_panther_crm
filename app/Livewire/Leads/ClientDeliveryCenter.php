@@ -110,7 +110,7 @@ class ClientDeliveryCenter extends Component
             $item = $this->historyQuery(false)->whereKey($itemId)->lockForUpdate()->firstOrFail();
             abort_unless($item->status === 'sent', 422);
             $item->update(['status' => 'accepted', 'accepted_at' => now()]);
-            AuditLog::create(['user_id' => auth()->id(), 'action' => 'delivery.accepted', 'subject_type' => LeadDeliveryItem::class, 'subject_id' => $item->id, 'from_value' => json_encode(['status' => 'sent']), 'to_value' => json_encode(['status' => 'accepted', 'accepted_at' => $item->accepted_at]), 'created_at' => now()]);
+            AuditLog::create(['user_id' => auth()->id(), 'organization_id' => $this->organizationId, 'action' => 'delivery.accepted', 'subject_type' => LeadDeliveryItem::class, 'subject_id' => $item->id, 'from_value' => json_encode(['status' => 'sent']), 'to_value' => json_encode(['status' => 'accepted', 'accepted_at' => $item->accepted_at]), 'created_at' => now()]);
         });
         $this->dispatch('toast', type: 'success', message: 'Client acceptance recorded.');
     }

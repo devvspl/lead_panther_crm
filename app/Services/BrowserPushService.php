@@ -13,7 +13,7 @@ class BrowserPushService
             $candidate = dirname(php_ini_loaded_file() ?: PHP_BINARY).'/extras/ssl/openssl.cnf';
             if (is_file($candidate)) $path = $candidate;
         }
-        if ($path && is_file($path)) putenv('OPENSSL_CONF='.$path);
+        if ($path && is_file($path) && function_exists('putenv')) putenv('OPENSSL_CONF='.$path);
     }
     public function keys(): ?array {
         if (! config('webpush.enabled')) return null;

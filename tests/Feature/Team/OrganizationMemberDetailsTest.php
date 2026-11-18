@@ -20,7 +20,7 @@ class OrganizationMemberDetailsTest extends TestCase
         $member = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']); $member->assignRole('Executive');
         $team = \App\Models\SalesTeam::create(['name' => 'Client sales', 'ownable_type' => Organization::class, 'ownable_id' => $org->id]);
         $component = Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
-            ->call('open', $member->id)->set('editing', true)->assertSee('Set Team Leader')->assertSee('Active')
+            ->call('open', $member->id)->set('editing', true)->assertSee('Team Leader')->assertSee('Active')
             ->set('leadershipTeamId', $team->id)->call('assignTeamLeader')->assertHasNoErrors();
         $this->assertSame($member->id, $team->fresh()->leader_id);
         $this->assertTrue($member->fresh()->hasRole('Team Leader'));
@@ -29,6 +29,24 @@ class OrganizationMemberDetailsTest extends TestCase
         $foreign = \App\Models\SalesTeam::create(['name' => 'Private team', 'ownable_type' => Organization::class, 'ownable_id' => $other->id]);
         $component->set('leadershipTeamId', $foreign->id)->call('assignTeamLeader')->assertNotFound();
         $this->assertNull($foreign->fresh()->leader_id);
+    }
+
+    public function test_executive_selects_brijesh_by_name_without_replacing_the_team_leader(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Deltek']);
+        $admin = User::factory()->create(['status'=>'active']); $admin->assignRole('Super Admin');
+        $leader = User::factory()->create(['name'=>'Brijesh', 'organization_id'=>$org->id, 'status'=>'active']); $leader->assignRole('Team Leader');
+        $member = User::factory()->create(['organization_id'=>$org->id, 'status'=>'active']); $member->assignRole('Executive');
+        $team = \App\Models\SalesTeam::create(['name'=>'Deltek Sales Team', 'ownable_type'=>Organization::class, 'ownable_id'=>$org->id, 'leader_id'=>$leader->id]);
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId'=>$org->id])
+            ->call('open', $member->id)->assertSee('Brijesh')->assertDontSee('Deltek Sales Team')
+            ->set('leadershipTeamId', $team->id)->call('assignMemberToTeam')->assertHasNoErrors()
+            ->call('open', $member->id)->assertSet('leadershipTeamId', $team->id);
+        $this->assertSame($leader->id, $team->fresh()->leader_id);
+        $this->assertTrue($member->fresh()->hasRole('Executive'));
+        $this->assertFalse($member->fresh()->hasRole('Team Leader'));
+        $this->assertDatabaseHas('sales_team_members', ['user_id'=>$member->id, 'sales_team_id'=>$team->id, 'is_active'=>true]);
     }
 
     public function test_admin_can_edit_and_change_password_only_for_this_organization(): void

@@ -36,6 +36,9 @@ class OrganizationDetail extends Component
     public array $projectRates = [];
     public string $mappingProjectName = '';
 
+    #[\Livewire\Attributes\On('org-member-updated')]
+    public function refreshMemberDetails(): void {}
+
     public function setBuilderCreditBalanceVisibility(bool $visible): void
     {
         abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);

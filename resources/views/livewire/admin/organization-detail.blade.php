@@ -831,7 +831,7 @@
                                                 {{ strtoupper(substr($member->name, 0, 1)) }}
                                             </div>
                                             <div>
-                                                <div class="font-bold text-ink">{{ $member->name }}</div>
+                                                <button type="button" wire:click="$dispatch('open-org-member', { memberId: {{ $member->id }} })" class="font-bold text-ink hover:text-primary hover:underline text-left">{{ $member->name }}</button>
                                                 <div class="text-[10px] text-muted font-mono">ID: #{{ $member->id }}</div>
                                             </div>
                                         </div>
@@ -1294,6 +1294,7 @@
     @endif
 
     <!-- MODAL 1: ADD MEMBER TO THIS ORGANIZATION -->
+    <livewire:admin.organization-member-details :organization-id="$organization->id" :key="'org-member-details-'.$organization->id" />
     <x-modal name="add-org-member-modal" :show="$showAddMemberModal" maxWidth="xl">
         <div class="p-5 sm:p-6 space-y-5">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">

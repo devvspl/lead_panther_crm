@@ -44,7 +44,7 @@ class ClientLeadManager extends LeadKanban
     public function pushLeadToClient(int $id): void
     {
         $this->assertSelectedLeads([$id]);
-        $this->dispatch('client-push-selected', organizationId: $this->clientOrganizationId, leadIds: [$id])->to(ClientDeliveryCenter::class);
+        $this->dispatch('client-push-selected', organizationId: $this->clientOrganizationId, leadIds: [$id], sendNow: true)->to(ClientDeliveryCenter::class);
     }
 
     protected function ownerIds()

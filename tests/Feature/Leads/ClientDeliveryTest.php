@@ -74,6 +74,35 @@ class ClientDeliveryTest extends TestCase
         $this->plan(['campaign_id'=>$this->sourceCampaign->id]);
     }
 
+    public function test_row_push_delivers_immediately_on_repeated_clicks_without_waiting_for_next_cycle(): void
+    {
+        Queue::fake();
+        $plan=$this->plan(['frequency'=>'immediate','quantity'=>1,'daily_enabled'=>false]);
+        $ids=$this->leads(2);
+        $component=Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id]);
+        $component->dispatch('client-push-selected',organizationId:$this->source->organization_id,leadIds:[$ids[0]],sendNow:true)->assertHasNoErrors();
+        $this->assertSame(1,$plan->items()->where('status','sent')->count());
+        $this->assertTrue($plan->fresh()->next_run_at->isFuture());
+        $component->dispatch('client-push-selected',organizationId:$this->source->organization_id,leadIds:[$ids[1]],sendNow:true)->assertHasNoErrors();
+        $this->assertSame(2,$plan->items()->where('status','sent')->count());
+        $component->dispatch('client-push-selected',organizationId:$this->source->organization_id,leadIds:[$ids[1]],sendNow:true)->assertHasNoErrors();
+        $this->assertSame(2,CreditTransaction::where('client_id',$this->destination->id)->count());
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(2,Lead::panelQuery()->whereIn('id',$ids)->count());
+    }
+
+    public function test_row_push_processes_a_lead_that_is_already_pending_in_the_queue(): void
+    {
+        Queue::fake();
+        $ids=$this->leads(1);
+        $plan=$this->plan(['frequency'=>'immediate','quantity'=>1]);
+        $this->service()->enqueueClientLeads($plan,$ids,true,$this->admin);
+        $plan->update(['next_run_at'=>now()->addHour()]);
+        Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id])
+            ->dispatch('client-push-selected',organizationId:$this->source->organization_id,leadIds:$ids,sendNow:true)->assertHasNoErrors();
+        $this->assertSame('sent',$plan->items()->firstOrFail()->status);
+    }
+
     private function service(): LeadDistributionService { return app(LeadDistributionService::class); }
     private function settings(array $overrides = []): array
     {

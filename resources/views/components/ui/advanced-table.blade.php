@@ -289,7 +289,7 @@
                                         @if(isset(${'cell_' . $colKey}))
                                             {{ ${'cell_' . $colKey}($row) }}
                                         @elseif($type === 'client_push')
-                                            <button type="button" wire:click="pushLeadToClient({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
+                                            <button type="button" wire:click="pushLeadToClient({{ $row->id }})" wire:confirm="Push this lead using the saved client delivery settings? Confirm that you have permission to share it. If settings are missing, the setup form will open." wire:loading.attr="disabled" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
                                         @elseif($type === 'delivery_item_actions')
                                             <button type="button" wire:click="inspectAttempts({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">History</button>
                                             @if($row->status === 'failed')<button type="button" wire:click="retry({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Retry</button>@elseif($row->status === 'sent')<button type="button" wire:click="accept({{ $row->id }})" wire:confirm="Record that the client has accepted this lead?" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark Accepted</button>@else<span class="text-xs text-muted">—</span>@endif
@@ -765,7 +765,7 @@
                                     @if(isset(${'cell_' . $colKey}))
                                         {{ ${'cell_' . $colKey} }}
                                     @elseif($type === 'client_push')
-                                        <button type="button" wire:click="pushLeadToClient({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
+                                        <button type="button" wire:click="pushLeadToClient({{ $row->id }})" wire:confirm="Push this lead using the saved client delivery settings? Confirm that you have permission to share it. If settings are missing, the setup form will open." wire:loading.attr="disabled" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
                                     @elseif($type === 'delivery_item_actions')
                                         <div class="flex flex-wrap gap-2"><button type="button" wire:click="inspectAttempts({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">History</button>@if($row->status === 'failed')<button type="button" wire:click="retry({{ $row->id }})" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Retry</button>@elseif($row->status === 'sent')<button type="button" wire:click="accept({{ $row->id }})" wire:confirm="Record client acceptance?" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark Accepted</button>@endif</div>
                                     @elseif($type === 'lead_id')

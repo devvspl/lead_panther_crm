@@ -55,13 +55,19 @@ class ClientDeliveryCenter extends Component
     public function updated($property): void { if (str_starts_with($property, 'history')) $this->resetPage('deliveryPage'); }
 
     #[On('client-push-selected')]
-    public function openPush(int $organizationId, array $leadIds): void
+    public function openPush(int $organizationId, array $leadIds, bool $sendNow = false): void
     {
         if ($organizationId !== $this->organizationId) return;
         $this->selectedLeadIds = array_values(array_unique(array_map('intval', $leadIds)));
+        if ($sendNow && ($plan = $this->plan())) {
+            $this->settings = array_merge($plan->settings, $plan->only('client_id','project_id','campaign_id'));
+            $this->pushLeads();
+            return;
+        }
         if (!$this->plan()) $this->settings['quantity'] = max(1, count($this->selectedLeadIds));
         $this->consentConfirmed = false;
         $this->showConfiguration = true;
+        $this->dispatch('open-offcanvas', name: 'client-delivery-configuration');
     }
 
     protected function persistSettings(): LeadDeliveryPlan
@@ -83,14 +89,14 @@ class ClientDeliveryCenter extends Component
         $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. Existing queued leads are preserved.');
     }
 
-    public function queueSelected(bool $allEligible = false): int
+    public function queueSelected(bool $allEligible = false, bool $startCycle = true): int
     {
         $this->validate(['consentConfirmed' => 'accepted']);
         $ids = $allEligible ? app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->pluck('id')->all() : $this->selectedLeadIds;
         if (!$ids) throw ValidationException::withMessages(['selectedLeadIds' => 'Select leads from the table, or choose Queue All Eligible.']);
         $plan = $this->persistSettings();
         $result = app(LeadDistributionService::class)->enqueueClientLeads($plan, $ids, $this->consentConfirmed, auth()->user());
-        if ($result['queued'] > 0 && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') $this->launchCycle($plan, false);
+        if ($startCycle && $result['queued'] > 0 && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') $this->launchCycle($plan, false);
         $this->showConfiguration = false;
         $this->selectedLeadIds = [];
         $this->dispatch('lead-updated');
@@ -102,8 +108,12 @@ class ClientDeliveryCenter extends Component
     {
         // The UI confirmation explicitly attests sharing permission; enqueue records the actor and time.
         $this->consentConfirmed = true;
-        $queued = $this->queueSelected($allEligible);
-        if ($queued > 0 && $this->settings['frequency'] === 'manual' && ($plan = $this->plan())) $this->launchCycle($plan, true);
+        $selected = $this->selectedLeadIds;
+        $queued = $this->queueSelected($allEligible, false);
+        if (($plan = $this->plan()) && in_array($plan->settings['frequency'], ['manual','immediate'])) {
+            $waiting = $plan->items()->whereIn('lead_id',$selected)->whereIn('status',['pending','queued'])->exists();
+            if ($queued > 0 || $waiting) $this->launchCycle($plan, true);
+        }
     }
 
     protected function launchCycle(LeadDeliveryPlan $plan, bool $manual): void

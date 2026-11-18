@@ -44,6 +44,13 @@ class ClientLeadManagerTest extends TestCase
         return Livewire::test(ClientLeadManager::class, ['organizationId' => $this->organization->id]);
     }
 
+    public function test_row_push_requests_immediate_delivery_for_the_selected_organization_lead(): void
+    {
+        $this->manager()->call('pushLeadToClient',$this->ours->id)
+            ->assertDispatched('client-push-selected',organizationId:$this->organization->id,leadIds:[$this->ours->id],sendNow:true);
+        $this->manager()->call('pushLeadToClient',$this->other->id)->assertForbidden();
+    }
+
     public function test_import_dropdowns_only_list_related_client_projects_campaigns_and_sources(): void
     {
         $foreignProject = Project::create(['client_id' => $this->other->client_id, 'name' => 'Private foreign project']);

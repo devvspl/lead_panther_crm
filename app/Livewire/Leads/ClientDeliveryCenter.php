@@ -236,6 +236,7 @@ class ClientDeliveryCenter extends Component
             'historyCampaigns' => Campaign::withoutGlobalScopes()->whereIn('id', (clone $items)->select('campaign_id'))->get(),
             'history' => $this->historyQuery()->latest('id')->paginate(10, ['*'], 'deliveryPage'),
             'inspectedItem' => $this->inspectedItemId ? $this->historyQuery(false)->with(['attemptHistory.run'])->find($this->inspectedItemId) : null,
+            'deliveryHealth'=>$plan ? app(LeadDistributionService::class)->clientDeliveryHealth($plan) : null,
         ]);
     }
 }

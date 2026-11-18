@@ -62,6 +62,39 @@ class ClientDeliveryTest extends TestCase
         $this->assertTrue(Lead::panelQuery()->whereKey($ids[0])->exists());
     }
 
+    public function test_deltek_configuration_seeder_replaces_settings_preserves_history_and_delivers_one_every_fifteen_minutes(): void
+    {
+        Queue::fake();
+        Organization::findOrFail($this->destination->organization_id)->update(['name' => 'Deltek']);
+        $ids = $this->leads(3);
+        Lead::withoutGlobalScopes()->whereIn('id', $ids)->update(['client_id' => $this->destination->id]);
+        $seeder = \Database\Seeders\DeltekDeliveryConfigurationSeeder::class;
+        $this->seed($seeder);
+        $plan = LeadDeliveryPlan::where('organization_id', $this->destination->organization_id)->firstOrFail();
+        $this->assertSame('15_minutes', $plan->settings['frequency']);
+        $this->assertSame(1, $plan->settings['quantity']);
+        $this->assertFalse($plan->settings['daily_enabled']);
+        $this->assertNull($plan->campaign_id);
+        $this->assertSame(3, $plan->items()->count());
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertSame(1, $plan->items()->where('status', 'sent')->count());
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(15)->minutes();
+        $run2 = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->service()->processClientDeliveryRun($run2->id);
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $plan->update(['settings' => array_merge($plan->settings, ['frequency' => 'manual', 'quantity' => 10])]);
+        $this->seed($seeder);
+        $this->assertSame($plan->id, LeadDeliveryPlan::where('organization_id', $plan->organization_id)->sole()->id);
+        $this->assertSame(3, $plan->items()->count());
+        $this->assertSame(2, $plan->runs()->where('status', 'completed')->count());
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(1, $plan->fresh()->settings['quantity']);
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(2, Lead::panelQuery()->whereIn('id', $ids)->count());
+    }
+
     public function test_optional_campaign_preserves_matching_campaign_and_rejects_wrong_project(): void
     {
         $ids = $this->leads(1);
@@ -101,6 +134,43 @@ class ClientDeliveryTest extends TestCase
         Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id])
             ->dispatch('client-push-selected',organizationId:$this->source->organization_id,leadIds:$ids,sendNow:true)->assertHasNoErrors();
         $this->assertSame('sent',$plan->items()->firstOrFail()->status);
+    }
+
+    public function test_recovery_command_enrolls_consent_and_delivers_one_lead_on_fifteen_minute_plan(): void
+    {
+        Queue::fake();
+        $plan=$this->plan(['frequency'=>'15_minutes','quantity'=>1]); $ids=$this->leads(3);
+        $this->artisan('client-delivery:recover',['organization'=>$this->source->organization_id,'--confirm-sharing'=>true,'--run'=>true])->assertSuccessful();
+        $this->assertSame(1,$plan->items()->where('status','sent')->count());
+        $this->assertSame(2,$plan->items()->where('status','pending')->count());
+        $this->assertTrue($plan->fresh()->next_run_at->equalTo(now()->addMinutes(15)));
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(15)->minutes(); $this->cycle($plan,false);
+        $this->assertSame(2,$plan->items()->where('status','sent')->count());
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertSame(2,Lead::panelQuery()->whereIn('id',$ids)->count());
+    }
+    public function test_delivery_health_reports_consent_limits_and_worker_errors(): void
+    {
+        $plan=$this->plan(['daily_limit'=>5]); $this->leads(2);
+        \App\Models\ScheduledTaskRun::create(['task_key'=>'queue-worker','label'=>'Queue worker','expression'=>'* * * * *','timezone'=>'UTC','origin'=>'scheduled','status'=>'failed','error'=>'proc_open unavailable']);
+        $health=$this->service()->clientDeliveryHealth($plan);
+        $this->assertSame(2,$health['awaiting']);
+        $this->assertStringContainsString('proc_open',collect($health['alerts'])->pluck('message')->implode(' '));
+        Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id])->assertSee('Queue worker failed')->assertSee('Daily limit: 5');
+    }
+    public function test_recovery_can_retry_a_failed_transfer_without_duplicate_charging(): void
+    {
+        Queue::fake();
+        $plan=$this->plan(['frequency'=>'15_minutes','quantity'=>1]); $ids=$this->leads(1);
+        $this->service()->enqueueClientLeads($plan,$ids,true,$this->admin);
+        CreditWallet::where('client_id',$this->destination->id)->update(['balance'=>0]);
+        $this->cycle($plan);
+        $this->assertSame('failed',$plan->items()->firstOrFail()->status);
+        CreditWallet::where('client_id',$this->destination->id)->update(['balance'=>100]);
+        $this->artisan('client-delivery:recover',['organization'=>$this->source->organization_id,'--retry-failed'=>true,'--run'=>true])->assertSuccessful();
+        $this->assertSame('sent',$plan->items()->firstOrFail()->status);
+        $this->assertSame(1,CreditTransaction::where('lead_id',$ids[0])->count());
     }
 
     private function service(): LeadDistributionService { return app(LeadDistributionService::class); }

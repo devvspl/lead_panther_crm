@@ -168,8 +168,13 @@ class LeadDistributionService
                 return true;
             }, 3);
         } catch (\Throwable $e) {
+            $message='Delivery failed; see application log.';
+            if ($e instanceof \Illuminate\Database\QueryException && (int)($e->errorInfo[1] ?? 0)===1364 && str_contains($e->getMessage(), "Field 'id'")) {
+                preg_match('/insert into [`"]?([a-zA-Z0-9_]+)/i',$e->getSql(),$matches);
+                $message='Database schema error: '.($matches[1] ?? 'record').'.id needs AUTO_INCREMENT. Apply the latest database migrations.';
+            }
             Lead::withoutGlobalScopes()->whereKey($leadId)->where('delivery_pending', true)
-                ->update(['delivery_failed_at' => now(), 'delivery_error' => 'Delivery failed; see application log.']);
+                ->update(['delivery_failed_at' => now(), 'delivery_error' => $message]);
             report($e);
             if ($record = \App\Models\InternalLeadProcessing::where('lead_id', $leadId)->whereNotNull('handover_requested_at')->whereNull('forwarded_at')->first()) $this->internalForwardingFailed($record, 'Forwarding failed. See delivery logs.');
             return false;

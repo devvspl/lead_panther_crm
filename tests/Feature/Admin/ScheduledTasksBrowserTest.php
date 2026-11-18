@@ -89,6 +89,25 @@ class ScheduledTasksBrowserTest extends TestCase
         $this->assertSame('completed',$run->status); $this->assertDatabaseHas('organizations',['name'=>'Worker invoked']);
         Queue::assertNotPushed(RunScheduledTask::class);
     }
+    public function test_scheduled_commands_execute_in_process_and_record_real_output(): void {
+        foreach($this->service()->events() as $task) $this->assertInstanceOf(\Illuminate\Console\Scheduling\CallbackEvent::class,$task);
+        \Illuminate\Support\Facades\Artisan::command('test:task-in-process',function() {
+            Organization::create(['name'=>'In-process command completed']); $this->info('Command completed without spawning a process.'); return 0;
+        });
+        $task=$this->service()->command('queue-worker','test:task-in-process')->withoutOverlapping(15);
+        $this->service()->instrument($task);
+        $run=$this->service()->request('queue-worker',$this->admin);
+        $this->assertSame('completed',$run->status);
+        $this->assertStringContainsString('without spawning a process',$run->output);
+        $this->assertDatabaseHas('organizations',['name'=>'In-process command completed']);
+    }
+    public function test_in_process_command_failure_keeps_its_exit_code_and_output(): void {
+        \Illuminate\Support\Facades\Artisan::command('test:task-command-failure',function() { $this->error('api_key="private-value" unavailable'); return 7; });
+        $task=$this->service()->command('queue-worker','test:task-command-failure')->withoutOverlapping(15); $this->service()->instrument($task);
+        $run=$this->service()->request('queue-worker',$this->admin);
+        $this->assertSame('failed',$run->status); $this->assertSame(7,$run->exit_code);
+        $this->assertStringNotContainsString('private-value',$run->output);
+    }
     public function test_manual_actions_and_history_are_super_admin_only(): void {
         $user=User::factory()->create(['status'=>'active']);
         Livewire::actingAs($user)->test(ScheduledTasksBrowser::class)->assertForbidden();

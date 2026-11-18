@@ -14,6 +14,14 @@
         @if($stats['Eligible'] > 0 && $stats['Pending'] == 0)
             <p class="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink">{{ $stats['Eligible'] }} existing lead(s) have not been queued for this delivery plan. Saving settings does not send them. Use Push Existing Leads to confirm the transfer.</p>
         @endif
+        @if($deliveryHealth)
+            <div class="space-y-2 text-xs" aria-live="polite">
+                <p class="font-semibold">Ready for delivery: {{ $deliveryHealth['ready'] }} · Awaiting sharing confirmation: {{ $deliveryHealth['awaiting'] }}</p>
+                <p class="text-muted">Client wallet: {{ number_format($deliveryHealth['balance'],2) }} credits · Expected cost per lead: {{ $deliveryHealth['cost'] !== null ? number_format($deliveryHealth['cost'],2) : 'Unavailable' }}</p>
+                @foreach($deliveryHealth['alerts'] as $alert)<p role="status" class="rounded-lg border border-border bg-surface px-3 py-2 {{ $alert['type']==='error' ? 'text-red-700' : ($alert['type']==='warning' ? 'text-amber-700' : 'text-muted') }}">{{ $alert['message'] }}</p>@endforeach
+                <a href="{{ route('admin.git-sync',['tab'=>'tasks']) }}" class="text-primary font-semibold">Open Scheduled Tasks &amp; Worker Monitoring</a>
+            </div>
+        @endif
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             @foreach($stats as $label => $value)<div class="rounded-lg bg-surface border border-border p-3"><div class="text-[10px] uppercase font-semibold text-muted">{{ $label }}</div><div class="mt-1 text-xs font-bold text-ink break-words">{{ $value }}</div></div>@endforeach
         </div>

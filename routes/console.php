@@ -49,7 +49,7 @@ Schedule::call(function () {
         });
 })->name('release-scheduled-leads')->everyMinute()->withoutOverlapping();
 
-Schedule::command('credits:check-low-balances')->name('low-credit-alerts')->hourly();
+app(\App\Services\ScheduledTaskService::class)->command('low-credit-alerts','credits:check-low-balances')->hourly();
 
 Schedule::call(function () {
     \App\Models\Organization::whereNotNull('assignment_config')->where('auto_assign_enabled',true)->where('status','active')
@@ -70,22 +70,22 @@ Schedule::call(function () {
 })->name('client-delivery-cycles')->everyMinute()->withoutOverlapping();
 
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
-Schedule::command('followups:check-due')->name('followup-reminders')->everyFifteenMinutes();
-Schedule::command('notifications:check-operational')->name('operational-notifications')->everyFiveMinutes()->withoutOverlapping();
+app(\App\Services\ScheduledTaskService::class)->command('followup-reminders','followups:check-due')->everyFifteenMinutes();
+app(\App\Services\ScheduledTaskService::class)->command('operational-notifications','notifications:check-operational')->everyFiveMinutes()->withoutOverlapping();
 
 // Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
-Schedule::command('team:auto-offline')->name('team-availability')->everyFiveMinutes();
+app(\App\Services\ScheduledTaskService::class)->command('team-availability','team:auto-offline')->everyFiveMinutes();
 
 // Schedule 5: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
-Schedule::command('meta:sync-leads')->name('meta-lead-sync')->everyTenMinutes();
+app(\App\Services\ScheduledTaskService::class)->command('meta-lead-sync','meta:sync-leads')->everyTenMinutes();
 
 // Schedule 6: Daily Backup of Database + Documents Disk
-Schedule::command('backup:run')->name('database-backup')->daily();
+app(\App\Services\ScheduledTaskService::class)->command('database-backup','backup:run')->daily();
 
 // Schedule 7: Weekly Cleanup of Old Backups
-Schedule::command('backup:clean')->name('backup-cleanup')->weekly();
+app(\App\Services\ScheduledTaskService::class)->command('backup-cleanup','backup:clean')->weekly();
 
-Schedule::command('queue:work --stop-when-empty --tries=3 --max-time=20 --max-jobs=100')->name('queue-worker')->everyMinute()->withoutOverlapping();
+app(\App\Services\ScheduledTaskService::class)->command('queue-worker','queue:work',['--stop-when-empty'=>true,'--tries'=>3,'--max-time'=>20,'--max-jobs'=>100])->everyMinute()->withoutOverlapping();
 
 foreach (app(\Illuminate\Console\Scheduling\Schedule::class)->events() as $task) {
     if (isset(\App\Services\ScheduledTaskService::TASKS[$task->description])) {

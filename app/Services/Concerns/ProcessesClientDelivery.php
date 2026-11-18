@@ -185,6 +185,40 @@ trait ProcessesClientDelivery
         return max(0, (int) $plan->settings['daily_limit'] - $sent);
     }
 
+    public function clientDeliveryHealth(LeadDeliveryPlan $plan): array
+    {
+        $alerts=[];
+        $owner=User::with('organization')->find($plan->client_id);
+        $project=Project::withoutGlobalScopes()->find($plan->project_id);
+        if(!$this->clientDeliveryRecipients()->whereKey($plan->client_id)->exists()) $alerts[]=['type'=>'error','message'=>'Destination client is inactive, unauthorized or belongs to an inactive organization.'];
+        if(!$project || $project->client_id!==$plan->client_id || $project->status!=='active' || !$project->delivery_enabled) $alerts[]=['type'=>'error','message'=>'Destination project is inactive, delivery is disabled, or its client mapping is invalid.'];
+        if($plan->campaign_id && !Campaign::withoutGlobalScopes()->whereKey($plan->campaign_id)->where('project_id',$plan->project_id)->where('status','active')->exists()) $alerts[]=['type'=>'error','message'=>'Selected destination campaign is inactive or mapped to another project.'];
+        $balance=(float)(\App\Models\CreditWallet::withoutGlobalScopes()->where('client_id',$plan->client_id)->value('balance') ?? 0);
+        $cost=$project ? (float)app(\App\Services\LeadPricingService::class)->resolveCost($project,null,$owner?->organization)['cost'] : null;
+        if($cost!==null && $balance<$cost) $alerts[]=['type'=>'error','message'=>'Insufficient credits: wallet '.number_format($balance,2).', expected lead cost '.number_format($cost,2).'. Recharge the destination client wallet.'];
+        $items=$plan->items();
+        $awaiting=(clone $items)->whereIn('status',['pending','queued'])->whereHas('lead',fn($q)=>$q->whereNull('delivery_consent_at'))->count();
+        $ready=(clone $items)->whereIn('status',['pending','queued'])->whereHas('lead',fn($q)=>$q->whereNotNull('delivery_consent_at'))->count();
+        if(!$plan->settings['automatic']) $alerts[]=['type'=>'warning','message'=>'Automatic delivery is disabled.'];
+        if($plan->state!=='active') $alerts[]=['type'=>'warning','message'=>'Delivery is '.$plan->state.'. Resume it to send leads.'];
+        if($awaiting) $alerts[]=['type'=>'warning','message'=>$awaiting.' lead(s) need sharing confirmation. Use Queue All Eligible to enroll them.'];
+        if($plan->settings['daily_enabled']) $alerts[]=['type'=>'info','message'=>'Daily limit: '.$plan->settings['daily_limit'].' successful leads. Remaining today: '.$this->remainingClientDeliveryCapacity($plan).'.'];
+        if($this->remainingClientDeliveryCapacity($plan)===0) $alerts[]=['type'=>'warning','message'=>'Daily capacity is exhausted. Pending leads wait until the next delivery day.'];
+        $lastFailure=(clone $items)->where('status','failed')->whereNotNull('failure_reason')->latest('updated_at')->first();
+        if($lastFailure) $alerts[]=['type'=>'error','message'=>'Lead #'.$lastFailure->lead_id.': '.$lastFailure->failure_reason];
+        $queued=$plan->runs()->where('status','queued')->whereNull('started_at')->first();
+        if($queued) $alerts[]=['type'=>'warning','message'=>'Batch #'.$queued->id.' has not started. Send Cycle Now processes a lead immediately; check Scheduled Tasks → Process Background Queue for worker errors.'];
+        if(\Illuminate\Support\Facades\Schema::hasTable('scheduled_task_runs')) {
+            $worker=\App\Models\ScheduledTaskRun::where('task_key','queue-worker')->latest('id')->first();
+            if($worker?->status==='failed') $alerts[]=['type'=>'error','message'=>'Queue worker failed: '.$worker->error];
+        }
+        if(in_array(DB::getDriverName(),['mysql','mariadb'])) {
+            $id=DB::selectOne("SELECT EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lead_status_history' AND COLUMN_NAME='id'");
+            if($id && !str_contains(strtolower($id->EXTRA),'auto_increment')) $alerts[]=['type'=>'error','message'=>'Database schema repair required: lead_status_history.id is missing AUTO_INCREMENT. Run pending migrations before delivery.'];
+        }
+        return ['alerts'=>$alerts,'ready'=>$ready,'awaiting'=>$awaiting,'balance'=>$balance,'cost'=>$cost];
+    }
+
     public function startClientDeliveryCycle(int $planId, bool $manual = false): ?LeadDeliveryRun
     {
         return DB::transaction(function () use ($planId, $manual) {

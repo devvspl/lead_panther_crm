@@ -10,6 +10,8 @@ class ScheduledTaskService
 {
     private array $running=[];
     private ?int $manualId=null;
+    private array $commandRuns=[];
+    private array $commandExitCodes=[];
     public const TASKS=[
         'release-scheduled-leads'=>['Release Scheduled Leads','Release eligible due leads after campaign, credit, consent and delivery-limit checks.'],
         'organization-lead-assignments'=>['Assign Organization Leads','Queue assignment batches for active organizations. Assignment jobs enforce team eligibility, working hours and executive limits.'],
@@ -37,6 +39,24 @@ class ScheduledTaskService
         foreach(app(Schedule::class)->events() as $event) if(isset(self::TASKS[$event->description])) $events[$event->description]=$event;
         return $events;
     }
+    public function command(string $key,string $command,array $parameters=[]): \Illuminate\Console\Scheduling\CallbackEvent
+    {
+        $event=\Illuminate\Support\Facades\Schedule::call(fn()=> $this->runCommand($key,$command,$parameters))->name($key);
+        // Metadata only: CallbackEvent executes Artisan in-process, without Symfony Process/proc_open.
+        $event->command=trim($command.' '.collect($parameters)->map(fn($value,$name)=>$name.($value===true ? '' : '='.$value))->implode(' '));
+        return $event;
+    }
+    public function runCommand(string $key,string $command,array $parameters=[]): bool
+    {
+        $output=new \Symfony\Component\Console\Output\BufferedOutput();
+        try {
+            $code=\Illuminate\Support\Facades\Artisan::call($command,$parameters,$output);
+            $this->commandExitCodes[$key]=$code;
+            return $code===0;
+        } finally {
+            if($id=$this->commandRuns[$key] ?? null) file_put_contents(storage_path('logs/scheduled-task-'.$id.'.log'),$output->fetch());
+        }
+    }
     public function instrument(Event $event): void
     {
         if(!isset(self::TASKS[$event->description])) return;
@@ -52,6 +72,8 @@ class ScheduledTaskService
             'timezone'=>(string)($event->timezone ?: config('app.timezone')),'origin'=>'scheduled']);
         $run->fill(['status'=>'running','started_at'=>now(),'command'=>$this->redact($event->command)])->save();
         $this->running[spl_object_id($event)]=['id'=>$run->id,'start'=>microtime(true)];
+        $this->commandRuns[$key]=$run->id;
+        unset($this->commandExitCodes[$key]);
         if($event->command) $event->sendOutputTo(storage_path('logs/scheduled-task-'.$run->id.'.log'));
     }
     public function finished(Event $event, ?\Throwable $error=null): void
@@ -67,7 +89,7 @@ class ScheduledTaskService
         $path=storage_path('logs/scheduled-task-'.$run->id.'.log');
         $output=is_file($path) ? file_get_contents($path,false,null,0,100000) : '';
         if(is_file($path)) unlink($path);
-        $code=$error ? ($event->exitCode ?: 1) : ($event->exitCode ?? 0);
+        $code=$error ? ($event->exitCode ?: 1) : ($this->commandExitCodes[$event->description] ?? $event->exitCode ?? 0);
         $run->update(['status'=>$code===0 ? 'completed':'failed','finished_at'=>now(),'duration_ms'=>(int)round((microtime(true)-$context['start'])*1000),
             'exit_code'=>$code,'output'=>$this->redact($output),
             'error'=>$error ? mb_substr($this->redact($error->getMessage()),0,10000) : ($code ? 'Task exited with code '.$code.'. See output for details.' : null)]);

@@ -18,6 +18,7 @@ class LeadDistributionService
 {
     use \App\Services\Concerns\ProcessesInternalLeads;
     use \App\Services\Concerns\ProcessesClientDelivery;
+    use \App\Services\Concerns\ConfiguresTeamAssignment;
     public function effectiveDeliveryConfig(\App\Models\Campaign $campaign, ?Project $project = null): array
     {
         $project ??= Project::withoutGlobalScopes()->findOrFail($campaign->project_id);
@@ -114,6 +115,7 @@ class LeadDistributionService
         try {
             return DB::transaction(function () use ($leadId, $deliveryRunId) {
                 $candidate = Lead::withoutGlobalScopes()->find($leadId);
+                if ($candidate) Organization::whereKey($this->resolveLeadOrganizationId($candidate))->whereNotNull('assignment_config')->lockForUpdate()->first();
                 $campaign = $candidate ? \App\Models\Campaign::withoutGlobalScopes()->find($candidate->campaign_id) : null;
                 $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
                 $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
@@ -151,6 +153,7 @@ class LeadDistributionService
                     return false;
                 }
                 $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'delivery_failed_at' => null, 'delivery_error' => null, 'internal_processing_pending' => false]);
+                if (Organization::find($this->resolveLeadOrganizationId($lead))?->assignment_config !== null) $this->distribute($lead);
                 if (isset($processing)) {
                     $processing->update(['forwarded_at' => now(), 'forwarded_by' => $processing->handover_requested_by, 'status_code' => 'forwarded_to_client', 'forwarding_error' => null]);
                     $this->internalEvent($processing, 'forwarded', ['after' => ['forwarded_at' => $processing->forwarded_at->toIso8601String(), 'assigned_to' => $lead->assigned_to]], User::find($processing->forwarded_by));
@@ -213,6 +216,14 @@ class LeadDistributionService
      */
     public function distribute(Lead $lead, ?string $forceMethod = null, array $overrideConfig = []): array
     {
+        $organizationId = $this->resolveLeadOrganizationId($lead);
+        if (Organization::find($organizationId)?->assignment_config !== null) {
+            return $this->distributeConfiguredLead($lead, $organizationId);
+        }
+        if ($existing = $lead->fresh()?->assignedTo) {
+            $this->assignLeadToUser($lead, $existing, 'existing');
+            return ['assigned_user' => $existing, 'method' => 'existing', 'status' => 'assigned', 'message' => 'Lead already assigned.'];
+        }
         // 1. Resolve Lead's Target Organization
         $targetOrgId = $this->resolveLeadOrganizationId($lead);
         $targetOrg = $targetOrgId ? Organization::find($targetOrgId) : null;
@@ -482,6 +493,8 @@ class LeadDistributionService
     public function assignLeadToUser(Lead $lead, User $user, string $method): void
     {
         DB::transaction(function () use ($lead, $user, $method) {
+            $lead = Lead::withoutGlobalScopes()->whereKey($lead->id)->lockForUpdate()->firstOrFail();
+            if ($lead->assigned_to === $user->id && LeadAssignment::where('lead_id',$lead->id)->where('assigned_to',$user->id)->whereNull('unassigned_at')->exists()) return;
             $previousAssigneeId = $lead->assigned_to;
             $oldStage = $lead->current_stage;
 

@@ -1,4 +1,5 @@
 <div class="space-y-6">
+    <livewire:settings.lead-assignment-configuration :organization-id="auth()->user()->organization_id" />
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>

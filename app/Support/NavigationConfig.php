@@ -81,6 +81,8 @@ class NavigationConfig
         };
 
         $leadsRoute = route('leads.index');
+        $hasFollowups = \Illuminate\Support\Facades\Route::has('followups.index');
+        if (!$hasFollowups) $allowedKeys = array_values(array_diff($allowedKeys,['followups']));
 
         $replacementsRoute = match ($roleKey) {
             'builder', 'client' => route('replacements.client'),
@@ -115,7 +117,7 @@ class NavigationConfig
             'followups' => [
                 'key' => 'followups',
                 'label' => 'My Follow-ups',
-                'url' => route('followups.index'),
+                'url' => $hasFollowups ? route('followups.index') : $leadsRoute,
                 'data_nav_route' => 'followups',
                 'data_nav_exact' => 'false',
                 'section' => 'primary',

@@ -50,6 +50,13 @@ Schedule::call(function () {
 
 Schedule::command('credits:check-low-balances')->hourly();
 
+Schedule::call(function () {
+    \App\Models\Organization::whereNotNull('assignment_config')->where('auto_assign_enabled',true)->where('status','active')
+        ->chunkById(100, function ($organizations) {
+            foreach ($organizations as $organization) \App\Jobs\AssignOrganizationLeads::dispatch($organization->id);
+        });
+})->name('organization-lead-assignments')->everyMinute()->withoutOverlapping();
+
 // Recover queued/running cycles as well as starting plans due now. Per-plan DB locks prevent duplicate cycles.
 Schedule::call(function () {
     $service = app(\App\Services\LeadDistributionService::class);

@@ -143,4 +143,7 @@
     @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']))
         <livewire:settings.email-notification-settings />
     @endif
+    @if(auth()->user()?->organization_id && auth()->user()?->hasAnyRole(['Builder/Developer','Builder','builder']))
+        <livewire:settings.lead-assignment-configuration :organization-id="auth()->user()->organization_id" />
+    @endif
 </div>

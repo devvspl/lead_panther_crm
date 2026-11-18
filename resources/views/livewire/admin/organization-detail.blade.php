@@ -566,6 +566,7 @@
                     </div>
                 </div>
 
+                <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
                 <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
 
                 <!-- Recent Members Quick Snapshot -->

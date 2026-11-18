@@ -20,6 +20,15 @@ class TeamAccess {
     public static function scopeLeads($q, User $user) {
         return $q->where('internal_processing_pending',false)->where('delivery_pending',false)
             ->whereHas('client',fn($owner)=>$owner->where('organization_id',$user->organization_id))
-            ->whereIn('assigned_to',self::executives($user)->select('id'));
+            ->where(function ($q) use ($user) {
+                $q->whereIn('assigned_to',self::executives($user)->select('id'));
+                $teamId = $user->organization?->assignment_config['team_id'] ?? null;
+                if ($teamId && self::teams($user)->whereKey($teamId)->exists()) {
+                    $settings = $user->organization->assignment_config;
+                    $q->orWhere(fn ($pending) => $pending->whereNull('assigned_to')->whereNotNull('delivered_at')
+                        ->when($settings['project_ids'] ?? [],fn ($p) => $p->whereIn('campaign_id',\App\Models\Campaign::withoutGlobalScopes()->whereIn('project_id',$settings['project_ids'])->select('id')))
+                        ->when($settings['campaign_ids'] ?? [],fn ($p) => $p->whereIn('campaign_id',$settings['campaign_ids'])));
+                }
+            });
     }
 }

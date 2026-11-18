@@ -237,6 +237,7 @@ trait ProcessesClientDelivery
                 }
                 $run->update(['status' => 'running', 'started_at' => $run->started_at ?: now()]);
                 $client = User::with('organization')->whereKey($item->client_id)->lockForUpdate()->first();
+                if ($client) Organization::whereKey($client->organization_id)->whereNotNull('assignment_config')->lockForUpdate()->first();
                 $project = Project::withoutGlobalScopes()->whereKey($item->project_id)->lockForUpdate()->first();
                 $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->first();
                 $reason = null;

@@ -102,7 +102,7 @@ class GitSync extends Component
             abort(403, 'Unauthorized. Super Admin role required for Git Deployment.');
         }
 
-        $validTabs = ['pull', 'push', 'history', 'settings', 'audit'];
+        $validTabs = ['pull', 'push', 'history', 'settings', 'audit', 'tasks'];
         if (!in_array($this->activeTab, $validTabs)) {
             $this->activeTab = 'pull';
         }
@@ -194,7 +194,7 @@ class GitSync extends Component
 
     public function setActiveTab(string $tab): void
     {
-        $validTabs = ['pull', 'push', 'history', 'settings', 'audit'];
+        $validTabs = ['pull', 'push', 'history', 'settings', 'audit', 'tasks'];
         $this->activeTab = in_array($tab, $validTabs) ? $tab : 'pull';
         $this->search = '';
         $this->statusFilter = 'all';

@@ -5,7 +5,8 @@
  * PRODUCTION BACKBONE & SYSTEMD/SUPERVISOR CONFIGURATION REQUIREMENTS
  * ============================================================================
  *
- * This project requires TWO continuous background processes in production:
+ * Shared hosting: run schedule:run every minute; the bounded queue worker below is included.
+ * VPS: a Supervisor worker can additionally keep background jobs processing continuously.
  *
  * 1. CRON SCHEDULER (Runs every minute to trigger scheduled tasks):
  *    * * * * * cd /var/www/lead-panther-crm && php artisan schedule:run >> /dev/null 2>&1
@@ -32,7 +33,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule 1: Process Background Queue Jobs (Every Minute - for Shared Hosting / Hostinger)
-Schedule::command('queue:work --stop-when-empty --tries=3')->everyMinute()->withoutOverlapping();
+// The bounded shared-hosting worker is registered LAST so newly created jobs run this minute.
 
 // Schedule 2: Check Low Credit Balances & Notify Client Admins (Hourly)
 Schedule::call(function () {
@@ -48,7 +49,7 @@ Schedule::call(function () {
         });
 })->name('release-scheduled-leads')->everyMinute()->withoutOverlapping();
 
-Schedule::command('credits:check-low-balances')->hourly();
+Schedule::command('credits:check-low-balances')->name('low-credit-alerts')->hourly();
 
 Schedule::call(function () {
     \App\Models\Organization::whereNotNull('assignment_config')->where('auto_assign_enabled',true)->where('status','active')
@@ -69,17 +70,26 @@ Schedule::call(function () {
 })->name('client-delivery-cycles')->everyMinute()->withoutOverlapping();
 
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
-Schedule::command('followups:check-due')->everyFifteenMinutes();
-Schedule::command('notifications:check-operational')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('followups:check-due')->name('followup-reminders')->everyFifteenMinutes();
+Schedule::command('notifications:check-operational')->name('operational-notifications')->everyFiveMinutes()->withoutOverlapping();
 
 // Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
-Schedule::command('team:auto-offline')->everyFiveMinutes();
+Schedule::command('team:auto-offline')->name('team-availability')->everyFiveMinutes();
 
 // Schedule 5: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
-Schedule::command('meta:sync-leads')->everyTenMinutes();
+Schedule::command('meta:sync-leads')->name('meta-lead-sync')->everyTenMinutes();
 
 // Schedule 6: Daily Backup of Database + Documents Disk
-Schedule::command('backup:run')->daily();
+Schedule::command('backup:run')->name('database-backup')->daily();
 
 // Schedule 7: Weekly Cleanup of Old Backups
-Schedule::command('backup:clean')->weekly();
+Schedule::command('backup:clean')->name('backup-cleanup')->weekly();
+
+Schedule::command('queue:work --stop-when-empty --tries=3 --max-time=20 --max-jobs=100')->name('queue-worker')->everyMinute()->withoutOverlapping();
+
+foreach (app(\Illuminate\Console\Scheduling\Schedule::class)->events() as $task) {
+    if (isset(\App\Services\ScheduledTaskService::TASKS[$task->description])) {
+        $task->withoutOverlapping(15);
+        app(\App\Services\ScheduledTaskService::class)->instrument($task);
+    }
+}

@@ -202,7 +202,12 @@
             </svg>
             <span>Audit Trail</span>
         </button>
+        <button type="button" wire:click="setActiveTab('tasks')" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 flex-shrink-0 {{ $activeTab === 'tasks' ? 'bg-surface text-ink border border-border' : 'text-muted hover:text-ink' }}">Scheduled Tasks</button>
     </div>
+
+    @if($activeTab === 'tasks')
+        <livewire:admin.scheduled-tasks-browser />
+    @endif
 
     <!-- TAB 1: PULL LATEST CHANGES -->
     @if($activeTab === 'pull')

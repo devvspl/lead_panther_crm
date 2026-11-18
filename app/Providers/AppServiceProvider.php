@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(\App\Services\ScheduledTaskService::class);
         $this->app->singleton(\App\Services\SeederRunService::class);
         $this->app->bind(WhatsAppGateway::class, LogWhatsAppGateway::class);
         $this->app->bind(SmsGateway::class, LogSmsGateway::class);
@@ -36,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Console\Events\ScheduledTaskFailed::class, fn($event)=>app(\App\Services\ScheduledTaskService::class)->schedulerFailed($event->task,$event->exception));
         \Illuminate\Support\Facades\Blade::if('canViewLeadSource', fn () => \App\Support\LeadSourceVisibility::allowed());
         \Illuminate\Support\Facades\RateLimiter::for('browser-push-subscribe', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by('push-subscribe:'.$request->user()?->id));
         \Illuminate\Support\Facades\RateLimiter::for('browser-push-test', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(2)->by('push-test:'.$request->user()?->id));

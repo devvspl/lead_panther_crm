@@ -288,6 +288,10 @@
                                     <td @if($colWidth) style="{{ $widthStyle }}" @endif class="py-3 px-2.5 sm:px-3.5 {{ $alignClass }} {{ $priorityClass }} {{ $col['cellClass'] ?? '' }}">
                                         @if(isset(${'cell_' . $colKey}))
                                             {{ ${'cell_' . $colKey}($row) }}
+                                        @elseif($type === 'scheduled_task_actions')
+                                            <div class="flex gap-2"><button type="button" wire:click="inspectTask('{{ $row->id }}')" class="border border-border rounded-lg px-2 py-1 text-xs">Details</button><button type="button" wire:click="runTask('{{ $row->id }}')" wire:confirm="Run this registered CRM task now? It can process queued leads, send notifications or perform configured maintenance. Business limits and task locks still apply." @disabled($row->busy || !$row->ready) wire:loading.attr="disabled" class="bg-ink text-white rounded-lg px-2 py-1 text-xs disabled:opacity-50">Run Now</button></div>
+                                        @elseif($type === 'scheduled_run_actions')
+                                            <button type="button" wire:click="inspectRun({{ $row->id }})" class="border border-border rounded-lg px-2 py-1 text-xs">Inspect</button>
                                         @elseif($type === 'client_push')
                                             <button type="button" wire:click="pushLeadToClient({{ $row->id }})" wire:confirm="Push this lead using the saved client delivery settings? Confirm that you have permission to share it. If settings are missing, the setup form will open." wire:loading.attr="disabled" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
                                         @elseif($type === 'delivery_item_actions')
@@ -764,6 +768,10 @@
                                 <div>
                                     @if(isset(${'cell_' . $colKey}))
                                         {{ ${'cell_' . $colKey} }}
+                                    @elseif($type === 'scheduled_task_actions')
+                                        <div class="flex gap-2"><button type="button" wire:click="inspectTask('{{ $row->id }}')" class="border border-border rounded-lg px-2 py-1 text-xs">Details</button><button type="button" wire:click="runTask('{{ $row->id }}')" wire:confirm="Run this registered CRM task now? It can process queued leads, send notifications or perform configured maintenance. Business limits and task locks still apply." @disabled($row->busy || !$row->ready) wire:loading.attr="disabled" class="bg-ink text-white rounded-lg px-2 py-1 text-xs disabled:opacity-50">Run Now</button></div>
+                                    @elseif($type === 'scheduled_run_actions')
+                                        <button type="button" wire:click="inspectRun({{ $row->id }})" class="border border-border rounded-lg px-2 py-1 text-xs">Inspect</button>
                                     @elseif($type === 'client_push')
                                         <button type="button" wire:click="pushLeadToClient({{ $row->id }})" wire:confirm="Push this lead using the saved client delivery settings? Confirm that you have permission to share it. If settings are missing, the setup form will open." wire:loading.attr="disabled" class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-primary">Push</button>
                                     @elseif($type === 'delivery_item_actions')

@@ -941,6 +941,20 @@ class OrganizationDetail extends Component
             });
         }
         $teamMembers = $usersQuery->orderBy('name')->get();
+        $teamMembershipDetails = [];
+        if ($this->activeTab === 'team') {
+            $teams = \App\Models\SalesTeam::where(fn ($q) => $q
+                ->where(fn ($q) => $q->where('ownable_type', Organization::class)->where('ownable_id', $orgId))
+                ->orWhere(fn ($q) => $q->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $orgId)->select('id'))))
+                ->with(['leader', 'members' => fn ($q) => $q->where('is_active', true)])->get();
+            foreach ($teamMembers as $member) {
+                $assignedTeams = $teams->filter(fn ($team) => $team->leader_id === $member->id || $team->members->contains('user_id', $member->id));
+                $teamMembershipDetails[$member->id] = [
+                    'teams' => $assignedTeams->pluck('name')->unique()->join(', '),
+                    'leaders' => $assignedTeams->filter(fn ($team) => $team->leader?->organization_id === $orgId)->pluck('leader.name')->filter()->unique()->join(', '),
+                ];
+            }
+        }
 
         // 2. Clients Query
         $clients = $this->billingClients()
@@ -1082,6 +1096,7 @@ class OrganizationDetail extends Component
 
         return view('livewire.admin.organization-detail', [
             'teamMembers' => $teamMembers,
+            'teamMembershipDetails' => $teamMembershipDetails,
             'clients' => $clients,
             'projects' => $projects,
             'leads' => $leads,

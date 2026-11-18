@@ -34,10 +34,10 @@ class OrganizationMemberDetailsTest extends TestCase
     public function test_executive_selects_brijesh_by_name_without_replacing_the_team_leader(): void
     {
         $this->seed(\Database\Seeders\RoleSeeder::class);
-        $org = Organization::create(['name' => 'Deltek']);
+        $org = Organization::create(['name' => 'Deltek', 'status' => 'active']);
         $admin = User::factory()->create(['status'=>'active']); $admin->assignRole('Super Admin');
         $leader = User::factory()->create(['name'=>'Brijesh', 'organization_id'=>$org->id, 'status'=>'active']); $leader->assignRole('Team Leader');
-        $member = User::factory()->create(['organization_id'=>$org->id, 'status'=>'active']); $member->assignRole('Executive');
+        $member = User::factory()->create(['organization_id'=>$org->id, 'status'=>'active', 'phone'=>'919123456789']); $member->assignRole('Executive');
         $team = \App\Models\SalesTeam::create(['name'=>'Deltek Sales Team', 'ownable_type'=>Organization::class, 'ownable_id'=>$org->id, 'leader_id'=>$leader->id]);
         Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId'=>$org->id])
             ->call('open', $member->id)->assertSee('Brijesh')->assertDontSee('Deltek Sales Team')
@@ -47,6 +47,8 @@ class OrganizationMemberDetailsTest extends TestCase
         $this->assertTrue($member->fresh()->hasRole('Executive'));
         $this->assertFalse($member->fresh()->hasRole('Team Leader'));
         $this->assertDatabaseHas('sales_team_members', ['user_id'=>$member->id, 'sales_team_id'=>$team->id, 'is_active'=>true]);
+        Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization'=>$org])
+            ->set('activeTab', 'team')->assertSee('Phone')->assertSee('Team Leader')->assertSee('Deltek Sales Team')->assertSee('Brijesh')->assertSee($member->phone);
     }
 
     public function test_admin_can_edit_and_change_password_only_for_this_organization(): void

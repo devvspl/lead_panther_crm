@@ -815,6 +815,9 @@
                             <tr>
                                 <th class="py-3 px-4">Member Name</th>
                                 <th class="py-3 px-4">Email Address</th>
+                                <th class="py-3 px-4">Phone</th>
+                                <th class="py-3 px-4">Team</th>
+                                <th class="py-3 px-4">Team Leader</th>
                                 <th class="py-3 px-4">Role Badge</th>
                                 <th class="py-3 px-4">Account Status</th>
                                 <th class="py-3 px-4">Joined Date</th>
@@ -840,6 +843,10 @@
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ $member->email }}
                                     </td>
+
+                                    <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">{{ $member->phone ?: '—' }}</td>
+                                    <td class="py-3 px-4 text-ink min-w-[140px]">{{ $teamMembershipDetails[$member->id]['teams'] ?: 'Not assigned' }}</td>
+                                    <td class="py-3 px-4 text-ink min-w-[120px]">{{ $teamMembershipDetails[$member->id]['leaders'] ?: 'Not assigned' }}</td>
 
                                     <td class="py-3 px-4">
                                         @php
@@ -908,7 +915,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="p-8 text-center text-xs text-muted">
+                                    <td colspan="9" class="p-8 text-center text-xs text-muted">
                                         No team members found matching your search.
                                     </td>
                                 </tr>

@@ -10,6 +10,7 @@
     'showFilterDropdown' => true,
     'showConfigurations' => true,
     'showCheckboxes' => false,
+    'stickySelection' => false,
     'selectedRows' => [],
     'selectAll' => false,
     'visibleColumns' => [],
@@ -198,7 +199,7 @@
                     class="bg-canvas border-b border-border text-[10px] uppercase font-bold text-muted tracking-wider select-none">
                     <tr>
                         @if($showCheckboxes)
-                            <th class="py-3 px-3.5 w-10 text-center">
+                            <th class="py-3 px-3.5 w-10 text-center {{ $stickySelection ? 'sticky left-0 z-20 bg-canvas' : '' }}">
                                 <input type="checkbox" wire:model.live="selectAll"
                                     class="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer">
                             </th>
@@ -266,7 +267,7 @@
                             @endphp
                             <tr class="hover:bg-canvas/50 transition {{ $isRowSelected ? 'bg-primary/5' : '' }}">
                                 @if($showCheckboxes && $rowId)
-                                    <td class="py-3 px-3.5 text-center">
+                                    <td class="py-3 px-3.5 text-center {{ $stickySelection ? 'sticky left-0 z-10 bg-surface' : '' }}">
                                         <input type="checkbox" wire:click="toggleSelectRow('{{ $rowId }}')" @checked($isRowSelected)
                                             class="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer">
                                     </td>

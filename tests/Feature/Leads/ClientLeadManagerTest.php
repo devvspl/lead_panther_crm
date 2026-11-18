@@ -51,6 +51,16 @@ class ClientLeadManagerTest extends TestCase
         $this->manager()->call('pushLeadToClient',$this->other->id)->assertForbidden();
     }
 
+    public function test_table_selection_opens_client_push_for_selected_leads_only(): void
+    {
+        $this->manager()->assertSee('Push Selected to Client (0)')
+            ->set('selectedRows', [$this->ours->id])->assertSee('Push Selected to Client (1)')
+            ->call('pushSelectedToClient')
+            ->assertDispatched('client-push-selected', organizationId: $this->organization->id, leadIds: [$this->ours->id]);
+        $this->manager()->set('selectedRows', [$this->other->id])->call('pushSelectedToClient')->assertForbidden();
+        $this->manager()->call('pushSelectedToClient')->assertHasErrors('selectedRows');
+    }
+
     public function test_import_dropdowns_only_list_related_client_projects_campaigns_and_sources(): void
     {
         $foreignProject = Project::create(['client_id' => $this->other->client_id, 'name' => 'Private foreign project']);

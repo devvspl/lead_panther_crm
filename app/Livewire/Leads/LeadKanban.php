@@ -2097,7 +2097,6 @@ class LeadKanban extends Component
         if ($this->isBuilder) {
             return [
                 ['key' => 'all', 'label' => 'All Leads'],
-                ['key' => 'new', 'label' => 'New'],
                 ['key' => 'assigned', 'label' => 'Assigned'],
                 ['key' => 'unassigned', 'label' => 'Unassigned'],
                 ['key' => 'in_progress', 'label' => 'In Progress'],
@@ -2112,7 +2111,6 @@ class LeadKanban extends Component
 
         return [
             ['key' => 'all', 'label' => 'All Leads'],
-            ['key' => 'new', 'label' => 'New'],
             ['key' => 'assigned', 'label' => 'Assigned'],
             ['key' => 'unassigned', 'label' => 'Unassigned'],
             ['key' => 'contacted', 'label' => 'Contacted'],

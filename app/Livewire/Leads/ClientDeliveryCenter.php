@@ -100,7 +100,11 @@ class ClientDeliveryCenter extends Component
         $this->showConfiguration = false;
         $this->selectedLeadIds = [];
         $this->dispatch('lead-updated');
-        $this->dispatch('toast', type: 'success', message: $result['queued'].' lead(s) queued; '.$result['skipped'].' ineligible or already queued lead(s) skipped.');
+        $waiting = $plan->items()->whereIn('lead_id', $ids)->whereIn('status', ['pending', 'queued'])->count();
+        $this->dispatch('toast', type: ($result['queued'] || $waiting) ? 'info' : 'warning', message: $result['queued']
+            ? $result['queued'].' lead(s) added to the delivery queue. Delivery follows the saved frequency and quantity.'
+            : ($waiting ? $waiting.' selected lead(s) are already waiting for delivery. Use Send Cycle Now to run the saved batch immediately.'
+                : 'No leads added: selected leads are already delivered or not eligible. Check Delivery History for their status.'));
         return $result['queued'];
     }
 

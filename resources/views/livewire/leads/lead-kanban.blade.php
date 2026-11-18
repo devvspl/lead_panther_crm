@@ -886,6 +886,7 @@
                 :sortField="$sortField"
                 :sortDirection="$sortDirection" 
                 :showCheckboxes="true"
+                :stickySelection="$this->isClientContext()"
                 :selectedRows="$selectedRows"
                 :selectAll="$selectAll"
                 searchPlaceholder="Search leads by code, name, phone, city..."
@@ -893,6 +894,12 @@
                 emptyMessage="No leads matched your search and filter criteria.">
                 <x-slot:action>
                     <div class="flex items-center gap-2">
+                        @if($this->isClientContext())
+                            <button type="button" wire:click="pushSelectedToClient" @disabled(empty($selectedRows)) wire:loading.attr="disabled"
+                                class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg whitespace-nowrap disabled:opacity-50">
+                                Push Selected to Client ({{ count($selectedRows) }})
+                            </button>
+                        @endif
                         @if(!$isSalesExecutive)
                             @if(!empty($selectedRows))
                                 <button type="button" wire:click="openBulkAssignModal"

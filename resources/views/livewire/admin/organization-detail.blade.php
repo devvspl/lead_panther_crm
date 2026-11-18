@@ -566,6 +566,18 @@
                     </div>
                 </div>
 
+                <section class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between gap-4">
+                    <div>
+                        <h3 id="builder-credit-visibility-label" class="text-sm font-bold text-ink">Show Credit Balance</h3>
+                        <p class="text-xs text-muted mt-1">Show available credits and credits consumed on this client's Builder/Developer dashboard.</p>
+                    </div>
+                    <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label" aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
+                        wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})" wire:loading.attr="disabled"
+                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 {{ $organization->show_builder_credit_balance ? 'bg-primary' : 'bg-neutral-300' }}">
+                        <span class="inline-block h-4 w-4 rounded-full bg-white shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    </button>
+                </section>
+
                 <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
                 <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
 

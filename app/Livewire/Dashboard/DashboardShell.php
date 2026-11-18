@@ -1899,12 +1899,12 @@ class DashboardShell extends Component
                 'closed_won' => ['value' => $closedWon, 'delta' => $this->calculateDelta($closedWon, (int) ($prevStats->closed_won_leads ?? 0))],
                 'replacement_requests' => ['value' => $replacementRequests, 'delta' => null],
             ],
-            'credits' => [
+            'credits' => ($org?->show_builder_credit_balance ?? true) ? [
                 'available_credits' => $availableCredits,
                 'credits_consumed' => $creditsConsumed,
                 'total_leads_received' => $totalLeadsAllTime,
                 'history' => $creditHistory,
-            ],
+            ] : [],
             'team_performance' => $teamPerformance,
             'monthly_trend' => [
                 'labels' => $monthlyLabels,

@@ -36,6 +36,25 @@ class OrganizationDetail extends Component
     public array $projectRates = [];
     public string $mappingProjectName = '';
 
+    public function setBuilderCreditBalanceVisibility(bool $visible): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        DB::transaction(function () use ($visible) {
+            $organization = Organization::whereKey($this->organization->id)->lockForUpdate()->firstOrFail();
+            $before = $organization->show_builder_credit_balance;
+            $organization->update(['show_builder_credit_balance' => $visible]);
+            AuditLog::create([
+                'user_id' => auth()->id(), 'organization_id' => $organization->id,
+                'action' => 'organization.credit_balance_visibility_updated',
+                'subject_type' => Organization::class, 'subject_id' => $organization->id,
+                'from_value' => json_encode(['show_builder_credit_balance' => $before]),
+                'to_value' => json_encode(['show_builder_credit_balance' => $visible]), 'created_at' => now(),
+            ]);
+        });
+        $this->organization->refresh();
+        $this->dispatch('toast', type: 'success', message: $visible ? 'Credit balance is visible on the builder dashboard.' : 'Credit balance is hidden on the builder dashboard.');
+    }
+
     public function auditTableColumns(): array
     {
         return [

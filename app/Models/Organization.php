@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 class Organization extends Model
 {
     protected $guarded = [];
-    protected $casts = ['internal_processing_enabled' => 'boolean', 'internal_processing_config' => 'array', 'assignment_config' => 'array', 'auto_assign_enabled' => 'boolean'];
+    protected $casts = ['show_builder_credit_balance' => 'boolean', 'internal_processing_enabled' => 'boolean', 'internal_processing_config' => 'array', 'assignment_config' => 'array', 'auto_assign_enabled' => 'boolean'];
 
     public function clients(): HasMany
     {

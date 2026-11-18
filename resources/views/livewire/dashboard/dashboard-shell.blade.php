@@ -1148,6 +1148,7 @@
         </div>
 
         <!-- 3. Small Credit Summary (Read-Only) -->
+        @if($builderData['organization']?->show_builder_credit_balance ?? true)
         <div class="bg-surface rounded-xl border border-border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
             <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Balance</span>
@@ -1172,6 +1173,7 @@
         </div>
 
         <!-- 4. Six Compact KPI Cards -->
+        @endif
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <!-- 1. Total Leads -->
             <a href="{{ route('leads.index') }}?statusFilter=all" wire:navigate

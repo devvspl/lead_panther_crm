@@ -267,7 +267,7 @@
                 </svg>
                 <span>Team Members</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'team' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'team' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ $totalUsersCount }}
                 </span>
             </a>
@@ -282,7 +282,7 @@
                 </svg>
                 <span>Projects</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ $totalProjectsCount }}
                 </span>
             </a>
@@ -301,7 +301,7 @@
                 </svg>
                 <span>Credits & Wallet</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-slate-100 text-slate-700 border border-slate-200' }}">
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ number_format($totalWalletBalance) }}
                 </span>
             </a>
@@ -830,7 +830,7 @@
                                     <td class="py-3 px-4">
                                         <div class="flex items-center gap-3">
                                             <div
-                                                class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-border text-ink font-bold text-xs flex items-center justify-center shrink-0">
+                                                class="w-8 h-8 rounded-full bg-canvas dark:bg-canvas border border-border text-ink font-bold text-xs flex items-center justify-center shrink-0">
                                                 {{ strtoupper(substr($member->name, 0, 1)) }}
                                             </div>
                                             <div>
@@ -853,7 +853,7 @@
                                             $roleName = $member->roles->first()?->name;
                                         @endphp
                                         <span
-                                            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider {{ in_array(strtolower($roleName ?? ''), ['super admin', 'super-admin']) ? 'bg-purple-100 text-purple-950 border-purple-300' : (in_array(strtolower($roleName ?? ''), ['builder']) ? 'bg-blue-100 text-blue-950 border-blue-300' : 'bg-slate-100 text-slate-900 border-slate-300') }}">
+                                            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider {{ in_array(strtolower($roleName ?? ''), ['super admin', 'super-admin']) ? 'bg-primary/10 text-primary border-primary/20' : (in_array(strtolower($roleName ?? ''), ['builder']) ? 'bg-primary/10 text-primary border-primary/20' : 'bg-canvas text-ink border-border') }}">
                                             {{ $roleName ? ucwords(str_replace(['-', '_'], ' ', $roleName)) : 'No Role' }}
                                         </span>
                                     </td>
@@ -863,14 +863,14 @@
                                             class="cursor-pointer" title="Click to toggle user status">
                                             @if(($member->status ?? 'active') === 'active')
                                                 <span
-                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
                                                     Active
                                                 </span>
                                             @else
                                                 <span
-                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-950 border border-red-300">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-danger/10 text-danger border border-danger/20">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-danger"></span>
                                                     Inactive
                                                 </span>
                                             @endif
@@ -884,18 +884,18 @@
                                     <td class="py-3 px-4 text-right">
                                         <div class="flex items-center justify-end gap-1.5">
                                             <a href="{{ route('admin.users.impersonate', $member->id) }}"
-                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-purple-50 text-purple-700 hover:border-purple-300 transition shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-primary/10 text-purple-700 hover:border-primary/20 transition shadow-2xs inline-flex items-center justify-center cursor-pointer"
                                                 title="Impersonate User">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                                                 </svg>
                                             </a>
 
                                             <button type="button" wire:click="generateUserActivationLink({{ $member->id }})"
-                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-blue-50 text-blue-600 hover:border-blue-300 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-primary/10 text-primary hover:border-primary/20 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
                                                 title="Generate Reset / Activation Link">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                                 </svg>
@@ -903,9 +903,9 @@
 
                                             <button type="button" wire:click="removeUserFromOrganization({{ $member->id }})"
                                                 wire:confirm="Remove {{ $member->name }} from {{ $organization->name }}?"
-                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-red-50 text-red-600 hover:border-red-300 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                                                class="p-1.5 rounded-lg border border-border bg-surface hover:bg-danger/10 text-danger hover:border-danger/20 transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
                                                 title="Unassign from Organization">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>

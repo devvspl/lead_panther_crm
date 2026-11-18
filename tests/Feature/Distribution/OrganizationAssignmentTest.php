@@ -49,6 +49,30 @@ class OrganizationAssignmentTest extends TestCase
         if($delivered) $lead->update(['delivered_at'=>now(),'delivery_pending'=>false]);
         return $lead->fresh();
     }
+
+    public function test_leader_saves_team_rules_and_real_assignment_uses_them(): void
+    {
+        $leader=User::factory()->create(['organization_id'=>$this->org->id,'status'=>'active']); $leader->assignRole('Team Leader');
+        $this->team->update(['leader_id'=>$leader->id]);
+        $this->configure(['team_id'=>$this->team->id,'batch_size'=>1]);
+        $lead = $this->lead();
+        $component=Livewire::actingAs($leader)->test(LeadAssignmentConfiguration::class,['organizationId'=>$this->org->id])
+            ->assertSee('Save Settings')->assertDontSee('Project & campaign eligibility')->assertDontSee('Assign Pending Batch')
+            ->set('settings.timezone','Pacific/Auckland')->set('settings.team_id',999999)
+            ->set('settings.method','equal_distribution')->set('settings.daily_limit',2)->set('settings.batch_size',2)
+            ->set('settings.members.'.$this->agents[0]->id.'.available',false)->call('save')->assertHasNoErrors();
+        $this->assertSame('equal_distribution',$this->org->fresh()->assignment_config['method']);
+        $this->assertSame('UTC',$this->org->fresh()->assignment_config['timezone']);
+        $this->assertEquals($this->team->id,$this->org->fresh()->assignment_config['team_id']);
+        $result=$this->service()->distribute($lead);
+        $this->assertSame('assigned',$result['status']);
+        $this->assertNotEquals($this->agents[0]->id,$lead->fresh()->assigned_to);
+        $component->set('settings.enabled',false)->call('save')->assertHasNoErrors();
+        $this->assertSame(0,$this->service()->processOrganizationAssignments($this->org->id));
+        $other=User::factory()->create(['organization_id'=>$this->org->id]);
+        $component->set('settings.members.'.$other->id,['available'=>true])->call('save')->assertHasErrors('settings.members');
+        $component->call('assignPending')->assertForbidden();
+    }
     public function test_round_robin_daily_limits_duplicate_prevention_and_timezone_reset(): void
     {
         $this->configure(['daily_limit'=>1,'timezone'=>'Asia/Kolkata']);

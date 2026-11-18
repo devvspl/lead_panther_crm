@@ -22,7 +22,17 @@ class LeadAssignmentConfiguration extends Component
         $this->organizationId = $organizationId;
         $org = $this->organization();
         // Read-only team viewers must not receive other teams' member settings in Livewire's snapshot.
-        if (!auth()->user()->hasRole('Super Admin')) return;
+        if (!auth()->user()->hasRole('Super Admin')) {
+            if (TeamAccess::isLeader(auth()->user())) {
+                $all = app(LeadDistributionService::class)->assignmentDefaults($org);
+                $this->settings = array_intersect_key($all, array_flip(['enabled','method','daily_limit','batch_size','working_days','start_time','end_time']));
+                $this->settings['members'] = [];
+                foreach (TeamAccess::executives(auth()->user(), false)->whereIn('id', \App\Models\SalesTeamMember::where('sales_team_id', $all['team_id'])->select('user_id'))->get() as $member) {
+                    $this->settings['members'][$member->id] = ['available'=>$all['members'][$member->id]['available'] ?? true];
+                }
+            }
+            return;
+        }
         $this->settings = app(LeadDistributionService::class)->assignmentDefaults($org);
         foreach (app(LeadDistributionService::class)->assignmentExecutives($organizationId)->get() as $member) {
             $this->settings['members'][$member->id] ??= ['available'=>true,'priority'=>1];
@@ -50,8 +60,10 @@ class LeadAssignmentConfiguration extends Component
         $projects = $org->projects()->withoutGlobalScopes()->pluck('projects.name','projects.id')->all();
         $effective = $service->assignmentDefaults($org);
         $ownsPendingPool = !$leader || (!empty($effective['team_id']) && TeamAccess::teams(auth()->user())->whereKey($effective['team_id'])->exists());
+        if ($leader && $ownsPendingPool) $ids = array_values(array_intersect($ids, \App\Models\SalesTeamMember::where('sales_team_id', $effective['team_id'])->pluck('user_id')->all()));
         return view('livewire.settings.lead-assignment-configuration',[
-            'canConfigure'=>auth()->user()->hasRole('Super Admin'),
+            'canConfigure'=>auth()->user()->hasRole('Super Admin') || ($leader && $ownsPendingPool && auth()->user()->can('assign-team-leads')),
+            'isTeamLeader'=>$leader,
             'teams'=>$service->assignmentTeams($org->id)->pluck('name','id')->all(),
             'statistics'=>$service->assignmentStatistics($org,$ids),
             'effective'=>$effective,

@@ -31,7 +31,21 @@ trait ConfiguresTeamAssignment
 
     public function saveAssignmentConfiguration(Organization $org, array $input, User $actor): void
     {
-        abort_unless($actor->is_active && $actor->hasRole('Super Admin'), 403);
+        $leader = \App\Support\TeamAccess::isLeader($actor);
+        $current = $this->assignmentDefaults($org);
+        $leaderIds = [];
+        if ($leader) {
+            abort_unless($actor->is_active && $actor->organization_id === $org->id && $actor->can('assign-team-leads')
+                && $current['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($current['team_id'])->exists(), 403);
+            $leaderIds = \App\Support\TeamAccess::executives($actor, false)->whereIn('id', SalesTeamMember::where('sales_team_id', $current['team_id'])->select('user_id'))->pluck('id')->all();
+            if (array_diff(array_keys($input['members'] ?? []), $leaderIds)) throw ValidationException::withMessages(['settings.members'=>'Only your assignment team members can be configured.']);
+            $allowed = array_intersect_key($input, array_flip(['enabled','method','daily_limit','batch_size','working_days','start_time','end_time']));
+            foreach ($input['members'] ?? [] as $id=>$member) $current['members'][$id]['available'] = $member['available'] ?? true;
+            $input = array_replace($current, $allowed);
+            foreach ($input['members'] as &$member) $member['priority'] ??= 1;
+            unset($member);
+            if (!in_array($input['method'], ['round_robin','equal_distribution','manual']) && !($input['method'] === 'priority' && $current['method'] === 'priority')) throw ValidationException::withMessages(['settings.method'=>'Choose Round Robin, Equal Distribution or Manual Assignment.']);
+        } else abort_unless($actor->is_active && $actor->hasRole('Super Admin'), 403);
         $data = validator($input, [
             'enabled'=>'required|boolean', 'method'=>'required|in:round_robin,equal_distribution,priority,manual',
             'team_id'=>'nullable|integer',
@@ -47,8 +61,18 @@ trait ConfiguresTeamAssignment
             || array_diff(array_keys($data['members']), $this->assignmentExecutives($org->id)->pluck('id')->all())) {
             throw ValidationException::withMessages(['assignment' => 'Select projects, campaigns and executives belonging to this organization.']);
         }
-        DB::transaction(function () use ($org, $data, $actor) {
+        DB::transaction(function () use ($org, $data, $actor, $leader, $leaderIds) {
             $org = Organization::whereKey($org->id)->lockForUpdate()->firstOrFail();
+            if ($leader) {
+                $latest = $this->assignmentDefaults($org);
+                abort_unless($latest['team_id'] === $data['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($data['team_id'])->exists(),403);
+                foreach (['timezone','project_ids','campaign_ids'] as $key) $data[$key] = $latest[$key];
+                $members = $latest['members'];
+                foreach ($leaderIds as $id) {
+                    if (isset($data['members'][$id])) $members[$id] = array_replace($members[$id] ?? ['priority'=>1], ['available'=>$data['members'][$id]['available']]);
+                }
+                $data['members'] = $members;
+            }
             $before = $org->assignment_config;
             $org->update(['assignment_config'=>$data, 'auto_assign_enabled'=>$data['enabled'], 'distribution_method'=>$data['method']]);
             AuditLog::create(['organization_id'=>$org->id, 'user_id'=>$actor->id, 'action'=>'assignment.configuration_updated',

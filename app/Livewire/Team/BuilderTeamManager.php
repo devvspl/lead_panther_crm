@@ -28,6 +28,77 @@ class BuilderTeamManager extends Component
     public ?int $teamLeaderId = null;
     public ?int $existingMemberId = null;
     public string $existingMemberRole = 'Executive';
+    #[\Livewire\Attributes\Locked] public ?int $editingMemberId = null;
+    public bool $showMemberEditor = false;
+    public string $editMemberName = '';
+    public string $editMemberEmail = '';
+    public string $editMemberPhone = '';
+    public ?int $moveToTeamId = null;
+
+    private function managedMember(int $id): User
+    {
+        $this->guard();
+        $team = $this->teams()->find($this->teamId);
+        abort_unless($team && SalesTeamMember::where('sales_team_id',$team->id)->where('user_id',$id)->exists(),403);
+        $member = User::where('organization_id',auth()->user()->organization_id)->findOrFail($id);
+        abort_unless($member->hasAnyRole(['Executive','Sales Executive','sales-executive']) && !$member->hasAnyRole(['Super Admin','super-admin','Builder/Developer','Builder','builder','builder-admin','Team Leader','team-leader']),403);
+        return $member;
+    }
+
+    public function editTeamMember(int $id): void
+    {
+        $member = $this->managedMember($id);
+        $this->editingMemberId = $id;
+        $this->editMemberName = $member->name;
+        $this->editMemberEmail = $member->email;
+        $this->editMemberPhone = $member->phone ?? '';
+        $this->moveToTeamId = $this->teamId;
+        $this->resetValidation();
+        $this->showMemberEditor = true;
+        $this->dispatch('open-modal','team-member-editor');
+    }
+
+    public function saveTeamMember(): void
+    {
+        $member = $this->managedMember($this->editingMemberId ?? 0);
+        $this->validate(['editMemberName'=>'required|string|max:255','editMemberEmail'=>['required','email',\Illuminate\Validation\Rule::unique('users','email')->ignore($member->id)],
+            'editMemberPhone'=>['nullable','string','max:30',\Illuminate\Validation\Rule::unique('users','phone')->ignore($member->id)],'moveToTeamId'=>'required|integer']);
+        abort_unless($this->teams()->whereKey($this->moveToTeamId)->exists(),403);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($member) {
+            $before = $member->only(['name','email','phone']);
+            $data = ['name'=>$this->editMemberName,'email'=>$this->editMemberEmail,'phone'=>$this->editMemberPhone ?: null];
+            if ($member->email !== $data['email']) $data['email_verified_at'] = null;
+            $member->update($data);
+            if ($this->moveToTeamId !== $this->teamId) {
+                SalesTeamMember::where('sales_team_id',$this->teamId)->where('user_id',$member->id)->delete();
+                SalesTeamMember::updateOrCreate(['sales_team_id'=>$this->moveToTeamId,'user_id'=>$member->id],['role'=>'Executive','is_active'=>true]);
+            }
+            $this->memberAudit($member,'team.member_updated',$before,['name'=>$member->name,'email'=>$member->email,'phone'=>$member->phone,'team_id'=>$this->moveToTeamId]);
+        });
+        $this->showMemberEditor = false;
+        $this->dispatch('close-modal','team-member-editor');
+        $this->dispatch('toast',type:'success',message:'Team member updated.');
+    }
+
+    public function removeTeamMember(int $id): void
+    {
+        $member = $this->managedMember($id);
+        if (\App\Models\Lead::withoutGlobalScopes()->where('assigned_to',$id)->exists()) {
+            $this->addError('teamMember','Reassign this member’s leads before removing their membership.');
+            return;
+        }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($member) {
+            SalesTeamMember::where('sales_team_id',$this->teamId)->where('user_id',$member->id)->delete();
+            $this->memberAudit($member,'team.member_removed',['team_id'=>$this->teamId],[]);
+        });
+        $this->dispatch('toast',type:'success',message:'Membership removed. The user account was preserved.');
+    }
+
+    private function memberAudit(User $member, string $action, array $before, array $after): void
+    {
+        \App\Models\AuditLog::create(['user_id'=>auth()->id(),'organization_id'=>$member->organization_id,'action'=>$action,'subject_type'=>User::class,'subject_id'=>$member->id,
+            'from_value'=>json_encode($before),'to_value'=>json_encode($after),'created_at'=>now()]);
+    }
 
     private function guard(): void {
         $user=auth()->user();
@@ -74,9 +145,14 @@ class BuilderTeamManager extends Component
     public function toggleMember(int $userId): void {
         $this->guard(); $team=$this->teams()->findOrFail($this->teamId);
         $member=User::where('organization_id',auth()->user()->organization_id)->findOrFail($userId);
-        if (\App\Support\TeamAccess::isLeader(auth()->user())) abort_unless($member->hasRole('Executive') && ! $member->hasRole('Team Leader'),403);
+        if (\App\Support\TeamAccess::isLeader(auth()->user())) $this->managedMember($userId);
         $membership=SalesTeamMember::where('sales_team_id',$team->id)->where('user_id',$userId)->firstOrFail();
+        if ($membership->is_active && \App\Support\TeamAccess::isLeader(auth()->user()) && \App\Models\Lead::withoutGlobalScopes()->where('assigned_to',$userId)->exists()) {
+            $this->addError('teamMember','Reassign this member’s leads before deactivating their membership.');
+            return;
+        }
         $membership->update(['is_active'=>! $membership->is_active]);
+        $this->memberAudit($member,'team.membership_updated',[],['team_id'=>$team->id,'is_active'=>(bool)$membership->is_active]);
         $this->dispatch('toast',type:'success',message:'Team membership status updated.');
     }
 
@@ -86,19 +162,17 @@ class BuilderTeamManager extends Component
             ['key' => 'id', 'label' => 'Member ID', 'prefix' => '#', 'class' => 'font-mono font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'name', 'label' => 'Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'email', 'label' => 'Email', 'class' => 'font-mono text-muted text-xs', 'sortable' => true, 'priority' => 1],
-            ['key' => 'role', 'label' => 'Role', 'type' => 'badge', 'sortable' => false, 'priority' => 1, 'badgeMap' => [
-                'Super Admin' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'Builder/Developer' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-                'Channel Partner' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'Broker' => 'bg-cyan-50 text-cyan-700 border border-cyan-200',
-                'Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'Sales Executive' => 'bg-blue-50 text-blue-700 border border-blue-200',
-            ], 'default' => 'Executive'],
+            ['key'=>'status','label'=>'Account Status','type'=>'badge','sortable'=>false,'priority'=>1,'badgeStyle'=>fn ($value) => strtolower($value)==='active' ? 'bg-success/10 text-success border border-success/20' : 'bg-warning/10 text-warning border border-warning/20'],
+            ['key'=>'membership_status','label'=>'Membership','type'=>'badge','sortable'=>false,'priority'=>1,'badgeStyle'=>fn ($value) => strtolower($value)==='active' ? 'bg-success/10 text-success border border-success/20' : 'bg-warning/10 text-warning border border-warning/20'],
+            ['key'=>'member_actions','label'=>'Actions','sortable'=>false,'priority'=>1,'render'=>function ($row) {
+                return view('components.ui.team-member-actions',['member'=>$row])->render();
+            }],
+            ['key' => 'role', 'label' => 'Role', 'type' => 'badge', 'sortable' => false, 'priority' => 1, 'badgeStyle' => fn () => 'bg-primary/10 text-primary border border-primary/20', 'default' => 'Executive'],
             ['key' => 'assigned_leads_count', 'label' => 'Assigned', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink text-center'],
-            ['key' => 'contacted_leads_count', 'label' => 'Contacted', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-blue-600 text-center'],
+            ['key' => 'contacted_leads_count', 'label' => 'Contacted', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-primary text-center'],
             ['key' => 'followups_count', 'label' => 'Follow-ups', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-ink text-center'],
-            ['key' => 'site_visits_count', 'label' => 'Site Visits', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-purple-600 text-center'],
-            ['key' => 'bookings_count', 'label' => 'Bookings Won', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-emerald-600 text-center'],
+            ['key' => 'site_visits_count', 'label' => 'Site Visits', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-primary text-center'],
+            ['key' => 'bookings_count', 'label' => 'Bookings Won', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-success text-center'],
         ];
     }
 
@@ -202,6 +276,7 @@ class BuilderTeamManager extends Component
             $this->updatedTeamId();
         }
         $query = User::where('organization_id', $orgId)
+            ->with('roles')
             ->withCount([
                 'assignedLeads as assigned_leads_count',
                 'assignedLeads as contacted_leads_count' => fn($q) => $q->whereIn('current_stage', ['contacted', 'connected', 'qualified', 'interested', 'site_visit', 'negotiation', 'booking', 'closed_won']),
@@ -227,6 +302,11 @@ class BuilderTeamManager extends Component
         $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
 
         $members = $query->orderBy($sortField, $sortDir)->paginate($this->perPage);
+        $membershipStates = SalesTeamMember::where('sales_team_id',$this->teamId)->pluck('is_active','user_id');
+        $members->getCollection()->each(function ($member) use ($membershipStates) {
+            $member->membership_status = ($membershipStates[$member->id] ?? false) ? 'Active' : 'Inactive';
+            $member->role = $member->getRoleNames()->join(', ');
+        });
 
         return view('livewire.team.builder-team-manager', [
             'members' => $members,

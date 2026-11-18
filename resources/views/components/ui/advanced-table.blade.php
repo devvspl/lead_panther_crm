@@ -9,6 +9,7 @@
     'sortAction' => 'sortBy',
     'showFilterDropdown' => true,
     'showConfigurations' => true,
+    'iconOnlyActions' => false,
     'showCheckboxes' => false,
     'stickySelection' => false,
     'selectedRows' => [],
@@ -115,12 +116,15 @@
             @if($showConfigurations && !empty($columns))
                 <div class="relative">
                     <button type="button" @click="configOpen = !configOpen; filterOpen = false"
+                        title="Configuration" aria-label="Configuration"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition shadow-2xs cursor-pointer">
+                        @if($iconOnlyActions)<x-ui.team-icon name="settings" />@else
                         <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                         </svg>
-                        <span>Configuration</span>
+                        @endif
+                        @unless($iconOnlyActions)<span>Configuration</span>@endunless
                     </button>
 
                     <!-- Column Toggles Panel -->

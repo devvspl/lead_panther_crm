@@ -80,6 +80,24 @@ class TeamLeaderTest extends TestCase {
         Livewire::test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$this->outside->id)->call('executeAssignment')->assertForbidden();
     }
 
+    public function test_leader_member_actions_are_scoped_and_preserve_user_accounts(): void {
+        $foreignTeamId=SalesTeamMember::where('user_id',$this->outside->id)->value('sales_team_id');
+        Livewire::actingAs($this->leader)->test(BuilderTeamManager::class)->call('editTeamMember',$this->exec->id)
+            ->set('moveToTeamId',$foreignTeamId)->call('saveTeamMember')->assertForbidden();
+        $second = SalesTeam::create(['name'=>'Second managed team','ownable_type'=>Organization::class,'ownable_id'=>$this->builder->organization_id,'leader_id'=>$this->leader->id]);
+        $manager = Livewire::actingAs($this->leader)->test(BuilderTeamManager::class)->assertSee('Edit / Reassign')->assertSee('Membership')
+            ->call('editTeamMember',$this->exec->id)->set('editMemberName','Updated executive')->set('moveToTeamId',$second->id)
+            ->call('saveTeamMember')->assertHasNoErrors();
+        $this->assertSame('Updated executive',$this->exec->fresh()->name);
+        $this->assertDatabaseHas('sales_team_members',['sales_team_id'=>$second->id,'user_id'=>$this->exec->id,'is_active'=>true]);
+        $manager->set('teamId',$second->id)->call('toggleMember',$this->exec->id);
+        $this->assertDatabaseHas('sales_team_members',['sales_team_id'=>$second->id,'user_id'=>$this->exec->id,'is_active'=>false]);
+        $manager->call('toggleMember',$this->exec->id)->call('removeTeamMember',$this->exec->id)->assertHasNoErrors();
+        $this->assertDatabaseHas('users',['id'=>$this->exec->id]);
+        $this->assertDatabaseMissing('sales_team_members',['sales_team_id'=>$second->id,'user_id'=>$this->exec->id]);
+        $manager->call('editTeamMember',$this->outside->id)->assertForbidden();
+    }
+
     public function test_deltek_repair_restores_confirmed_inactive_leader_link_without_reassigning_leads(): void {
         $lead = $this->lead($this->exec, 'LP-RESTORED-DATA');
         SalesTeamMember::where('sales_team_id', $this->team->id)->where('user_id', $this->leader->id)->update(['is_active'=>false]);

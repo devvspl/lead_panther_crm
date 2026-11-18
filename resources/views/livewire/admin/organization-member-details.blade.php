@@ -3,7 +3,7 @@
         <div x-init="$watch('show', value => { if (!value &amp;&amp; $wire.show) $wire.close() })" class="flex flex-col max-h-[calc(100dvh-4rem)]">
             <div class="flex items-center justify-between gap-3 p-4 sm:p-6 border-b border-border shrink-0">
                 <h2 class="text-lg font-bold text-ink">Team Member Details</h2>
-                <button type="button" wire:click="close" aria-label="Close member details" class="text-muted px-2 py-1">✕</button>
+                <button type="button" wire:click="close" aria-label="Close member details" class="inline-flex items-center justify-center rounded-lg p-2 text-muted hover:text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-primary"><x-ui.team-icon name="close" /></button>
             </div>
             <div class="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
             @if($member)
@@ -37,7 +37,7 @@
                         <livewire:shared.searchable-select wire:model.live="leadershipTeamId" :value="$leadershipTeamId" :options="$teams->mapWithKeys(fn ($team) => [$team->id => $team->leader->name])->all()" placeholder="Choose Team Leader" class="block w-full" :key="'member-leader-team-'.$memberId" />
                         <x-input-error :messages="$errors->get('leadershipTeamId')" />
                         @if($teams->isEmpty())<p class="text-xs text-muted">Assign an active Team Leader to a client team first.</p>@endif
-                        <button type="submit" wire:loading.attr="disabled" @disabled($teams->isEmpty() || $member->status !== 'active') class="px-4 py-2 bg-ink text-white rounded-lg text-xs disabled:opacity-50">Save Team Leader</button>
+                        <button type="submit" wire:loading.attr="disabled" @disabled($teams->isEmpty() || $member->status !== 'active') class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs disabled:opacity-50">Save Team Leader</button>
                     </form>
                 @endif
                 @if($changingPassword)
@@ -56,10 +56,10 @@
                     <button type="button" wire:click="$toggle('editing')" class="px-3 py-2 border border-border rounded-lg text-xs text-ink bg-surface">{{ $editing ? 'Cancel Edit' : 'Edit Details' }}</button>
                     <button type="button" wire:click="$toggle('changingPassword')" class="px-3 py-2 border border-border rounded-lg text-xs text-ink bg-surface">{{ $changingPassword ? 'Cancel Password Change' : 'Change Password' }}</button>
                     @if($editing)
-                        <button type="submit" form="org-member-details-form" wire:loading.attr="disabled" class="px-4 py-2 bg-ink text-white rounded-lg text-xs disabled:opacity-50">Save Details</button>
+                        <button type="submit" form="org-member-details-form" wire:loading.attr="disabled" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs disabled:opacity-50">Save Details</button>
                     @endif
                     @if($changingPassword)
-                        <button type="submit" form="org-member-password-form" wire:loading.attr="disabled" class="px-4 py-2 bg-ink text-white rounded-lg text-xs disabled:opacity-50">Save New Password</button>
+                        <button type="submit" form="org-member-password-form" wire:loading.attr="disabled" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs disabled:opacity-50">Save New Password</button>
                     @endif
                 @endif
             </footer>

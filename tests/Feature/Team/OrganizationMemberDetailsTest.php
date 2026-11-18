@@ -39,6 +39,7 @@ class OrganizationMemberDetailsTest extends TestCase
         $leader = User::factory()->create(['name'=>'Brijesh', 'organization_id'=>$org->id, 'status'=>'active']); $leader->assignRole('Team Leader');
         $member = User::factory()->create(['organization_id'=>$org->id, 'status'=>'active', 'phone'=>'919123456789']); $member->assignRole('Executive');
         $team = \App\Models\SalesTeam::create(['name'=>'Deltek Sales Team', 'ownable_type'=>Organization::class, 'ownable_id'=>$org->id, 'leader_id'=>$leader->id]);
+        \App\Models\SalesTeamMember::create(['sales_team_id'=>$team->id, 'user_id'=>$leader->id, 'role'=>'Team Leader', 'is_active'=>false]);
         Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId'=>$org->id])
             ->call('open', $member->id)->assertSee('Brijesh')->assertDontSee('Deltek Sales Team')
             ->set('leadershipTeamId', $team->id)->call('assignMemberToTeam')->assertHasNoErrors()
@@ -47,6 +48,11 @@ class OrganizationMemberDetailsTest extends TestCase
         $this->assertTrue($member->fresh()->hasRole('Executive'));
         $this->assertFalse($member->fresh()->hasRole('Team Leader'));
         $this->assertDatabaseHas('sales_team_members', ['user_id'=>$member->id, 'sales_team_id'=>$team->id, 'is_active'=>true]);
+        $this->assertDatabaseHas('sales_team_members', ['user_id'=>$leader->id, 'sales_team_id'=>$team->id, 'is_active'=>true]);
+        $this->actingAs($leader->fresh());
+        $this->assertTrue(\App\Support\TeamAccess::executives(auth()->user())->whereKey($member->id)->exists());
+        Livewire::test(\App\Livewire\Team\BuilderTeamManager::class)->assertSee($member->name)->assertSee('Deltek Sales Team');
+        Livewire::test(\App\Livewire\Settings\LeadAssignmentConfiguration::class, ['organizationId'=>$org->id])->assertSee($member->name);
         Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization'=>$org])
             ->set('activeTab', 'team')->assertSee('Phone')->assertSee('Team Leader')->assertSee('Deltek Sales Team')->assertSee('Brijesh')->assertSee($member->phone);
     }

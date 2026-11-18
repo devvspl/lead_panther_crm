@@ -196,6 +196,11 @@ class BuilderTeamManager extends Component
     {
         $this->guard();
         $orgId = auth()->user()?->organization_id;
+        $accessibleTeams = $this->teams()->orderBy('name')->get();
+        if (!$this->teamId && $accessibleTeams->isNotEmpty()) {
+            $this->teamId = $accessibleTeams->first()->id;
+            $this->updatedTeamId();
+        }
         $query = User::where('organization_id', $orgId)
             ->withCount([
                 'assignedLeads as assigned_leads_count',
@@ -225,7 +230,7 @@ class BuilderTeamManager extends Component
 
         return view('livewire.team.builder-team-manager', [
             'members' => $members,
-            'teams'=>$this->teams()->pluck('name','id')->all(),
+            'teams'=>$accessibleTeams->pluck('name','id')->all(),
             'leaders'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->where('status','active')->role('Team Leader')->pluck('name','id')->all(),
             'organizationMembers'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->whereDoesntHave('roles',fn($q)=>$q->whereIn('name',['Super Admin','Builder/Developer','Builder','builder']))->pluck('name','id')->all(),
             'roleOptions'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? ['Executive'=>'Sales Executive'] : ['Executive'=>'Sales Executive','Team Leader'=>'Team Leader','Channel Partner'=>'Channel Partner'],

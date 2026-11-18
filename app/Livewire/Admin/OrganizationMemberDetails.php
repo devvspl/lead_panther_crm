@@ -31,6 +31,12 @@ class OrganizationMemberDetails extends Component
         DB::transaction(function () use ($member) {
             $team = $this->teams()->with('leader')->lockForUpdate()->find($this->leadershipTeamId);
             abort_unless($team && $team->leader && $team->leader->organization_id === $this->organizationId && $team->leader->status === 'active' && $team->leader->hasRole('Team Leader'), 404);
+            // This explicit administrator assignment confirms the active named leader.
+            // Repair an imported/revoked duplicate pivot so all team panels agree.
+            $leaderMembership = SalesTeamMember::updateOrCreate(['sales_team_id' => $team->id, 'user_id' => $team->leader_id], ['role' => 'Team Leader', 'is_active' => true]);
+            if ($leaderMembership->wasRecentlyCreated || $leaderMembership->wasChanged()) {
+                $this->audit($team->leader, 'organization.leader_membership_confirmed', [], ['team_id' => $team->id, 'is_active' => true]);
+            }
             $previous = SalesTeamMember::whereIn('sales_team_id', $this->teams()->select('id'))->where('user_id', $member->id)->where('is_active', true)->pluck('sales_team_id')->all();
             SalesTeamMember::whereIn('sales_team_id', $this->teams()->select('id'))->where('user_id', $member->id)->where('sales_team_id', '!=', $team->id)->update(['is_active' => false]);
             SalesTeamMember::updateOrCreate(['sales_team_id' => $team->id, 'user_id' => $member->id], ['role' => 'Executive', 'is_active' => true]);

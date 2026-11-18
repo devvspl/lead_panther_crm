@@ -2218,11 +2218,26 @@ class LeadKanban extends Component
             return;
         }
         $this->manualMobile = preg_replace('/[^0-9]/', '', $this->manualMobile);
+        $budget = null;
         $this->validate([
             'manualName' => 'required|string|max:255',
             'manualMobile' => 'required|string|min:10|max:15',
             'manualEmail' => 'nullable|email',
             'manualProjectId' => 'required|exists:projects,id',
+            'manualBudget' => ['bail', 'nullable', 'string', 'max:100', function ($attribute, $value, $fail) use (&$budget) {
+                $value = trim($value);
+                if ($value === '') return;
+                // Store rupees in the existing decimal column, never a display label.
+                if (!preg_match('/^(?:₹\s*|INR\s*|Rs\.?\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(L|Lac|Lacs|Lakh|Lakhs|Cr|Crore|Crores|K)?$/i', $value, $parts)) {
+                    $fail('Enter a budget such as 5000000, 50 Lakh or ₹75.0L.');
+                    return;
+                }
+                $number = str_replace(',', '', $parts[1]);
+                $budget = empty($parts[2]) ? (float) $number : \App\Services\MetaLeadSyncService::parseBudget($number.' '.$parts[2]);
+                if (!is_finite($budget) || $budget < 0 || $budget > 9999999999999.99) {
+                    $fail('Budget must be between 0 and 9,999,999,999,999.99 rupees.');
+                }
+            }],
         ], [
             'manualName.required' => 'Lead Name is required.',
             'manualMobile.required' => 'Mobile number is required.',
@@ -2278,7 +2293,7 @@ class LeadKanban extends Component
             'mobile' => $mobile,
             'email' => $email,
             'city' => $this->manualCity ?: null,
-            'budget' => $this->manualBudget ?: null,
+            'budget' => $budget,
             'property_type' => $this->manualPropertyType ?: null,
             'requirement' => $this->manualRequirement ?: 'Manual lead entry via Lead Manager',
             'status' => 'new',
@@ -2295,6 +2310,7 @@ class LeadKanban extends Component
             'manualRequirement',
             'manualProjectId',
             'manualCampaignId',
+            'manualBudget',
         ]);
 
         $this->showPullLeadsModal = false;

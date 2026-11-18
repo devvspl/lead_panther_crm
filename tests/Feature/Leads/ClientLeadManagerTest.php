@@ -93,6 +93,26 @@ class ClientLeadManagerTest extends TestCase
         $manager->set('manualProjectId', 999999)->call('createManualLead')->assertForbidden();
     }
 
+    public function test_manual_budget_labels_are_saved_as_rupees_and_invalid_values_stay_in_form(): void
+    {
+        $manager = $this->manager();
+        foreach (['50 Lakh' => 5000000, '₹75.0L' => 7500000, '1.25 Cr' => 12500000, '50,00,000' => 5000000, '250' => 250, '0' => 0, '' => null] as $input => $expected) {
+            $mobile = '91234567'.str_pad((string) Lead::count(), 2, '0', STR_PAD_LEFT);
+            $manager->set('manualName', 'Budget customer')->set('manualMobile', $mobile)
+                ->set('manualProjectId', $this->project->id)->set('manualBudget', (string) $input)
+                ->call('createManualLead')->assertHasNoErrors()->assertSet('manualBudget', '');
+            $saved = Lead::where('mobile', $mobile)->firstOrFail();
+            $expected === null ? $this->assertNull($saved->budget) : $this->assertEquals($expected, $saved->budget);
+        }
+        $count = Lead::count();
+        foreach (['unknown', '-50 Lakh', '50 Lakh - 1 Cr', '10000000000000'] as $invalid) {
+            $manager->set('manualName', 'Invalid budget')->set('manualMobile', '9111111111')
+                ->set('manualProjectId', $this->project->id)->set('manualBudget', $invalid)
+                ->call('createManualLead')->assertHasErrors('manualBudget');
+            $this->assertSame($count, Lead::count());
+        }
+    }
+
     public function test_bulk_status_assignment_delete_and_forged_ids(): void
     {
         $executive = User::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);

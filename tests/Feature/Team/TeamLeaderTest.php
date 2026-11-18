@@ -80,6 +80,21 @@ class TeamLeaderTest extends TestCase {
         Livewire::test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$this->outside->id)->call('executeAssignment')->assertForbidden();
     }
 
+    public function test_deltek_repair_restores_confirmed_inactive_leader_link_without_reassigning_leads(): void {
+        $lead = $this->lead($this->exec, 'LP-RESTORED-DATA');
+        SalesTeamMember::where('sales_team_id', $this->team->id)->where('user_id', $this->leader->id)->update(['is_active'=>false]);
+        $this->actingAs($this->leader);
+        $this->assertSame(0, TeamAccess::teams($this->leader)->count());
+        auth()->logout();
+        $this->seed(\Database\Seeders\DeltekTeamAccessRepairSeeder::class);
+        $this->seed(\Database\Seeders\DeltekTeamAccessRepairSeeder::class);
+        $this->actingAs($this->leader->fresh());
+        $this->assertSame(10, TeamAccess::executives(auth()->user())->count());
+        $this->assertTrue(Lead::panelQuery()->whereKey($lead->id)->exists());
+        $this->assertSame($this->exec->id, $lead->fresh()->assigned_to);
+        $this->assertSame(1, \App\Models\AuditLog::where('action', 'organization.leader_membership_confirmed')->count());
+    }
+
     public function test_legacy_role_permission_repair_restores_team_members_and_leads(): void {
         $own = $this->lead($this->exec, 'LP-ROLE-REPAIR');
         $outside = $this->lead($this->outside, 'LP-ROLE-OTHER');

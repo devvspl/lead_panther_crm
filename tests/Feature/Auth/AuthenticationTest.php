@@ -20,6 +20,25 @@ class AuthenticationTest extends TestCase
             ->assertSeeVolt('pages.auth.login');
     }
 
+    public function test_login_page_refreshes_do_not_trigger_password_attempt_lockout(): void
+    {
+        for ($i = 0; $i < 8; $i++) $this->get('/login')->assertOk();
+    }
+
+    public function test_failed_password_attempts_remain_limited_and_expire(): void
+    {
+        $user = User::factory()->create();
+        $component = Volt::test('pages.auth.login')->set('form.email', $user->email)->set('form.password', 'wrong-password');
+        for ($i = 0; $i < 5; $i++) $component->call('login')->assertHasErrors('form.email');
+        $component->set('form.password', 'password')->call('login')->assertHasErrors('form.email');
+        $this->assertGuest();
+        // A locked-out password must not prevent opening the login screen.
+        $this->get('/login')->assertOk();
+        $this->travel(61)->seconds();
+        $component->call('login')->assertHasNoErrors();
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();

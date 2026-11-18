@@ -12,6 +12,15 @@ new class extends Component
     public string $password = '';
     public string $password_confirmation = '';
 
+    public function generatePassword(): void
+    {
+        abort_unless(Auth::check(), 403);
+        $this->password = \Illuminate\Support\Str::password(14);
+        $this->password_confirmation = $this->password;
+        $this->resetValidation(['password', 'password_confirmation']);
+        $this->dispatch('profile-password-generated');
+    }
+
     /**
      * Update the password for the currently authenticated user.
      */
@@ -61,49 +70,45 @@ new class extends Component
     <form wire:submit="updatePassword" class="space-y-4 text-xs">
         <div>
             <label for="update_password_current_password" class="font-bold text-ink block mb-1">Current Password <span class="text-danger">*</span></label>
-            <input 
+            <x-ui.password-input
                 wire:model="current_password" 
                 id="update_password_current_password" 
                 name="current_password" 
-                type="password" 
                 autocomplete="current-password" 
                 placeholder="Enter current password"
-                class="w-full h-9 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition font-medium placeholder:text-muted"
-            >
+            />
             <x-input-error :messages="$errors->get('current_password')" class="mt-1 text-xs text-danger" />
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
             <div>
                 <label for="update_password_password" class="font-bold text-ink block mb-1">New Password <span class="text-danger">*</span></label>
-                <input 
+                <x-ui.password-input :reveal-generated="true"
                     wire:model="password" 
                     id="update_password_password" 
                     name="password" 
-                    type="password" 
                     autocomplete="new-password" 
                     placeholder="Minimum 8 characters"
-                    class="w-full h-9 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition font-medium placeholder:text-muted"
-                >
+                />
                 <x-input-error :messages="$errors->get('password')" class="mt-1 text-xs text-danger" />
             </div>
 
             <div>
                 <label for="update_password_password_confirmation" class="font-bold text-ink block mb-1">Confirm New Password <span class="text-danger">*</span></label>
-                <input 
+                <x-ui.password-input :reveal-generated="true"
                     wire:model="password_confirmation" 
                     id="update_password_password_confirmation" 
                     name="password_confirmation" 
-                    type="password" 
                     autocomplete="new-password" 
                     placeholder="Repeat new password"
-                    class="w-full h-9 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition font-medium placeholder:text-muted"
-                >
+                />
                 <x-input-error :messages="$errors->get('password_confirmation')" class="mt-1 text-xs text-danger" />
             </div>
         </div>
 
-        <div class="flex items-center justify-end pt-4 border-t border-border">
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border">
+            <button type="button" wire:click="generatePassword" wire:loading.attr="disabled"
+                class="px-3 py-2 border border-border rounded-lg text-ink bg-canvas hover:bg-surface text-xs font-semibold disabled:opacity-60">Generate Strong Password</button>
             <button 
                 type="submit" 
                 wire:loading.attr="disabled"

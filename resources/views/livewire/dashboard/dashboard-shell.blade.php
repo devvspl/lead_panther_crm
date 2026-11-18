@@ -1281,8 +1281,8 @@
         <!-- 5. Three Main Sections: (A) Lead Performance & (B) Team Performance -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <!-- Section A: Lead Performance -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-3 flex flex-col justify-between">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs flex flex-col gap-3 min-w-0 h-[26rem]">
+                <div class="flex items-center justify-between gap-2 min-h-12 shrink-0 pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
                         <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
@@ -1318,14 +1318,14 @@
                 </div>
 
                 <!-- Monthly Trend Chart -->
-                <div class="relative h-52 w-full">
+                <div class="relative flex-1 min-h-0 w-full">
                     <canvas id="builderMonthlyTrendChart"></canvas>
                 </div>
             </div>
 
             <!-- Section B: Team Performance -->
-            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs space-y-3 flex flex-col justify-between">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
+            <div class="bg-surface rounded-xl border border-border p-3.5 shadow-2xs flex flex-col gap-3 min-w-0 h-[26rem]">
+                <div class="flex items-center justify-between gap-2 min-h-12 shrink-0 pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
                         <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -1340,42 +1340,20 @@
                     </a>
                 </div>
 
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-canvas text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border">
-                            <tr>
-                                <th class="py-2 px-3">Team Member</th>
-                                <th class="py-2 px-3 text-center">Assigned Leads</th>
-                                <th class="py-2 px-3 text-center">Contacted</th>
-                                <th class="py-2 px-3 text-center">Closed Won</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border/60">
-                            @forelse($builderData['team_performance'] ?? [] as $m)
-                                <tr class="hover:bg-canvas/50 transition">
-                                    <td class="py-2 px-3">
-                                        <div class="font-bold text-ink truncate max-w-[140px]">{{ $m['name'] }}</div>
-                                        <div class="text-[10px] text-muted truncate max-w-[140px]">{{ $m['email'] }}</div>
-                                    </td>
-                                    <td class="py-2 px-3 text-center font-mono font-bold text-ink">
-                                        {{ number_format($m['assigned_leads'] ?? 0) }}
-                                    </td>
-                                    <td class="py-2 px-3 text-center font-mono text-blue-600 font-semibold">
-                                        {{ number_format($m['contacted_leads'] ?? 0) }}
-                                    </td>
-                                    <td class="py-2 px-3 text-center font-mono text-emerald-600 font-bold">
-                                        {{ number_format($m['closed_won'] ?? 0) }}
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="py-6 text-center text-xs text-muted">
-                                        No team members found in organization.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                <div class="flex-1 min-h-0 overflow-auto rounded-lg">
+                    @php
+                        $teamColumns = [
+                            ['key' => 'name', 'label' => 'Team Member', 'sortable' => false,
+                                'render' => fn ($row) => '<div class="font-semibold text-ink">'.e($row['name']).'</div><div class="text-[10px] text-muted break-all">'.e($row['email']).'</div>'],
+                            ['key' => 'assigned_leads', 'label' => 'Assigned Leads', 'sortable' => false, 'class' => 'font-mono font-semibold text-ink'],
+                            ['key' => 'contacted_leads', 'label' => 'Contacted', 'sortable' => false, 'class' => 'font-mono text-blue-600'],
+                            ['key' => 'closed_won', 'label' => 'Closed Won', 'sortable' => false, 'class' => 'font-mono text-emerald-600'],
+                        ];
+                    @endphp
+                    <x-ui.advanced-table :columns="$teamColumns" :rows="collect($builderData['team_performance'] ?? [])"
+                        :showSearch="false" :showFilterDropdown="false" :showConfigurations="false" :showCheckboxes="false"
+                        :showSkeleton="false" tableName="builder-team-performance"
+                        emptyTitle="No Team Members" emptyMessage="No team members found in organization." />
                 </div>
             </div>
         </div>

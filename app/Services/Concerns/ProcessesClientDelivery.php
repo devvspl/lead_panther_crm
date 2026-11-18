@@ -35,11 +35,13 @@ trait ProcessesClientDelivery
     public function saveClientDeliveryPlan(Organization $source, array $input, User $actor): LeadDeliveryPlan
     {
         $this->deliveryAdmin($actor);
+        $input['campaign_id'] = $input['campaign_id'] ?? null;
+        if ($input['campaign_id'] === '') $input['campaign_id'] = null;
         // Inactive caps are ignored, including their stale form values.
         if (($input['quantity_mode'] ?? null) === 'all') $input['quantity'] = $input['max_cycle'] = null;
         if (array_key_exists('daily_enabled', $input) && !filter_var($input['daily_enabled'], FILTER_VALIDATE_BOOLEAN)) $input['daily_limit'] = null;
         $data = Validator::make($input, [
-            'client_id' => 'required|integer|exists:users,id', 'project_id' => 'required|integer|exists:projects,id', 'campaign_id' => 'required|integer|exists:campaigns,id',
+            'client_id' => 'required|integer|exists:users,id', 'project_id' => 'required|integer|exists:projects,id', 'campaign_id' => 'nullable|integer|exists:campaigns,id',
             'frequency' => ['required', Rule::in(self::DELIVERY_FREQUENCIES)],
             'quantity_mode' => ['required', Rule::in(['fixed', 'all'])], 'quantity' => 'required_if:quantity_mode,fixed|nullable|integer|min:1|max:1000000',
             'max_cycle' => 'nullable|integer|min:1|max:1000000', 'daily_enabled' => 'required|boolean', 'daily_limit' => 'required_if:daily_enabled,true|nullable|integer|min:1|max:1000000',
@@ -61,7 +63,7 @@ trait ProcessesClientDelivery
         }
         $project = Project::withoutGlobalScopes()->where('client_id', $owner->id)->find($data['project_id']);
         if (!$project) throw ValidationException::withMessages(['project_id' => 'Choose a project belonging to this client.']);
-        if (!Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->whereKey($data['campaign_id'])->exists()) throw ValidationException::withMessages(['campaign_id' => 'Choose a campaign for this project.']);
+        if ($data['campaign_id'] !== null && !Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->whereKey($data['campaign_id'])->exists()) throw ValidationException::withMessages(['campaign_id' => 'Choose a campaign for this project.']);
         if (in_array($data['frequency'], ['daily', 'weekly']) && ($data['daily_time'] < $data['window_start'] || $data['daily_time'] > $data['window_end'])) throw ValidationException::withMessages(['daily_time' => 'The scheduled time must be inside the delivery window.']);
         if ($data['frequency'] === 'weekly' && !in_array((int) $data['weekly_day'], array_map('intval', $data['working_days']))) throw ValidationException::withMessages(['weekly_day' => 'The weekly day must also be a working day.']);
         unset($data['client_id'], $data['project_id'], $data['campaign_id'], $data['confirmed_send_all'], $data['confirmed_unlimited']);
@@ -117,12 +119,23 @@ trait ProcessesClientDelivery
             ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']);
     }
 
+    protected function clientDeliveryCampaign(LeadDeliveryPlan $plan, Lead $lead): int
+    {
+        if ($plan->campaign_id) return $plan->campaign_id;
+        Project::withoutGlobalScopes()->whereKey($plan->project_id)->lockForUpdate()->firstOrFail();
+        if (Campaign::withoutGlobalScopes()->whereKey($lead->campaign_id)->where('project_id',$plan->project_id)->where('status','active')->exists()) return $lead->campaign_id;
+        // Reuse the CRM's project-only lead mapping instead of assigning an unrelated campaign.
+        $destination = new Lead(['lead_source_id'=>$lead->lead_source_id]);
+        $destination->project_id = $plan->project_id;
+        return $destination->campaign_id;
+    }
+
     public function captureClientDeliveryLead(Lead $lead): void
     {
         $plan = LeadDeliveryPlan::findOrFail($lead->delivery_plan_id);
         $item = LeadDeliveryItem::firstOrCreate(['lead_id' => $lead->id], [
             'plan_id' => $plan->id, 'source_client_id' => $lead->client_id, 'source_campaign_id' => $lead->campaign_id,
-            'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $plan->campaign_id,
+            'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $this->clientDeliveryCampaign($plan, $lead),
             'requested_by' => $plan->created_by, 'status' => 'pending',
         ]);
         if ($item->wasRecentlyCreated) $this->deliveryAudit('delivery.intake_captured', $item, [], $item->getAttributes(), $plan->created_by);
@@ -155,7 +168,7 @@ trait ProcessesClientDelivery
                 }
                 if (!$this->eligibleClientDeliveryLeads($plan->organization_id)->whereKey($lead->id)->exists() || LeadDeliveryItem::where('lead_id', $lead->id)->exists() || CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->exists()) continue;
                 $item = LeadDeliveryItem::create(['plan_id' => $plan->id, 'lead_id' => $lead->id, 'source_client_id' => $lead->client_id, 'source_campaign_id' => $lead->campaign_id,
-                    'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $plan->campaign_id, 'requested_by' => $actor->id, 'status' => 'pending']);
+                    'client_id' => $plan->client_id, 'project_id' => $plan->project_id, 'campaign_id' => $this->clientDeliveryCampaign($plan, $lead), 'requested_by' => $actor->id, 'status' => 'pending']);
                 $lead->update(['delivery_plan_id' => $plan->id, 'delivery_pending' => true, 'delivery_consent_at' => now(), 'delivery_consent_by' => $actor->id]);
                 $this->deliveryAudit('delivery.enqueued', $item, [], array_merge($item->getAttributes(), ['consent_confirmed_by' => $actor->id, 'consent_confirmed_at' => now()->toIso8601String()]), $actor->id);
                 $count++;

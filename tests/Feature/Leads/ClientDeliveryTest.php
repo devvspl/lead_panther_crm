@@ -43,6 +43,37 @@ class ClientDeliveryTest extends TestCase
         CreditWallet::create(['client_id' => $this->destination->id, 'balance' => 10000, 'opening_balance' => 10000]);
     }
 
+    public function test_campaign_is_optional_and_project_only_push_delivers_to_client(): void
+    {
+        Queue::fake();
+        $project = Project::create(['client_id'=>$this->destination->id,'name'=>'Project without campaigns','status'=>'active','delivery_enabled'=>true]);
+        $ids = $this->leads(1);
+        Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id])
+            ->call('openPush',$this->source->organization_id,$ids)
+            ->set('settings.client_id',$this->destination->id)->set('settings.project_id',$project->id)
+            ->set('settings.campaign_id','')->call('pushLeads')->assertHasNoErrors();
+        $plan = LeadDeliveryPlan::where('organization_id',$this->source->organization_id)->firstOrFail();
+        $this->assertNull($plan->campaign_id);
+        $item = $plan->items()->firstOrFail();
+        $this->assertSame('sent',$item->status);
+        $this->assertSame($project->id,$item->campaign->project_id);
+        $this->assertSame('General Campaign',$item->campaign->name);
+        $this->actingAs(User::findOrFail($this->destination->id));
+        $this->assertTrue(Lead::panelQuery()->whereKey($ids[0])->exists());
+    }
+
+    public function test_optional_campaign_preserves_matching_campaign_and_rejects_wrong_project(): void
+    {
+        $ids = $this->leads(1);
+        Lead::withoutGlobalScopes()->whereKey($ids[0])->update(['campaign_id'=>$this->campaign->id]);
+        $plan = $this->plan(['campaign_id'=>null]);
+        $this->assertNull($plan->campaign_id);
+        $this->service()->enqueueClientLeads($plan,$ids,true,$this->admin);
+        $this->assertSame($this->campaign->id,$plan->items()->firstOrFail()->campaign_id);
+        $this->expectException(ValidationException::class);
+        $this->plan(['campaign_id'=>$this->sourceCampaign->id]);
+    }
+
     private function service(): LeadDistributionService { return app(LeadDistributionService::class); }
     private function settings(array $overrides = []): array
     {

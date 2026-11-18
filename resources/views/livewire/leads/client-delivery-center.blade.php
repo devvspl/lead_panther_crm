@@ -45,7 +45,7 @@
             <div class="grid sm:grid-cols-3 gap-3">
                 <div><label class="font-semibold">Destination Client *</label><x-ui.themed-select wire:model.live="settings.client_id" :options="$clients->pluck('name','id')->all()" placeholder="Choose client" :searchable="true" /></div>
                 <div wire:key="delivery-project-{{ $settings['client_id'] }}"><label class="font-semibold">Project *</label><x-ui.themed-select wire:model.live="settings.project_id" :options="$projects->pluck('name','id')->all()" placeholder="Choose project" :searchable="true" /></div>
-                <div wire:key="delivery-campaign-{{ $settings['project_id'] }}"><label class="font-semibold">Campaign *</label><x-ui.themed-select wire:model.live="settings.campaign_id" :options="$campaigns->pluck('name','id')->all()" placeholder="Choose campaign" :searchable="true" /></div>
+                <div wire:key="delivery-campaign-{{ $settings['project_id'] }}"><label class="font-semibold">Campaign (Optional)</label><x-ui.themed-select wire:model.live="settings.campaign_id" :options="['' => 'Use project default'] + $campaigns->pluck('name','id')->all()" placeholder="Use project default" :searchable="true" /></div>
             </div>
             <div class="grid sm:grid-cols-2 gap-3">
                 <div><label>Delivery Frequency</label><x-ui.themed-select wire:model.live="settings.frequency" :options="['immediate'=>'Immediately','15_minutes'=>'Every 15 minutes','30_minutes'=>'Every 30 minutes','hourly'=>'Hourly','daily'=>'Daily','weekly'=>'Weekly','manual'=>'Manual Only']" :searchable="true" /></div>

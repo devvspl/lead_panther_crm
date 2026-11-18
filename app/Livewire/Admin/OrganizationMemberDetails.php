@@ -1,7 +1,7 @@
 <?php
 namespace App\Livewire\Admin;
 
-use App\Models\{AuditLog, User};
+use App\Models\{AuditLog, User, Organization, SalesTeam, SalesTeamMember};
 use Illuminate\Support\Facades\{DB, Hash};
 use Illuminate\Support\Str;
 use Illuminate\Validation\{Rule, Rules\Password};
@@ -21,6 +21,35 @@ class OrganizationMemberDetails extends Component
     public string $status = 'active';
     public string $password = '';
     public string $password_confirmation = '';
+    public ?int $leadershipTeamId = null;
+
+    private function teams()
+    {
+        return SalesTeam::where(fn ($q) => $q->where(fn ($q) => $q->where('ownable_type', Organization::class)->where('ownable_id', $this->organizationId))
+            ->orWhere(fn ($q) => $q->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $this->organizationId)->select('id'))));
+    }
+
+    public function assignTeamLeader(): void
+    {
+        $member = $this->member();
+        abort_unless($member->status === 'active' && $member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive', 'Team Leader', 'team-leader'])
+            && !$member->hasAnyRole(['Super Admin', 'super-admin', 'Builder/Developer', 'Builder']), 403);
+        $this->validate(['leadershipTeamId' => 'required|integer']);
+        DB::transaction(function () use ($member) {
+            $team = $this->teams()->lockForUpdate()->find($this->leadershipTeamId);
+            abort_unless($team, 404);
+            $before = ['leader_id' => $team->leader_id];
+            if ($team->leader_id && $team->leader_id !== $member->id) {
+                SalesTeamMember::where('sales_team_id', $team->id)->where('user_id', $team->leader_id)->update(['role' => 'Executive']);
+            }
+            $member->syncRoles('Team Leader');
+            SalesTeamMember::updateOrCreate(['sales_team_id' => $team->id, 'user_id' => $member->id], ['role' => 'Team Leader', 'is_active' => true]);
+            $team->update(['leader_id' => $member->id]);
+            $this->audit($member, 'organization.team_leader_assigned', $before, ['team_id' => $team->id, 'leader_id' => $member->id]);
+        });
+        $this->dispatch('org-member-updated');
+        $this->dispatch('toast', type: 'success', message: 'Team Leader assigned.');
+    }
 
     public function boot(): void
     {
@@ -42,6 +71,7 @@ class OrganizationMemberDetails extends Component
         $this->resetValidation();
         $this->reset('password', 'password_confirmation', 'editing', 'changingPassword');
         foreach (['name', 'email', 'phone', 'status'] as $field) $this->$field = (string) $member->$field;
+        $this->leadershipTeamId = $this->teams()->where('leader_id', $member->id)->value('id');
         $this->show = true;
         $this->dispatch('open-modal', 'org-member-details');
     }
@@ -95,6 +125,7 @@ class OrganizationMemberDetails extends Component
 
     public function render()
     {
-        return view('livewire.admin.organization-member-details', ['member' => $this->show ? $this->member() : null]);
+        return view('livewire.admin.organization-member-details', ['member' => $this->show ? $this->member() : null,
+            'teams' => $this->show ? $this->teams()->get() : collect()]);
     }
 }

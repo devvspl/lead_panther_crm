@@ -80,6 +80,22 @@ class TeamLeaderTest extends TestCase {
         Livewire::test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$this->outside->id)->call('executeAssignment')->assertForbidden();
     }
 
+    public function test_legacy_role_permission_repair_restores_team_members_and_leads(): void {
+        $own = $this->lead($this->exec, 'LP-ROLE-REPAIR');
+        $outside = $this->lead($this->outside, 'LP-ROLE-OTHER');
+        $role = \Spatie\Permission\Models\Role::findByName('Team Leader', 'web');
+        $role->revokePermissionTo('view-team-leads');
+        $this->actingAs($this->leader->fresh());
+        $this->assertSame(0, TeamAccess::executives(auth()->user())->count());
+        $migration = require database_path('migrations/2026_11_18_000005_repair_team_leader_permissions.php');
+        $migration->up(); $migration->up();
+        $this->actingAs($this->leader->fresh());
+        $this->assertSame(10, TeamAccess::executives(auth()->user())->count());
+        $this->assertTrue(Lead::panelQuery()->whereKey($own->id)->exists());
+        $this->assertFalse(Lead::panelQuery()->whereKey($outside->id)->exists());
+        Livewire::test(LeadKanban::class)->assertSee('SE1')->assertSee('LP-ROLE-REPAIR')->assertDontSee('Other team executive');
+    }
+
     public function test_imported_team_without_leader_pivot_keeps_team_leads_visible(): void {
         $own = $this->lead($this->exec, 'LP-IMPORTED-TEAM');
         $other = $this->lead($this->outside, 'LP-OTHER-TEAM');

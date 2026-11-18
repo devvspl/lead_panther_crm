@@ -148,7 +148,7 @@
                         :options="$eligibleAssignees->pluck('name', 'id')->toArray()" 
                         placeholder="All Members" 
                         class="w-full"
-                        :key="'b-leads-exec-'.($executive ?? 'none')" 
+                        :key="'b-leads-exec-'.($executive ?? 'none').'-'.md5($eligibleAssignees->pluck('name', 'id')->toJson())"
                     />
                 </div>
 

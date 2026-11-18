@@ -79,6 +79,29 @@ class TeamLeaderTest extends TestCase {
         $this->assertEquals($second->id,$lead->fresh()->assigned_to);
         Livewire::test(LeadKanban::class)->set('selectedLeadIds',[$lead->id])->set('assignUserId',$this->outside->id)->call('executeAssignment')->assertForbidden();
     }
+
+    public function test_imported_team_without_leader_pivot_keeps_team_leads_visible(): void {
+        $own = $this->lead($this->exec, 'LP-IMPORTED-TEAM');
+        $other = $this->lead($this->outside, 'LP-OTHER-TEAM');
+        SalesTeamMember::where('sales_team_id', $this->team->id)->where('user_id', $this->leader->id)->delete();
+        $this->actingAs($this->leader);
+        $this->assertTrue(Lead::panelQuery()->whereKey($own->id)->exists());
+        $this->assertFalse(Lead::panelQuery()->whereKey($other->id)->exists());
+        $this->get('/team-leader/dashboard')->assertOk()->assertSee('LP-IMPORTED-TEAM')->assertDontSee('LP-OTHER-TEAM');
+        SalesTeamMember::create(['sales_team_id'=>$this->team->id, 'user_id'=>$this->leader->id, 'role'=>'Team Leader', 'is_active'=>false]);
+        $this->assertFalse(Lead::panelQuery()->whereKey($own->id)->exists());
+    }
+
+    public function test_inactive_executive_existing_leads_remain_visible_for_leader_reassignment(): void {
+        $own = $this->lead($this->exec, 'LP-INACTIVE-EXEC');
+        $personal = $this->lead($this->leader, 'LP-LEADER-ASSIGNED');
+        $this->exec->update(['status'=>'inactive']);
+        $this->actingAs($this->leader);
+        $this->assertFalse(TeamAccess::executives($this->leader)->whereKey($this->exec->id)->exists());
+        $this->assertTrue(Lead::panelQuery()->whereKey($own->id)->exists());
+        $this->assertTrue(Lead::panelQuery()->whereKey($personal->id)->exists());
+        Livewire::test(LeadKanban::class)->assertSee('LP-INACTIVE-EXEC');
+    }
     public function test_owner_can_assign_leadership_and_leader_cannot_promote_users(): void {
         $replacement=User::factory()->create(['organization_id'=>$this->builder->organization_id,'status'=>'active']); $replacement->assignRole('Executive');
         Livewire::actingAs($this->builder)->test(BuilderTeamManager::class)->set('teamId',$this->team->id)->set('existingMemberId',$replacement->id)->set('existingMemberRole','Team Leader')->call('assignExistingMember')->assertHasNoErrors();

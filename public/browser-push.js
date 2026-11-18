@@ -66,6 +66,8 @@ function show(node, text, enabled = false, ready = false) {
     enable.disabled = !ready || enabled;
     const disable = node.querySelector('[data-push-action="disable"]');
     const test = node.querySelector('[data-push-action="test"]');
+    const desktop = node.querySelector('[data-push-action="desktop"]');
+    if (desktop) desktop.disabled = !supported();
     if (disable) disable.disabled = !enabled;
     if (test) test.disabled = !enabled;
     const dismiss = node.querySelector('[data-push-action="dismiss"]');
@@ -106,7 +108,20 @@ document.addEventListener('click', async (event) => {
     if (action === 'dismiss') { closePrompt(node); return; }
     node.querySelectorAll('button').forEach(item => item.disabled = true);
     try {
-        if (action === 'enable') {
+        if (action === 'desktop') {
+            if (await Notification.requestPermission() !== 'granted') { await refresh(node); return; }
+            const config = node.pushConfig || await request(node, 'config');
+            await bounded(navigator.serviceWorker.register(config.workerUrl), 'Desktop notification worker failed to register.');
+            const registration = await bounded(navigator.serviceWorker.ready, 'Desktop notification worker did not activate.');
+            await registration.showNotification('Lead Panther desktop notification', {
+                body: 'Desktop popup test. Your CRM alerts can appear here when browser push is enabled.',
+                tag: 'lead-panther-desktop-test-' + Date.now(), requireInteraction: true, silent: false,
+                data: { url: node.dataset.base.replace(/\/push\/?$/, '') },
+            });
+            await refresh(node);
+            status.textContent = 'Desktop popup requested. If it is missing, enable browser notification banners in Windows and turn off Do not disturb. This test does not enable server push.';
+            return;
+        } else if (action === 'enable') {
             // Request permission directly from the user gesture, never on page load.
             status.textContent = 'Allow notifications in the browser prompt...';
             if (await Notification.requestPermission() !== 'granted') { await refresh(node); return; }

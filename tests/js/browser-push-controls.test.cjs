@@ -6,7 +6,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 25));
 
 function page({ timeout = false, denied = false, mounted = true, prompt = false, subscribed = false, configured = true, dismissed = false, missingEnable = false } = {}) {
     const handlers = {}, observers = [], status = { textContent: 'Checking...' };
-    const buttons = Object.fromEntries((prompt ? ['enable', 'dismiss'] : ['enable', 'disable', 'test']).map(action => [action, { disabled: action !== 'dismiss', dataset: { pushAction: action } }]));
+    const buttons = Object.fromEntries((prompt ? ['enable', 'dismiss'] : ['enable', 'disable', 'test', 'desktop']).map(action => [action, { disabled: action !== 'dismiss', dataset: { pushAction: action } }]));
     const node = { dataset: { base: 'https://crm.example.com/notifications/push' },
         querySelector(selector) { return selector === '[data-push-status]' ? status : (missingEnable && selector.includes('"enable"') ? null : buttons[selector.match(/"(.*?)"/)[1]]); },
         querySelectorAll() { return Object.values(buttons); },
@@ -17,7 +17,8 @@ function page({ timeout = false, denied = false, mounted = true, prompt = false,
     for (const button of Object.values(buttons)) button.closest = selector => selector === '[data-push-action]' ? button : node;
     let nodes = mounted ? [node] : [], requests = 0, permissionRequests = 0, subscription = subscribed ? { endpoint: 'https://fcm.googleapis.com/test' } : null;
     const notification = { permission: denied ? 'denied' : 'default', async requestPermission() { permissionRequests++; notification.permission = 'granted'; return 'granted'; } };
-    const registration = { pushManager: {
+    const shown = [];
+    const registration = { showNotification: async (...args) => shown.push(args), pushManager: {
         getSubscription: async () => subscription,
         subscribe: async () => subscription = { endpoint: 'https://fcm.googleapis.com/test', toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/test', keys: {} }) },
     } };
@@ -39,7 +40,7 @@ function page({ timeout = false, denied = false, mounted = true, prompt = false,
         },
     };
     vm.runInNewContext(fs.readFileSync('public/browser-push.js', 'utf8'), context);
-    return { status, buttons, modalEvents, requests: () => requests, permissionRequests: () => permissionRequests,
+    return { status, buttons, modalEvents, shown, requests: () => requests, permissionRequests: () => permissionRequests,
         async click(action) { await handlers.click({ target: buttons[action] }); },
         mount() { nodes = [node]; observers.forEach(fn => fn()); },
         restoreEnable() { missingEnable = false; observers.forEach(fn => fn()); },
@@ -54,6 +55,18 @@ test('standalone controls finish Checking and request permission only on Enable 
     await instance.click('enable');
     assert.equal(instance.permissionRequests(), 1);
     assert.equal(instance.status.textContent, 'Enabled on this browser');
+});
+
+test('desktop test displays an OS notification without claiming a server subscription', async () => {
+    const instance = page({ configured: false }); await settle();
+    assert.equal(instance.buttons.desktop.disabled, false);
+    await instance.click('desktop');
+    assert.equal(instance.permissionRequests(), 1);
+    assert.equal(instance.shown.length, 1);
+    assert.equal(instance.shown[0][1].requireInteraction, true);
+    assert.equal(instance.shown[0][1].silent, false);
+    assert.match(instance.status.textContent, /does not enable server push/);
+    assert.equal(instance.buttons.test.disabled, true);
 });
 test('timed-out server request shows refresh guidance rather than Checking forever', async () => {
     const instance = page({ timeout: true }); await settle();

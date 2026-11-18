@@ -14,7 +14,7 @@ self.addEventListener('push', event => {
         const target = new URL(message.url, self.location.origin);
         if (target.origin !== self.location.origin) return;
         await self.registration.showNotification(message.title, { body: message.body, tag: message.tag,
-            data: { url: target.href }, renotify: false });
+            data: { url: target.href }, renotify: false, requireInteraction: true, silent: false });
         for (const client of await self.clients.matchAll({ type: 'window' })) client.postMessage({ type: 'notifications-refresh' });
     })());
 });

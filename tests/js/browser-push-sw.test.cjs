@@ -29,6 +29,8 @@ test('current authenticated notification renders and click stays on the CRM orig
     const instance = worker({ ok: true, json: async () => ({ title: 'Assigned', body: 'Your team update', url: 'https://crm.example.com/notifications/123/open', tag: '123' }) });
     await instance.push('https://crm.example.com/notifications/push/message/123');
     assert.equal(instance.shown[0][0], 'Assigned');
+    assert.equal(instance.shown[0][1].requireInteraction, true);
+    assert.equal(instance.shown[0][1].silent, false);
     await instance.click('https://crm.example.com/notifications/123/open');
     assert.deepEqual(instance.opened, ['https://crm.example.com/notifications/123/open']);
 });

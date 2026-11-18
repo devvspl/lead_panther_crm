@@ -190,6 +190,12 @@
             sidebarOpen: false,
             sidebarCollapsed: JSON.parse(localStorage.getItem('leadpanther_sidebar_collapsed') || 'false'),
             sidebarActiveStyle: localStorage.getItem('leadpanther_sidebar_active_style') || 'highlighted',
+            closeMobileSidebarOutside(event) {
+                if (!this.sidebarOpen || window.matchMedia('(min-width: 768px)').matches) return;
+                if (event.target.closest('#sidebar-main, [data-mobile-sidebar-toggle]')) return;
+                this.sidebarOpen = false;
+                this.hideSidebarTooltip();
+            },
             sidebarTooltip: {
                 show: false,
                 text: '',
@@ -219,6 +225,9 @@
             }
         }" 
         x-bind:class="{ 'overflow-hidden': sidebarOpen }"
+        x-on:click.window.capture="closeMobileSidebarOutside($event)"
+        x-on:keydown.escape.window="sidebarOpen = false; hideSidebarTooltip()"
+        x-on:resize.window="if (window.matchMedia('(min-width: 768px)').matches) { sidebarOpen = false; hideSidebarTooltip() }"
         x-on:popstate.window="sidebarOpen = false; hideSidebarTooltip()"
         x-on:livewire:navigated.window="sidebarOpen = false; hideSidebarTooltip()"
         class="font-sans antialiased bg-canvas text-ink selection:bg-accent selection:text-white min-h-screen overflow-x-hidden w-full max-w-full"
@@ -233,7 +242,7 @@
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
             x-on:click="sidebarOpen = false" 
-            class="fixed inset-0 bg-black/40 z-40 md:hidden" 
+            class="fixed inset-0 bg-black/40 z-[45] md:hidden"
             style="display: none;"
         ></div>
 

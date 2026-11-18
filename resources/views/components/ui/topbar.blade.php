@@ -4,7 +4,8 @@
     <!-- Left Section: Mobile toggle, Desktop toggle & Search -->
     <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 mr-3 sm:mr-6">
         <!-- Hamburger Icon Button (Mobile Only: md:hidden) -->
-        <button x-on:click="sidebarOpen = !sidebarOpen" type="button"
+        <button data-mobile-sidebar-toggle x-on:click="sidebarOpen = !sidebarOpen" type="button"
+            aria-controls="sidebar-main" x-bind:aria-expanded="sidebarOpen"
             class="md:hidden p-2 -ml-1 rounded-lg text-muted hover:text-ink hover:bg-canvas focus:outline-none flex-shrink-0"
             aria-label="Toggle mobile sidebar">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

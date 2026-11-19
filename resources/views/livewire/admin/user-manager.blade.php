@@ -441,7 +441,7 @@
 
                 @if($generatedInviteLink)
                     <div class="p-3.5 bg-surface border border-border rounded-xl space-y-2 mt-2 shadow-xs">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="text-[11px] font-bold text-ink flex items-center gap-1.5">
                                 <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

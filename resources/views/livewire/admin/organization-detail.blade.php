@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Top Breadcrumbs & Back Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <div class="flex items-center space-x-2 text-xs text-muted mb-1.5">
                 <a href="{{ route('admin.dashboard') }}" class="hover:text-ink transition" wire:navigate>System
@@ -50,7 +50,7 @@
         </div>
 
         <!-- Header Actions -->
-        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div class="flex flex-wrap items-center gap-2.5 min-w-0 max-w-full">
             <!-- Full Workbook Excel Export Button -->
             <button type="button" wire:click="exportFullExcel"
                 class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
@@ -293,7 +293,7 @@
                             @error('deliverySettings.'.$projectKey.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
                         </label>
                         <label class="text-xs text-ink">Delivery status
-                            <select wire:model="deliverySettings.{{ $projectKey }}.enabled" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2"><option value="1">Active</option><option value="0">Inactive</option></select>
+                            <x-ui.themed-select class="w-full" searchable  wire:model="deliverySettings.{{ $projectKey }}.enabled" trigger-class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2"><option value="1">Active</option><option value="0">Inactive</option></x-ui.themed-select>
                         </label>
                         <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
                     </form>
@@ -516,7 +516,7 @@
                     <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label" aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
                         wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})" wire:loading.attr="disabled"
                         class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 {{ $organization->show_builder_credit_balance ? 'bg-primary' : 'bg-neutral-300' }}">
-                        <span class="inline-block h-4 w-4 rounded-full bg-white shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                        <span class="inline-block h-4 w-4 rounded-full bg-surface shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
                     </button>
                 </section>
 
@@ -525,7 +525,7 @@
 
                 <!-- Recent Members Quick Snapshot -->
                 <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <h3 class="text-sm font-bold text-ink flex items-center gap-2">
                             <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -577,7 +577,7 @@
             <div class="space-y-6">
                 <!-- Registered Clients -->
                 <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <h3 class="text-sm font-bold text-ink flex items-center gap-2">
                             <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -622,7 +622,7 @@
 
                 <!-- Projects Quick List -->
                 <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <h3 class="text-sm font-bold text-ink flex items-center gap-2">
                             <span class="p-1.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -680,17 +680,17 @@
 
                     <!-- Role Filter -->
                     <div class="w-44">
-                        <select wire:model.live="userRoleFilter"
-                            class="w-full h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
+                        <x-ui.themed-select class="w-full" searchable  wire:model.live="userRoleFilter"
+                            trigger-class="w-full h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
                             <option value="all">All Roles</option>
                             @foreach($this->availableRoles as $roleKey => $roleLabel)
                                 <option value="{{ $roleKey }}">{{ $roleLabel }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
                     <button type="button" wire:click="exportTabExcel('team')"
                         class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
                         title="Export Team Members to Excel">
@@ -715,7 +715,7 @@
             <!-- Shareable Activation Token Banner if generated -->
             @if($generatedInviteLink)
                 <div class="p-4 bg-surface border border-primary/30 rounded-2xl space-y-2 shadow-xs">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1441,14 +1441,14 @@
 
                     <div>
                         <label class="font-bold text-ink">Directly Assign To Agent</label>
-                        <select wire:model="newLeadAssignedTo"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="newLeadAssignedTo"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Unassigned Pool</option>
                             @foreach($teamMembers as $tm)
                                 <option value="{{ $tm->id }}">{{ $tm->name }} ({{ $tm->roles->first()?->name ?: 'Member' }})
                                 </option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('newLeadAssignedTo') <span
                         class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
@@ -1457,28 +1457,28 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                         <label class="font-bold text-ink">Target Client <span class="text-red-500">*</span></label>
-                        <select wire:model.live="newLeadClientId"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
+                        <x-ui.themed-select class="w-full" searchable  wire:model.live="newLeadClientId"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Select Client</option>
                             @foreach($clients as $c)
                                 <option value="{{ $c->id }}">{{ $c->name }} (Bal:
                                     {{ number_format($c->wallet?->balance ?? 0) }})
                                 </option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('newLeadClientId') <span
                         class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="font-bold text-ink">Associated Project</label>
-                        <select wire:model="newLeadProjectId"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="newLeadProjectId"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Auto-select or General Project</option>
                             @foreach($clientProjects as $proj)
                                 <option value="{{ $proj->id }}">{{ $proj->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                 </div>
 
@@ -1536,15 +1536,15 @@
             <form wire:submit.prevent="executeCreditAdjustment" class="space-y-4 text-xs">
                 <div>
                     <label class="font-bold text-ink">Select Target Client <span class="text-red-500">*</span></label>
-                    <select wire:model="selectedCreditClientId"
-                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
+                    <x-ui.themed-select class="w-full" searchable  wire:model="selectedCreditClientId"
+                        trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                         <option value="">Select Client</option>
                         @foreach($clients as $cl)
                             <option value="{{ $cl->id }}">
                                 {{ $cl->name }} (Current Balance: {{ number_format($cl->wallet?->balance ?? 0) }})
                             </option>
                         @endforeach
-                    </select>
+                    </x-ui.themed-select>
                     @error('selectedCreditClientId') <span
                     class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
@@ -1552,14 +1552,14 @@
                 <div class="grid grid-cols-2 gap-3.5">
                     <div>
                         <label class="font-bold text-ink">Action Type <span class="text-red-500">*</span></label>
-                        <select wire:model="creditAdjustmentType"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="creditAdjustmentType"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="recharge">+ Recharge Credits</option>
                             <option value="opening_credit">+ Opening Credit (Baseline)</option>
                             <option value="refund">+ Refund Credits (Replacement / SLA)</option>
                             <option value="manual_adjustment">+ Manual Adjustment</option>
                             <option value="deduct">- Deduct / Debit Credits</option>
-                        </select>
+                        </x-ui.themed-select>
                     </div>
 
                     <div>

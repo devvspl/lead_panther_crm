@@ -25,7 +25,7 @@
         <button
             type="button"
             wire:click="switchTab('meta')"
-            class="flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer {{ $activeTab === 'meta' ? 'bg-white border-2 border-primary text-primary shadow-xs' : 'bg-white border border-border text-ink/70 hover:bg-canvas' }}"
+            class="flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer {{ $activeTab === 'meta' ? 'bg-surface border-2 border-primary text-primary shadow-xs' : 'bg-surface border border-border text-ink/70 hover:bg-canvas' }}"
         >
             <span class="w-5 h-5 rounded-full bg-[#1877F2] text-white flex items-center justify-center font-bold text-xs shrink-0">f</span>
             <span>Meta Ads (Facebook)</span>
@@ -35,7 +35,7 @@
         <button
             type="button"
             wire:click="switchTab('git')"
-            class="flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer {{ $activeTab === 'git' ? 'bg-white border-2 border-primary text-primary shadow-xs' : 'bg-white border border-border text-ink/70 hover:bg-canvas' }}"
+            class="flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer {{ $activeTab === 'git' ? 'bg-surface border-2 border-primary text-primary shadow-xs' : 'bg-surface border border-border text-ink/70 hover:bg-canvas' }}"
         >
             <span class="px-1.5 py-0.5 rounded bg-ink text-white font-mono text-[9px] font-extrabold uppercase shrink-0">GIT</span>
             <span>Git Repository</span>
@@ -104,7 +104,7 @@
                         type="button"
                         wire:click="testCurrentConnection"
                         wire:loading.attr="disabled"
-                        class="px-3 py-1 rounded-xl border border-border bg-white text-xs font-semibold text-ink hover:bg-canvas transition flex items-center gap-1 shadow-2xs cursor-pointer disabled:opacity-60"
+                        class="px-3 py-1 rounded-xl border border-border bg-surface text-xs font-semibold text-ink hover:bg-canvas transition flex items-center gap-1 shadow-2xs cursor-pointer disabled:opacity-60"
                         title="Verify connection"
                     >
                         <svg wire:loading.remove wire:target="testCurrentConnection" class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +228,7 @@
 
                 <!-- Row 3: Page Access Token (Full Width) -->
                 <div>
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <label class="font-bold text-ink">Page Access Token <span class="text-rose-500">*</span></label>
                         <a href="https://developers.facebook.com/docs/pages/access-tokens" target="_blank" rel="noopener noreferrer" class="text-[11px] text-primary hover:underline inline-flex items-center gap-1">
                             <span>System User Token Guide</span>
@@ -312,7 +312,7 @@
                             <button
                                 type="button"
                                 wire:click="regenerateVerifyToken"
-                                class="px-3.5 h-9 bg-white border border-border rounded-xl text-ink font-semibold text-xs hover:bg-canvas transition flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+                                class="px-3.5 h-9 bg-surface border border-border rounded-xl text-ink font-semibold text-xs hover:bg-canvas transition flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
                             >
                                 <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                 <span>Generate New</span>
@@ -338,7 +338,7 @@
                                     copied = true;
                                     setTimeout(function() { copied = false; }, 2000);
                                 "
-                                class="px-3.5 h-9 bg-white border border-border rounded-xl text-ink font-semibold text-xs hover:bg-canvas transition flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+                                class="px-3.5 h-9 bg-surface border border-border rounded-xl text-ink font-semibold text-xs hover:bg-canvas transition flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
                             >
                                 <span x-show="!copied" class="flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
@@ -372,7 +372,7 @@
                             type="button"
                             wire:click="fetchLeadForms"
                             wire:loading.attr="disabled"
-                            class="px-3.5 py-1.5 bg-canvas border border-border rounded-xl text-ink font-semibold text-xs hover:bg-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 self-start sm:self-auto"
+                            class="px-3.5 py-1.5 bg-canvas border border-border rounded-xl text-ink font-semibold text-xs hover:bg-surface transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 self-start sm:self-auto"
                         >
                             <svg wire:loading.remove wire:target="fetchLeadForms" class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             <svg wire:loading wire:target="fetchLeadForms" class="animate-spin w-3.5 h-3.5 text-ink" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -541,7 +541,7 @@
                 type="button"
                 wire:click="testCurrentConnection"
                 wire:loading.attr="disabled"
-                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-xl hover:bg-canvas transition flex items-center gap-2 cursor-pointer shadow-2xs disabled:opacity-60"
+                class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-xl hover:bg-canvas transition flex items-center gap-2 cursor-pointer shadow-2xs disabled:opacity-60"
             >
                 <svg wire:loading.remove wire:target="testCurrentConnection" class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>

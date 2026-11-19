@@ -1,7 +1,7 @@
 <div>
     @if($isOpen && $lead)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between border-b border-border pb-3">
                     <h3 class="text-base font-bold text-ink">Claim Lead Replacement</h3>
                     <button wire:click="closeForm" class="text-muted hover:text-ink">

@@ -4,8 +4,8 @@
         <x-ui.button wire:click="exportExcel">Export to Excel</x-ui.button>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-xl border border-border bg-surface p-4">
-        <label class="text-sm text-ink">Archived by<select wire:model.live="archivedBy" class="mt-1 block w-full rounded-lg border-border bg-surface text-ink"><option value="">All users</option>@foreach($archivers as $actor)<option value="{{ $actor->id }}">{{ $actor->name }}</option>@endforeach</select></label>
-        <label class="text-sm text-ink">Stage<select wire:model.live="stage" class="mt-1 block w-full rounded-lg border-border bg-surface text-ink"><option value="">All stages</option>@foreach($stages as $value)<option value="{{ $value }}">{{ ucwords(str_replace('_',' ',$value)) }}</option>@endforeach</select></label>
+        <label class="text-sm text-ink">Archived by<x-ui.themed-select class="w-full" searchable  wire:model.live="archivedBy" trigger-class="mt-1 block w-full rounded-lg border-border bg-surface text-ink"><option value="">All users</option>@foreach($archivers as $actor)<option value="{{ $actor->id }}">{{ $actor->name }}</option>@endforeach</x-ui.themed-select></label>
+        <label class="text-sm text-ink">Stage<x-ui.themed-select class="w-full" searchable  wire:model.live="stage" trigger-class="mt-1 block w-full rounded-lg border-border bg-surface text-ink"><option value="">All stages</option>@foreach($stages as $value)<option value="{{ $value }}">{{ ucwords(str_replace('_',' ',$value)) }}</option>@endforeach</x-ui.themed-select></label>
         <label class="text-sm text-ink">Archived from<x-text-input type="date" wire:model.live="dateFrom" class="mt-1 block w-full" /></label>
         <label class="text-sm text-ink">Archived to<x-text-input type="date" wire:model.live="dateTo" class="mt-1 block w-full" /></label>
     </div>

@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Failed Queue Jobs Browser</h1>
             <p class="text-xs text-muted">Inspect, retry, or flush failed asynchronous queue jobs and webhooks.</p>

@@ -1,114 +1,68 @@
 @props([
     'options' => [],
     'placeholder' => 'Select Option',
-    'class' => '',
+    'class' => 'w-full',
+    'triggerClass' => '',
     'searchable' => false,
     'align' => 'left',
 ])
 
 @php
     $wireModel = $attributes->wire('model')->value();
-
-    $normalizedOptions = [];
-    foreach ($options as $key => $val) {
-        if (is_array($val)) {
-            $normalizedOptions[] = [
-                'value' => (string)($val['value'] ?? $key),
-                'label' => (string)($val['label'] ?? $val['name'] ?? $val['value'] ?? $key),
-            ];
-        } else {
-            $normalizedOptions[] = [
-                'value' => (string)$key,
-                'label' => (string)$val,
-            ];
-        }
-    }
+    $alpineModel = $attributes->whereStartsWith('x-model');
+    $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value']);
 @endphp
-
-<div 
-    x-data="{ 
-        open: false, 
-        search: '',
-        value: @if($wireModel) ($wire.entangle('{{ $wireModel }}'){{ $attributes->wire('model')->hasModifier('live') ? '.live' : '' }} ?? '') @else '{{ $attributes->get('value', '') }}' @endif,
-        options: {{ json_encode($normalizedOptions) }},
-        get filteredOptions() {
-            if (!this.search || !this.search.trim()) return this.options || [];
-            let q = this.search.toLowerCase().trim();
-            return (this.options || []).filter(o => (o.label || '').toLowerCase().includes(q) || (o.value || '').toLowerCase().includes(q));
-        },
-        get selectedLabel() {
-            if (this.value === undefined || this.value === null) return '{{ $placeholder }}';
-            let valStr = String(this.value);
-            let found = (this.options || []).find(o => String(o.value) === valStr);
-            return found ? found.label : '{{ $placeholder }}';
-        },
-        select(val) {
-            this.value = val ?? '';
-            this.open = false;
-            this.search = '';
-        }
-    }" 
-    class="relative inline-block text-left text-xs w-full min-w-0 {{ $class }}"
->
-    <!-- Trigger Button -->
-    <button 
-        type="button" 
-        @click="open = !open" 
-        class="inline-flex items-center justify-between gap-1.5 h-8 text-xs px-2.5 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-0 whitespace-nowrap"
-    >
-        <span class="truncate font-semibold text-left" x-text="selectedLabel"></span>
-        <svg class="w-3.5 h-3.5 text-muted transition-transform duration-150 shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-        </svg>
+<div x-id="['select-list', 'select-error']" x-modelable="value" {{ $alpineModel }}
+    x-data="leadPantherSelect({
+        value: @if($wireModel) $wire.entangle(@js($wireModel)){{ $attributes->wire('model')->hasModifier('live') ? '.live' : '' }} @else @js($attributes->get('value')) @endif,
+        bound: @js((bool)$wireModel || count($alpineModel->getAttributes()) > 0 || $attributes->has('value')),
+        placeholder: @js($placeholder), align: @js($align)
+    })"
+    @keydown.escape.stop.prevent="close(true)" @keydown.tab="close()"
+    @resize.window="if(open) place()" @scroll.window.capture="if(open && !$refs.panel.contains($event.target)) place()"
+    x-on:livewire:navigating.window="close()"
+    class="relative inline-block min-w-0 max-w-full text-left text-xs {{ $class }}">
+    {{-- Retains HTML form semantics and original change/disabled/required attributes. --}}
+    <select x-ref="native" {{ $nativeAttributes }} class="sr-only" tabindex="-1" aria-hidden="true"
+        @invalid.prevent="invalid()" @focus="$refs.trigger.focus()">
+        @if(trim((string)$slot) !== '')
+            {{ $slot }}
+        @else
+            @foreach($options as $key => $option)
+                @php
+                    $optionValue = is_array($option) ? ($option['value'] ?? $key) : $key;
+                    $optionLabel = is_array($option) ? ($option['label'] ?? $option['name'] ?? $optionValue) : $option;
+                @endphp
+                <option value="{{ $optionValue }}" @disabled(is_array($option) && ($option['disabled'] ?? false))>{{ $optionLabel }}</option>
+            @endforeach
+        @endif
+    </select>
+    <button x-ref="trigger" type="button" @click="open ? close() : show()" @keydown.arrow-down.prevent="show()"
+        :disabled="disabled" :aria-label="accessibleLabel" :aria-expanded="open" :aria-controls="$id('select-list')"
+        :aria-invalid="Boolean(validationMessage)" :aria-describedby="validationMessage ? $id('select-error') : null" aria-haspopup="listbox"
+        class="lp-select-trigger inline-flex w-full min-w-0 items-center justify-between gap-2 h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed {{ $triggerClass }}">
+        <span class="truncate text-left font-medium" x-text="selectedLabel"></span>
+        <svg class="w-4 h-4 shrink-0 text-muted" :class="open && 'rotate-180'" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
     </button>
-
-    <!-- Dropdown Panel -->
-    <div 
-        x-show="open" 
-        x-cloak 
-        @click.outside="open = false; search = ''" 
-        x-transition:enter="transition ease-out duration-100" 
-        x-transition:enter-start="transform opacity-0 scale-95" 
-        x-transition:enter-end="transform opacity-100 scale-100" 
-        x-transition:leave="transition ease-in duration-75" 
-        x-transition:leave-start="transform opacity-100 scale-100" 
-        x-transition:leave-end="transform opacity-0 scale-95" 
-        @if($searchable)
-            x-effect="if (open) $nextTick(function() { if ($refs.searchInput) $refs.searchInput.focus(); })"
-        @endif
-        class="absolute {{ $align === 'right' ? 'right-0' : 'left-0' }} z-50 mt-1.5 min-w-full w-max max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5"
-    >
-        @if($searchable)
-            <!-- Search Input Header -->
-            <div class="relative">
-                <input 
-                    x-ref="searchInput"
-                    x-model="search"
-                    type="text" 
-                    placeholder="Search..." 
-                    class="w-full h-9 pl-8 pr-3.5 bg-canvas text-ink text-xs rounded-lg border border-border focus:ring-2 focus:ring-ink focus:outline-none placeholder:text-muted transition"
-                />
-                <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-            </div>
-        @endif
-
-        <div class="max-h-52 overflow-y-auto sidebar-scroll space-y-0.5">
-            <template x-for="opt in filteredOptions" :key="opt.value">
-                <button 
-                    type="button" 
-                    @click="select(opt.value)" 
-                    class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between gap-3"
-                    :class="String(value) === String(opt.value) ? 'bg-canvas text-ink font-bold' : 'text-ink'"
-                >
-                    <span class="truncate" x-text="opt.label"></span>
-                    <span x-show="String(value) === String(opt.value)" class="text-ink text-xs font-bold shrink-0">✓</span>
+    <p x-show="validationMessage" x-cloak :id="$id('select-error')" x-text="validationMessage" class="mt-1 text-xs text-danger"></p>
+    <template x-teleport="body">
+        <div x-ref="panel" @click.stop x-show="open" x-cloak :style="panelStyle" @click.outside="if (!$refs.trigger.contains($event.target)) close()"
+            @keydown.escape.stop.prevent="close(true)" @keydown.tab="close()" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="select(filteredOptions[activeIndex])"
+            tabindex="-1" role="listbox" :id="$id('select-list')" :aria-label="accessibleLabel"
+            class="lp-select-panel fixed z-[100] overflow-y-auto overscroll-contain rounded-card border border-border bg-surface p-1.5 shadow-xl text-xs text-ink focus:outline-none">
+            @if($searchable)
+                <input x-ref="searchInput" x-model="search" @input="activeIndex=0" type="search" placeholder="Search options..." aria-label="Search options" class="sticky top-0 mb-1 w-full rounded-lg border-border bg-canvas text-ink text-sm" />
+            @endif
+            <template x-for="(option, index) in filteredOptions" :key="option.value">
+                <button type="button" role="option" :aria-selected="key(value) === option.value" :disabled="option.disabled"
+                    @click="select(option)" @mouseenter="activeIndex=index"
+                    :class="index === activeIndex || key(value) === option.value ? 'bg-canvas font-semibold' : ''"
+                    class="flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-ink hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed">
+                    <span class="break-words" x-text="option.label"></span>
+                    <svg x-show="key(value) === option.value" class="w-4 h-4 shrink-0 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                 </button>
             </template>
-            <div x-show="filteredOptions.length === 0" class="py-2 text-center text-muted text-[11px]">
-                No matching results
-            </div>
+            <p x-show="!filteredOptions.length" class="p-3 text-center text-muted">No matching results</p>
         </div>
-    </div>
+    </template>
 </div>

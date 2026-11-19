@@ -49,18 +49,37 @@ html, body {
 /* Global Focus Ring Consistency */
 input:focus, textarea:focus, select:focus {
   outline: none !important;
-  border-color: transparent !important;
-  box-shadow: 0 0 0 2px #111827 !important; /* ink / accent token */
+  border-color: var(--theme-primary, #111827) !important;
+  box-shadow: 0 0 0 2px var(--theme-primary, #111827) !important; /* ink / accent token */
 }
 
 /* Livewire 3 Navigation Progress Bar Theming */
 :root {
-  --livewire-progress-bar-color: #111827;
+  --livewire-progress-bar-color: var(--theme-primary, #111827);
 }
 
 #livewire-progress-bar,
 .livewire-progress-bar,
 div[data-livewire-progress-bar] {
-  background-color: #111827 !important;
-  color: #111827 !important;
+  background-color: var(--theme-primary, #111827) !important;
+  color: var(--theme-primary, #111827) !important;
+}
+
+/* Shared viewport boundaries: content scrolls inside its component, never behind a drawer. */
+html.lp-overlay-open, html.lp-overlay-open body { overflow: hidden !important; }
+main, form, fieldset { min-width: 0; }
+main canvas { max-width: 100%; }
+input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea { max-width: 100%; }
+input[type=checkbox], input[type=radio] { accent-color: var(--theme-primary, #111827); }
+.lp-select-panel { scrollbar-width: thin; scrollbar-color: var(--theme-border-color, #e5e7eb) transparent; }
+.lp-select-panel [role=option] { overflow-wrap: anywhere; }
+.lp-table-actions > .flex { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+@media (max-width: 767px) {
+  main { overflow-wrap: break-word; }
+  .lp-mobile-value { overflow-wrap: anywhere; }
+  .lp-mobile-value span { max-width: 100%; }
+  .lp-mobile-value .whitespace-nowrap { white-space: normal; }
+  .lp-mobile-value .truncate { display: block; max-width: 100%; }
+  .lp-select-trigger, input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea { min-height: 2.5rem; font-size: 1rem; }
+  .lp-select-panel [role=option] { min-height: 2.75rem; }
 }

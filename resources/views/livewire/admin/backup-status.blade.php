@@ -49,7 +49,7 @@
                 wire:click="cleanBackups" 
                 wire:loading.attr="disabled" 
                 wire:target="cleanBackups" 
-                class="px-4 py-2 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-xs cursor-pointer"
+                class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-xs cursor-pointer"
             >
                 <span wire:loading.remove wire:target="cleanBackups">Clean Old Backups</span>
                 <span wire:loading wire:target="cleanBackups" class="flex items-center gap-2">

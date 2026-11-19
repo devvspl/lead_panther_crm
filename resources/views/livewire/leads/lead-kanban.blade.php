@@ -46,7 +46,7 @@
     @else
     <!-- 2. COMPACT GLOBAL FILTERS -->
     <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -362,11 +362,11 @@
     </div>
 
     @endif
-    @if($isSalesExecutive)<div class="flex gap-2 text-xs items-center"><label for="lead-followup-filter">Follow-ups</label><select id="lead-followup-filter" wire:model.live="followupFilter" class="rounded-lg border-border"><option value="">All</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option></select></div>@endif
+    @if($isSalesExecutive)<div class="flex gap-2 text-xs items-center"><label for="lead-followup-filter">Follow-ups</label><x-ui.themed-select class="max-w-full" searchable  id="lead-followup-filter" wire:model.live="followupFilter" trigger-class="rounded-lg border-border"><option value="">All</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option></x-ui.themed-select></div>@endif
     @if($isBuilder || $this->isClientContext())
         <!-- 3. BUILDER COMPACT 8 OPERATIONAL KPI CARDS -->
         <div class="space-y-2">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Overview Metrics</h2>
                 <span class="text-[11px] text-muted">Click any metric card to filter leads</span>
             </div>
@@ -580,7 +580,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <!-- Left Chart: Lead Generation Trend -->
             <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-xs font-bold text-ink">Lead Intake vs Conversion Trend</span>
                     <span class="text-[10px] text-muted font-medium">Daily Timeline</span>
                 </div>
@@ -634,7 +634,7 @@
 
             <!-- Right Chart: Active Breakdown Ranking -->
             <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-xs font-bold text-ink">Volume Breakdown ({{ ucfirst($breakdownTab) }})</span>
                     <span class="text-[10px] text-muted font-medium">Top Entities</span>
                 </div>
@@ -718,19 +718,19 @@
                 </span>
             </div>
             <div class="space-y-1.5 text-xs">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Round Robin Routed</span>
                     <span class="font-bold text-ink">{{ $monitoring['assignment']['round_robin'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Manual Assignments</span>
                     <span class="font-bold text-ink">{{ $monitoring['assignment']['manual'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Priority Rule Routed</span>
                     <span class="font-bold text-ink">{{ $monitoring['assignment']['priority'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Unassigned Pool</span>
                     <span class="font-bold text-amber-600">{{ $monitoring['assignment']['unassigned'] }}</span>
                 </div>
@@ -746,19 +746,19 @@
                 </span>
             </div>
             <div class="space-y-1.5 text-xs">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Within SLA Met</span>
                     <span class="font-bold text-emerald-600">{{ $monitoring['sla']['within'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">SLA Breached (&gt;15m)</span>
                     <span class="font-bold text-rose-600">{{ $monitoring['sla']['breached'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Pending First Response</span>
                     <span class="font-bold text-amber-600">{{ $monitoring['sla']['pending'] }}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Avg Response Speed</span>
                     <span class="font-mono font-bold text-ink">{{ $monitoring['sla']['avg_response'] }}</span>
                 </div>
@@ -800,19 +800,19 @@
                 </span>
             </div>
             <div class="space-y-1.5 text-xs">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Credits Reserved</span>
                     <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['reserved'], 0) }} Cr</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Credits Consumed</span>
                     <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['used'], 0) }} Cr</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Credits Refunded</span>
                     <span class="font-mono font-bold text-emerald-600">{{ number_format($monitoring['credit']['refunded'], 0) }} Cr</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-muted">Approved Replacements</span>
                     <span class="font-bold text-indigo-600">{{ $monitoring['credit']['approved'] }}</span>
                 </div>
@@ -841,11 +841,11 @@
                 <!-- Sort Dropdown -->
                 <div class="flex items-center gap-1.5 shrink-0">
                     <span class="text-xs text-muted font-medium">Sort By:</span>
-                    <select wire:model.live="sort_by" class="h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:outline-none">
+                    <x-ui.themed-select class="max-w-full" searchable  wire:model.live="sort_by" trigger-class="h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:outline-none">
                         <option value="created_desc">Latest Created</option>
                         <option value="score_desc">Priority Score: High to Low</option>
                         <option value="score_asc">Priority Score: Low to High</option>
-                    </select>
+                    </x-ui.themed-select>
                 </div>
 
                 <!-- SLA Quick Toggle -->
@@ -1158,8 +1158,8 @@
 
     <!-- Confirmation Modal for Terminal / Exception Stage Transition -->
     @if($showConfirmModal)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center space-x-3 text-amber-500">
                     <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1238,23 +1238,23 @@
                             }
                             $formOptions['custom'] = 'Custom Form ID...';
                         @endphp
-                        <select wire:model.live="selectedFormOption"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
+                        <x-ui.themed-select class="w-full" searchable  wire:model.live="selectedFormOption"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
                             @foreach($formOptions as $val => $lbl)
                                 <option value="{{ $val }}">{{ $lbl }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                     <div>
                         <label class="font-bold text-ink">Max Leads to Pull</label>
-                        <select wire:model="pullLimit"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="pullLimit"
+                            trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1 font-medium">
                             <option value="10">10 Most Recent</option>
                             <option value="25">25 Leads</option>
                             <option value="50">50 Leads</option>
                             <option value="100">100 Leads</option>
                             <option value="250">250 Leads</option>
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                 </div>
 
@@ -1345,23 +1345,23 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="font-bold text-ink">Associated Project <span class="text-rose-500">*</span></label>
-                        <select wire:model.live="manualProjectId" class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <x-ui.themed-select class="w-full" searchable  wire:model.live="manualProjectId" trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                             <option value="">Select Project</option>
                             @foreach($allProjects as $p)
                                 <option value="{{ $p->id }}">{{ $p->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('manualProjectId') <span class="text-rose-500 text-[10px]">{{ $message }}</span> @enderror
                     </div>
                     @canViewLeadSource
 <div>
                         <label class="font-bold text-ink">Lead Source</label>
-                        <select wire:model="manualLeadSourceId" class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="manualLeadSourceId" trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                             <option value="">Direct Entry</option>
                             @foreach($allLeadSources as $s)
                                 <option value="{{ $s->id }}">{{ $s->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
 @endcanViewLeadSource
                 </div>
@@ -1407,7 +1407,7 @@
         <x-slot:footer>
             <div class="flex items-center justify-end gap-2 w-full">
                 <button type="button" wire:click="closePullLeadsModal"
-                    class="px-3.5 py-1.5 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
+                    class="px-3.5 py-1.5 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
                     Close
                 </button>
 
@@ -1430,7 +1430,7 @@
     <!-- Lead Manual & Bulk Assignment Modal -->
     @if($showAssignModal)
     <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
             <div class="flex items-center justify-between pb-3 border-b border-border">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -1523,7 +1523,7 @@
     <!-- Return Lead to Super Admin (Replacement Request) Modal -->
     @if($showReturnLeadModal && $returnLeadModel)
     <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4">
+        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
             <div class="flex items-center justify-between pb-3 border-b border-border">
                 <div class="flex items-center gap-2.5">
                     <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">

@@ -1,4 +1,5 @@
-<div class="w-48 sm:w-80 relative" x-data="{ open: true }" @click.outside="open = false">
+<div class="relative min-w-0 w-full max-w-xs" x-data="{ open: true, panelStyle: {}, place() { if(this.$refs.results) this.panelStyle=window.LeadPantherUI.position(this.$refs.input,this.$refs.results,384); } }" @click.outside="open = false" @keydown.escape.stop="open=false" @resize.window="if(open) place()" @scroll.window.capture="if(open && $refs.results && !$refs.results.contains($event.target)) place()">
+
     <!-- Input Field -->
     <div class="relative">
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted">
@@ -10,7 +11,7 @@
         <input 
             type="search" 
             name="global_search_query"
-            id="global_search_query"
+            id="global_search_query" x-ref="input" aria-label="Search leads, projects and clients" aria-controls="global-search-results"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
@@ -21,8 +22,8 @@
             wire:model.live.debounce.300ms="search" 
             @focus="open = true"
             placeholder="Search leads, projects, clients..."
-            class="w-full h-8 pl-9 pr-12 bg-canvas text-ink text-xs rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent focus:bg-surface placeholder:text-muted transition">
-        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none hidden sm:flex">
+            class="w-full h-8 pl-9 pr-3 xl:pr-12 bg-canvas text-ink text-xs rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent focus:bg-surface placeholder:text-muted transition">
+        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none hidden xl:flex">
             <kbd
                 class="px-1.5 py-0.5 text-[10px] font-semibold text-muted bg-surface border border-border rounded shadow-2xs">⌘F</kbd>
         </div>
@@ -30,8 +31,9 @@
 
     <!-- Dropdown Grouped Results Overlay -->
     @if(strlen(trim($search)) >= 2)
-        <div x-show="open"
-            class="absolute top-full left-0 mt-2 w-80 sm:w-96 bg-surface rounded-card border border-border shadow-lg z-50 overflow-hidden text-xs max-h-96 overflow-y-auto space-y-3 p-3">
+        <template x-teleport="body">
+        <div x-show="open" x-ref="results" :style="panelStyle" @keydown.escape.stop="open=false; $refs.input.focus()" x-init="$nextTick(()=>place())" x-effect="if(open) $nextTick(()=>place())" @click.stop @click.outside="if(!$refs.input.contains($event.target)) open=false" role="region" id="global-search-results" aria-label="Global search results"
+            class="fixed max-w-full bg-surface rounded-card border border-border shadow-lg z-[100] overflow-hidden text-xs max-h-96 overflow-y-auto space-y-3 p-3">
             <!-- LEADS SECTION -->
             <div>
                 <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted bg-canvas rounded">Leads
@@ -97,5 +99,6 @@
                 </div>
             @endif
         </div>
+        </template>
     @endif
 </div>

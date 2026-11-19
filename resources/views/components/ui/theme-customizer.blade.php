@@ -4,10 +4,11 @@
     $defaultsJson = json_encode(\App\Support\ThemeService::DEFAULTS);
 @endphp
 
-<div 
+<div
     x-data="{
         open: false,
         saving: false,
+        destroy() { window.LeadPantherUI.lock(this.$el,false); },
         resetting: false,
         theme: {{ $themeJson }},
         defaults: {{ $defaultsJson }},
@@ -15,14 +16,6 @@
         init() {
             this.applyThemeToDOM();
 
-            window.addEventListener('open-theme-customizer', () => {
-                this.open = true;
-            });
-            window.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.open) {
-                    this.open = false;
-                }
-            });
         },
 
         applyThemeToDOM() {
@@ -42,6 +35,7 @@
             root.style.setProperty('--theme-font-family', this.theme.theme_font_family);
             root.style.setProperty('--theme-font-size', this.theme.theme_font_size);
             root.style.setProperty('--theme-border-radius', this.theme.theme_border_radius);
+            window.LeadPantherUI?.syncTheme();
 
             // Notify sidebar navigation active style handler
             localStorage.setItem('leadpanther_sidebar_active_style', this.theme.theme_active_menu_style === 'text_only' ? 'text-only' : 'highlighted');
@@ -75,19 +69,19 @@
                 if (data.success) {
                     this.theme = data.theme;
                     this.applyThemeToDOM();
-                    window.dispatchEvent(new CustomEvent('toast-alert', { 
-                        detail: { type: 'success', message: data.message || 'Theme saved successfully!' } 
+                    window.dispatchEvent(new CustomEvent('toast-alert', {
+                        detail: { type: 'success', message: data.message || 'Theme saved successfully!' }
                     }));
                 } else {
-                    window.dispatchEvent(new CustomEvent('toast-alert', { 
-                        detail: { type: 'error', message: 'Failed to save theme customizations.' } 
+                    window.dispatchEvent(new CustomEvent('toast-alert', {
+                        detail: { type: 'error', message: 'Failed to save theme customizations.' }
                     }));
                 }
             })
             .catch(err => {
                 this.saving = false;
-                window.dispatchEvent(new CustomEvent('toast-alert', { 
-                    detail: { type: 'error', message: 'Error saving theme settings.' } 
+                window.dispatchEvent(new CustomEvent('toast-alert', {
+                    detail: { type: 'error', message: 'Error saving theme settings.' }
                 }));
             });
         },
@@ -117,15 +111,15 @@
                             if (data.success) {
                                 self.theme = Object.assign({}, self.defaults);
                                 self.applyThemeToDOM();
-                                window.dispatchEvent(new CustomEvent('toast-alert', { 
-                                    detail: { type: 'info', message: data.message || 'Theme reset to defaults!' } 
+                                window.dispatchEvent(new CustomEvent('toast-alert', {
+                                    detail: { type: 'info', message: data.message || 'Theme reset to defaults!' }
                                 }));
                             }
                         })
                         .catch(function(err) {
                             self.resetting = false;
-                            window.dispatchEvent(new CustomEvent('toast-alert', { 
-                                detail: { type: 'error', message: 'Error resetting theme.' } 
+                            window.dispatchEvent(new CustomEvent('toast-alert', {
+                                detail: { type: 'error', message: 'Error resetting theme.' }
                             }));
                         });
                     }
@@ -133,10 +127,11 @@
             }));
         }
     }"
+    x-on:open-theme-customizer.window="open=true" @keydown.escape.window="if(open) open=false" x-effect="window.LeadPantherUI.lock($el,open)"
     class="relative z-50"
 >
     <!-- Offcanvas Backdrop Overlay -->
-    <div 
+    <div
         x-show="open"
         x-cloak
         x-transition:enter="transition-opacity ease-linear duration-200"
@@ -151,7 +146,7 @@
     ></div>
 
     <!-- Offcanvas Panel (Slide in from Right) -->
-    <div 
+    <div
         x-show="open"
         x-cloak
         x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300"
@@ -160,11 +155,11 @@
         x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300"
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
-        class="fixed inset-y-0 right-0 max-w-full flex pl-10 z-50 pointer-events-auto"
+        class="fixed inset-y-0 right-0 w-full max-w-full flex sm:pl-10 z-50 pointer-events-none"
         style="display: none;"
     >
-        <div class="w-screen max-w-md sm:max-w-lg bg-surface border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden">
-            
+        <div role="dialog" aria-modal="true" aria-label="Theme customizer" class="ml-auto w-full max-w-md sm:max-w-lg h-[100dvh] pointer-events-auto bg-surface border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden">
+
             <!-- Offcanvas Header -->
             <div class="px-5 py-4 border-b border-border flex items-center justify-between bg-canvas/30">
                 <div class="flex items-center space-x-2.5">
@@ -183,9 +178,9 @@
                     </div>
                 </div>
 
-                <button 
+                <button
                     x-on:click="open = false"
-                    type="button" 
+                    type="button"
                     class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
                     aria-label="Close theme customizer"
                 >
@@ -197,7 +192,7 @@
 
             <!-- Scrollable Body with Live Preview & Settings -->
             <div class="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-6 sidebar-scroll">
-                
+
                 <!-- Live Mini Preview Box -->
                 <div class="p-3.5 bg-canvas/70 rounded-xl border border-border space-y-2.5">
                     <div class="flex items-center justify-between">
@@ -206,7 +201,7 @@
                     </div>
 
                     <!-- Mini Mockup Interface -->
-                    <div 
+                    <div
                         class="rounded-lg border overflow-hidden text-xs shadow-xs transition-colors duration-200"
                         :style="{
                             backgroundColor: theme.theme_page_bg,
@@ -215,7 +210,7 @@
                         }"
                     >
                         <!-- Mini Header -->
-                        <div 
+                        <div
                             class="h-8 px-3 border-b flex items-center justify-between transition-colors duration-200"
                             :style="{
                                 backgroundColor: theme.theme_header_bg,
@@ -233,7 +228,7 @@
                         <!-- Mini Body: Sidebar + Content -->
                         <div class="flex min-h-[110px]">
                             <!-- Mini Sidebar -->
-                            <div 
+                            <div
                                 class="w-24 p-2 border-r space-y-1.5 flex flex-col justify-between transition-colors duration-200"
                                 :style="{
                                     backgroundColor: theme.theme_sidebar_bg,
@@ -243,7 +238,7 @@
                             >
                                 <div class="space-y-1">
                                     <!-- Active Item -->
-                                    <div 
+                                    <div
                                         class="px-2 py-1 text-[10px] font-bold rounded transition-colors duration-200 flex items-center space-x-1"
                                         :style="{
                                             backgroundColor: theme.theme_active_menu_style === 'text_only' ? 'transparent' : theme.theme_active_menu_bg,
@@ -264,7 +259,7 @@
 
                             <!-- Mini Main Canvas -->
                             <div class="flex-1 p-2.5 space-y-2">
-                                <div 
+                                <div
                                     class="p-2 rounded border shadow-2xs transition-colors duration-200"
                                     :style="{
                                         backgroundColor: theme.theme_card_bg,
@@ -279,8 +274,8 @@
                                     <div class="text-sm font-bold text-ink">1,482</div>
                                 </div>
 
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     class="w-full py-1 text-[10px] font-bold text-white shadow-2xs flex items-center justify-center transition-colors duration-200"
                                     :style="{
                                         backgroundColor: theme.theme_primary_color,
@@ -299,7 +294,7 @@
                     <label class="text-xs font-bold text-ink uppercase tracking-wider">Quick Presets</label>
                     <div class="grid grid-cols-2 gap-2">
                         <!-- Clean Default Light -->
-                        <button 
+                        <button
                             type="button"
                             x-on:click="applyPreset({
                                 theme_primary_color: '#111827',
@@ -316,7 +311,7 @@
                                 theme_card_bg: '#FFFFFF',
                                 theme_border_color: '#E5E7EB'
                             })"
-                            class="p-2 border border-border rounded-lg text-left hover:border-ink transition bg-white text-xs space-y-1 cursor-pointer"
+                            class="p-2 border border-border rounded-lg text-left hover:border-ink transition bg-surface text-xs space-y-1 cursor-pointer"
                         >
                             <div class="flex items-center space-x-1">
                                 <span class="w-3 h-3 rounded-full bg-[#111827]"></span>
@@ -327,7 +322,7 @@
                         </button>
 
                         <!-- Emerald Fresh -->
-                        <button 
+                        <button
                             type="button"
                             x-on:click="applyPreset({
                                 theme_primary_color: '#059669',
@@ -364,14 +359,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Primary Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_primary_color"
                                     x-on:input="onColorChange('theme_primary_color', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_primary_color"
                                     x-on:input="onColorChange('theme_primary_color', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -383,14 +378,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Secondary Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_secondary_color"
                                     x-on:input="onColorChange('theme_secondary_color', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_secondary_color"
                                     x-on:input="onColorChange('theme_secondary_color', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -402,14 +397,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Accent Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_accent_color"
                                     x-on:input="onColorChange('theme_accent_color', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_accent_color"
                                     x-on:input="onColorChange('theme_accent_color', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -427,14 +422,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Sidebar Background</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_sidebar_bg"
                                     x-on:input="onColorChange('theme_sidebar_bg', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_sidebar_bg"
                                     x-on:input="onColorChange('theme_sidebar_bg', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -446,14 +441,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Sidebar Text / Inactive</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_sidebar_text"
                                     x-on:input="onColorChange('theme_sidebar_text', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_sidebar_text"
                                     x-on:input="onColorChange('theme_sidebar_text', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -467,7 +462,7 @@
                         <span class="text-xs font-bold text-ink">Active Menu Style</span>
                         <div class="grid grid-cols-2 gap-2">
                             <!-- Option 1: Text Only -->
-                            <button 
+                            <button
                                 type="button"
                                 x-on:click="onColorChange('theme_active_menu_style', 'text_only')"
                                 :class="theme.theme_active_menu_style === 'text_only' ? 'border-ink bg-ink text-white font-bold shadow-xs' : 'border-border bg-canvas text-ink hover:bg-surface'"
@@ -481,7 +476,7 @@
                             </button>
 
                             <!-- Option 2: Background Highlight -->
-                            <button 
+                            <button
                                 type="button"
                                 x-on:click="onColorChange('theme_active_menu_style', 'highlight')"
                                 :class="theme.theme_active_menu_style === 'highlight' ? 'border-ink bg-ink text-white font-bold shadow-xs' : 'border-border bg-canvas text-ink hover:bg-surface'"
@@ -502,14 +497,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Active Text/Icon Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_active_menu_color"
                                     x-on:input="onColorChange('theme_active_menu_color', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_active_menu_color"
                                     x-on:input="onColorChange('theme_active_menu_color', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -518,7 +513,7 @@
                         </div>
 
                         <!-- Active Menu Background Color (Hidden/Disabled when text_only is selected) -->
-                        <div 
+                        <div
                             class="space-y-1 transition-opacity duration-200"
                             :class="theme.theme_active_menu_style === 'text_only' ? 'opacity-40 pointer-events-none' : 'opacity-100'"
                         >
@@ -527,15 +522,15 @@
                                 <span x-show="theme.theme_active_menu_style === 'text_only'" class="text-[10px] text-muted">(Disabled in Text Only)</span>
                             </span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_active_menu_bg"
                                     x-on:input="onColorChange('theme_active_menu_bg', $event.target.value)"
                                     :disabled="theme.theme_active_menu_style === 'text_only'"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_active_menu_bg"
                                     x-on:input="onColorChange('theme_active_menu_bg', $event.target.value)"
                                     :disabled="theme.theme_active_menu_style === 'text_only'"
@@ -554,14 +549,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Header Background</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_header_bg"
                                     x-on:input="onColorChange('theme_header_bg', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_header_bg"
                                     x-on:input="onColorChange('theme_header_bg', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -573,14 +568,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Header Text Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_header_text"
                                     x-on:input="onColorChange('theme_header_text', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_header_text"
                                     x-on:input="onColorChange('theme_header_text', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -598,14 +593,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Page Background</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_page_bg"
                                     x-on:input="onColorChange('theme_page_bg', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_page_bg"
                                     x-on:input="onColorChange('theme_page_bg', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -617,14 +612,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Card Background</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_card_bg"
                                     x-on:input="onColorChange('theme_card_bg', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_card_bg"
                                     x-on:input="onColorChange('theme_card_bg', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -636,14 +631,14 @@
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Border Color</span>
                             <div class="flex items-center space-x-2">
-                                <input 
-                                    type="color" 
+                                <input
+                                    type="color"
                                     :value="theme.theme_border_color"
                                     x-on:input="onColorChange('theme_border_color', $event.target.value)"
                                     class="h-8 w-10 p-0 border border-border rounded cursor-pointer bg-transparent"
                                 />
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     x-model="theme.theme_border_color"
                                     x-on:input="onColorChange('theme_border_color', $event.target.value)"
                                     class="h-8 flex-1 text-xs px-2.5 border border-border rounded-lg font-mono focus:ring-1 focus:ring-ink"
@@ -656,14 +651,14 @@
                 <!-- Section: Typography & Layout -->
                 <div class="space-y-3 pt-3 border-t border-border">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider">Typography & Layout</label>
-                    
+
                     <!-- Font Family -->
                     <div class="space-y-1">
                         <span class="text-xs font-medium text-ink">Font Family</span>
-                        <select 
+                        <x-ui.themed-select class="w-full" searchable
                             x-model="theme.theme_font_family"
                             x-on:change="onColorChange('theme_font_family', $event.target.value)"
-                            class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
+                            trigger-class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
                         >
                             <option value="Inter, sans-serif">Inter (Modern Clean)</option>
                             <option value="'Roboto', sans-serif">Roboto</option>
@@ -671,39 +666,39 @@
                             <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
                             <option value="'Poppins', sans-serif">Poppins</option>
                             <option value="system-ui, -apple-system, sans-serif">System UI</option>
-                        </select>
+                        </x-ui.themed-select>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <!-- Font Size -->
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Base Font Size</span>
-                            <select 
+                            <x-ui.themed-select class="w-full" searchable
                                 x-model="theme.theme_font_size"
                                 x-on:change="onColorChange('theme_font_size', $event.target.value)"
-                                class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
+                                trigger-class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
                             >
                                 <option value="13px">Compact (13px)</option>
                                 <option value="14px">Standard (14px)</option>
                                 <option value="15px">Comfortable (15px)</option>
                                 <option value="16px">Large (16px)</option>
-                            </select>
+                            </x-ui.themed-select>
                         </div>
 
                         <!-- Border Radius -->
                         <div class="space-y-1">
                             <span class="text-xs font-medium text-ink">Border Radius</span>
-                            <select 
+                            <x-ui.themed-select class="w-full" searchable
                                 x-model="theme.theme_border_radius"
                                 x-on:change="onColorChange('theme_border_radius', $event.target.value)"
-                                class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
+                                trigger-class="w-full h-9 text-xs px-3 bg-surface text-ink border border-border rounded-lg focus:ring-1 focus:ring-ink"
                             >
                                 <option value="0px">Sharp (0px)</option>
                                 <option value="0.25rem">Small (4px)</option>
                                 <option value="0.5rem">Medium (8px)</option>
                                 <option value="0.75rem">Large (12px)</option>
                                 <option value="1rem">Extra Large (16px)</option>
-                            </select>
+                            </x-ui.themed-select>
                         </div>
                     </div>
                 </div>
@@ -712,8 +707,8 @@
 
             <!-- Offcanvas Footer Actions -->
             <div class="p-4 border-t border-border bg-canvas/40 flex items-center justify-between gap-2.5">
-                <button 
-                    type="button" 
+                <button
+                    type="button"
                     x-on:click="resetTheme()"
                     :disabled="resetting"
                     class="px-3.5 py-2 text-xs font-semibold text-danger hover:bg-danger/10 rounded-lg border border-danger/20 transition cursor-pointer"
@@ -726,15 +721,15 @@
                 </button>
 
                 <div class="flex items-center space-x-2">
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         x-on:click="open = false"
                         class="px-3.5 py-2 text-xs font-semibold text-ink hover:bg-canvas rounded-lg border border-border transition cursor-pointer"
                     >
                         Close
                     </button>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         x-on:click="saveTheme()"
                         :disabled="saving"
                         class="px-4 py-2 text-xs font-bold text-white bg-ink hover:bg-black rounded-lg shadow-sm transition cursor-pointer flex items-center space-x-1.5"

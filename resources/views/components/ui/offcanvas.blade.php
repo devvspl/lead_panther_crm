@@ -28,6 +28,7 @@ $maxWidthClass = match ($maxWidth) {
                 if (typeof detail === 'object') return detail.name === '{{ $name }}' || detail[0] === '{{ $name }}';
                 return false;
             },
+            destroy() { window.LeadPantherUI.lock(this.$el, false); },
             open() { this.show = true; },
             close() { 
                 this.show = false; 
@@ -37,10 +38,8 @@ $maxWidthClass = match ($maxWidth) {
                 $dispatch('offcanvas-closed', '{{ $name }}');
             }
         }"
-        x-init="$watch('show', function(value) {
-            if (value) document.body.classList.add('overflow-hidden');
-            else document.body.classList.remove('overflow-hidden');
-        })"
+        x-init="$watch('show', value => window.LeadPantherUI.lock($el, value)); window.LeadPantherUI.lock($el, show)"
+        x-effect="window.LeadPantherUI.lock($el, show)"
         x-show="show"
         x-cloak
         x-on:open-offcanvas.window="if (checkEvent($event.detail)) open()"
@@ -61,7 +60,7 @@ $maxWidthClass = match ($maxWidth) {
             class="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
         ></div>
 
-        <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
+        <div class="fixed inset-y-0 right-0 flex w-full max-w-full sm:pl-10 pointer-events-none">
             <!-- Slide-over panel -->
             <div 
                 x-show="show"
@@ -71,11 +70,12 @@ $maxWidthClass = match ($maxWidth) {
                 x-transition:leave="transform transition ease-in duration-200"
                 x-transition:leave-start="translate-x-0"
                 x-transition:leave-end="translate-x-full"
-                class="w-screen {{ $maxWidthClass }} bg-surface border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden"
+                class="ml-auto w-full {{ $maxWidthClass }} h-[100dvh] bg-surface border-l border-border shadow-2xl flex flex-col justify-between overflow-hidden pointer-events-auto"
+                role="dialog" aria-modal="true" aria-label="{{ $title }}"
                 x-on:click.stop
             >
                 <!-- Offcanvas Header -->
-                <div class="px-6 py-4.5 border-b border-border bg-canvas/40 flex items-center justify-between shrink-0">
+                <div class="px-4 sm:px-6 py-4 border-b border-border bg-canvas/40 flex items-center justify-between gap-3 shrink-0">
                     <div>
                         <h3 class="text-sm font-bold text-ink flex items-center gap-2">
                             @if(isset($headerIcon))
@@ -100,13 +100,13 @@ $maxWidthClass = match ($maxWidth) {
                 </div>
 
                 <!-- Offcanvas Body -->
-                <div class="p-6 overflow-y-auto sidebar-scroll flex-1 space-y-6">
+                <div class="min-h-0 min-w-0 p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 space-y-6">
                     {{ $slot }}
                 </div>
 
                 @if(isset($footer))
                     <!-- Offcanvas Footer -->
-                    <div class="px-6 py-3.5 border-t border-border bg-canvas/40 flex items-center justify-end gap-3 shrink-0">
+                    <div class="px-4 sm:px-6 py-3.5 border-t border-border bg-canvas/40 flex flex-wrap items-center justify-end gap-3 shrink-0">
                         {{ $footer }}
                     </div>
                 @endif

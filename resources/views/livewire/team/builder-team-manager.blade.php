@@ -7,7 +7,7 @@
     }
 }">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Management' : 'Builder Direct Team Management' }}</h1>
             <p class="text-xs text-muted">Assignments and team members.</p>
@@ -46,7 +46,7 @@
     <!-- Add Member Form -->
     <x-modal name="add-team-member" :show="$errors->hasAny(['memberName','memberEmail','roleName','password']) || (bool)$generatedInviteLink" maxWidth="2xl">
         <div class="max-h-[calc(100dvh-4rem)] overflow-y-auto p-5 space-y-4">
-            <div class="flex items-center justify-between"><h2 class="font-semibold text-ink">Add Team Member</h2><button type="button" x-on:click="$dispatch('close-modal', 'add-team-member')" title="Close" aria-label="Close add member form" class="p-2 text-muted hover:text-ink"><x-ui.team-icon name="close" /></button></div>
+            <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-semibold text-ink">Add Team Member</h2><button type="button" x-on:click="$dispatch('close-modal', 'add-team-member')" title="Close" aria-label="Close add member form" class="p-2 text-muted hover:text-ink"><x-ui.team-icon name="close" /></button></div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div class="min-w-0">
@@ -79,7 +79,7 @@
 
         @if($generatedInviteLink)
             <div class="p-3.5 bg-surface border border-border rounded-xl space-y-2 mt-4 shadow-xs">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-[11px] font-bold text-ink flex items-center gap-1.5">
                         <x-ui.team-icon name="link" class="text-primary" />
                         <span>Activation link</span>

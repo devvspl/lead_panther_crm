@@ -1,6 +1,6 @@
 <div class="space-y-6 max-w-4xl mx-auto">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Lead Distribution Configuration</h1>
             <p class="text-xs text-muted">Configure lead assignment rules for <span
@@ -26,7 +26,7 @@
                 <!-- Round Robin Card -->
                 <div wire:click="$set('ruleType', 'round_robin')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'round_robin' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Round Robin Rotation</span>
                         <input type="radio" wire:model="ruleType" value="round_robin" class="text-ink">
                     </div>
@@ -37,7 +37,7 @@
                 <!-- Manual Queue Card -->
                 <div wire:click="$set('ruleType', 'manual')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'manual' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Manual Manager Queue</span>
                         <input type="radio" wire:model="ruleType" value="manual" class="text-ink">
                     </div>
@@ -48,7 +48,7 @@
                 <!-- Location-wise Card -->
                 <div wire:click="$set('ruleType', 'location')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'location' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Location-wise Mapping</span>
                         <input type="radio" wire:model="ruleType" value="location" class="text-ink">
                     </div>
@@ -58,7 +58,7 @@
                 <!-- Priority First Refusal Card -->
                 <div wire:click="$set('ruleType', 'priority')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'priority' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Priority First-Refusal</span>
                         <input type="radio" wire:model="ruleType" value="priority" class="text-ink">
                     </div>
@@ -68,7 +68,7 @@
                 <!-- Availability Card -->
                 <div wire:click="$set('ruleType', 'availability')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'availability' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Real-time Availability</span>
                         <input type="radio" wire:model="ruleType" value="availability" class="text-ink">
                     </div>
@@ -79,7 +79,7 @@
                 <!-- Project Direct Team Card -->
                 <div wire:click="$set('ruleType', 'project_wise')"
                     class="p-4 rounded-card border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $ruleType === 'project_wise' ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-xs font-bold text-ink">Project-wise Dedicated Team</span>
                         <input type="radio" wire:model="ruleType" value="project_wise" class="text-ink">
                     </div>
@@ -92,7 +92,7 @@
         <!-- Conditional Config Section -->
         @if($ruleType === 'location')
             <div class="p-4 bg-canvas rounded-card border border-border space-y-3">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <h3 class="text-xs font-bold text-ink">City / Pincode Mapping Table</h3>
                     <x-ui.button wire:click="addLocationRow" variant="secondary" class="text-[10px] px-2 py-1">+ Add City
                         Mapping</x-ui.button>

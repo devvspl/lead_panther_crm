@@ -52,7 +52,7 @@
 
         <!-- Template Form -->
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xs font-bold text-ink uppercase tracking-wider">{{ $selectedId ? 'Edit Template' : 'Create New Template' }}</h2>
                 @if($selectedId)
                     <span class="text-[10px] bg-accent/10 text-accent font-bold px-2 py-0.5 rounded-pill">ID #{{ $selectedId }}</span>

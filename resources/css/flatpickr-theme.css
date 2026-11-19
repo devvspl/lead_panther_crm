@@ -1,7 +1,7 @@
 /* Lead Panther CRM Flatpickr Custom Theme */
 .flatpickr-calendar {
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
+  background: var(--theme-card-bg, #ffffff) !important;
+  border: 1px solid var(--theme-border-color, #e5e7eb) !important;
   border-radius: 0.75rem !important;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
@@ -42,8 +42,8 @@
 }
 
 .flatpickr-months .flatpickr-month {
-  color: #111827 !important;
-  fill: #111827 !important;
+  color: var(--theme-header-text, #111827) !important;
+  fill: var(--theme-header-text, #111827) !important;
   height: 2rem !important;
   line-height: 2rem !important;
   flex: 1 1 0% !important;
@@ -57,7 +57,7 @@
   font-size: 0.875rem !important;
   font-weight: 700 !important;
   padding: 0 !important;
-  color: #111827 !important;
+  color: var(--theme-header-text, #111827) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -66,12 +66,12 @@
 
 .flatpickr-current-month .cur-month {
   font-weight: 700 !important;
-  color: #111827 !important;
+  color: var(--theme-header-text, #111827) !important;
 }
 
 .flatpickr-current-month input.cur-year {
   font-weight: 700 !important;
-  color: #111827 !important;
+  color: var(--theme-header-text, #111827) !important;
 }
 
 .flatpickr-months .flatpickr-prev-month,
@@ -87,14 +87,14 @@
 
 .flatpickr-months .flatpickr-prev-month:hover,
 .flatpickr-months .flatpickr-next-month:hover {
-  color: #111827 !important;
-  fill: #111827 !important;
-  background: #f3f4f6 !important;
+  color: var(--theme-header-text, #111827) !important;
+  fill: var(--theme-header-text, #111827) !important;
+  background: var(--theme-page-bg, #f3f4f6) !important;
 }
 
 .flatpickr-weekdays {
   height: 1.75rem !important;
-  border-bottom: 1px solid #f3f4f6 !important;
+  border-bottom: 1px solid var(--theme-page-bg, #f3f4f6) !important;
   margin-bottom: 0.25rem !important;
   display: flex !important;
   width: 100% !important;
@@ -149,50 +149,52 @@ span.flatpickr-weekday {
 }
 
 .flatpickr-day:hover {
-  background: #f3f4f6 !important;
-  color: #111827 !important;
+  background: var(--theme-page-bg, #f3f4f6) !important;
+  color: var(--theme-header-text, #111827) !important;
   border-color: transparent !important;
 }
 
 .flatpickr-day.today {
-  border-color: #9ca3af !important;
+  border-color: var(--theme-secondary, #9ca3af) !important;
   background: transparent !important;
-  color: #111827 !important;
+  color: var(--theme-header-text, #111827) !important;
   font-weight: 700 !important;
 }
 
 .flatpickr-day.today:hover {
-  background: #f3f4f6 !important;
-  border-color: #9ca3af !important;
+  background: var(--theme-page-bg, #f3f4f6) !important;
+  border-color: var(--theme-secondary, #9ca3af) !important;
 }
 
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
-  background: #111827 !important;
-  border-color: #111827 !important;
-  color: #ffffff !important;
+  background: var(--theme-header-text, #111827) !important;
+  border-color: var(--theme-header-text, #111827) !important;
+  color: var(--theme-card-bg, #ffffff) !important;
   font-weight: 700 !important;
 }
 
 .flatpickr-day.inRange {
-  background: #f3f4f6 !important;
+  background: var(--theme-page-bg, #f3f4f6) !important;
   border-color: transparent !important;
-  color: #111827 !important;
-  box-shadow: -5px 0 0 #f3f4f6, 5px 0 0 #f3f4f6 !important;
+  color: var(--theme-header-text, #111827) !important;
+  box-shadow: -5px 0 0 var(--theme-page-bg, #f3f4f6), 5px 0 0 var(--theme-page-bg, #f3f4f6) !important;
 }
 
 .flatpickr-day.selected.startRange + .endRange:not(:hover),
 .flatpickr-day.startRange.startRange + .endRange:not(:hover),
 .flatpickr-day.endRange.startRange + .endRange:not(:hover) {
-  box-shadow: -10px 0 0 #111827 !important;
+  box-shadow: -10px 0 0 var(--theme-header-text, #111827) !important;
 }
 
 .flatpickr-day.flatpickr-disabled,
 .flatpickr-day.flatpickr-disabled:hover,
 .flatpickr-day.prevMonthDay,
 .flatpickr-day.nextMonthDay {
-  color: #d1d5db !important;
+  color: var(--theme-secondary, #d1d5db) !important;
   background: transparent !important;
   border-color: transparent !important;
 }
+
+.flatpickr-calendar { max-width: calc(100vw - 1rem) !important; }

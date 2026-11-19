@@ -163,8 +163,8 @@
 
     <!-- Manual Adjustment Modal -->
     @if($showAdjustModal)
-        <div class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 max-w-lg w-full shadow-2xl space-y-4">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between border-b border-border pb-3">
                     <h3 class="text-base font-bold text-ink">Manual Credit Adjustment</h3>
                     <button type="button" wire:click="closeAdjustModal" class="text-muted hover:text-ink cursor-pointer">
@@ -178,12 +178,12 @@
                 <div class="space-y-4">
                     <div>
                         <label class="text-xs font-bold text-ink">Select Client</label>
-                        <select wire:model="selectedClientId"
-                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                        <x-ui.themed-select class="w-full" searchable  wire:model="selectedClientId"
+                            trigger-class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                             @foreach($clients as $c)
                                 <option value="{{ $c->id }}">{{ $c->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">

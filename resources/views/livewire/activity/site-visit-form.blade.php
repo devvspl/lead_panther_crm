@@ -43,8 +43,8 @@
 
     <!-- Stage Suggestion Modal -->
     @if($showStageSuggestModal)
-        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <h3 class="text-sm font-bold text-ink">Move Lead Stage to "Site Visit"?</h3>
                 <p class="text-xs text-muted">You logged a site visit for {{ $lead->name }}. Would you like to advance the
                     lead's stage to <strong>Site Visit</strong>?</p>

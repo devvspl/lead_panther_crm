@@ -146,7 +146,7 @@
                     </div>
 
                     <!-- Required Format & Sample Data Table -->
-                    <div class="border border-border rounded-xl overflow-hidden bg-surface">
+                    <div class="border border-border rounded-xl overflow-x-auto bg-surface">
                         <div class="px-3.5 py-2.5 bg-canvas/70 border-b border-border flex items-center justify-between">
                             <span class="font-bold text-[11px] text-ink uppercase tracking-wider flex items-center gap-1.5">
                                 <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,7 +300,7 @@
                                     </div>
                                 </div>
                                 <button type="button" wire:click="downloadImportErrorsCsv"
-                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-red-300 text-red-800 rounded-lg text-xs font-bold hover:bg-red-100 transition shadow-2xs shrink-0 cursor-pointer">
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface border border-red-300 text-red-800 rounded-lg text-xs font-bold hover:bg-red-100 transition shadow-2xs shrink-0 cursor-pointer">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -310,7 +310,7 @@
                             </div>
 
                             <!-- Row-wise Error Table -->
-                            <div class="border border-red-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-surface">
+                            <div class="border border-red-200 rounded-xl overflow-x-auto max-h-48 overflow-y-auto bg-surface">
                                 <table class="w-full text-left text-[11px] border-collapse">
                                     <thead class="sticky top-0 bg-red-50 text-red-900 border-b border-red-200">
                                         <tr>
@@ -339,7 +339,7 @@
                     <!-- Valid Rows Preview -->
                     @if(!empty($importRows))
                         <div class="space-y-2">
-                            <div class="flex items-center justify-between">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
                                 <span class="font-bold text-ink flex items-center gap-1.5">
                                     <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -352,7 +352,7 @@
                                 @endif
                             </div>
 
-                            <div class="border border-border rounded-xl overflow-hidden bg-surface">
+                            <div class="border border-border rounded-xl overflow-x-auto bg-surface">
                                 <table class="w-full text-left text-[11px] border-collapse">
                                     <thead class="bg-canvas/50 text-muted border-b border-border">
                                         <tr>
@@ -531,7 +531,7 @@
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Assigned Team
                                     Members</span>
-                                <div class="flex items-center justify-between">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
                                     <span
                                         class="text-lg font-bold font-mono text-ink">{{ $editingOrg->users_count ?? 0 }}</span>
                                     <button type="button" wire:click="openUserModal({{ $editingOrg->id }})"
@@ -675,7 +675,7 @@
                 @if($selectedOrg)
                     <!-- SECTION 1: Create New User for this Clients -->
                     <div class="bg-canvas/50 border border-border rounded-xl p-4 sm:p-5 space-y-4">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <h4 class="text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-2">
                                 <span class="p-1 rounded-md bg-primary/10 text-primary">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -741,7 +741,7 @@
 
                             @if($generatedInviteLink)
                                 <div class="p-3.5 bg-surface border border-border rounded-xl space-y-2 mt-2 shadow-xs">
-                                    <div class="flex items-center justify-between">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
                                         <span class="text-[11px] font-bold text-ink flex items-center gap-1.5">
                                             <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24">
@@ -778,7 +778,7 @@
 
                     <!-- SECTION 2: Current Assigned Members -->
                     <div class="space-y-3">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <h4 class="text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-2">
                                 <span class="p-1 rounded-md bg-canvas text-muted border border-border">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

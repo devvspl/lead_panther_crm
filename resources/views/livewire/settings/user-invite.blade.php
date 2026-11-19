@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">B2B Clients User Invites</h1>
             <p class="text-xs text-muted">Invite team members to your organization. Public self-registration is disabled.</p>

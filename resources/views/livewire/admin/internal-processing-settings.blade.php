@@ -1,7 +1,7 @@
 <section class="rounded-2xl border border-border bg-surface p-5 space-y-5">
     <div><h3 class="text-sm font-bold text-ink">Lead Panther Internal Processing</h3><p class="text-xs text-muted mt-1">Route new leads to Lead Panther for calling and verification before client delivery. Existing internal leads keep their processing history when this is disabled.</p></div>
     <form wire:submit="saveSettings" class="space-y-4">
-        <label class="flex items-center gap-3 text-sm font-semibold text-ink"><span class="relative inline-flex"><input type="checkbox" role="switch" wire:model.live="enabled" class="peer sr-only"><span class="h-6 w-11 rounded-full bg-muted/30 peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary"></span><span class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5"></span></span>Enable Internal Lead Processing</label>
+        <label class="flex items-center gap-3 text-sm font-semibold text-ink"><span class="relative inline-flex"><input type="checkbox" role="switch" wire:model.live="enabled" class="peer sr-only"><span class="h-6 w-11 rounded-full bg-muted/30 peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary"></span><span class="absolute left-1 top-1 h-4 w-4 rounded-full bg-surface transition-transform peer-checked:translate-x-5"></span></span>Enable Internal Lead Processing</label>
         @if($enabled)
             <div class="grid sm:grid-cols-2 gap-4">
                 <div><label class="block text-xs font-semibold text-ink mb-1">Internal processing team</label>

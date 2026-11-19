@@ -1,7 +1,7 @@
-<div x-data="{ open: false }" class="relative text-left text-xs {{ $class ?: 'inline-block' }}">
+<div x-data="{ open: false, panelStyle: {}, place() { this.panelStyle=window.LeadPantherUI.position(this.$refs.trigger,this.$refs.panel,280); } }" @resize.window="if(open) place()" @scroll.window.capture="if(open && !$refs.panel.contains($event.target)) place()" @keydown.escape.stop.prevent="open=false; $refs.trigger.focus()" x-on:livewire:navigating.window="open=false" class="relative text-left text-xs {{ $class ?: 'inline-block' }}">
     <!-- Trigger Button -->
-    <button type="button" @click="open = !open"
-        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap">
+    <button x-ref="trigger" type="button" :aria-expanded="open" aria-haspopup="listbox" @click="open = !open; if(open) $nextTick(() => place())"
+        class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-0 whitespace-nowrap">
         <span class="truncate font-semibold {{ $value !== null && $value !== '' ? 'text-ink' : 'text-muted' }}">
             {{ $selectedLabel ?: $placeholder }}
         </span>
@@ -19,12 +19,13 @@
     </button>
 
     <!-- Dropdown Popover Panel -->
-    <div x-show="open" x-cloak @click.outside="open = false" x-transition:enter="transition ease-out duration-100"
+    <template x-teleport="body">
+    <div x-ref="panel" :style="panelStyle" x-show="open" x-cloak @click.outside="if(!$refs.trigger.contains($event.target)) open = false" x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100"
         x-transition:leave-end="transform opacity-0 scale-95" @if($searchable ?? true)
         x-effect="if (open) $nextTick(function() { if ($refs.searchInput) $refs.searchInput.focus(); })" @endif
-        class="absolute left-0 z-50 mt-1.5 min-w-full w-full max-w-[320px] bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5">
+        class="fixed z-[100] overflow-y-auto overscroll-contain bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-1.5">
         @if($searchable ?? true)
             <!-- Search Input Header -->
             <div class="relative">
@@ -92,4 +93,5 @@
             @endif
         </div>
     </div>
+    </template>
 </div>

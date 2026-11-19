@@ -87,8 +87,8 @@
 
     <!-- Complete Next-Step Modal -->
     @if($completingFollowupId)
-        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <h3 class="text-sm font-bold text-ink">Complete Follow-up: Schedule Next Action</h3>
                 <p class="text-xs text-muted">A follow-up cannot be closed without either a next follow-up date or explicit stage update.</p>
 

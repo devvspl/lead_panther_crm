@@ -55,12 +55,12 @@
         <!-- Help Center Link -->
         <a href="#"
             class="text-xs font-medium text-muted hover:text-ink transition hidden md:flex items-center space-x-1.5 px-2 py-1.5 rounded-lg hover:bg-canvas"
-            title="Help Center">
+            title="Help Center" aria-label="Help Center">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>Help Center</span>
+            <span class="hidden xl:inline">Help Center</span>
         </a>
 
         <!-- Notification Bell with Count Badge -->
@@ -75,7 +75,7 @@
                         class="h-8 w-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold ring-2 ring-border flex-shrink-0">
                         {{ strtoupper(substr(auth()->user()->name ?? 'User', 0, 2)) }}
                     </div>
-                    <span class="text-xs font-semibold text-ink hidden sm:flex items-center space-x-1">
+                    <span class="text-xs font-semibold text-ink hidden lg:flex items-center space-x-1">
                         <span class="max-w-[120px] truncate">{{ auth()->user()->name ?? 'Account User' }}</span>
                         <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />

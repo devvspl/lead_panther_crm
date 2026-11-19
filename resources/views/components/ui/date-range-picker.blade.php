@@ -10,9 +10,11 @@
     $wireCustomTo = $attributes->wire('custom-to')->value();
 @endphp
 
-<div 
-    x-data="{ 
-        open: false, 
+<div
+    x-data="{
+        open: false,
+        popupStyle: {},
+        placePopup() { this.popupStyle = window.LeadPantherUI.position(this.$refs.presetTrigger,this.$refs.presetPanel,192,'{{ $align }}'); },
         modalOpen: false,
         range: @if($wireModel) ($wire.entangle('{{ $wireModel }}') ?? 'month') @else 'month' @endif,
         customFrom: @if($wireCustomFrom) ($wire.entangle('{{ $wireCustomFrom }}') ?? '') @else '' @endif,
@@ -20,6 +22,7 @@
         draftFrom: '',
         draftTo: '',
         fpInstance: null,
+        destroy() { this.fpInstance?.destroy(); window.LeadPantherUI.lock(this.$el,false); },
 
         formatDate(d) {
             if (!d) return '';
@@ -277,13 +280,15 @@
 
             this.closeModal();
         }
-    }" 
-    class="relative inline-block text-left text-xs {{ $class }}"
+    }"
+    x-effect="window.LeadPantherUI.lock($el,modalOpen)" @keydown.escape.window="open=false; if(modalOpen) closeModal()"
+    @resize.window="if(open) placePopup()" @scroll.window.capture="if(open && !$refs.presetPanel.contains($event.target)) placePopup()" x-on:livewire:navigating.window="open=false; closeModal()"
+    class="relative inline-block min-w-0 max-w-full text-left text-xs {{ $class }}"
 >
     <!-- Trigger Button -->
-    <button 
-        type="button" 
-        @click="open = !open" 
+    <button
+        type="button"
+        @click="open = !open; if(open) $nextTick(() => placePopup())" x-ref="presetTrigger" :aria-expanded="open"
         class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-[110px] whitespace-nowrap shadow-xs font-semibold"
     >
         <div class="flex items-center gap-1.5 truncate">
@@ -298,21 +303,22 @@
     </button>
 
     <!-- Dropdown Panel -->
-    <div 
-        x-show="open" 
-        x-cloak 
-        @click.outside="open = false" 
-        x-transition:enter="transition ease-out duration-100" 
-        x-transition:enter-start="transform opacity-0 scale-95" 
-        x-transition:enter-end="transform opacity-100 scale-100" 
-        x-transition:leave="transition ease-in duration-75" 
-        x-transition:leave-start="transform opacity-100 scale-100" 
-        x-transition:leave-end="transform opacity-0 scale-95" 
-        class="absolute {{ $align === 'right' ? 'right-0' : 'left-0' }} z-50 mt-1.5 w-48 bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-0.5"
+    <template x-teleport="body">
+    <div x-ref="presetPanel" :style="popupStyle" @keydown.escape.stop.prevent="open=false; $refs.presetTrigger.focus()"
+        x-show="open"
+        x-cloak
+        @click.outside="if(!$refs.presetTrigger.contains($event.target)) open = false"
+        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter-start="transform opacity-0 scale-95"
+        x-transition:enter-end="transform opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="transform opacity-100 scale-100"
+        x-transition:leave-end="transform opacity-0 scale-95"
+        class="fixed z-[100] overflow-y-auto overscroll-contain bg-surface rounded-card border border-border shadow-xl p-1.5 text-xs space-y-0.5"
     >
-        <button 
-            type="button" 
-            @click="selectPreset('today')" 
+        <button
+            type="button"
+            @click="selectPreset('today')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'today' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
         >
@@ -320,9 +326,9 @@
             <span x-show="range === 'today'" class="text-ink font-bold text-xs">✓</span>
         </button>
 
-        <button 
-            type="button" 
-            @click="selectPreset('week')" 
+        <button
+            type="button"
+            @click="selectPreset('week')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'week' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
         >
@@ -330,9 +336,9 @@
             <span x-show="range === 'week'" class="text-ink font-bold text-xs">✓</span>
         </button>
 
-        <button 
-            type="button" 
-            @click="selectPreset('month')" 
+        <button
+            type="button"
+            @click="selectPreset('month')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'month' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
         >
@@ -340,9 +346,9 @@
             <span x-show="range === 'month'" class="text-ink font-bold text-xs">✓</span>
         </button>
 
-        <button 
-            type="button" 
-            @click="selectPreset('quarter')" 
+        <button
+            type="button"
+            @click="selectPreset('quarter')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'quarter' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
         >
@@ -350,9 +356,9 @@
             <span x-show="range === 'quarter'" class="text-ink font-bold text-xs">✓</span>
         </button>
 
-        <button 
-            type="button" 
-            @click="selectPreset('all')" 
+        <button
+            type="button"
+            @click="selectPreset('all')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'all' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
         >
@@ -362,9 +368,9 @@
 
         <div class="border-t border-border my-1"></div>
 
-        <button 
-            type="button" 
-            @click="selectPreset('custom')" 
+        <button
+            type="button"
+            @click="selectPreset('custom')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between font-medium text-ink"
             :class="range === 'custom' ? 'bg-canvas text-ink font-bold' : ''"
         >
@@ -378,15 +384,17 @@
         </button>
     </div>
 
+    </template>
+
     <!-- Custom Date Range Modal -->
     <template x-teleport="body">
-        <div 
-            x-show="modalOpen" 
+        <div
+            x-show="modalOpen" role="dialog" aria-modal="true" aria-label="Custom date range"
             x-cloak
             class="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 flex items-center justify-center min-h-full"
         >
             <!-- Backdrop -->
-            <div 
+            <div
                 x-show="modalOpen"
                 x-transition:enter="transition-opacity ease-out duration-200"
                 x-transition:enter-start="opacity-0"
@@ -394,12 +402,12 @@
                 x-transition:leave="transition-opacity ease-in duration-150"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                @click="closeModal()" 
+                @click="closeModal()"
                 class="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
             ></div>
 
             <!-- Modal Card -->
-            <div 
+            <div
                 x-show="modalOpen"
                 x-transition:enter="transition ease-out duration-200"
                 x-transition:enter-start="opacity-0 translate-y-4 sm:scale-95"
@@ -416,9 +424,9 @@
                         <h3 class="text-sm font-bold text-ink">Select Custom Date Range</h3>
                         <p class="text-[11px] text-muted">Choose quick presets or click on calendar to select dates.</p>
                     </div>
-                    <button 
-                        type="button" 
-                        @click="closeModal()" 
+                    <button
+                        type="button"
+                        @click="closeModal()"
                         class="text-muted hover:text-ink p-1 rounded-lg transition"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -448,9 +456,9 @@
                         <div class="w-full flex items-center justify-center gap-2 max-w-[420px] mb-2">
                             <div class="flex-1">
                                 <label class="text-[9px] font-bold uppercase tracking-wider text-muted block mb-0.5">From Date</label>
-                                <input 
-                                    type="date" 
-                                    x-model="draftFrom" 
+                                <input
+                                    type="date"
+                                    x-model="draftFrom"
                                     @change="updateFromInputs()"
                                     class="w-full h-7 px-2 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-1 focus:ring-ink font-medium"
                                 >
@@ -458,9 +466,9 @@
                             <span class="text-muted text-xs mt-3">→</span>
                             <div class="flex-1">
                                 <label class="text-[9px] font-bold uppercase tracking-wider text-muted block mb-0.5">To Date</label>
-                                <input 
-                                    type="date" 
-                                    x-model="draftTo" 
+                                <input
+                                    type="date"
+                                    x-model="draftTo"
                                     @change="updateFromInputs()"
                                     class="w-full h-7 px-2 bg-canvas text-ink text-xs rounded-md border border-border focus:ring-1 focus:ring-ink font-medium"
                                 >
@@ -480,16 +488,16 @@
                     </div>
 
                     <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                        <button 
-                            type="button" 
-                            @click="closeModal()" 
-                            class="px-4 py-1.5 border border-border bg-white text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
+                        <button
+                            type="button"
+                            @click="closeModal()"
+                            class="px-4 py-1.5 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition"
                         >
                             Cancel
                         </button>
-                        <button 
-                            type="button" 
-                            @click="applyCustomRange()" 
+                        <button
+                            type="button"
+                            @click="applyCustomRange()"
                             :disabled="!draftFrom || !draftTo"
                             class="px-4 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                         >

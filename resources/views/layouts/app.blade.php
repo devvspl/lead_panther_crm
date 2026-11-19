@@ -181,6 +181,7 @@
             });
         </script>
 
+        <script src="{{ asset('ui-controls.js') }}?v={{ filemtime(public_path('ui-controls.js')) }}" data-navigate-once></script>
         <!-- Scripts & Styles -->
         <x-ui.vite-assets />
         @livewireStyles

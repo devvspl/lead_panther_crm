@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-center space-x-2 text-xs text-muted mb-1">
                 <span>Leads &amp; Pipeline</span>

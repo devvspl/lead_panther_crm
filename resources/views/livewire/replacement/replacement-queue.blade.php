@@ -71,8 +71,8 @@
 
     <!-- Rejection Note Modal -->
     @if($showRejectModal)
-        <div class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between border-b border-border pb-3">
                     <h3 class="text-base font-bold text-ink">Reject Replacement Claim</h3>
                     <button type="button" wire:click="closeRejectModal" class="text-muted hover:text-ink cursor-pointer">

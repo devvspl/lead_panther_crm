@@ -35,18 +35,21 @@
     $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || $hasFilterConfig)) || ($showConfigurations && !empty($columns)) || isset($action);
 @endphp
 
-<div class="space-y-4" x-data="{ 
-    filterOpen: false, 
+<div class="lp-data-view min-w-0 max-w-full space-y-4" x-data="{
+    filterOpen: false,
     configOpen: false,
-    activeActionMenu: null 
-}">
+    activeActionMenu: null,
+    filterStyle: {}, configStyle: {},
+    place(which) { this[which+'Style'] = window.LeadPantherUI.position(this.$refs[which+'Trigger'],this.$refs[which+'Panel'],which==='filter'?320:280,'right'); }
+
+}" @keydown.escape.stop="filterOpen=false; configOpen=false" @scroll.window.capture="if(filterOpen && !$refs.filterPanel.contains($event.target)) place('filter'); if(configOpen && !$refs.configPanel.contains($event.target)) place('config')" @resize.window="if(filterOpen) place('filter'); if(configOpen) place('config')" x-on:livewire:navigating.window="filterOpen=false; configOpen=false">
     <!-- 1. TOOLBAR: Search, Filter, Column Configuration & Add Action -->
     @if($hasToolbar)
     <div
         class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-surface p-3 sm:p-4 rounded-card border border-border shadow-2xs">
         <!-- Search Input -->
         @if($showSearch)
-            <div class="relative flex-1 max-w-md">
+            <div class="relative min-w-0 w-full flex-1 max-w-md">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -69,11 +72,11 @@
         @endif
 
         <!-- Action Controls Group -->
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div class="flex min-w-0 items-center gap-2 flex-wrap">
             <!-- Filter Dropdown Button & Popover -->
             @if($showFilterDropdown && (isset($filters) || $hasFilterConfig))
                 <div class="relative">
-                    <button type="button" @click="filterOpen = !filterOpen; configOpen = false"
+                    <button x-ref="filterTrigger" type="button" :aria-expanded="filterOpen" @click="filterOpen = !filterOpen; configOpen = false; if(filterOpen) $nextTick(() => place('filter'))"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition shadow-2xs cursor-pointer">
                         <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -87,16 +90,17 @@
                     </button>
 
                     <!-- Filter Popover Panel -->
-                    <div x-show="filterOpen" @click.outside="filterOpen = false" x-cloak
+                    <template x-teleport="body">
+                    <div x-ref="filterPanel" :style="filterStyle" role="dialog" aria-label="Advanced filters" @keydown.escape.stop="filterOpen=false; $refs.filterTrigger.focus()" x-show="filterOpen" @click.outside="if(!$refs.filterTrigger.contains($event.target)) filterOpen = false" x-cloak
                         x-transition:enter="transition ease-out duration-100"
                         x-transition:enter-start="transform opacity-0 scale-95"
                         x-transition:enter-end="transform opacity-100 scale-100"
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="transform opacity-100 scale-100"
                         x-transition:leave-end="transform opacity-0 scale-95"
-                        class="absolute right-0 mt-2 w-72 sm:w-80 bg-surface rounded-card border border-border shadow-xl p-4 z-40 space-y-3">
-                        <div class="flex items-center justify-between pb-2 border-b border-border">
-                            <h4 class="text-xs font-bold text-ink">Custom Filters</h4>
+                        class="fixed overflow-y-auto overscroll-contain bg-surface rounded-card border border-border shadow-xl p-4 z-[80] space-y-3">
+                        <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-surface pb-2 border-b border-border">
+                            <h4 class="text-xs font-bold text-ink">Custom Filters</h4><button type="button" @click="filterOpen=false; $refs.filterTrigger.focus()" title="Close filters" aria-label="Close filters" class="p-1 text-muted hover:text-ink"><x-ui.team-icon name="close" /></button>
                             <button type="button" wire:click="resetTableFilters" @click="filterOpen = false"
                                 class="text-[11px] text-primary font-bold hover:underline cursor-pointer">
                                 Reset All
@@ -108,14 +112,16 @@
                                 {{ $filters }}
                             @endif
                         </div>
+                        <div class="sticky bottom-0 flex justify-end border-t border-border bg-surface pt-3"><button type="button" @click="filterOpen=false; $refs.filterTrigger.focus()" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white">Done</button></div>
                     </div>
+                    </template>
                 </div>
             @endif
 
             <!-- Column Configurations Dropdown -->
             @if($showConfigurations && !empty($columns))
                 <div class="relative">
-                    <button type="button" @click="configOpen = !configOpen; filterOpen = false"
+                    <button x-ref="configTrigger" type="button" :aria-expanded="configOpen" @click="configOpen = !configOpen; filterOpen = false; if(configOpen) $nextTick(() => place('config'))"
                         title="Configuration" aria-label="Configuration"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition shadow-2xs cursor-pointer">
                         @if($iconOnlyActions)<x-ui.team-icon name="settings" />@else
@@ -128,12 +134,13 @@
                     </button>
 
                     <!-- Column Toggles Panel -->
-                    <div x-show="configOpen" @click.outside="configOpen = false" x-cloak
+                    <template x-teleport="body">
+                    <div x-ref="configPanel" :style="configStyle" role="dialog" aria-label="Column visibility" @keydown.escape.stop="configOpen=false; $refs.configTrigger.focus()" x-show="configOpen" @click.outside="if(!$refs.configTrigger.contains($event.target)) configOpen = false" x-cloak
                         x-transition:enter="transition ease-out duration-100"
                         x-transition:enter-start="transform opacity-0 scale-95"
                         x-transition:enter-end="transform opacity-100 scale-100"
-                        class="absolute right-0 mt-2 w-64 bg-surface rounded-card border border-border shadow-xl p-3.5 z-40 space-y-2.5">
-                        <div class="flex items-center justify-between pb-2 border-b border-border">
+                        class="fixed overflow-y-auto overscroll-contain bg-surface rounded-card border border-border shadow-xl p-3.5 z-[80] space-y-2.5">
+                        <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-surface pb-2 border-b border-border">
                             <h4 class="text-xs font-bold text-ink">Column Visibility</h4>
                             <button type="button" wire:click="resetColumns"
                                 class="text-[10px] text-primary font-bold hover:underline cursor-pointer">
@@ -157,12 +164,13 @@
                             @endforeach
                         </div>
                     </div>
+                    </template>
                 </div>
             @endif
 
             <!-- Add New Action Slot -->
             @if(isset($action))
-                <div class="ml-auto sm:ml-0">
+                <div class="lp-table-actions min-w-0 max-w-full ml-auto sm:ml-0">
                     {{ $action }}
                 </div>
             @endif
@@ -186,7 +194,7 @@
                     <span>{{ $pillLabel }}</span>
                     @if($pillCount !== null)
                         <span
-                            class="px-1.5 py-0.2 text-[10px] rounded-full {{ $isActive ? 'bg-white/20 text-white' : 'bg-canvas text-muted border border-border' }}">
+                            class="px-1.5 py-0.2 text-[10px] rounded-full {{ $isActive ? 'bg-surface/20 text-white' : 'bg-canvas text-muted border border-border' }}">
                             {{ $pillCount }}
                         </span>
                     @endif
@@ -197,7 +205,7 @@
 
     <!-- 3. DESKTOP / TABLET DATA TABLE (Hidden below md) -->
     <div class="hidden md:block bg-surface rounded-card border border-border shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="max-w-full overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Scrollable data table">
             <table class="w-full text-left text-xs text-ink border-collapse {{ $tableClass }}">
                 <thead
                     class="bg-canvas border-b border-border text-[10px] uppercase font-bold text-muted tracking-wider select-none">
@@ -729,7 +737,7 @@
                     class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 {{ $isRowSelected ? 'border-primary bg-primary/5' : '' }}">
                     <!-- Card Top Row: Checkbox, Primary Title & Action Menu -->
                     <div class="flex items-start justify-between gap-2 pb-2 border-b border-border">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
                             @if($showCheckboxes && $rowId)
                                 <input type="checkbox" wire:click="toggleSelectRow('{{ $rowId }}')" @checked($isRowSelected)
                                     class="rounded text-primary focus:ring-primary h-4 w-4 cursor-pointer">
@@ -767,11 +775,11 @@
                                 $val = is_object($row) ? data_get($row, $colKey) : ($row[$colKey] ?? null);
                             @endphp
                             <div
-                                class="space-y-0.5 {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
+                                class="min-w-0 break-words space-y-0.5 {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
                                 @if(!in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']))
                                     <span class="text-[10px] uppercase font-bold text-muted tracking-wider block">{{ $colLabel }}</span>
                                 @endif
-                                <div>
+                                <div class="lp-mobile-value min-w-0 max-w-full">
                                     @if(isset(${'cell_' . $colKey}))
                                         {{ ${'cell_' . $colKey} }}
                                     @elseif($type === 'scheduled_task_actions')
@@ -1059,7 +1067,7 @@
         @if(!$loading) wire:loading.block @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
         @for($i = 0; $i < (int) min($skeletonRows, 4); $i++)
             <div class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 animate-pulse">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
+                <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-surface pb-2 border-b border-border">
                     <div class="flex items-center gap-2">
                         @if($showCheckboxes)
                             <div class="w-4 h-4 bg-slate-200 rounded"></div>

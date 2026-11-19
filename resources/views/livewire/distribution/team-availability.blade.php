@@ -1,5 +1,5 @@
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Team Availability & Duty Roster</h1>
             <p class="text-xs text-muted">Toggle sales executive online/offline availability status for real-time lead routing.</p>

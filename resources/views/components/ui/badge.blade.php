@@ -12,7 +12,7 @@ $colorClasses = match(true) {
     !is_null($color) && $color === 'purple' => 'bg-purple-50 text-purple-700',
     !is_null($color) && $color === 'orange' => 'bg-orange-50 text-orange-700',
     !is_null($color) && $color === 'green' => 'bg-green-50 text-green-700',
-    !is_null($color) && $color === 'gray' => 'bg-gray-100 text-gray-600',
+    !is_null($color) && $color === 'gray' => 'bg-canvas text-muted',
     !is_null($color) && $color === 'red' => 'bg-red-50 text-red-700',
     
     // Status Family Mapping (Section 2.3)
@@ -21,7 +21,7 @@ $colorClasses = match(true) {
     in_array($badgeStatus, ['qualified', 'interested']) => 'bg-purple-50 text-purple-700',
     in_array($badgeStatus, ['site_visit', 'meeting', 'negotiation']) => 'bg-orange-50 text-orange-700',
     in_array($badgeStatus, ['booking', 'payment', 'closed_won']) => 'bg-green-50 text-green-700',
-    in_array($badgeStatus, ['lost', 'rejected', 'replaced']) => 'bg-gray-100 text-gray-600',
+    in_array($badgeStatus, ['lost', 'rejected', 'replaced']) => 'bg-canvas text-muted',
     in_array($badgeStatus, ['sla_breached', 'danger']) => 'bg-red-50 text-red-700',
     
     default => 'bg-blue-50 text-blue-700',

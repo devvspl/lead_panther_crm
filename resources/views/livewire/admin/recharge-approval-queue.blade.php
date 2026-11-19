@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-center space-x-2 text-xs text-muted mb-1">
                 <span>Billing &amp; Credits</span>
@@ -34,8 +34,8 @@
 
     <!-- APPROVE CONFIRMATION MODAL -->
     @if($showApproveModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <h3 class="text-base font-bold text-ink">Approve Credit Recharge Request</h3>
                 <p class="text-xs text-muted">Confirming this request will immediately credit the client's wallet with the requested credit balance.</p>
 
@@ -54,8 +54,8 @@
 
     <!-- REJECT MODAL -->
     @if($showRejectModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <h3 class="text-base font-bold text-ink">Decline Credit Recharge Request</h3>
                 <p class="text-xs text-muted">Please specify a reason for rejecting this recharge request. This will be sent to the client.</p>
 

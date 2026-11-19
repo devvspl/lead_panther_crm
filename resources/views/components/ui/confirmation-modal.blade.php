@@ -4,6 +4,7 @@
         return {
             open: false,
             loading: false,
+            scrollOwner: Symbol('confirmation'),
             title: 'Are you sure?',
             message: 'Please confirm that you want to perform this action.',
             confirmText: 'Confirm',
@@ -19,15 +20,7 @@
             eventParams: null,
             previousActiveElement: null,
 
-            init: function () {
-                const self = this;
-                window.addEventListener('confirm-action', function (e) {
-                    self.showModal(e.detail || {});
-                });
-                window.addEventListener('open-confirmation-modal', function (e) {
-                    self.showModal(e.detail || {});
-                });
-            },
+            destroy: function () { window.LeadPantherUI.lock(this.scrollOwner,false); },
 
             showModal: function (options) {
                 this.previousActiveElement = document.activeElement;
@@ -47,7 +40,7 @@
                 this.loading = false;
                 this.open = true;
 
-                document.body.classList.add('overflow-hidden');
+                window.LeadPantherUI.lock(this.scrollOwner,true);
 
                 const self = this;
                 this.$nextTick(function () {
@@ -61,7 +54,7 @@
                 if (this.loading) return;
                 this.open = false;
                 this.loading = false;
-                document.body.classList.remove('overflow-hidden');
+                window.LeadPantherUI.lock(this.scrollOwner,false);
                 if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
                     this.previousActiveElement.focus();
                 }
@@ -110,7 +103,7 @@
 
                     this.loading = false;
                     this.open = false;
-                    document.body.classList.remove('overflow-hidden');
+                    window.LeadPantherUI.lock(this.scrollOwner,false);
                     if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
                         this.previousActiveElement.focus();
                     }
@@ -149,7 +142,7 @@
     };
 </script>
 
-<div x-data="leadPantherConfirmModal()" x-init="init()" x-cloak x-show="open"
+<div x-data="leadPantherConfirmModal()" x-on:confirm-action.window="showModal($event.detail || {})" x-on:open-confirmation-modal.window="showModal($event.detail || {})" x-cloak x-show="open"
     x-on:keydown.escape.window="handleCancel()" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title"
     aria-describedby="confirm-modal-desc"
     class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
@@ -168,7 +161,7 @@
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 translate-y-2"
-        class="relative w-full max-w-md bg-surface rounded-card border border-border p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 transform transition-all z-10">
+        class="relative w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-surface rounded-card border border-border p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 transform transition-all z-10">
         
         <!-- Top-Right Close Button -->
         <button type="button" @click="handleCancel()" :disabled="loading" aria-label="Close confirmation dialog"

@@ -172,7 +172,7 @@
             <!-- ========================================================= -->
             @canViewLeadSource
             <div class="p-4 bg-canvas rounded-xl border border-border space-y-2">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">2 &bull; Lead Source
                         &amp; Ingestion</span>
                     <span class="text-[10px] font-mono text-muted">Received:
@@ -229,7 +229,7 @@
             <!-- SECTION 4: ASSIGNMENT INFORMATION                         -->
             <!-- ========================================================= -->
             <div class="p-4 bg-canvas rounded-xl border border-border space-y-2">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">3 &bull; Assignment
                         &amp; Ownership</span>
                     @if($lead->assignedTo)
@@ -284,7 +284,7 @@
             <!-- SECTION 5: CURRENT STAGE & SLA STATUS                     -->
             <!-- ========================================================= -->
             <div class="p-4 bg-canvas rounded-xl border border-border space-y-2">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">4 &bull; Current Stage
                         &amp; SLA</span>
                     <span
@@ -314,7 +314,7 @@
             <!-- SECTION 6: DYNAMIC STAGE-SPECIFIC DETAILS & ACTIONS       -->
             <!-- ========================================================= -->
             <div class="p-4 rounded-xl border-2 border-primary/20 bg-primary/5 space-y-4">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
                             <span class="w-2 h-2 rounded-full bg-primary"></span>
@@ -368,15 +368,15 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Call Outcome</label>
-                                    <select wire:model="callOutcome"
-                                        class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
+                                    <x-ui.themed-select class="w-full" searchable  wire:model="callOutcome"
+                                        trigger-class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                         <option value="Connected">Connected &amp; Discussed</option>
                                         <option value="Interested">Interested in Project</option>
                                         <option value="Call Back Later">Call Back Later / Busy</option>
                                         <option value="Ringing No Response">Ringing No Response</option>
                                         <option value="Switch Off / Unreachable">Switch Off / Unreachable</option>
                                         <option value="Wrong Number">Wrong / Invalid Number</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Duration (Minutes)</label>
@@ -446,7 +446,7 @@
                                         </p>
                                     </div>
                                     <span
-                                        class="font-mono text-[11px] font-bold text-amber-800 bg-white px-2 py-1 rounded border border-amber-200">
+                                        class="font-mono text-[11px] font-bold text-amber-800 bg-surface px-2 py-1 rounded border border-amber-200">
                                         {{ \Carbon\Carbon::parse($activeFollowup->due_at)->format('M d, H:i') }}
                                     </span>
                                 </div>
@@ -539,13 +539,13 @@
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Attendance Status</label>
-                                    <select wire:model="visitAttendance"
-                                        class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
+                                    <x-ui.themed-select class="w-full" searchable  wire:model="visitAttendance"
+                                        trigger-class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                         <option value="attended">Attended Visit</option>
                                         @if(!\App\Models\Lead::usesSalesPanel())
                                         <option value="scheduled">Scheduled / Upcoming</option>@endif
                                         <option value="no_show">No Show / Cancelled</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                             </div>
                             <div>
@@ -576,12 +576,12 @@
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Payment Plan Option</label>
-                                    <select
-                                        class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
+                                    <x-ui.themed-select class="w-full" searchable
+                                        trigger-class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                         <option>Construction Linked Plan (CLP)</option>
                                         <option>Down Payment Plan (DP)</option>
                                         <option>Subvention / Flexi Plan</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                             </div>
                             <div>
@@ -645,13 +645,13 @@
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Payment Method</label>
-                                    <select wire:model="paymentMethod"
-                                        class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
+                                    <x-ui.themed-select class="w-full" searchable  wire:model="paymentMethod"
+                                        trigger-class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                         <option value="Bank Transfer">Bank Transfer / NEFT / RTGS</option>
                                         <option value="UPI">UPI / Net Banking</option>
                                         <option value="Cheque">Cheque</option>
                                         <option value="Cash">Cash / Other</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Transaction ID / Cheque No.</label>
@@ -685,7 +685,7 @@
                             </p>
                             @if($latestBooking)
                                 <div
-                                    class="p-2 bg-white rounded border border-emerald-200 grid grid-cols-2 gap-2 text-[11px] text-ink">
+                                    class="p-2 bg-surface rounded border border-emerald-200 grid grid-cols-2 gap-2 text-[11px] text-ink">
                                     <div><span class="text-muted block text-[10px]">Booking Amount:</span>
                                         <strong>₹{{ number_format($latestBooking->booking_amount) }}</strong></div>
                                     <div><span class="text-muted block text-[10px]">Booked Date:</span>
@@ -793,22 +793,22 @@
                             <div>
                                 <label class="text-[10px] font-semibold text-red-800">Lost Reason <span
                                         class="text-red-500">*</span></label>
-                                <select wire:model="lostReason"
-                                    class="w-full text-xs p-1.5 rounded border border-red-300 bg-white text-ink mt-0.5">
+                                <x-ui.themed-select class="w-full" searchable  wire:model="lostReason"
+                                    trigger-class="w-full text-xs p-1.5 rounded border border-red-300 bg-surface text-ink mt-0.5">
                                     <option value="Budget mismatch">Budget mismatch</option>
                                     <option value="Location preference mismatch">Location preference mismatch</option>
                                     <option value="Purchased competitor property">Purchased competitor property</option>
                                     <option value="Postponed purchase plan">Postponed purchase plan</option>
                                     <option value="Loan eligibility issue">Loan eligibility issue</option>
                                     <option value="Other">Other</option>
-                                </select>
+                                </x-ui.themed-select>
                             </div>
                             <div>
                                 <label class="text-[10px] font-semibold text-red-800">Detailed Remarks <span
                                         class="text-red-500">*</span></label>
                                 <textarea wire:model="lostRemarks" rows="2"
                                     placeholder="Explain why the customer decided not to proceed..."
-                                    class="w-full text-xs p-1.5 rounded border border-red-300 bg-white text-ink mt-0.5"></textarea>
+                                    class="w-full text-xs p-1.5 rounded border border-red-300 bg-surface text-ink mt-0.5"></textarea>
                             </div>
                             <div class="flex items-center justify-end gap-2 pt-1">
                                 <button type="button" wire:click="$set('targetNextStage', '')"
@@ -826,19 +826,19 @@
                             <span class="font-bold text-amber-900 block">Mark Lead as Invalid / Unreachable</span>
                             <div>
                                 <label class="text-[10px] font-semibold text-amber-800">Verification Outcome</label>
-                                <select wire:model="lostReason"
-                                    class="w-full text-xs p-1.5 rounded border border-amber-300 bg-white text-ink mt-0.5">
+                                <x-ui.themed-select class="w-full" searchable  wire:model="lostReason"
+                                    trigger-class="w-full text-xs p-1.5 rounded border border-amber-300 bg-surface text-ink mt-0.5">
                                     <option value="Unreachable after 3+ attempts">Unreachable after 3+ attempts</option>
                                     <option value="Wrong / Invalid Phone Number">Wrong / Invalid Phone Number</option>
                                     <option value="Duplicate Lead">Duplicate Lead</option>
                                     <option value="Not Inquired / Spam">Not Inquired / Spam</option>
-                                </select>
+                                </x-ui.themed-select>
                             </div>
                             <div>
                                 <label class="text-[10px] font-semibold text-amber-800">Remarks <span
                                         class="text-red-500">*</span></label>
                                 <textarea wire:model="lostRemarks" rows="2" placeholder="Call attempt timestamps and notes..."
-                                    class="w-full text-xs p-1.5 rounded border border-amber-300 bg-white text-ink mt-0.5"></textarea>
+                                    class="w-full text-xs p-1.5 rounded border border-amber-300 bg-surface text-ink mt-0.5"></textarea>
                             </div>
                             <div class="flex items-center justify-end gap-2 pt-1">
                                 <button type="button" wire:click="$set('targetNextStage', '')"
@@ -856,7 +856,7 @@
             <!-- SECTION 7: FOLLOW-UP INFORMATION                          -->
             <!-- ========================================================= -->
             <div class="p-4 bg-canvas rounded-xl border border-border space-y-3">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">5 &bull; Follow-up
                         Schedule &amp; History</span>
                     <span class="font-bold text-ink text-[11px]">{{ count($leadFollowups) }} Recorded</span>
@@ -896,7 +896,7 @@
             <!-- ========================================================= -->
             @if($isBuilder)
                 <div class="p-4 bg-rose-50/50 rounded-xl border border-rose-200 space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -925,31 +925,31 @@
                             <div>
                                 <label class="text-[10px] font-semibold text-rose-900 block">Select Replacement Reason <span
                                         class="text-rose-600">*</span></label>
-                                <select wire:model="replacementReasonId"
-                                    class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-white text-ink mt-0.5">
+                                <x-ui.themed-select class="w-full" searchable  wire:model="replacementReasonId"
+                                    trigger-class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-surface text-ink mt-0.5">
                                     <option value="">-- Choose Reason --</option>
                                     @foreach($replacementReasons as $rr)
                                         <option value="{{ $rr->id }}">{{ $rr->label }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.themed-select>
                             </div>
                             <div>
                                 <label class="text-[10px] font-semibold text-rose-900 block">Detailed Remarks for Super
                                     Admin</label>
                                 <textarea wire:model="replacementRemarks" rows="2"
                                     placeholder="Call attempts made, customer feedback, reasons..."
-                                    class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-white text-ink mt-0.5"></textarea>
+                                    class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-surface text-ink mt-0.5"></textarea>
                             </div>
                             <textarea wire:model="replacementSupportingInfo" rows="2"
                                 placeholder="Supporting information (optional)"
-                                class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-white text-ink"></textarea>
+                                class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-surface text-ink"></textarea>
                             <button type="button" wire:click="requestReplacement"
                                 class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition shadow-2xs cursor-pointer">
                                 Request Replacement
                             </button>
                         </div>
                     @else
-                        <div class="p-2.5 rounded bg-white border border-rose-200 text-[11px] text-ink">
+                        <div class="p-2.5 rounded bg-surface border border-rose-200 text-[11px] text-ink">
                             A replacement request has been submitted to Lead Panther Super Admin. You will receive credits back
                             into your wallet once approved.
                         </div>
@@ -1040,7 +1040,7 @@
                     <div class="space-y-2">
                         @forelse($communications as $comm)
                             <div class="p-3 bg-canvas rounded-lg border border-border space-y-1 text-xs">
-                                <div class="flex items-center justify-between">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
                                     <span class="font-bold text-ink uppercase text-[10px]">{{ $comm->channel }}</span>
                                     <span
                                         class="text-muted font-mono text-[10px]">{{ \Carbon\Carbon::parse($comm->sent_at)->format('M d, H:i') }}</span>

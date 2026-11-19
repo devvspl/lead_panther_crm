@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-center space-x-2 text-xs text-muted mb-1">
                 <span>System Administration</span>
@@ -35,13 +35,13 @@
         <x-slot:filters>
             <div class="space-y-3">
                 <label class="block text-xs text-ink">Organization
-                    <select wire:model.live="organizationId" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All organizations</option>@foreach($organizations as $org)<option value="{{ $org->id }}">{{ $org->name }}</option>@endforeach</select>
+                    <x-ui.themed-select class="w-full" searchable  wire:model.live="organizationId" trigger-class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All organizations</option>@foreach($organizations as $org)<option value="{{ $org->id }}">{{ $org->name }}</option>@endforeach</x-ui.themed-select>
                 </label>
                 <label class="block text-xs text-ink">Event Category
-                    <select wire:model.live="eventCategory" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All categories</option>@foreach(['model', 'request', 'livewire', 'api', 'webhook', 'notification', 'access'] as $category)<option value="{{ $category }}">{{ ucfirst($category) }}</option>@endforeach</select>
+                    <x-ui.themed-select class="w-full" searchable  wire:model.live="eventCategory" trigger-class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All categories</option>@foreach(['model', 'request', 'livewire', 'api', 'webhook', 'notification', 'access'] as $category)<option value="{{ $category }}">{{ ucfirst($category) }}</option>@endforeach</x-ui.themed-select>
                 </label>
                 <label class="block text-xs text-ink">Result
-                    <select wire:model.live="eventStatus" class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All results</option><option value="success">Success</option><option value="failure">Failure</option></select>
+                    <x-ui.themed-select class="w-full" searchable  wire:model.live="eventStatus" trigger-class="block w-full border border-border rounded-lg bg-canvas p-2"><option value="">All results</option><option value="success">Success</option><option value="failure">Failure</option></x-ui.themed-select>
                 </label>
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Performing User</label>
@@ -79,7 +79,7 @@
 
                 <div>
                     <label class="text-[11px] font-bold text-ink block mb-1">Subject Entity</label>
-                    <select wire:model.live="subjectType" class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
+                    <x-ui.themed-select class="w-full" searchable  wire:model.live="subjectType" trigger-class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs">
                         <option value="">All Subjects &amp; Targets</option>
                         <optgroup label="Activity &amp; Execution">
                             <option value="Controller">Controllers</option>
@@ -114,7 +114,7 @@
                             <option value="Campaign">Campaign</option>
                             <option value="UploadBatch">UploadBatch</option>
                         </optgroup>
-                    </select>
+                    </x-ui.themed-select>
                 </div>
 
                 <div>

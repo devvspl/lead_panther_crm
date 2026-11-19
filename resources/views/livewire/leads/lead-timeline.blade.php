@@ -106,7 +106,7 @@
 
                                     <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted">
                                         <div class="min-w-0 flex flex-wrap items-center gap-1 break-words">
-                                            <span class="font-semibold text-gray-500">Source:</span>
+                                            <span class="font-semibold text-muted">Source:</span>
                                             <span class="font-medium text-ink">{{ $event['actor'] ?? 'System' }}</span>
                                         </div>
                                         <div class="text-[11px] font-semibold uppercase tracking-wide text-muted break-words">

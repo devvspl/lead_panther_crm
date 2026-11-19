@@ -136,7 +136,7 @@
                 </div>
             </div>
             <button type="button" wire:click="cancelSync"
-                class="px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-blue-800 text-xs font-semibold hover:bg-blue-100 transition shrink-0 cursor-pointer shadow-2xs">
+                class="px-3 py-1.5 rounded-lg border border-blue-300 bg-surface text-blue-800 text-xs font-semibold hover:bg-blue-100 transition shrink-0 cursor-pointer shadow-2xs">
                 Dismiss / Reset Status
             </button>
         </div>
@@ -213,7 +213,7 @@
     @if($activeTab === 'pull')
         <div class="space-y-6">
             <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-6">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
                     <div>
                         <h2 class="text-base font-bold text-ink">Pull Updates from Remote Repository</h2>
                         <p class="text-xs text-muted mt-0.5">Fetches and merges the latest commits from <span
@@ -222,15 +222,15 @@
                     </div>
 
                     <!-- Target Branch Dropdown & Pull Button -->
-                    <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <div class="flex min-w-0 max-w-full items-center gap-2.5 flex-wrap">
                         <div class="flex items-center space-x-2">
                             <span class="text-xs font-semibold text-muted">Target Branch:</span>
-                            <select wire:model.live="selectedBranch"
-                                class="h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-semibold">
+                            <x-ui.themed-select class="max-w-full" searchable  wire:model.live="selectedBranch"
+                                trigger-class="h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-semibold">
                                 @foreach($remoteBranches as $br)
                                     <option value="{{ $br }}">{{ $br }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.themed-select>
                         </div>
 
                         <button type="button" wire:click="startPull" wire:loading.attr="disabled"
@@ -258,7 +258,7 @@
 
                 <div class="lg:col-span-2 space-y-4">
                     <div class="p-4 bg-canvas rounded-xl border border-border space-y-3 text-xs">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-ink uppercase text-[10px] tracking-wider">Latest Local
                                 Commit</span>
                             <span
@@ -318,7 +318,7 @@
                                     </div>
                                 </div>
                                 <button type="button" wire:click="$set('activeTab', 'settings')"
-                                    class="px-3 py-1.5 rounded-lg bg-white border border-red-300 text-red-800 text-xs font-bold hover:bg-red-100 transition shrink-0 cursor-pointer shadow-2xs">
+                                    class="px-3 py-1.5 rounded-lg bg-surface border border-red-300 text-red-800 text-xs font-bold hover:bg-red-100 transition shrink-0 cursor-pointer shadow-2xs">
                                     Open Settings &rarr;
                                 </button>
                             </div>
@@ -343,7 +343,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                     <button type="button" wire:click="runFollowup('migrate')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-ink">Run Migrations</span>
                             <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -355,7 +355,7 @@
 
                     <button type="button" wire:click="runFollowup('seed')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-ink">Run Seeders</span>
                             <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -371,7 +371,7 @@
                     <button type="button" wire:click="runFollowup('clean_dummy')" wire:loading.attr="disabled"
                         wire:confirm="Remove all dummy demo leads, campaigns, clients, projects, demo users, and transactions while keeping required system tables, lead sources, and Super Admin accounts?"
                         class="p-3.5 bg-canvas rounded-xl border border-amber-300 hover:border-amber-500 bg-amber-50/30 text-left transition space-y-1.5 cursor-pointer disabled:opacity-50 shadow-2xs">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-amber-900">Clean Dummy Data</span>
                             <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -385,7 +385,7 @@
 
                     <button type="button" wire:click="runFollowup('composer')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-ink">Composer Install</span>
                             <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -397,7 +397,7 @@
 
                     <button type="button" wire:click="runFollowup('npm')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-ink">Rebuild Assets</span>
                             <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -409,7 +409,7 @@
 
                     <button type="button" wire:click="runFollowup('cache_all')" wire:loading.attr="disabled"
                         class="p-3.5 bg-canvas rounded-xl border border-border text-left hover:border-ink transition space-y-1.5 cursor-pointer disabled:opacity-50">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
                             <span class="font-bold text-xs text-ink">Optimize Cache</span>
                             <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -425,13 +425,13 @@
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/70 text-xs">
                     <div class="flex items-center gap-2">
                         <label for="seederSelector" class="font-bold text-ink whitespace-nowrap">Target Seeder:</label>
-                        <select id="seederSelector" wire:model.live="selectedSeederClass"
-                            class="bg-canvas border border-border rounded-lg px-2.5 py-1 text-xs text-ink font-mono focus:border-ink focus:outline-none">
+                        <x-ui.themed-select class="max-w-full" searchable  id="seederSelector" wire:model.live="selectedSeederClass"
+                            trigger-class="bg-canvas border border-border rounded-lg px-2.5 py-1 text-xs text-ink font-mono focus:border-ink focus:outline-none">
                             <option value="">All Seeders (DatabaseSeeder)</option>
                             @foreach($availableSeeders as $seeder)
                                 <option value="{{ $seeder }}">{{ $seeder }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                     <div class="text-[11px] text-muted flex items-center gap-1.5 font-mono">
                         <span>Command:</span>
@@ -479,7 +479,7 @@
                     </div>
 
                     <!-- 3-Tab Navigation Switcher -->
-                    <div class="inline-flex items-center p-1 bg-canvas rounded-lg border border-border">
+                    <div class="inline-flex flex-wrap max-w-full items-center p-1 bg-canvas rounded-lg border border-border">
                         <button type="button" wire:click="$set('dbManagerTab', 'migrations')"
                             class="px-3.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer {{ $dbManagerTab === 'migrations' ? 'bg-surface text-ink font-bold shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
                             <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -585,12 +585,12 @@
                             <!-- Folder Filter Dropdown -->
                             <div class="flex items-center gap-1.5">
                                 <span class="text-muted text-[11px] font-semibold hidden md:inline">Folder:</span>
-                                <select wire:model.live="testFolderFilter"
-                                    class="py-1 px-2.5 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-1 focus:ring-primary cursor-pointer">
+                                <x-ui.themed-select class="max-w-full" searchable  wire:model.live="testFolderFilter"
+                                    trigger-class="py-1 px-2.5 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-1 focus:ring-primary cursor-pointer">
                                     @foreach($testFolders as $f)
                                         <option value="{{ $f['folder'] }}">{{ $f['label'] }} ({{ $f['count'] }})</option>
                                     @endforeach
-                                </select>
+                                </x-ui.themed-select>
                             </div>
 
                             <!-- Status Filter Pills -->
@@ -1207,7 +1207,7 @@
                                     </div>
                                 </div>
                                 <button type="button" wire:click="$set('activeTab', 'settings')"
-                                    class="px-3 py-1.5 rounded-lg bg-white border border-red-300 text-red-800 text-xs font-bold hover:bg-red-100 transition shrink-0 cursor-pointer shadow-2xs">
+                                    class="px-3 py-1.5 rounded-lg bg-surface border border-red-300 text-red-800 text-xs font-bold hover:bg-red-100 transition shrink-0 cursor-pointer shadow-2xs">
                                     Open Settings &rarr;
                                 </button>
                             </div>
@@ -1229,7 +1229,7 @@
             <!-- Safety Backups Header Panel -->
             @if(!empty($backupBranches))
                 <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <span class="p-1.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1389,7 +1389,7 @@
                 </div>
 
                 <div class="md:col-span-2">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <label class="font-bold text-ink">Personal Access Token (Encrypted) <span
                                 class="text-red-500">*</span></label>
                         @if($hasStoredToken && !$isReplacingToken)
@@ -1480,9 +1480,9 @@
 
     <!-- INTERACTIVE REVERT MODAL -->
     @if($showRevertModal && $selectedCommit)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto overscroll-contain">
             <div
-                class="bg-surface rounded-card border border-border max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95">
+                class="bg-surface rounded-card border border-border max-w-2xl w-full p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <!-- Modal Header -->
                 <div class="flex items-start justify-between pb-4 border-b border-border">
                     <div class="flex items-center gap-3">
@@ -1620,9 +1620,9 @@
 
     <!-- GENERATE NEW TEST MODAL -->
     @if($showGenerateTestModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto overscroll-contain">
             <div
-                class="bg-surface rounded-card border border-border max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+                class="bg-surface rounded-card border border-border max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <!-- Modal Header -->
                 <div class="flex items-start justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-3">
@@ -1747,7 +1747,7 @@
             <h3 class="font-bold text-ink">Revert Seeder Data</h3>
             <p class="text-sm text-muted">{{ $seederRevertPreview['class'] }} · Run #{{ $seederRevertPreview['id'] }} · {{ $seederRevertPreview['changes'] }} changes</p>
             <p class="text-xs text-muted">Records created by this run will be removed. Its updates and deletions will be restored. Audit history is retained. Revert stops if affected records have changed or gained dependencies.</p>
-            <table class="w-full text-xs text-left"><thead><tr class="border-b border-border"><th class="py-2">Table</th><th>Change</th><th>Records</th></tr></thead><tbody>@foreach($seederRevertPreview['tables'] as $table)<tr class="border-b border-border"><td class="py-2 font-mono">{{ $table['table_name'] }}</td><td>{{ ucfirst($table['operation']) }}</td><td>{{ $table['count'] }}</td></tr>@endforeach</tbody></table>
+            <div class="max-w-full overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr class="border-b border-border"><th class="py-2">Table</th><th>Change</th><th>Records</th></tr></thead><tbody>@foreach($seederRevertPreview['tables'] as $table)<tr class="border-b border-border"><td class="py-2 font-mono">{{ $table['table_name'] }}</td><td>{{ ucfirst($table['operation']) }}</td><td>{{ $table['count'] }}</td></tr>@endforeach</tbody></table></div>
             @foreach($seederRevertPreview['conflicts'] as $issue)<p class="text-xs text-red-600">{{ $issue }}</p>@endforeach
             <div class="flex justify-end gap-3"><button type="button" wire:click="$set('seederRevertPreview', null)" @click="$dispatch('close-modal', 'revert-seeder-run')" class="border border-border rounded-lg px-3 py-2 text-xs">Cancel</button>@if(!$seederRevertPreview['conflicts'])<button type="button" wire:click="confirmSeederRevert({{ $seederRevertPreview['id'] }})" wire:confirm="Revert the database changes listed for this seeder run?" wire:loading.attr="disabled" class="bg-red-600 text-white rounded-lg px-4 py-2 text-xs font-semibold">Confirm Revert</button>@endif</div>
         </div>

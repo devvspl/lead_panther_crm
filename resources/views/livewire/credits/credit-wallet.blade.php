@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">Credits & Wallet</h1>
             <p class="text-xs text-muted">Manage your lead ingestion credit balance and view transaction history.</p>
@@ -13,9 +13,9 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Live Available Balance Card -->
         <div class="bg-accent text-white rounded-card p-6 shadow-md flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Available Spendable Credits</span>
-                <span class="px-2.5 py-1 text-[10px] font-bold rounded-pill bg-white/10 text-white">Live Wallet</span>
+                <span class="px-2.5 py-1 text-[10px] font-bold rounded-pill bg-surface/10 text-white">Live Wallet</span>
             </div>
             <div>
                 <div class="text-4xl font-black tracking-tight">
@@ -31,7 +31,7 @@
                 </div>
             </div>
             <div class="pt-2">
-                <x-ui.button wire:click="openRechargeModal" variant="secondary" class="bg-white text-ink hover:bg-gray-100 text-xs font-bold">
+                <x-ui.button wire:click="openRechargeModal" variant="secondary" class="bg-surface text-ink hover:bg-canvas text-xs font-bold">
                     + Recharge Credits
                 </x-ui.button>
             </div>
@@ -39,7 +39,7 @@
 
         <!-- Opening Credit Balance Baseline Card -->
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <span class="text-xs font-bold uppercase text-muted tracking-wider">Opening Balance</span>
                 <span class="px-2 py-0.5 text-[10px] font-bold rounded-pill bg-sky-100 text-sky-800 border border-sky-300">Baseline</span>
             </div>
@@ -64,7 +64,7 @@
                 <div class="text-sm font-bold text-ink">{{ $client->name ?? 'Clients Client' }}</div>
                 <div class="text-xs text-muted">{{ $client->billing_email ?? 'billing@client.com' }}</div>
                 <div class="p-2.5 rounded-lg bg-canvas border border-border text-xs space-y-1">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <span class="text-muted">Cost Per Lead:</span>
                         <strong class="text-ink font-mono font-bold">{{ $pricingResolution['formatted'] ?? '10.00 Credits' }}</strong>
                     </div>
@@ -107,8 +107,8 @@
 
     <!-- Recharge Packages Modal -->
     @if($showRechargeModal)
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-surface rounded-card border border-border p-6 max-w-xl w-full shadow-2xl space-y-4">
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 max-w-xl w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between border-b border-border pb-3">
                     <h3 class="text-base font-bold text-ink">Select Credit Recharge Package</h3>
                     <button wire:click="closeRechargeModal" class="text-muted hover:text-ink">
@@ -122,7 +122,7 @@
                             wire:click="$set('selectedPackageId', {{ $pkg->id }})"
                             class="p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $selectedPackageId === $pkg->id ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}"
                         >
-                            <div class="flex items-center justify-between">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
                                 <span class="text-xs font-bold text-ink">{{ $pkg->name }}</span>
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-ink text-white">{{ $pkg->credit_count }} Credits</span>
                             </div>
@@ -142,7 +142,7 @@
 
     <!-- Transactions Table Component -->
     <div class="space-y-2">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Transaction Ledger</h2>
         </div>
 

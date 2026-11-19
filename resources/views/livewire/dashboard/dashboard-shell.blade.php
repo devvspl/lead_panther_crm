@@ -202,7 +202,7 @@
 
         <!-- 3. Primary KPI Cards -->
         <div class="space-y-2">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Key Metrics</h2>
             </div>
 
@@ -253,7 +253,7 @@
 
         <!-- 4. Secondary Metric Groups (4 Summary Cards) -->
         <div class="space-y-2">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Summary by Category</h2>
             </div>
 
@@ -450,7 +450,7 @@
 
                     <div class="pt-2 border-t border-border/70 space-y-1 text-xs">
                         @foreach($adminLeadAnalytics['sources']['labels'] as $idx => $label)
-                            <div class="flex items-center justify-between">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
                                 <span class="flex items-center gap-1.5 text-muted">
                                     <span class="w-2 h-2 rounded-full" style="background-color: {{ $adminLeadAnalytics['sources']['colors'][$idx] ?? '#2563EB' }};"></span>
                                     <span>{{ $label }}</span>
@@ -931,7 +931,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
                     @foreach($adminNotificationMonitoring['channels'] as $chan)
                         <div class="p-3 rounded-lg bg-canvas border border-border space-y-1.5">
-                            <div class="flex items-center justify-between">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
                                 <span class="font-bold text-ink text-xs">{{ $chan['name'] }}</span>
                                 <span class="font-bold text-emerald-600 text-[11px] px-1.5 py-0.2 rounded bg-emerald-50 border border-emerald-200">{{ $chan['success_rate'] }}%</span>
                             </div>
@@ -1411,7 +1411,7 @@
                     <span class="text-[10px] font-bold text-rose-800 uppercase tracking-wider block">Overdue Follow-ups</span>
                     <div class="space-y-1.5 max-h-56 overflow-y-auto">
                         @forelse($builderData['followups']['overdue'] ?? [] as $fu)
-                            <div class="p-2 rounded bg-white border border-rose-200 flex items-center justify-between gap-2 text-xs">
+                            <div class="p-2 rounded bg-surface border border-rose-200 flex items-center justify-between gap-2 text-xs">
                                 <div class="truncate">
                                     <span class="font-bold text-rose-900 block truncate">{{ $fu->lead?->name ?? 'Lead #'.$fu->lead_id }}</span>
                                     <span class="text-[10px] text-rose-700 truncate block">{{ $fu->note ?: 'Pending overdue call' }}</span>
@@ -1596,7 +1596,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <!-- Section A: Today's Follow-ups -->
                 <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold text-ink uppercase tracking-wider">Today's Follow-ups</span>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
@@ -1643,7 +1643,7 @@
 
                 <!-- Section B: Recently Assigned Leads -->
                 <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold text-ink uppercase tracking-wider">Recently Assigned Leads</span>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">

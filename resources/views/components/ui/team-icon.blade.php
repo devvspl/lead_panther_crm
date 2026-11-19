@@ -2,6 +2,9 @@
 {{-- The same 24px outline paths used by Lead Panther navigation and actions. --}}
 <svg {{ $attributes->merge(['class' => 'w-4 h-4 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     @switch($name)
+        @case('project')<path d="M3 12l9-9 9 9M5 10v11h14V10M9 21v-7h6v7" />@break
+        @case('leads')<path d="M9 5H5a2 2 0 00-2 2v13a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2h-4M9 3h6v4H9zM7 12h10M7 16h10" />@break
+        @case('wallet')<path d="M3 7h18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zM16 12h5M16 16h5" />@break
         @case('more')<circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />@break
         @case('close')<path d="M6 6l12 12M6 18L18 6" />@break
         @case('edit')<path d="M11 4H4a1 1 0 00-1 1v15a1 1 0 001 1h15a1 1 0 001-1v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />@break

@@ -1032,19 +1032,16 @@ class OrganizationDetail extends Component
         $totalUsersCount = count($userIds);
         $totalClientsCount = count($clientIds);
         $totalProjectsCount = $projects->count();
-        $totalLeadsCount = Lead::withoutGlobalScopes()
-            ->where(function ($q) use ($clientIds, $userIds) {
-                if (!empty($clientIds)) {
-                    $q->whereIn('client_id', $clientIds);
-                }
-                if (!empty($userIds)) {
-                    $q->orWhereIn('assigned_to', $userIds);
-                }
-            })->count();
-
-        $directlyAssignedLeadsCount = Lead::withoutGlobalScopes()
-            ->whereIn('assigned_to', $userIds)
-            ->count();
+        $activeMemberIds = User::where('organization_id', $orgId)->where('status', 'active')
+            ->whereHas('roles')->pluck('id');
+        $activeTeamMembersCount = $activeMemberIds->count();
+        $activeProjectsCount = $projects->where('status', 'active')->count();
+        // Owner IDs are users in this organization. An unrelated lead's assignee
+        // must never make that lead part of this client's received-lead total.
+        $organizationLeads = Lead::withoutGlobalScopes()->whereIn('client_id', $userIds)
+            ->whereNotIn('status', ['inactive', 'deleted']);
+        $totalLeadsCount = (clone $organizationLeads)->count();
+        $directlyAssignedLeadsCount = (clone $organizationLeads)->whereIn('assigned_to', $activeMemberIds)->count();
 
         $totalWalletBalance = DB::table('client_wallets')
             ->whereIn('client_id', $clientIds)
@@ -1103,6 +1100,8 @@ class OrganizationDetail extends Component
             'creditTransactions' => $creditTransactions,
             'rechargeRequests' => $rechargeRequests,
             'totalUsersCount' => $totalUsersCount,
+            'activeTeamMembersCount' => $activeTeamMembersCount,
+            'activeProjectsCount' => $activeProjectsCount,
             'totalClientsCount' => $totalClientsCount,
             'totalProjectsCount' => $totalProjectsCount,
             'totalLeadsCount' => $totalLeadsCount,

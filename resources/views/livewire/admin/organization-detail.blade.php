@@ -156,91 +156,33 @@
         </div>
     @endif
 
-    <!-- KPI Metric Cards Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <!-- Card 1: Users Count -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-            <div
-                class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Team Members</span>
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
+    <!-- Organization KPIs: tab counts and workflows remain independent. -->
+    @php
+        $overviewMetrics = [
+            ['label' => 'Team Members', 'value' => $activeTeamMembersCount, 'description' => 'Active members', 'icon' => 'team'],
+            ['label' => 'Active Projects', 'value' => $activeProjectsCount, 'description' => 'Currently active', 'icon' => 'project'],
+            ['label' => 'Total Leads', 'value' => $totalLeadsCount, 'description' => 'Client leads', 'icon' => 'leads'],
+            ['label' => 'Assigned Leads', 'value' => $directlyAssignedLeadsCount, 'description' => 'With active members', 'icon' => 'check'],
+            ['label' => 'Available Balance', 'value' => $totalWalletBalance, 'description' => 'Spendable credits', 'icon' => 'wallet', 'balance' => true],
+        ];
+    @endphp
+    <div data-organization-kpis class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-stretch">
+        @foreach($overviewMetrics as $metric)
+            @php $isBalance = $metric['balance'] ?? false; @endphp
+            <div class="min-w-0 p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2 text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <span>{{ $metric['label'] }}</span>
+                    <x-ui.team-icon :name="$metric['icon']" class="text-primary" />
+                </div>
+                <div class="text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value'], $isBalance ? 2 : 0) }}</div>
+                <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted">
+                    <span>{{ $metric['description'] }}</span>
+                    @if($isBalance)
+                        <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Balance' }}</span>
+                    @endif
+                </div>
             </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ $totalUsersCount }}</div>
-            <div class="text-[10px] text-muted">Across all assigned roles</div>
-        </div>
-
-        <!-- Card 2: Clients Count -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-            <div
-                class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Clients</span>
-                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-            </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ $totalClientsCount }}</div>
-            <div class="text-[10px] text-muted">Direct registered clients</div>
-        </div>
-
-        <!-- Card 3: Opening Credit Balance -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-            <div
-                class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Opening Balance</span>
-                <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-            </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 2) }}</div>
-            <div class="text-[10px] text-muted flex items-center justify-between">
-                <span>Baseline allocation</span>
-                <span
-                    class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">Opening</span>
-            </div>
-        </div>
-
-        <!-- Card 4: Available Credit Balance -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-            <div
-                class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Available Balance</span>
-                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div class="text-2xl font-bold font-mono text-emerald-600">{{ number_format($totalWalletBalance, 2) }}</div>
-            <div class="text-[10px] text-muted flex items-center justify-between">
-                <span>Spendable credits</span>
-                <span
-                    class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance > 50 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
-                    {{ $totalWalletBalance > 50 ? 'Sufficient' : 'Low Balance' }}
-                </span>
-            </div>
-        </div>
-
-        <!-- Card 5: Projects & Rate -->
-        <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 lg:col-span-1">
-            <div
-                class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                <span>Projects & Rate</span>
-                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-            </div>
-            <div class="text-2xl font-bold font-mono text-ink">{{ $totalProjectsCount }} <span
-                    class="text-xs font-normal text-muted">Projects</span></div>
-            <div class="text-[10px] text-muted">
-                Cost: <strong
-                    class="text-ink font-mono">{{ $organization->lead_cost !== null ? number_format($organization->lead_cost, 2) . ' Cr (Custom)' : number_format($globalDefaultLeadCost, 2) . ' Cr (Default)' }}</strong>
-            </div>
-        </div>
+        @endforeach
     </div>
 
     <!-- Tabbed Navigation Bar -->

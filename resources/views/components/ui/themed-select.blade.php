@@ -11,6 +11,8 @@
     $wireModel = $attributes->wire('model')->value();
     $alpineModel = $attributes->whereStartsWith('x-model');
     $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value']);
+    $owner = isset($this) && $this instanceof \Livewire\Component ? $this->getId() : 'page';
+    $popupKey = 'select-popup-'.sha1($owner.'|'.($wireModel ?? $alpineModel->first() ?? $attributes->get('id') ?? $attributes->get('name') ?? $placeholder));
 @endphp
 <div x-id="['select-list', 'select-error']" x-modelable="value" {{ $alpineModel }}
     x-data="leadPantherSelect({
@@ -46,7 +48,7 @@
     </button>
     <p x-show="validationMessage" x-cloak :id="$id('select-error')" x-text="validationMessage" class="mt-1 text-xs text-danger"></p>
     <template x-teleport="body">
-        <div x-ref="panel" @click.stop x-show="open" x-cloak :style="panelStyle" @click.outside="if (!$refs.trigger.contains($event.target)) close()"
+        <div wire:key="{{ $popupKey }}" x-ref="panel" @click.stop x-show="open" x-cloak :style="panelStyle" @click.outside="if (!$refs.trigger.contains($event.target)) close()"
             @keydown.escape.stop.prevent="close(true)" @keydown.tab="close()" @keydown.arrow-down.prevent="move(1)" @keydown.arrow-up.prevent="move(-1)" @keydown.enter.prevent="select(filteredOptions[activeIndex])"
             tabindex="-1" role="listbox" :id="$id('select-list')" :aria-label="accessibleLabel"
             class="lp-select-panel fixed z-[100] overflow-y-auto overscroll-contain rounded-card border border-border bg-surface p-1.5 shadow-xl text-xs text-ink focus:outline-none">

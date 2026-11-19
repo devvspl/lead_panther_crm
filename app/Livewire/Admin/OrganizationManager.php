@@ -8,6 +8,11 @@ use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\CreditWallet;
+use App\Models\CreditTransaction;
+use App\Models\AuditLog;
+use App\Models\GeneralSetting;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
@@ -58,32 +63,123 @@ class OrganizationManager extends Component
     public string $newUserPassword = '';
     public ?string $generatedInviteLink = null;
 
+    public array $columnOrder = [];
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
     public function mount(): void
     {
         $this->loadColumnPreferences();
     }
 
-    public function tableColumns(): array
+    private function directoryColumns(): array
     {
         return [
-            ['key' => 'id', 'label' => 'ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'id', 'label' => 'Client ID', 'sortable' => true, 'formatter' => fn($id) => '#ORG-'.str_pad($id, 4, '0', STR_PAD_LEFT), 'class' => 'font-mono text-muted text-xs'],
             ['key' => 'name', 'label' => 'Client Name', 'type' => 'org_name', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'users_count', 'label' => 'Users Count', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink font-mono'],
-            ['key' => 'clients_count', 'label' => 'Projects Count', 'type' => 'text', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted'],
+            ['key' => 'users_count', 'label' => 'Total Users', 'sortable' => true, 'class' => 'font-bold text-ink font-mono'],
+            ['key' => 'projects_count', 'label' => 'Total Projects', 'sortable' => true, 'class' => 'font-mono text-muted'],
+            ['key' => 'available_credits', 'label' => 'Credits (Available / Total)', 'type' => 'html', 'sortable' => true,
+                'render' => fn($org) => view('components.ui.client-directory-credits', ['organization' => $org])->render()],
             [
                 'key' => 'status',
-                'label' => 'Status',
+                'label' => 'Account Status',
                 'type' => 'badge',
                 'sortable' => true,
                 'priority' => 1,
                 'badgeMap' => [
-                    'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                    'suspended' => 'bg-red-50 text-red-700 border border-red-200',
+                    'active' => 'bg-success/10 text-success border border-success/20',
+                    'suspended' => 'bg-danger/10 text-danger border border-danger/20',
                 ]
             ],
-            ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
-            ['key' => 'actions', 'label' => 'Actions', 'type' => 'org_actions', 'priority' => 1],
+            ['key' => 'created_at', 'label' => 'Created Date', 'type' => 'date', 'sortable' => true],
+            ['key' => 'last_login', 'label' => 'Last Login', 'sortable' => true, 'formatter' => fn($date) => $date ? Carbon::parse($date)->format('M d, Y h:i A') : 'Never logged in', 'class' => 'text-xs text-muted'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'html', 'mobileClass' => 'col-span-2 pt-2 border-t border-border',
+                'render' => fn($org) => view('components.ui.client-directory-actions', ['organization' => $org])->render()],
         ];
+    }
+
+    public function tableColumns(): array
+    {
+        $columns = collect($this->directoryColumns())->keyBy('key');
+        $order = array_values(array_unique(array_merge(array_intersect($this->columnOrder, $columns->keys()->all()), $columns->keys()->all())));
+        return array_map(fn($key) => $columns[$key], $order);
+    }
+
+    // Reuse the existing per-user settings store, preserving explicitly hidden columns.
+    public function loadColumnPreferences(): void
+    {
+        $keys = array_column($this->directoryColumns(), 'key');
+        $saved = json_decode(GeneralSetting::getValue(auth()->id(), 'table_columns_'.$this->getTableIdentifier()) ?: 'null', true);
+        $known = json_decode(GeneralSetting::getValue(auth()->id(), 'table_column_schema_'.$this->getTableIdentifier()) ?: 'null', true);
+        if (is_array($saved) && $saved) {
+            $saved = array_map(fn($key) => $key === 'clients_count' ? 'projects_count' : $key, $saved);
+            $new = is_array($known) ? array_diff($keys, $known) : ['available_credits', 'last_login'];
+            $this->visibleColumns = array_values(array_unique(array_intersect(array_merge($saved, $new), $keys)));
+            if (!$this->visibleColumns) $this->visibleColumns = $keys;
+        } else {
+            $this->visibleColumns = $keys;
+        }
+        $order = json_decode(GeneralSetting::getValue(auth()->id(), 'table_column_order_'.$this->getTableIdentifier()) ?: '[]', true);
+        $this->columnOrder = array_values(array_unique(array_merge(is_array($order) ? array_intersect($order, $keys) : [], $keys)));
+    }
+
+    public function persistColumnPreferences(): void
+    {
+        $keys = array_column($this->directoryColumns(), 'key');
+        GeneralSetting::setValue(auth()->id(), 'table_columns_'.$this->getTableIdentifier(), json_encode(array_values(array_intersect($this->visibleColumns, $keys))));
+        GeneralSetting::setValue(auth()->id(), 'table_column_schema_'.$this->getTableIdentifier(), json_encode($keys));
+        GeneralSetting::setValue(auth()->id(), 'table_column_order_'.$this->getTableIdentifier(), json_encode(array_column($this->tableColumns(), 'key')));
+    }
+
+    public function moveColumn(string $key, int $direction): void
+    {
+        abort_unless(in_array($direction, [-1, 1], true), 422);
+        $order = array_column($this->tableColumns(), 'key');
+        $index = array_search($key, $order, true);
+        abort_if($index === false, 422);
+        $next = $index + $direction;
+        if (isset($order[$next])) {
+            [$order[$index], $order[$next]] = [$order[$next], $order[$index]];
+            $this->columnOrder = $order;
+            $this->persistColumnPreferences();
+        }
+    }
+
+    public function resetColumns(): void
+    {
+        $this->columnOrder = $this->visibleColumns = array_column($this->directoryColumns(), 'key');
+        $this->persistColumnPreferences();
+    }
+
+    public function updatedColumnFilters(): void
+    {
+        $this->resetPage();
+        $this->selectedRows = [];
+        $this->selectAll = false;
+        $this->validate([
+            'columnFilters.projects_min' => 'nullable|integer|min:0', 'columnFilters.projects_max' => 'nullable|integer|min:0',
+            'columnFilters.credits_min' => 'nullable|numeric|min:0', 'columnFilters.credits_max' => 'nullable|numeric|min:0',
+            'columnFilters.created_from' => 'nullable|date_format:Y-m-d', 'columnFilters.created_to' => 'nullable|date_format:Y-m-d',
+        ]);
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        $this->setStatusFilter($this->statusFilter);
+    }
+
+    public function getActiveFilterCountProperty(): int
+    {
+        return ($this->statusFilter !== 'all' ? 1 : 0) + count(array_filter($this->columnFilters, fn($value) => $value !== '' && $value !== null));
+    }
+
+    protected function getCurrentPageRowIds(): array
+    {
+        return $this->getFilteredQuery()->paginate($this->perPage)->pluck('id')->map(fn($id) => (string)$id)->all();
     }
 
     public function quickFilters(): array
@@ -734,53 +830,87 @@ class OrganizationManager extends Component
         }
     }
 
-    protected function getFilteredQuery()
+    protected function getFilteredQuery(): Builder
     {
-        $query = Organization::withCount(['clients', 'users']);
-
-        if (!empty($this->search)) {
-            $query->where('name', 'like', '%' . $this->search . '%');
+        $members = fn() => User::select('id')->whereColumn('users.organization_id', 'organizations.id');
+        // Actual wallet movements: consumption less refunds. Funding/adjustments aren't lead usage.
+        $movement = "CASE WHEN transaction_type IN ('lead_consumption','deduct','reserve') THEN CASE WHEN credit_before > credit_after THEN credit_before-credit_after ELSE 0 END WHEN transaction_type = 'refund' THEN CASE WHEN credit_after > credit_before THEN credit_before-credit_after ELSE 0 END ELSE 0 END";
+        $metrics = Organization::query()->select('organizations.*')->withCount(['users', 'projects'])->addSelect([
+            'available_credits' => CreditWallet::query()->selectRaw('COALESCE(SUM(balance),0)')->whereIn('client_id', $members()),
+            'credits_used' => CreditTransaction::query()->selectRaw("CASE WHEN SUM($movement)>0 THEN SUM($movement) ELSE 0 END")->whereIn('client_id', $members()),
+            'last_login' => AuditLog::query()->selectRaw('MAX(created_at)')->where('action', 'auth.login')->where(function ($q) use ($members) {
+                $q->whereColumn('audit_logs.organization_id', 'organizations.id')->orWhere(function ($q) use ($members) {
+                    $q->whereNull('audit_logs.organization_id')->whereIn('user_id', $members());
+                });
+            }),
+        ]);
+        // Filter derived values without database-specific HAVING behavior.
+        $query = Organization::query()->fromSub($metrics, 'organizations')->select('organizations.*');
+        $search = trim($this->search);
+        if ($search !== '') {
+            $id = preg_match('/^(?:#?ORG-?)?#?0*(\d+)$/i', $search, $match) ? (int)$match[1] : null;
+            $query->where(function ($q) use ($search, $id) {
+                $q->where('organizations.name', 'like', '%'.$search.'%')
+                    ->orWhereHas('users', fn($users) => $users->where('email', 'like', '%'.$search.'%'));
+                if ($id !== null) $q->orWhere('organizations.id', $id);
+            });
         }
-
-        if ($this->statusFilter === 'active') {
-            $query->where('status', 'active');
-        } elseif ($this->statusFilter === 'suspended') {
-            $query->where('status', 'suspended');
+        if (in_array($this->statusFilter, ['active', 'suspended'], true)) $query->where('organizations.status', $this->statusFilter);
+        foreach (['projects_min' => ['projects_count', '>='], 'projects_max' => ['projects_count', '<='], 'credits_min' => ['available_credits', '>='], 'credits_max' => ['available_credits', '<=']] as $key => [$column, $operator]) {
+            $value = $this->columnFilters[$key] ?? '';
+            if (is_numeric($value) && (float)$value >= 0) $query->whereRaw("CAST($column AS DECIMAL(18,2)) $operator ?", [(float)$value]);
         }
-
-        if (!empty($this->sortField)) {
-            $query->orderBy($this->sortField, $this->sortDirection);
-        } else {
-            $query->latest('id');
+        foreach (['created_from' => '>=', 'created_to' => '<='] as $key => $operator) {
+            $date = $this->columnFilters[$key] ?? '';
+            $parsed = is_string($date) ? \DateTimeImmutable::createFromFormat('!Y-m-d', $date) : false;
+            if ($parsed && $parsed->format('Y-m-d') === $date) $query->where('organizations.created_at', $operator, $date.($key === 'created_from' ? ' 00:00:00' : ' 23:59:59'));
         }
+        $sortable = ['id', 'name', 'users_count', 'projects_count', 'available_credits', 'status', 'created_at', 'last_login'];
+        $field = $this->sortField === 'clients_count' ? 'projects_count' : $this->sortField;
+        if (in_array($field, $sortable, true)) $query->orderBy($field, $this->sortDirection === 'asc' ? 'asc' : 'desc');
+        return $query->orderByDesc('organizations.id');
+    }
 
-        return $query;
+    private function creditMetrics(Organization $organization): Organization
+    {
+        $total = round(max(0, (float)$organization->available_credits + (float)$organization->credits_used), 2);
+        $organization->setAttribute('total_credits', $total);
+        $organization->setAttribute('usage_percent', $total > 0 ? round(min(100, (float)$organization->credits_used / $total * 100), 1) : 0);
+        return $organization;
     }
 
     public function render()
     {
-        $organizations = $this->getFilteredQuery()->paginate($this->perPage);
+        $organizations = $this->getFilteredQuery()->paginate($this->perPage)->through(fn($org) => $this->creditMetrics($org));
+        $summary = [
+            'total' => Organization::count(), 'active' => Organization::where('status', 'active')->count(),
+            'suspended' => Organization::where('status', 'suspended')->count(), 'users' => User::whereHas('organization')->count(),
+        ];
         $roles = Role::all();
 
         return view('livewire.admin.organization-manager', [
             'organizations' => $organizations,
+            'summary' => $summary,
             'roles' => $roles,
         ])->layout('layouts.app');
     }
 
-    public function exportExcel()
+    public function exportExcel(bool $selectedOnly = false)
     {
-        $data = $this->getFilteredQuery()->get();
+        $query = $this->getFilteredQuery();
+        if ($selectedOnly) {
+            abort_if(empty($this->selectedRows), 422);
+            $query->whereIn('organizations.id', $this->selectedRows);
+        }
+        $data = $query->get()->map(fn($org) => $this->creditMetrics($org));
         $filename = "clients-directory_" . now()->format('Y-m-d') . ".xlsx";
 
-        $headings = ['Client ID', 'Client Name', 'Users Count', 'Projects Count', 'Status', 'Created At'];
+        $headings = ['Client ID', 'Client Name', 'Total Users', 'Total Projects', 'Available Credits', 'Total Credits', 'Used Credits', 'Usage %', 'Account Status', 'Created Date', 'Last Login'];
         $columns = [
-            'id',
-            'name',
-            'users_count',
-            'clients_count',
-            'status',
-            fn($o) => $o->created_at ? $o->created_at->format('M d, Y H:i') : '',
+            fn($o) => '#ORG-'.str_pad($o->id, 4, '0', STR_PAD_LEFT), 'name', 'users_count', 'projects_count',
+            'available_credits', 'total_credits', 'credits_used', 'usage_percent', 'status',
+            fn($o) => $o->created_at?->format('Y-m-d H:i:s') ?? '',
+            fn($o) => $o->last_login ? Carbon::parse($o->last_login)->format('Y-m-d H:i:s') : '',
         ];
 
         $subtitle = "Exported " . now()->format('d M Y, H:i T');

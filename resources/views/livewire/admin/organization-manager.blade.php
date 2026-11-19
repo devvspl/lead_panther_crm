@@ -19,6 +19,20 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4" aria-label="Client summary">
+        @foreach([
+            ['total','Total Clients','project','text-primary'],
+            ['active','Active Clients','check','text-success'],
+            ['suspended','Suspended Clients','power','text-danger'],
+            ['users','Total Users','team','text-primary'],
+        ] as [$key,$label,$icon,$color])
+            <div class="min-w-0 rounded-card border border-border bg-surface p-4 shadow-2xs">
+                <div class="flex items-start justify-between gap-2"><span class="text-[11px] font-semibold uppercase tracking-wide text-muted">{{ $label }}</span><x-ui.team-icon :name="$icon" :class="$color" /></div>
+                <div class="mt-3 text-2xl font-bold font-mono text-ink">{{ number_format($summary[$key]) }}</div>
+            </div>
+        @endforeach
+    </div>
+
     <!-- Register Clients Modal (Create & Import) -->
     <x-modal name="register-organization-modal" :show="$showCreateOrgModal" maxWidth="3xl">
         <div class="p-5 sm:p-6 space-y-5">
@@ -427,11 +441,37 @@
     <x-ui.advanced-table :columns="$this->tableColumns()" :rows="$organizations" :quickFilters="$this->quickFilters()"
         :activeStatus="$statusFilter" :visibleColumns="$visibleColumns" :sortField="$sortField"
         :sortDirection="$sortDirection" :filterCount="$this->activeFilterCount"
-        searchPlaceholder="Search client name..." emptyTitle="No Clients Found"
+        :showCheckboxes="true" :selectAll="$selectAll" :selectedRows="$selectedRows" :reorderableColumns="true"
+        tableName="client-directory" searchPlaceholder="Search name, client ID, domain or email..." emptyTitle="No Clients Found"
         emptyMessage="No clients match your current search and filters.">
+        <x-slot:filters>
+            <label class="block text-xs text-ink">Account Status
+                <x-ui.themed-select wire:model.live="statusFilter" :options="['all'=>'All statuses','active'=>'Active','suspended'=>'Suspended']" class="mt-1 w-full" />
+            </label>
+            @foreach(['projects'=>['Total Projects','1'], 'credits'=>['Available Credits','0.01']] as $prefix=>[$label,$step])
+                <fieldset class="space-y-1.5"><legend class="text-xs font-semibold text-ink">{{ $label }}</legend>
+                    <div class="grid grid-cols-2 gap-2">
+                        @foreach(['min'=>'Minimum','max'=>'Maximum'] as $suffix=>$bound)
+                            <label class="block text-[11px] text-muted">{{ $bound }}<x-text-input variant="compact" type="number" min="0" :step="$step" wire:model.live.debounce.400ms="columnFilters.{{ $prefix }}_{{ $suffix }}" placeholder="Any" class="mt-1" /></label>
+                        @endforeach
+                    </div>
+                </fieldset>
+            @endforeach
+            <fieldset class="space-y-1.5"><legend class="text-xs font-semibold text-ink">Created Date</legend><div class="grid grid-cols-2 gap-2">
+                <label class="block text-[11px] text-muted">From<x-text-input variant="compact" type="date" wire:model.live="columnFilters.created_from" class="mt-1" /></label>
+                <label class="block text-[11px] text-muted">To<x-text-input variant="compact" type="date" wire:model.live="columnFilters.created_to" class="mt-1" /></label>
+            </div></fieldset>
+            @foreach(['projects_min','projects_max','credits_min','credits_max','created_from','created_to'] as $key)
+                @error('columnFilters.'.$key)<p class="text-xs text-danger">{{ $message }}</p>@enderror
+            @endforeach
+        </x-slot:filters>
         <!-- Primary Action Slot -->
         <x-slot:action>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+                @if(count($selectedRows))
+                    <span class="text-xs text-muted">{{ count($selectedRows) }} selected</span>
+                    <button type="button" wire:click="exportExcel(true)" wire:loading.attr="disabled" title="Export selected clients" class="px-3 py-2 border border-border rounded-lg text-xs font-semibold text-ink hover:bg-canvas">Export Selected</button>
+                @endif
                 <x-ui.export-button target="exportExcel" class="text-xs" />
                 <button type="button" wire:click="openRegisterOrgModal('create')"
                     class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-xs cursor-pointer">

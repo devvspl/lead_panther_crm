@@ -26,11 +26,12 @@
     'skeletonRows' => 5,
     'loading' => false,
     'loadingTarget' => null,
+    'reorderableColumns' => false,
 ])
 
 @php
     $visibleCols = !empty($visibleColumns) ? $visibleColumns : array_map(fn($c) => $c['key'], $columns);
-    $activeColumns = array_filter($columns, fn($c) => in_array($c['key'], $visibleCols));
+    $activeColumns = array_values(array_filter($columns, fn($c) => in_array($c['key'], $visibleCols)));
     $hasFilterConfig = isset($this) && method_exists($this, 'filterConfig') && !empty($this->filterConfig());
     $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || $hasFilterConfig)) || ($showConfigurations && !empty($columns)) || isset($action);
 @endphp
@@ -155,12 +156,18 @@
                                     $colLabel = $col['label'] ?? ucfirst($colKey);
                                     $isChecked = in_array($colKey, $visibleCols);
                                 @endphp
+                                <div class="flex items-center gap-1">
                                 <label
-                                    class="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-canvas text-xs cursor-pointer select-none">
+                                    class="flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-canvas text-xs cursor-pointer select-none">
                                     <span class="text-ink font-medium">{{ $colLabel }}</span>
                                     <input type="checkbox" wire:click="toggleColumn('{{ $colKey }}')" @checked($isChecked)
                                         class="rounded text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer">
                                 </label>
+                                @if($reorderableColumns)
+                                    <button type="button" wire:click="moveColumn('{{ $colKey }}', -1)" @disabled($loop->first) title="Move {{ $colLabel }} up" aria-label="Move {{ $colLabel }} up" class="p-1 text-muted hover:text-primary disabled:opacity-30"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6" /></svg></button>
+                                    <button type="button" wire:click="moveColumn('{{ $colKey }}', 1)" @disabled($loop->last) title="Move {{ $colLabel }} down" aria-label="Move {{ $colLabel }} down" class="p-1 text-muted hover:text-primary disabled:opacity-30"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" /></svg></button>
+                                @endif
+                                </div>
                             @endforeach
                         </div>
                     </div>
@@ -775,7 +782,7 @@
                                 $val = is_object($row) ? data_get($row, $colKey) : ($row[$colKey] ?? null);
                             @endphp
                             <div
-                                class="min-w-0 break-words space-y-0.5 {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
+                                class="min-w-0 break-words space-y-0.5 {{ $col['mobileClass'] ?? '' }} {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
                                 @if(!in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']))
                                     <span class="text-[10px] uppercase font-bold text-muted tracking-wider block">{{ $colLabel }}</span>
                                 @endif

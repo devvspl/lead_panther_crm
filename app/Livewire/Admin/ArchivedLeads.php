@@ -6,10 +6,11 @@ use App\Exports\BaseStyledExport;
 use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\{AuditLog, Lead, User};
 use App\Services\LeadArchiveService;
-use Livewire\Attributes\Locked;
+use Livewire\Attributes\{Layout, Locked};
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
+#[Layout('layouts.app')]
 class ArchivedLeads extends Component
 {
     use HasAdvancedTable;

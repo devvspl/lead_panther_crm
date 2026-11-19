@@ -42,6 +42,14 @@ class LeadArchiveTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_can_open_the_full_archived_leads_page_with_the_existing_layout(): void
+    {
+        $lead = $this->lead();
+        app(LeadArchiveService::class)->archive($lead->id, 'Full-page route check');
+        $this->get(route('admin.archived-leads'))->assertOk()
+            ->assertSee('Archived Leads')->assertSee('sidebar-main')->assertSee($lead->name);
+    }
+
     public function test_archive_and_restore_preserve_data_and_history_and_hold_automatic_assignment(): void
     {
         $lead = $this->lead();

@@ -225,19 +225,15 @@ class ClientLeadManager extends LeadKanban
 
     public function deleteSelectedLeads(): void
     {
-        abort_unless(auth()->user()->can('delete-leads'), 403);
+        \App\Services\LeadArchiveService::authorize();
         $this->assertSelectedLeads($this->selectedRows);
         DB::transaction(function () {
-            foreach ($this->contextLeads()->whereIn('id', $this->selectedRows)->orderBy('id')->lockForUpdate()->get() as $lead) {
-                // Preserve financial references; deletion must not erase billing evidence.
-                if (CreditTransaction::where('lead_id', $lead->id)->exists() || \App\Models\LeadDeliveryItem::where('lead_id', $lead->id)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['selectedRows' => 'Leads with credit transactions or transfer history cannot be deleted.']);
-                AuditLog::create(['user_id' => auth()->id(), 'action' => 'lead.deleted', 'subject_type' => Lead::class, 'subject_id' => $lead->id, 'from_value' => json_encode($lead->getAttributes()), 'created_at' => now()]);
-                $lead->delete();
-            }
+            foreach ($this->selectedRows as $id) app(\App\Services\LeadArchiveService::class)->archive((int)$id, 'Archived through the selected-leads action.');
         });
         $this->selectedRows = [];
         $this->selectAll = false;
-        $this->dispatch('toast', type: 'success', message: 'Selected leads deleted.');
+        $this->dispatch('lead-updated');
+        $this->dispatch('toast', type: 'success', message: 'Selected leads archived.');
     }
 
     public function exportSelectedLeads()

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class LeadCommunication extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     use HasFactory;
 
     protected $guarded = [];

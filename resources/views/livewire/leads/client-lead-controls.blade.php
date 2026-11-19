@@ -24,7 +24,7 @@
             <button type="button" wire:click="changeSelectedStatus" wire:confirm="Change the status of the selected leads?" class="px-3 h-8 bg-ink text-white rounded-lg text-xs font-semibold">Change Status</button>
             <button type="button" wire:click="openBulkAssignModal" class="px-3 h-8 border border-border rounded-lg text-xs font-semibold">Assign / Reassign</button>
             <x-ui.export-button target="exportSelectedLeads" label="Export Selected" />
-            @can('delete-leads')<button type="button" wire:click="deleteSelectedLeads" wire:confirm="Permanently delete the selected leads and their activity records? Leads with credit transactions are protected." class="px-3 h-8 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Delete Selected</button>@endcan
+            @can('delete-leads')<button type="button" wire:click="deleteSelectedLeads" wire:confirm="Archive the selected leads? Their details, assignments and history will be preserved." class="px-3 h-8 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Archive Selected</button>@endcan
             @error('bulkStage')<span class="text-xs text-red-600">{{ $message }}</span>@enderror
             @error('selectedRows')<span class="text-xs text-red-600">{{ $message }}</span>@enderror
         </div>

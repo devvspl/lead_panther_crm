@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     protected $guarded = [];
 
     protected $casts = [

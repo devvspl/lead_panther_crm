@@ -123,7 +123,7 @@ class ClientLeadManagerTest extends TestCase
         }
     }
 
-    public function test_bulk_status_assignment_delete_and_forged_ids(): void
+    public function test_bulk_status_assignment_archive_and_forged_ids(): void
     {
         $executive = User::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
         $executive->assignRole('Executive');
@@ -135,8 +135,9 @@ class ClientLeadManagerTest extends TestCase
         $this->manager()->set('selectedLeadIds', [$this->ours->id])->set('assignUserId', $this->other->client_id)->call('executeAssignment')->assertForbidden();
         $this->manager()->set('selectedRows', [$this->other->id])->call('deleteSelectedLeads')->assertForbidden();
         $this->manager()->set('selectedRows', [$this->ours->id])->call('deleteSelectedLeads')->assertHasNoErrors();
-        $this->assertDatabaseMissing('leads', ['id' => $this->ours->id]);
-        $this->assertDatabaseHas('audit_logs', ['subject_id' => $this->ours->id, 'action' => 'lead.deleted']);
+        $this->assertDatabaseHas('leads', ['id' => $this->ours->id]);
+        $this->assertNotNull(Lead::withoutGlobalScopes()->withArchived()->findOrFail($this->ours->id)->archived_at);
+        $this->assertDatabaseHas('audit_logs', ['subject_id' => $this->ours->id, 'action' => 'lead.archived']);
     }
 
     public function test_import_maps_first_column_validates_rows_and_detects_duplicates(): void
@@ -169,7 +170,7 @@ class ClientLeadManagerTest extends TestCase
         $manager->call('resetFilters')->assertSee('LP-CLIENT-OURS');
     }
 
-    public function test_xlsx_import_and_financial_delete_protection(): void
+    public function test_xlsx_import_and_archiving_preserves_financial_leads(): void
     {
         $sheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet->getActiveSheet()->fromArray([['Mobile', 'Name'], ['9123000022', 'Spreadsheet customer']]);
@@ -185,7 +186,7 @@ class ClientLeadManagerTest extends TestCase
         $this->assertSame(1, $import->instance()->completedBatch->imported_count, json_encode($import->instance()->completedBatch->toArray()));
         $this->assertDatabaseHas('leads', ['name' => 'Spreadsheet customer', 'client_id' => $this->owner->id]);
         \App\Models\CreditTransaction::create(['client_id' => $this->owner->id, 'lead_id' => $this->ours->id, 'credit_before' => 10, 'credit_used' => 1, 'credit_after' => 9, 'transaction_type' => 'deduct', 'created_at' => now()]);
-        $this->manager()->set('selectedRows', [$this->ours->id])->call('deleteSelectedLeads')->assertHasErrors('selectedRows');
+        $this->manager()->set('selectedRows', [$this->ours->id])->call('deleteSelectedLeads')->assertHasNoErrors();
         $this->assertDatabaseHas('leads', ['id' => $this->ours->id]);
     }
 }

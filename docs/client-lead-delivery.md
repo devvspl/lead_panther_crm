@@ -6,6 +6,29 @@ Super Admin → Clients → Client Details → Leads contains Client Delivery. I
 
 Run `php artisan migrate --force`, then `php artisan queue:restart`. Keep the existing minute-based `schedule:run` cron and configured queue worker running. `client-delivery-cycles` starts due plans and recovers unfinished runs; ordinary `release-scheduled-leads` cannot release a lead enrolled in a plan.
 
+### cPanel cron setup
+
+`/artisan-schedule-run` is not an application route. Calling it with curl or wget returns the HTML 404 page and does not run scheduled tasks. Replace that cron entry with the Artisan CLI command; changing the HTTP URL or suppressing its output does not fix scheduling.
+
+In the server terminal, change to the Laravel project root (the folder containing `artisan`), then check PHP and list the scheduled tasks:
+
+```sh
+php -v
+php artisan schedule:list
+```
+
+Generate a cron line using that server's PHP executable and project path:
+
+```sh
+printf '* * * * * %s %s/artisan schedule:run >> %s/storage/logs/scheduler-cron.log 2>&1\n' "$(command -v php)" "$PWD" "$PWD"
+```
+
+In cPanel set Minute, Hour, Day, Month and Weekday to `*`. Paste the generated command after the five stars into Command. Use the PHP CLI version configured for this application. The paths must be server paths, not local Windows paths or a website URL.
+
+Keep only one cron entry invoking this application's scheduler. Do not remove unrelated application cron entries without checking their purpose. The scheduler already starts a bounded queue worker every minute on shared hosting.
+
+After saving, wait at least one minute and inspect `storage/logs/scheduler-cron.log`, `storage/logs/laravel.log` and the application's scheduled-task run history. For an immediate end-to-end check, `php artisan schedule:run -v` runs due tasks, including real delivery and notification work. A successful scheduler invocation does not guarantee a lead delivery: the plan must be active, due, funded and have eligible queued leads. Keep the scheduler cron at every minute even when a client receives one lead every 15 minutes; the delivery plan controls that interval.
+
 ## Operation
 
 Select one or more source leads and choose Push to Client, or use the Push button on an individual table row. Choose an active billing client and its project/campaign, configure settings and confirm consent. Queue All Eligible enrolls the source organization's eligible, undelivered leads. Internal verification must finish before enrollment. Each lead can have only one transfer record. Enrollment does not copy customer records.

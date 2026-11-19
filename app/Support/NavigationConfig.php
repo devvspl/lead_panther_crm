@@ -33,7 +33,7 @@ class NavigationConfig
             'super-admin' => array_merge([
                 'dashboard', 'leads', 'bulk-import', 'distribution', 'credits',
                 'replacements', 'reports', 'integrations', 'organizations', 'users', 'audit-logs', 'notifications',
-                'failed-jobs', 'recharge-queue', 'backups', 'git-sync'
+                'failed-jobs', 'recharge-queue', 'backups', 'git-sync', 'archived-leads'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
                 'dashboard', 'leads', 'team', 'replacements', 'reports'
@@ -95,6 +95,12 @@ class NavigationConfig
         $isBuilder = $roleKey === 'builder';
 
         $allMasterItems = [
+            'archived-leads' => [
+                'key' => 'archived-leads', 'label' => 'Archived Leads',
+                'url' => route('admin.archived-leads'), 'data_nav_route' => 'admin/archived-leads',
+                'data_nav_exact' => 'false', 'section' => 'database',
+                'icon' => '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>',
+            ],
             'dashboard' => [
                 'key' => 'dashboard',
                 'label' => 'Dashboard',

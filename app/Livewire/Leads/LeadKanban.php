@@ -472,7 +472,11 @@ class LeadKanban extends Component
     #[On('lead-updated')]
     public function refreshBoard(): void
     {
-        // Refresh component state
+        if ($this->selectedRows) {
+            $visibleIds = $this->getScopedQuery()->whereIn('id', $this->selectedRows)->pluck('id')->map(fn ($id) => (string)$id)->all();
+            $this->selectedRows = array_values(array_filter($this->selectedRows, fn ($id) => in_array((string)$id, $visibleIds, true)));
+            $this->selectAll = false;
+        }
     }
 
     public function updateLeadStage(int $leadId, string $toStage): void
@@ -1474,7 +1478,7 @@ class LeadKanban extends Component
 
         if ($this->isBuilder && $orgId) {
             $orgUserIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
-            $orgProjectIds = DB::table('leads')
+            $orgProjectIds = DB::table('leads')->whereNull('leads.archived_at')
                 ->join('campaigns', 'leads.campaign_id', '=', 'campaigns.id')
                 ->where(function ($q) use ($orgUserIds) {
                     $q->whereIn('leads.client_id', $orgUserIds)

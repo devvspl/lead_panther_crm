@@ -221,6 +221,7 @@ class LeadDistributionService
      */
     public function distribute(Lead $lead, ?string $forceMethod = null, array $overrideConfig = []): array
     {
+        if (!Lead::withoutGlobalScopes()->whereKey($lead->id)->exists() || ($lead->archive_assignment_hold && !$forceMethod)) return ['assigned_user'=>null, 'method'=>'manual', 'status'=>'held', 'message'=>'Lead is archived or restored with assignment on hold.'];
         $organizationId = $this->resolveLeadOrganizationId($lead);
         if (Organization::find($organizationId)?->assignment_config !== null) {
             return $this->distributeConfiguredLead($lead, $organizationId);
@@ -519,6 +520,7 @@ class LeadDistributionService
             try {
                 $lead->update([
                     'assigned_to' => $user->id,
+                    'archive_assignment_hold' => false,
                     'current_stage' => $newStage,
                     'status' => $newStage,
                 ]);

@@ -22,6 +22,28 @@ class ClientDeliveryTest extends TestCase
     private Campaign $campaign;
     private Campaign $sourceCampaign;
 
+    public function test_archiving_a_queued_lead_stops_delivery_without_losing_transfer_evidence(): void
+    {
+        $ids = $this->leads(2);
+        $plan = $this->plan(['frequency'=>'immediate','quantity'=>2]);
+        $this->service()->enqueueClientLeads($plan,$ids,true,$this->admin);
+        $run = $this->service()->startClientDeliveryCycle($plan->id,true);
+        $this->assertNotNull($run);
+        app(\App\Services\LeadArchiveService::class)->archive($ids[0], 'Pause customer review');
+        $this->assertDatabaseHas('lead_delivery_items',['lead_id'=>$ids[0],'status'=>'pending','run_id'=>null]);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertDatabaseHas('lead_delivery_items',['lead_id'=>$ids[1],'status'=>'sent']);
+        $this->assertDatabaseHas('leads',['id'=>$ids[0],'delivered_at'=>null]);
+        $this->assertSame(0,CreditTransaction::where('lead_id',$ids[0])->count());
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id,true));
+        $this->deleteJson(route('admin.leads.purge',$ids[0]),['confirmed'=>true])->assertUnprocessable();
+        app(\App\Services\LeadArchiveService::class)->restore($ids[0]);
+        $restoredRun = $this->service()->startClientDeliveryCycle($plan->id,true);
+        $this->assertNotNull($restoredRun);
+        $this->service()->processClientDeliveryRun($restoredRun->id);
+        $this->assertDatabaseHas('lead_delivery_items',['lead_id'=>$ids[0],'status'=>'sent']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

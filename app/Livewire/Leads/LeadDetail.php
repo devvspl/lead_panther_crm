@@ -172,6 +172,7 @@ class LeadDetail extends Component
         $this->replacementRemarks = '';
     }
 
+    #[On('lead-archived')]
     public function close(): void
     {
         $this->isOpen = false;

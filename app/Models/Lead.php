@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Lead extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     use ClientScoped, HasFactory;
 
     protected $guarded = [];
@@ -31,6 +33,8 @@ class Lead extends Model
     }
 
     protected $casts = [
+        'archived_at' => 'datetime',
+        'archive_assignment_hold' => 'boolean',
         'first_response_at' => 'datetime',
         'delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
@@ -128,12 +132,12 @@ class Lead extends Model
     public static function generateUniqueLeadCode(string $prefix = 'LP'): string
     {
         $year = date('Y');
-        $maxId = (int) static::withoutGlobalScopes()->max('id');
+        $maxId = (int) \Illuminate\Support\Facades\DB::table('leads')->max('id');
 
         do {
             $maxId++;
             $code = sprintf('%s-%s-%08d', $prefix, $year, $maxId);
-        } while (static::withoutGlobalScopes()->where('lead_code', $code)->exists());
+        } while (\Illuminate\Support\Facades\DB::table('leads')->where('lead_code', $code)->exists());
 
         return $code;
     }
@@ -141,6 +145,10 @@ class Lead extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(User::class, 'client_id');
+    }
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
     }
     public function internalProcessing() { return $this->hasOne(InternalLeadProcessing::class); }
 

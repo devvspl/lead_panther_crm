@@ -138,6 +138,10 @@ Route::middleware(['auth','role:Team Leader|team-leader'])->prefix('team-leader'
     Route::get('/team', BuilderTeamManager::class)->name('team');
 });
 Route::middleware(['auth', 'role:Super Admin|super-admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/archived-leads', \App\Livewire\Admin\ArchivedLeads::class)->name('archived-leads');
+    Route::post('/leads/{id}/archive', [\App\Http\Controllers\Admin\LeadArchiveController::class, 'archive'])->whereNumber('id')->name('leads.archive');
+    Route::post('/archived-leads/{id}/restore', [\App\Http\Controllers\Admin\LeadArchiveController::class, 'restore'])->whereNumber('id')->name('leads.restore');
+    Route::delete('/archived-leads/{id}', [\App\Http\Controllers\Admin\LeadArchiveController::class, 'destroy'])->whereNumber('id')->name('leads.purge');
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/credits', AdminCredits::class)->name('credits');
     Route::get('/webhook-logs', WebhookLogs::class)->name('webhook-logs');

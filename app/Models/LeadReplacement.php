@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class LeadReplacement extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -52,7 +54,7 @@ class LeadReplacement extends Model
 
         return DB::transaction(function () use ($approvedByUserId) {
             $userId = $approvedByUserId ?? auth()->id() ?? 1;
-            $lead = $this->lead;
+            $lead = Lead::withoutGlobalScopes()->whereKey($this->lead_id)->lockForUpdate()->firstOrFail();
 
             // 1. Update replacement record
             $this->update([
@@ -148,6 +150,7 @@ class LeadReplacement extends Model
     public function reject(string $rejectionNote, ?int $rejectedByUserId = null): bool
     {
         return DB::transaction(function () use ($rejectionNote, $rejectedByUserId) {
+            Lead::withoutGlobalScopes()->whereKey($this->lead_id)->lockForUpdate()->firstOrFail();
             $userId = $rejectedByUserId ?? auth()->id() ?? 1;
 
             $this->update([

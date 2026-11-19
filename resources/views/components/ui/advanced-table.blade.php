@@ -381,6 +381,7 @@
                                                 $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                             @endphp
                                             <div class="flex items-center justify-end gap-1">
+                                                <x-ui.lead-archive-menu :id="$actionLeadId" />
                                                 <button type="button"
                                                     @click="$dispatch('open-lead-detail', { id: {{ $actionLeadId }} })"
                                                     class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
@@ -812,6 +813,7 @@
                                             $isSalesUserMob = $actionUserMob && (\App\Support\NavigationConfig::getRoleKey($actionUserMob) === 'sales-executive' || $actionUserMob->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                         @endphp
                                         <div class="flex items-center justify-end gap-1">
+                                            <x-ui.lead-archive-menu :id="$actionLeadIdMob" />
                                             <button type="button"
                                                 @click="$dispatch('open-lead-detail', { id: {{ $actionLeadIdMob }} })"
                                                 class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"

@@ -6,5 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class LeadActivity extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     //
 }

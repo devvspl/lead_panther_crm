@@ -182,7 +182,7 @@ class ClientDeliveryCenter extends Component
 
     protected function historyQuery(bool $filtered = true)
     {
-        $query = LeadDeliveryItem::whereHas('plan', fn ($q) => $q->where('organization_id', $this->organizationId))->with(['lead', 'client', 'project', 'campaign']);
+        $query = LeadDeliveryItem::whereHas('lead')->whereHas('plan', fn ($q) => $q->where('organization_id', $this->organizationId))->with(['lead', 'client', 'project', 'campaign']);
         if (!$filtered) return $query;
         $this->validate(['historyFrom' => 'nullable|date_format:Y-m-d', 'historyTo' => 'nullable|date_format:Y-m-d']);
         return $query->when($this->historyStatus, fn ($q) => $q->where('status', $this->historyStatus))

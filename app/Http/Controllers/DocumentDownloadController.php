@@ -24,6 +24,10 @@ class DocumentDownloadController extends Controller
         // Extract tenant client_id from namespaced path: e.g. "1/42/proposal.pdf"
         $segments = explode('/', ltrim($path, '/'));
         $pathClientId = isset($segments[0]) ? (int) $segments[0] : null;
+        // Lead document URLs must stop working while their lead is archived.
+        if (isset($segments[1]) && ctype_digit($segments[1])) {
+            abort_unless(\App\Models\Lead::withoutGlobalScopes()->whereKey((int)$segments[1])->exists(), 404);
+        }
 
         $user = auth()->user();
 

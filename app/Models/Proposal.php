@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Proposal extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     protected $guarded = [];
 
     protected $casts = [

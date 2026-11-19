@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class LeadStatusHistory extends Model
 {
+    use \App\Traits\HidesArchivedLeads;
+
     protected $table = 'lead_status_history';
     protected $guarded = [];
 

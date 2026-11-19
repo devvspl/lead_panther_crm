@@ -107,7 +107,7 @@ trait ConfiguresTeamAssignment
         return Lead::withoutGlobalScopes()->whereIn('client_id',User::where('organization_id',$orgId)->select('id'))
             ->when($settings['project_ids'], fn ($q) => $q->whereIn('campaign_id', \App\Models\Campaign::withoutGlobalScopes()->whereIn('project_id',$settings['project_ids'])->select('id')))
             ->when($settings['campaign_ids'], fn ($q) => $q->whereIn('campaign_id',$settings['campaign_ids']))
-            ->whereNull('assigned_to')->where('delivery_pending',false)->where('internal_processing_pending',false)->whereNotNull('delivered_at')
+            ->where('archive_assignment_hold', false)->whereNull('assigned_to')->where('delivery_pending',false)->where('internal_processing_pending',false)->whereNotNull('delivered_at')
             ->whereNotIn('status',['duplicate','invalid','rejected','lost','closed_won','replaced']);
     }
 

@@ -23,12 +23,22 @@
             </div>
         @endif
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-            @foreach($stats as $label => $value)<div class="rounded-lg bg-surface border border-border p-3"><div class="text-[10px] uppercase font-semibold text-muted">{{ $label }}</div><div class="mt-1 text-xs font-bold text-ink break-words">{{ $value }}</div></div>@endforeach
+            @foreach($stats as $label => $value)
+                @if($label === 'Delivered' && $run)
+                    <button type="button" wire:click="$dispatch('open-delivered-batch', { organizationId: {{ $organizationId }}, batchId: {{ $run->id }} })" title="View delivered leads in batch #{{ $run->id }}" class="rounded-lg bg-surface border border-border p-3 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-primary">
+                        <span class="block text-[10px] uppercase font-semibold text-muted">Delivered · Batch #{{ $run->id }}</span><span class="block mt-1 text-xs font-bold text-primary">{{ $successes }}</span><span class="block mt-1 text-[10px] text-muted">{{ $value }} delivered overall</span>
+                    </button>
+                @else
+                    <div class="rounded-lg bg-surface border border-border p-3"><div class="text-[10px] uppercase font-semibold text-muted">{{ $label }}</div><div class="mt-1 text-xs font-bold text-ink break-words">{{ $value }}</div></div>
+                @endif
+            @endforeach
         </div>
         @if($run)
-            <div class="text-xs text-ink space-y-2" role="status"><div class="flex flex-wrap gap-x-4 gap-y-1"><strong>Batch #{{ $run->id }} · {{ ucfirst($run->status) }}</strong><span>Total: {{ $run->total }}</span><span>Processed: {{ $processed }}</span><span>Successful: {{ $successes }}</span><span>Failed: {{ $failures }}</span><span>Remaining: {{ $remaining }}</span></div><progress class="w-full h-2 accent-primary" max="{{ max(1, $run->total) }}" value="{{ $processed }}"></progress></div>
+            <div class="text-xs text-ink space-y-2" role="status"><div class="flex flex-wrap gap-x-4 gap-y-1"><strong>Batch #{{ $run->id }} · {{ ucfirst($run->status) }}</strong><span>Total: {{ $run->total }}</span><span>Processed: {{ $processed }}</span><button type="button" wire:click="$dispatch('open-delivered-batch', { organizationId: {{ $organizationId }}, batchId: {{ $run->id }} })" title="View delivered leads in batch #{{ $run->id }}" class="font-semibold text-primary underline underline-offset-2">Successful / Delivered: {{ $successes }}</button><span>Failed: {{ $failures }}</span><span>Remaining: {{ $remaining }}</span></div><progress class="w-full h-2 accent-primary" max="{{ max(1, $run->total) }}" value="{{ $processed }}"></progress></div>
         @endif
     </div>
+
+    <livewire:leads.delivered-batch-leads :organization-id="$organizationId" :key="'delivered-batch-leads-'.$organizationId" />
 
     <details class="rounded-card border border-border bg-surface p-4">
         <summary class="text-sm font-semibold text-ink cursor-pointer">Delivery History & Reports</summary>

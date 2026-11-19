@@ -5,6 +5,7 @@
 ])
 
 @php
+$wireModel = $attributes->wire('model')->value();
 $maxWidth = [
     'sm' => 'sm:max-w-sm',
     'md' => 'sm:max-w-md',
@@ -21,7 +22,7 @@ $maxWidth = [
 
 <div
     x-data="{
-        show: @js($show),
+        show: @if($wireModel) $wire.entangle(@js($wireModel)){{ $attributes->wire('model')->hasModifier('live') ? '.live' : '' }} @else @js($show) @endif,
         returnFocus: null,
         destroy() { window.LeadPantherUI.lock(this.$el, false); },
         focusables() {

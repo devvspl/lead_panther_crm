@@ -520,6 +520,23 @@
                     </button>
                 </section>
 
+                <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-5 rounded-2xl bg-surface border border-border space-y-3">
+                        <h3 class="text-sm font-bold text-ink">Lead Delivery Interval</h3>
+                        <p class="text-xs text-muted">Controls when leads reach the client panel.</p>
+                        <button type="button" wire:click="setTab('campaigns')" class="text-xs font-semibold text-primary">Manage delivery settings</button>
+                    </div>
+                    <form wire:submit="saveExecutiveResponseTime" class="p-5 rounded-2xl bg-surface border border-border space-y-3">
+                        <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response Time</label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-text-input id="executive-response-minutes" type="number" min="1" max="10080" wire:model="executiveResponseMinutes" class="w-28" />
+                            <span class="text-xs text-muted">minutes</span>
+                            <button type="submit" wire:loading.attr="disabled" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-semibold">Save</button>
+                        </div>
+                        @error('executiveResponseMinutes')<p role="alert" class="text-xs text-danger">{{ $message }}</p>@enderror
+                        <p class="text-xs text-muted">First response deadline from assignment. Applies to new assignments.</p>
+                    </form>
+                </section>
                 <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
                 <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
 

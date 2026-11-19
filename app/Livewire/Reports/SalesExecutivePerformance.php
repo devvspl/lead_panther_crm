@@ -24,6 +24,7 @@ class SalesExecutivePerformance extends Component
             ['key' => 'executive_name', 'label' => 'Executive Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
             ['key' => 'assigned_leads', 'label' => 'Leads Assigned', 'class' => 'font-mono', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
             ['key' => 'sla_contacted_rate', 'label' => 'Contacted Within SLA (%)', 'suffix' => '%', 'class' => 'font-mono font-bold text-purple-700', 'sortable' => true, 'priority' => 1],
+            ['key' => 'average_response_minutes', 'label' => 'Average Response (min)', 'sortable' => false, 'priority' => 2],
             ['key' => 'site_visits', 'label' => 'Site Visits Logged', 'class' => 'font-mono', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
             ['key' => 'bookings_closed', 'label' => 'Bookings Closed', 'class' => 'font-mono font-bold text-success', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
         ];
@@ -43,8 +44,8 @@ class SalesExecutivePerformance extends Component
     public function exportExcel()
     {
         $rows = collect($this->getExecutiveData());
-        $headings = ['Sales Executive', 'Leads Assigned', 'Contacted Within SLA (%)', 'Site Visits Logged', 'Bookings Closed'];
-        $columns = ['executive_name', 'assigned_leads', fn ($r) => $r['sla_contacted_rate'].'%', 'site_visits', 'bookings_closed'];
+        $headings = ['Sales Executive', 'Leads Assigned', 'Contacted Within SLA (%)', 'Average Response (min)', 'Site Visits Logged', 'Bookings Closed'];
+        $columns = ['executive_name', 'assigned_leads', fn ($r) => $r['sla_contacted_rate'].'%', 'average_response_minutes', 'site_visits', 'bookings_closed'];
 
         $filename = 'sales-executive-leaderboard_'.now()->format('Y-m-d').'.xlsx';
         $subtitle = 'Exported '.now()->format('d M Y, H:i T')." | Sorted By: {$this->sortField} ({$this->sortDirection})";
@@ -84,15 +85,20 @@ class SalesExecutivePerformance extends Component
             $assignedCount = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id)->count();
             $query = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->where('assigned_to', $exec->id);
             $assigned = (clone $query)->get();
-            $met = $assigned->filter(fn ($lead) => $lead->first_response_at && $lead->client_response_start->diffInMinutes($lead->first_response_at) <= 15)->count();
+            $met = $assigned->filter(fn ($lead) => $lead->sla_badge === 'SLA Met')->count();
             $slaRate = $assignedCount ? round($met / $assignedCount * 100, 1) : 0;
             $leadIds = (clone $query)->select('id');
             $siteVisits = SiteVisit::whereIn('lead_id', clone $leadIds)->where('attendance', 'attended')->count();
             $bookingsClosed = Booking::whereIn('lead_id', clone $leadIds)->where('status', 'confirmed')->count();
+            $history = \App\Models\LeadAssignment::where('assigned_to', $exec->id)->whereNotNull('first_response_at')
+                ->whereIn('lead_id', (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->select('id'))->get();
+            $responseTimes = $history->filter(fn ($a) => $a->assigned_at && $a->first_response_at->gte($a->assigned_at))
+                ->map(fn ($a) => $a->assigned_at->diffInSeconds($a->first_response_at) / 60);
             $data[] = [
                 'executive_name' => $exec->name,
                 'assigned_leads' => $assignedCount,
                 'sla_contacted_rate' => $slaRate,
+                'average_response_minutes' => $responseTimes->isEmpty() ? null : round($responseTimes->avg(), 2),
                 'site_visits' => $siteVisits,
                 'bookings_closed' => $bookingsClosed,
             ];

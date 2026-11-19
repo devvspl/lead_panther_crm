@@ -384,7 +384,7 @@ class NotificationDeliveryService
 
         return match ($key) {
             'email_test' => "Hello " . ($tokens['recipient_name'] ?? 'there') . ",\n\nYour Lead Panther test email reached the configured mail transport. This message uses the active email design.",
-            'lead_assigned' => "Hello {$agent}, you have been assigned lead {$leadName} ({$code}). Please contact them within 15 minutes to meet SLA.",
+            'lead_assigned' => "Hello {$agent}, you have been assigned lead {$leadName} ({$code}). Please contact them before the executive response deadline shown in Lead Panther.",
             'lead_status_changed' => "Lead {$code} status updated to " . ($tokens['new_status'] ?? 'Updated') . ".",
             'lead_replacement_requested' => "Replacement request received for lead {$code}. Reason: " . ($tokens['reason'] ?? 'N/A') . ".",
             'credit_low_alert' => "Alert: Your credit balance is running low (" . ($tokens['balance'] ?? '0') . " credits remaining). Please recharge.",

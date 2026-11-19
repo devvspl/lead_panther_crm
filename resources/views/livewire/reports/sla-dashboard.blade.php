@@ -2,7 +2,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-bold text-ink">Real-time SLA Response Monitoring</h2>
-            <p class="text-xs text-muted">Target: respond within 15 minutes. Pending means the response window is still open. Auto-refreshes every 60 seconds.</p>
+            <p class="text-xs text-muted">Target: each client's configured time from executive assignment. Pending means the response window is still open. Auto-refreshes every 60 seconds.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3 shrink-0">
             <span class="px-2.5 py-1 text-[10px] font-bold rounded-pill bg-green-50 text-green-700 animate-pulse">● Live Poll (60s)</span>

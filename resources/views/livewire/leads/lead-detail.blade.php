@@ -294,13 +294,15 @@
                     <div>
                         <span class="text-[10px] text-muted block">First Response</span>
                         <span class="font-semibold text-ink block mt-0.5">
-                            {{ $lead->first_response_at ? \Carbon\Carbon::parse($lead->first_response_at)->format('M d, H:i') : 'Pending Action' }}
+                            {{ $lead->executive_first_response_at?->format('M d, H:i') ?? 'Pending Action' }}
                         </span>
                     </div>
                     <div>
                         <span class="text-[10px] text-muted block">SLA Compliance</span>
                         <div class="mt-0.5">
                             <x-ui.badge status="{{ $lead->sla_badge }}">{{ $lead->sla_badge }}</x-ui.badge>
+                            <p class="text-[10px] text-muted mt-1">Deadline: {{ $lead->executive_response_due_at?->format('d M H:i') ?? 'Not assigned' }}</p>
+                            @if($lead->executive_response_time !== null)<p class="text-[10px] text-muted">Response: {{ $lead->executive_response_time }} min</p>@endif
                         </div>
                     </div>
                     <div>

@@ -58,6 +58,13 @@ class FirstResponseObserver
             return;
         }
 
+        if (!($model instanceof Lead) || ($event === 'updated' && $model->wasChanged('current_stage'))) {
+            if (!($model instanceof LeadCommunication) || !in_array($model->status, ['failed', 'pending', 'queued'])) {
+                app(\App\Services\ExecutiveResponseService::class)->record($leadId,
+                    $model->user_id ?? auth()->id(), $model->called_at ?? $model->sent_at ?? now());
+            }
+        }
+
         $now = now()->toDateTimeString();
 
         // Atomic DB-level guard prevents race conditions across near-simultaneous activities

@@ -14,11 +14,22 @@ class CheckWebNotificationAlerts extends Command
     public function handle(): int
     {
         $service = app(NotificationDeliveryService::class);
-        Lead::withoutGlobalScopes()->where('delivery_pending', false)->whereNull('first_response_at')
-            ->whereNotNull('delivered_at')->where('delivered_at', '<=', now()->subMinutes(15))
+        Lead::withoutGlobalScopes()->where('delivery_pending', false)->where('internal_processing_pending', false)->whereNull('executive_first_response_at')
+            ->whereNotNull('assigned_to')->whereNotNull('executive_assigned_at')->where('executive_response_due_at', '<=', now()->addMinutes(5))->whereNotNull('delivered_at')
             ->whereNotIn('current_stage', ['closed_won', 'lost', 'invalid', 'replaced', 'rejected'])->chunkById(100, function ($leads) use ($service) {
-                foreach ($leads as $lead) $service->leadAlert($lead, 'sla_breached', 'SLA response overdue',
-                    "Lead {$lead->lead_code} has not received its first response within 15 minutes of delivery.", 'sla:'.$lead->id, 'sla', true);
+                foreach ($leads as $lead) {
+                    $due = $lead->executive_response_due_at;
+                    $minutes = max(1, (int) $lead->executive_assigned_at->diffInMinutes($due));
+                    $warning = $due->copy()->subMinutes(min(5, max(1, (int) ceil($minutes * .2))));
+                    if (now()->lt($warning)) continue;
+                    $breached = now()->gt($due);
+                    $type = $breached ? 'sla_breached' : 'sla_approaching';
+                    $assignmentId = \App\Models\LeadAssignment::where('lead_id', $lead->id)->where('assigned_to', $lead->assigned_to)
+                        ->whereNull('unassigned_at')->latest('id')->value('id');
+                    $service->leadAlert($lead, $type, $breached ? 'Executive response overdue' : 'Executive response deadline approaching',
+                        "Lead {$lead->lead_code}: first response due by {$due->format('d M H:i T')} ({$minutes} minutes from assignment).",
+                        $type.':'.$lead->id.':'.$lead->assigned_to.':'.($assignmentId ?? $lead->executive_assigned_at->timestamp), 'sla', true);
+                }
             });
         Organization::where('status', 'active')->chunkById(100, function ($organizations) use ($service) {
             foreach ($organizations as $org) {

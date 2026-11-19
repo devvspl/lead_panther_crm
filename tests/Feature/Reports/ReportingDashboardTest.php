@@ -60,6 +60,17 @@ class ReportingDashboardTest extends TestCase
         $created=now()->subDay();
         $first=\App\Models\Lead::factory()->create(['client_id'=>$owner->id,'assigned_to'=>$executive->id,'project_id'=>$project->id,'lead_source_id'=>$source->id,'current_stage'=>'closed_won','status'=>'closed_won','lead_cost'=>10,'created_at'=>$created,'first_response_at'=>$created->copy()->addMinutes(5)]);
         $second=\App\Models\Lead::factory()->create(['client_id'=>$owner->id,'assigned_to'=>$executive->id,'project_id'=>$project->id,'lead_source_id'=>$source->id,'current_stage'=>'contacted','status'=>'in_progress','lead_cost'=>30,'created_at'=>$created,'first_response_at'=>$created->copy()->addMinutes(40)]);
+        // These historical fixtures now provide actual assignment snapshots, independent of receipt time.
+        foreach ([[$first, 5], [$second, 40]] as [$lead, $minutes]) {
+            \Illuminate\Support\Facades\DB::table('leads')->where('id', $lead->id)->update([
+                'executive_assigned_at' => $created, 'executive_response_due_at' => $created->copy()->addMinutes(15),
+                'executive_first_response_at' => $created->copy()->addMinutes($minutes),
+                'delivery_pending' => false, 'delivered_at' => $created,
+            ]);
+            \Illuminate\Support\Facades\DB::table('lead_assignments')->where('lead_id', $lead->id)->update([
+                'assigned_at' => $created, 'response_due_at' => $created->copy()->addMinutes(15), 'first_response_at' => $created->copy()->addMinutes($minutes),
+            ]);
+        }
         $unit=\App\Models\ProjectUnit::create(['project_id'=>$project->id,'unit_number'=>'R-101','status'=>'reserved']);
         $booking=\App\Models\Booking::create(['lead_id'=>$first->id,'project_unit_id'=>$unit->id,'booking_amount'=>500,'booked_at'=>now(),'status'=>'confirmed']);
         \App\Models\PaymentReceived::create(['booking_id'=>$booking->id,'amount'=>200,'method'=>'UPI','transaction_id'=>'ACTUAL-001','paid_at'=>now(),'status'=>'completed']);
@@ -76,7 +87,7 @@ class ReportingDashboardTest extends TestCase
         $sourceReport->assertViewHas('chartReportData',fn($rows)=>count($rows)===1 && $rows[0]['total_leads']===2 && (float)$rows[0]['cost_per_lead']===20.0 && (float)$rows[0]['conversion_rate']===50.0);
         $second->update(['lead_cost'=>50]);
         $sourceReport->call('$refresh')->assertViewHas('chartReportData',fn($rows)=>(float)$rows[0]['cost_per_lead']===30.0);
-        Livewire::test(SlaDashboard::class)->assertViewHas('buckets',fn($b)=>$b===['excellent'=>1,'acceptable'=>0,'breached'=>1]);
+        Livewire::test(SlaDashboard::class)->assertViewHas('buckets',['excellent'=>1,'acceptable'=>0,'breached'=>1]);
         Livewire::test(SalesExecutivePerformance::class)->assertViewHas('executives',fn($rows)=>$rows[0]['assigned_leads']===2 && (float)$rows[0]['sla_contacted_rate']===50.0 && $rows[0]['site_visits']===1 && $rows[0]['bookings_closed']===1);
         Livewire::test(FollowupPerformance::class)->assertViewHas('followupData',fn($rows)=>$rows[0]['on_time']===1 && $rows[0]['overdue']===1 && (float)$rows[0]['on_time_rate']===50.0);
         Livewire::test(ReplacementRate::class)->assertViewHas('ratesData',fn($rows)=>count($rows)===1 && $rows[0]['approved_claims']===1 && (float)$rows[0]['replacement_rate']===50.0)->assertViewHas('monthlyTrend',fn($trend)=>(float)end($trend['rates'])===50.0);

@@ -20,6 +20,94 @@ class FirstResponseSlaTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function executiveFixture(int $minutes = 15): array
+    {
+        $org = Organization::create(['name' => 'Response client', 'status' => 'active', 'executive_response_minutes' => $minutes]);
+        $owner = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $exec = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $exec->assignRole('Sales Executive');
+        $source = LeadSource::create(['name' => 'Response tests']);
+        $lead = Lead::create(['client_id' => $owner->id, 'assigned_to' => $exec->id, 'lead_source_id' => $source->id,
+            'lead_code' => Lead::generateUniqueLeadCode(), 'name' => 'Response customer', 'mobile' => '9000012345',
+            'status' => 'assigned', 'current_stage' => 'assigned', 'delivered_at' => now(), 'delivery_pending' => false]);
+        return [$org, $owner, $exec, $lead->fresh()];
+    }
+
+    public function test_client_specific_deadline_and_response_history_survive_reassignment(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        [$org, $owner, $exec, $lead] = $this->executiveFixture(30);
+        $this->assertEquals(30, $lead->executive_assigned_at->diffInMinutes($lead->executive_response_due_at));
+        $this->assertSame('SLA Pending', $lead->sla_badge);
+        $other = User::factory()->create(['organization_id' => $org->id]);
+        LeadCall::create(['lead_id' => $lead->id, 'user_id' => $other->id, 'duration_seconds' => 1, 'outcome' => 'connected', 'called_at' => now()]);
+        $this->assertNull($lead->fresh()->executive_first_response_at);
+        $this->travel(10)->minutes();
+        LeadCall::create(['lead_id' => $lead->id, 'user_id' => $exec->id, 'duration_seconds' => 1, 'outcome' => 'connected', 'called_at' => now()]);
+        $this->assertSame('SLA Met', $lead->fresh()->sla_badge);
+        $this->assertEquals(10, $lead->fresh()->executive_response_time);
+        $previous = \App\Models\LeadAssignment::where('lead_id', $lead->id)->firstOrFail();
+        $lead->refresh()->update(['assigned_to' => $other->id]);
+        $this->assertNull($lead->fresh()->executive_first_response_at);
+        $this->assertNotNull($previous->fresh()->first_response_at);
+        $this->assertNotNull($previous->fresh()->unassigned_at);
+        $this->travel(31)->minutes();
+        $this->assertSame('SLA Breached', $lead->fresh()->sla_badge);
+        LeadCall::create(['lead_id' => $lead->id, 'user_id' => $other->id, 'duration_seconds' => 1, 'outcome' => 'connected', 'called_at' => now()]);
+        $this->assertEquals(31, $lead->fresh()->executive_response_time);
+        $this->assertSame('SLA Breached', $lead->fresh()->sla_badge);
+        $this->assertSame(2, \App\Models\LeadAssignment::where('lead_id', $lead->id)->whereNotNull('first_response_at')->count());
+    }
+
+    public function test_approaching_and_breached_notifications_are_deduplicated_and_stop_after_response(): void
+    {
+        [$org, $owner, $exec, $lead] = $this->executiveFixture();
+        $this->travel(12)->minutes();
+        $this->artisan('notifications:check-operational')->assertExitCode(0);
+        $this->artisan('notifications:check-operational')->assertExitCode(0);
+        $this->assertSame(1, $exec->notifications()->where('data->type', 'sla_approaching')->count());
+        $this->travel(4)->minutes();
+        $this->artisan('notifications:check-operational')->assertExitCode(0);
+        $this->artisan('notifications:check-operational')->assertExitCode(0);
+        $this->assertSame(1, $exec->notifications()->where('data->type', 'sla_breached')->count());
+        LeadCall::create(['lead_id' => $lead->id, 'user_id' => $exec->id, 'duration_seconds' => 1, 'outcome' => 'connected', 'called_at' => now()]);
+        $this->travel(1)->hours();
+        $this->artisan('notifications:check-operational')->assertExitCode(0);
+        $this->assertSame(1, $exec->notifications()->where('data->type', 'sla_breached')->count());
+    }
+
+    public function test_clients_have_independent_targets_and_reports_use_assignment_deadlines(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        [$slowOrg, $owner, $slowExec, $slowLead] = $this->executiveFixture(30);
+        [$fastOrg, $fastOwner, $fastExec, $fastLead] = $this->executiveFixture(5);
+        $this->travel(6)->minutes();
+        $this->assertSame('SLA Pending', $slowLead->fresh()->sla_badge);
+        $this->assertSame('SLA Breached', $fastLead->fresh()->sla_badge);
+        Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        $admin = User::factory()->create(['status' => 'active']); $admin->assignRole('Super Admin');
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\SlaDashboard::class)
+            ->assertViewHas('buckets', fn ($b) => $b['breached'] === 1 && $b['acceptable'] === 1);
+        LeadCall::create(['lead_id' => $slowLead->id, 'user_id' => $slowExec->id, 'duration_seconds' => 1, 'outcome' => 'connected', 'called_at' => now()]);
+        \Livewire\Livewire::test(\App\Livewire\Reports\SlaDashboard::class)
+            ->assertViewHas('buckets', fn ($b) => $b['excellent'] === 1 && $b['breached'] === 1 && $b['acceptable'] === 0);
+    }
+
+    public function test_only_super_admin_can_save_response_minutes_and_delivery_settings_remain_separate(): void
+    {
+        [$org, $owner, $exec, $lead] = $this->executiveFixture();
+        Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        $admin = User::factory()->create(['status' => 'active']); $admin->assignRole('Super Admin');
+        $component = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org]);
+        $component->set('executiveResponseMinutes', 0)->call('saveExecutiveResponseTime')->assertHasErrors('executiveResponseMinutes');
+        $component->set('executiveResponseMinutes', 45)->call('saveExecutiveResponseTime')->assertHasNoErrors();
+        $this->assertEquals(45, $org->fresh()->executive_response_minutes);
+        $this->assertEquals(15, $lead->executive_assigned_at->diffInMinutes($lead->fresh()->executive_response_due_at));
+        \Livewire\Livewire::actingAs($exec)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org])
+            ->assertForbidden();
+        $this->assertEquals(45, $org->fresh()->executive_response_minutes);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

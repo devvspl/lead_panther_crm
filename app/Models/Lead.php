@@ -36,6 +36,9 @@ class Lead extends Model
         'archived_at' => 'datetime',
         'archive_assignment_hold' => 'boolean',
         'first_response_at' => 'datetime',
+        'executive_assigned_at' => 'datetime',
+        'executive_response_due_at' => 'datetime',
+        'executive_first_response_at' => 'datetime',
         'delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
         'delivery_pending' => 'boolean',
@@ -392,19 +395,15 @@ class Lead extends Model
     public function getSlaBadgeAttribute(): string
     {
         if ($this->internal_processing_pending) return 'Internal Processing';
-        $start = $this->client_response_start;
-        if ($this->first_response_at) {
-            if (static::usesSalesPanel() && $start->diffInMinutes($this->first_response_at) > 15) {
-                return 'SLA Breached';
-            }
+        if (!$this->assigned_to || !$this->executive_response_due_at || $this->delivery_pending) return 'SLA Pending';
+        return ($this->executive_first_response_at ?? now())->gt($this->executive_response_due_at) ? 'SLA Breached'
+            : ($this->executive_first_response_at ? 'SLA Met' : 'SLA Pending');
+    }
 
-            return 'SLA Met';
-        }
-        if ($start && Carbon::parse($start)->diffInMinutes(now()) > 15) {
-            return 'SLA Breached';
-        }
-
-        return 'SLA Pending';
+    public function getExecutiveResponseTimeAttribute(): ?float
+    {
+        return $this->executive_assigned_at && $this->executive_first_response_at
+            ? round($this->executive_assigned_at->diffInSeconds($this->executive_first_response_at) / 60, 2) : null;
     }
 
     public function getInternalVerificationAttribute(): string { return $this->internalProcessing?->forwarded_at ? ucfirst($this->internalProcessing->verification_status) : 'Direct delivery'; }

@@ -23,7 +23,7 @@ class SlaDashboard extends Component
             ['key' => 'lead_code', 'label' => 'Lead Code', 'class' => 'font-bold font-mono text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'name', 'label' => 'Lead Name', 'class' => 'font-semibold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'assigned_name', 'label' => 'Assigned To', 'class' => 'text-muted', 'sortable' => false, 'priority' => 2],
-            ['key' => 'created_at', 'label' => 'Ingested At', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
+            ['key' => 'created_at', 'label' => 'Assigned At', 'class' => 'text-muted font-mono text-[11px]', 'sortable' => false, 'priority' => 2],
             ['key' => 'minutes_over', 'label' => 'Minutes Over Target', 'prefix' => '+', 'suffix' => ' mins', 'class' => 'font-mono font-bold text-danger', 'sortable' => false, 'priority' => 1],
             ['key' => 'status_label', 'label' => 'Current SLA Status', 'type' => 'badge', 'badgeStyle' => fn ($val, $row) => (! empty($row['is_unresponded']) ? 'bg-red-100 text-red-800 animate-pulse border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'), 'sortable' => false, 'priority' => 1],
         ];
@@ -32,7 +32,7 @@ class SlaDashboard extends Component
     public function exportExcel()
     {
         $breached = collect($this->getBreachedLeadsData());
-        $headings = ['Lead Code', 'Lead Name', 'Client Name', 'Assigned Executive', 'Created At', 'First Response At', 'Minutes Over SLA', 'SLA Status'];
+        $headings = ['Lead Code', 'Lead Name', 'Client Name', 'Assigned Executive', 'Assigned At', 'First Response At', 'Minutes Over SLA', 'SLA Status'];
         $columns = ['lead_code', 'name', 'client_name', 'assigned_name', 'created_at', 'first_response_at', 'minutes_over', 'status_label'];
 
         $filename = 'first-response-sla-report_'.now()->format('Y-m-d').'.xlsx';
@@ -76,11 +76,7 @@ class SlaDashboard extends Component
         $breached = 0;
 
         foreach ($leads as $lead) {
-            if (! $lead->first_response_at) {
-                $lead->client_response_start->diffInMinutes(now()) > 15 ? $breached++ : $acceptable++;
-            } else {
-                $lead->client_response_start->diffInMinutes($lead->first_response_at) <= 15 ? $excellent++ : $breached++;
-            }
+            match ($lead->sla_badge) { 'SLA Met' => $excellent++, 'SLA Breached' => $breached++, default => $acceptable++ };
         }
 
         return [
@@ -110,21 +106,18 @@ class SlaDashboard extends Component
         $breachedList = [];
 
         foreach ($leads as $l) {
-            $mins = $l->first_response_at
-                ? Carbon::parse($l->client_response_start)->diffInMinutes(Carbon::parse($l->first_response_at))
-                : Carbon::parse($l->client_response_start)->diffInMinutes(now());
-
-            if ($mins > 15) {
+            if ($l->sla_badge === 'SLA Breached') {
+                $minsOver = $l->executive_response_due_at->diffInMinutes($l->executive_first_response_at ?? now());
                 $breachedList[] = [
                     'lead_code' => $l->lead_code,
                     'name' => $l->name,
                     'client_name' => $l->client?->name ?: 'Standard Client',
                     'assigned_name' => $l->assignedTo?->name ?: 'Unassigned',
-                    'created_at' => Carbon::parse($l->client_response_start)->format('M d, H:i'),
-                    'first_response_at' => $l->first_response_at ? Carbon::parse($l->first_response_at)->format('M d, H:i') : 'None',
-                    'minutes_over' => max(0, $mins - 15),
-                    'status_label' => $l->first_response_at ? 'Responded Late' : 'Unresponded',
-                    'is_unresponded' => ! $l->first_response_at,
+                    'created_at' => $l->executive_assigned_at?->format('M d, H:i'),
+                    'first_response_at' => $l->executive_first_response_at?->format('M d, H:i') ?? 'None',
+                    'minutes_over' => round(max(0, $minsOver), 2),
+                    'status_label' => 'SLA Breached',
+                    'is_unresponded' => ! $l->executive_first_response_at,
                 ];
             }
         }

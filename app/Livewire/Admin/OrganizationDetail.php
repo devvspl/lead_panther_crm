@@ -116,6 +116,23 @@ class OrganizationDetail extends Component
     public ?float $orgLeadCost = null;
     public array $deliverySettings = [];
     public string $deliveryTimezone = '';
+    public $executiveResponseMinutes = 15;
+
+    public function saveExecutiveResponseTime(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $this->validate(['executiveResponseMinutes' => 'required|integer|min:1|max:10080']);
+        DB::transaction(function () {
+            $organization = Organization::whereKey($this->organization->id)->lockForUpdate()->firstOrFail();
+            $before = $organization->executive_response_minutes;
+            $organization->update(['executive_response_minutes' => (int) $this->executiveResponseMinutes]);
+            AuditLog::create(['organization_id' => $organization->id, 'user_id' => auth()->id(), 'action' => 'executive_response.configured',
+                'subject_type' => Organization::class, 'subject_id' => $organization->id,
+                'from_value' => json_encode(['minutes' => $before]), 'to_value' => json_encode(['minutes' => (int) $this->executiveResponseMinutes]), 'created_at' => now()]);
+            $this->organization = $organization;
+        });
+        $this->dispatch('toast', type: 'success', message: 'Executive response time saved for new assignments.');
+    }
 
     public function saveDeliveryTimezone(): void
     {
@@ -239,6 +256,7 @@ class OrganizationDetail extends Component
         $this->organization = $organization;
         $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
         $this->deliveryTimezone = $organization->delivery_timezone ?: config('app.timezone');
+        $this->executiveResponseMinutes = $organization->executive_response_minutes ?? 15;
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
         $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;

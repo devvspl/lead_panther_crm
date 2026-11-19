@@ -831,8 +831,8 @@ class LeadKanban extends Component
 
         // SLA Breached Toggle
         if ($this->sla_breached) {
-            $query->whereNull('first_response_at')
-                  ->whereRaw(Lead::clientSlaStartExpression().' < ?', [now()->subMinutes(15)]);
+            $query->where('executive_response_due_at', '<', now())
+                ->where(fn ($q) => $q->whereNull('executive_first_response_at')->orWhereColumn('executive_first_response_at', '>', 'executive_response_due_at'));
         }
 
         // Stage Filter
@@ -870,9 +870,9 @@ class LeadKanban extends Component
             } elseif ($sf === 'pending_credit') {
                 $query->where('current_stage', 'pending_credit');
             } elseif ($sf === 'sla_breached') {
-                $query->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' < ?', [now()->subMinutes(15)]);
+                $query->where('executive_response_due_at', '<', now())->where(fn ($q) => $q->whereNull('executive_first_response_at')->orWhereColumn('executive_first_response_at', '>', 'executive_response_due_at'));
             } elseif ($sf === 'pending_response') {
-                $query->whereNotNull('assigned_to')->whereNull('first_response_at');
+                $query->whereNotNull('assigned_to')->whereNull('executive_first_response_at');
             } elseif ($sf === 'replacement_eligible') {
                 $query->where(fn($q) => $q->where('replacement_status', 'eligible')->orWhereIn('id', LeadReplacement::pluck('lead_id')));
             } elseif ($sf === 'replaced') {
@@ -947,9 +947,9 @@ class LeadKanban extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads,
-                COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
-            ", [Carbon::now()->subMinutes(15)])
+                COUNT(CASE WHEN (executive_first_response_at IS NULL AND executive_response_due_at < ?) OR executive_first_response_at > executive_response_due_at THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL AND executive_first_response_at IS NULL THEN 1 END) as pending_first_response
+            ", [Carbon::now()])
             ->first();
 
         // 2. Previous period aggregated lead metrics
@@ -969,9 +969,9 @@ class LeadKanban extends Component
                 COUNT(CASE WHEN current_stage IN ('booking', 'payment') THEN 1 END) as bookings_leads,
                 COUNT(CASE WHEN current_stage = 'closed_won' OR status = 'closed_won' THEN 1 END) as closed_won_leads,
                 COUNT(CASE WHEN current_stage IN ('lost', 'closed_lost', 'dead', 'rejected') OR status IN ('lost', 'closed_lost', 'rejected') THEN 1 END) as lost_leads,
-                COUNT(CASE WHEN first_response_at IS NULL AND ".Lead::clientSlaStartExpression()." <= ? THEN 1 END) as sla_breached_leads,
-                COUNT(CASE WHEN assigned_to IS NOT NULL AND first_response_at IS NULL THEN 1 END) as pending_first_response
-            ", [$prevStart, Carbon::now()->subDays(max(1, $start->diffInDays($end) + 1))->subMinutes(15)])
+                COUNT(CASE WHEN (executive_first_response_at IS NULL AND executive_response_due_at < ?) OR executive_first_response_at > executive_response_due_at THEN 1 END) as sla_breached_leads,
+                COUNT(CASE WHEN assigned_to IS NOT NULL AND executive_first_response_at IS NULL THEN 1 END) as pending_first_response
+            ", [$prevStart, Carbon::now()->subDays(max(1, $start->diffInDays($end) + 1))])
             ->first();
 
         $currReplacements = LeadReplacement::whereBetween('created_at', [$start, $end])->count();
@@ -1353,9 +1353,9 @@ class LeadKanban extends Component
         $successRate = $totalLeads > 0 ? round(($assignedCount / $totalLeads) * 100, 1) : 0;
 
         // SLA
-        $withinSla = (int) (clone $query)->whereNotNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [now()->subMinutes(15)])->count();
-        $slaBreached = (int) (clone $query)->whereNull('first_response_at')->whereRaw(Lead::clientSlaStartExpression().' <= ?', [now()->subMinutes(15)])->count();
-        $pending1st = (int) (clone $query)->whereNull('first_response_at')->count();
+        $withinSla = (int) (clone $query)->whereNotNull('executive_first_response_at')->whereColumn('executive_first_response_at', '<=', 'executive_response_due_at')->count();
+        $slaBreached = (int) (clone $query)->where('executive_response_due_at', '<', now())->where(fn ($q) => $q->whereNull('executive_first_response_at')->orWhereColumn('executive_first_response_at', '>', 'executive_response_due_at'))->count();
+        $pending1st = (int) (clone $query)->whereNotNull('assigned_to')->whereNull('executive_first_response_at')->count();
 
         // Upcoming Follow-ups (due next 5)
         $leadIds = (clone $query)->pluck('id');

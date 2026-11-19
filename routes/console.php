@@ -71,7 +71,7 @@ Schedule::call(function () {
 
 // Schedule 3: Send Follow-up Due Reminders via WhatsApp/SMS/Email/In-App (Every 15 Minutes)
 app(\App\Services\ScheduledTaskService::class)->command('followup-reminders','followups:check-due')->everyFifteenMinutes();
-app(\App\Services\ScheduledTaskService::class)->command('operational-notifications','notifications:check-operational')->everyFiveMinutes()->withoutOverlapping();
+app(\App\Services\ScheduledTaskService::class)->command('operational-notifications','notifications:check-operational')->everyMinute()->withoutOverlapping();
 
 // Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
 app(\App\Services\ScheduledTaskService::class)->command('team-availability','team:auto-offline')->everyFiveMinutes();

@@ -45,8 +45,18 @@ Configuration changes preserve queued items and their saved destinations. A runn
 
 Delivery history filters and Excel export apply only to the source organization's transfer records. History shows the current transfer state; its History action shows every attempted batch and failure. Leads with transfer history cannot be deleted from the Client Leads bulk action.
 
+## Executive response SLA
+
+Super Admin → Client Overview has a separate **Executive Response Time** setting (default 15 minutes, 1–10080 custom minutes). Delivery interval settings are unchanged. The configured response time is snapshotted when an executive receives a new assignment. Changing the setting applies to future assignments; reassignment starts a new timer and retains the previous assignment's first response history.
+
+The first qualifying call, outbound message/communication or recorded response stage change by the assigned executive records the actual response time. Internal activity and another user's activity cannot satisfy the executive's timer. Lead records and SLA reports show Pending, Met or Breached using the stored assignment deadline. Executive performance includes average response minutes from accessible assignment history.
+
+The existing `notifications:check-operational` scheduled task checks every minute. It sends an approaching alert during the final 20% of the configured window (at least one, at most five minutes), and a breach alert once overdue. Notification keys include lead, executive and assignment timestamp to deduplicate repeated cron/queue runs. Existing in-app notification preferences, browser subscriptions and push queue jobs are reused. Archived, undelivered and internal-processing leads do not receive SLA reminders.
+
+Deploy with `php artisan migrate --force` and `php artisan queue:restart`; retain the existing minute-based scheduler cron. The migration backfills deadlines only where an actual active assignment timestamp is known.
+
 ## Verification
 
-`php vendor/phpunit/phpunit/phpunit tests/Feature/Leads/ClientDeliveryTest.php`
+`php vendor/phpunit/phpunit/phpunit tests/Feature/Leads/ClientDeliveryTest.php tests/Feature/Leads/FirstResponseSlaTest.php`
 
 This test suite uses actual test database records, wallet transactions and the existing release service. Production cron/worker configuration and production database concurrency must also be verified in the deployment environment.

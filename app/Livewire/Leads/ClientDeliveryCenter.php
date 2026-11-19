@@ -86,14 +86,14 @@ class ClientDeliveryCenter extends Component
     public function saveSettings(): void
     {
         $this->persistSettings();
-        $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. Existing queued leads are preserved.');
+        $this->dispatch('toast', type: 'success', message: 'Settings saved. Eligible leads are detected automatically; delivery requires recorded consent.');
     }
 
     public function queueSelected(bool $allEligible = false, bool $startCycle = true): int
     {
         $this->validate(['consentConfirmed' => 'accepted']);
         $ids = $allEligible ? app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->pluck('id')->all() : $this->selectedLeadIds;
-        if (!$ids) throw ValidationException::withMessages(['selectedLeadIds' => 'Select leads from the table, or choose Queue All Eligible.']);
+        if (!$ids) throw ValidationException::withMessages(['selectedLeadIds' => 'Select leads from the table.']);
         $plan = $this->persistSettings();
         $result = app(LeadDistributionService::class)->enqueueClientLeads($plan, $ids, $this->consentConfirmed, auth()->user());
         if ($startCycle && $result['queued'] > 0 && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') $this->launchCycle($plan, false);
@@ -139,15 +139,6 @@ class ClientDeliveryCenter extends Component
     {
         $plan = $this->plan();
         if (!$plan) { $this->showConfiguration = true; return; }
-        $ready = $plan->items()->whereIn('status', ['pending', 'queued'])->whereHas('lead', fn ($q) => $q->whereNotNull('delivery_consent_at'))->exists();
-        if (!$ready) {
-            $ids = app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->pluck('id')->all();
-            if ($ids) {
-                $this->openPush($this->organizationId, $ids);
-                $this->dispatch('toast', type: 'info', message: 'These existing leads are not queued yet. Confirm Push Leads to enroll them for delivery.');
-                return;
-            }
-        }
         $this->launchCycle($plan, true);
     }
     public function control(string $action): void
@@ -219,7 +210,7 @@ class ClientDeliveryCenter extends Component
         $items = $this->historyQuery(false);
         $attempts = $run ? LeadDeliveryAttempt::where('run_id', $run->id) : null;
         $stats = [
-            'Eligible' => app(LeadDistributionService::class)->eligibleClientDeliveryLeads($this->organizationId)->count(),
+            'Ready' => app(LeadDistributionService::class)->readyClientDeliveryLeads($this->organizationId)->count(),
             'Delivered' => (clone $items)->whereNotNull('sent_at')->count(), 'Pending' => (clone $items)->whereIn('status', ['pending', 'queued'])->count(),
             'Failed' => (clone $items)->where('status', 'failed')->count(),
             'Awaiting consent' => (clone $items)->where('status', 'pending')->whereHas('lead', fn ($q) => $q->whereNull('delivery_consent_at'))->count(),

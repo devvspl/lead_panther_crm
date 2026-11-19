@@ -450,21 +450,103 @@ class ClientDeliveryTest extends TestCase
         $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
     }
 
-    public function test_empty_cycle_opens_existing_leads_for_confirmation_then_the_client_sees_delivery(): void
+    public function test_empty_cycle_automatically_enrolls_existing_consented_leads(): void
     {
         Queue::fake();
         $ids = $this->leads(2); // Existing intake predates the saved plan, as in organization 38.
         $plan = $this->plan(['frequency' => 'immediate']);
+        Lead::withoutGlobalScopes()->whereIn('id', $ids)->update(['delivery_consent_at' => now(), 'delivery_consent_by' => $this->admin->id]);
         $this->assertSame(0, $plan->items()->count());
         $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])
-            ->assertSee('Push Existing Leads')->call('runNow')
-            ->assertSet('showConfiguration', true)->assertSet('selectedLeadIds', $ids);
-        $this->assertSame(0, $plan->items()->count()); // Opening the confirmation does not share data or charge.
-        $component->call('pushLeads')->assertHasNoErrors();
+            ->assertSee('Send Cycle Now')->assertDontSee('Queue All Eligible')->call('runNow')
+            ->assertSet('showConfiguration', false)->assertHasNoErrors();
+        $this->assertSame(2, $plan->items()->count());
         $run = $plan->runs()->firstOrFail();
         (new \App\Jobs\ProcessClientDeliveryRun($run->id))->handle($this->service());
         $this->actingAs(User::findOrFail($this->destination->id));
         $this->assertSame(2, Lead::panelQuery()->whereIn('id', $ids)->count());
+    }
+
+    public function test_automatic_discovery_preserves_consent_and_verification_and_respects_batch_interval_and_limit(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(4);
+        Lead::withoutGlobalScopes()->whereIn('id', [$ids[0], $ids[1], $ids[3]])->update(['delivery_consent_at' => now(), 'delivery_consent_by' => $this->admin->id]);
+        Lead::withoutGlobalScopes()->whereKey($ids[3])->update(['internal_processing_pending' => true]);
+        $plan = $this->plan(['quantity' => 1, 'daily_limit' => 1]);
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertSame(1, $run->total);
+        $this->assertSame(3, $plan->items()->count());
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->assertSame(3, $plan->items()->count());
+        $this->assertSame(1, $plan->items()->whereNotNull('sent_at')->count());
+        $this->assertNull(Lead::withoutGlobalScopes()->find($ids[2])->delivery_consent_at);
+        $this->assertNull(Lead::withoutGlobalScopes()->find($ids[2])->delivered_at);
+        $this->assertNull(Lead::withoutGlobalScopes()->find($ids[3])->delivered_at);
+        $this->travel(31)->minutes();
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(1)->days();
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertNotNull($run);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertSame(2, $plan->items()->whereNotNull('sent_at')->count());
+    }
+
+    public function test_automatic_retry_recovers_credits_without_duplicate_delivery_and_keeps_batch_history(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(1);
+        Lead::withoutGlobalScopes()->whereIn('id', $ids)->update(['delivery_consent_at' => now(), 'delivery_consent_by' => $this->admin->id]);
+        $plan = $this->plan(['frequency' => 'immediate', 'daily_enabled' => false, 'daily_limit' => null]);
+        CreditWallet::where('client_id', $this->destination->id)->update(['balance' => 0]);
+        $first = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->service()->processClientDeliveryRun($first->id);
+        $item = $plan->items()->firstOrFail();
+        $this->assertSame('failed', $item->status);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        CreditWallet::where('client_id', $this->destination->id)->update(['balance' => 10000]);
+        $this->travel(2)->minutes();
+        $retry = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertNotNull($retry);
+        $this->service()->processClientDeliveryRun($retry->id);
+        $this->assertSame('sent', $item->fresh()->status);
+        $this->assertSame(2, $item->attemptHistory()->count());
+        $this->assertSame(1, $item->attemptHistory()->where('run_id', $first->id)->where('status', 'failed')->count());
+        $this->assertSame(1, $item->attemptHistory()->where('run_id', $retry->id)->where('status', 'sent')->count());
+        $balance = CreditWallet::where('client_id', $this->destination->id)->value('balance');
+        $this->travel(2)->minutes();
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->assertSame(1, $plan->items()->count());
+        $this->assertEquals($balance, CreditWallet::where('client_id', $this->destination->id)->value('balance'));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'delivery.auto_enrolled', 'subject_id' => $item->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'delivery.retry_scheduled', 'subject_id' => $item->id]);
+    }
+
+    public function test_automatic_cycles_obey_working_hours_interval_unlimited_capacity_and_pause(): void
+    {
+        Queue::fake();
+        $ids = $this->leads(2);
+        Lead::withoutGlobalScopes()->whereIn('id', $ids)->update(['delivery_consent_at' => now()]);
+        $plan = $this->plan(['frequency' => '15_minutes', 'daily_enabled' => false, 'window_start' => '12:00', 'window_end' => '13:00']);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->assertSame(2, $plan->items()->count());
+        $this->assertSame(0, $plan->runs()->count());
+        $this->assertNull($this->service()->remainingClientDeliveryCapacity($plan));
+        $this->travel(2)->hours();
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertSame(2, $plan->items()->whereNotNull('sent_at')->count());
+        $next = $this->leads(1);
+        Lead::withoutGlobalScopes()->whereIn('id', $next)->update(['delivery_consent_at' => now()]);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->travel(15)->minutes();
+        $this->service()->controlClientDelivery($plan, 'pause', $this->admin);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->service()->controlClientDelivery($plan, 'resume', $this->admin);
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertSame(3, $plan->items()->whereNotNull('sent_at')->count());
     }
 
     public function test_empty_push_does_not_save_a_plan_or_change_delivery_routing(): void

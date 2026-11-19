@@ -5,15 +5,12 @@
             <div class="flex flex-wrap gap-2 text-xs">
                 <button type="button" wire:click="$set('showConfiguration', true)" class="h-8 px-3 rounded-lg border border-border bg-surface font-semibold">Configure Delivery</button>
                 @if($plan)
-                    <button type="button" wire:click="runNow" @if($stats['Pending'] > 0) wire:confirm="Start one delivery cycle using the saved limits and working hours?" @endif class="h-8 px-3 rounded-lg bg-ink text-white font-semibold">{{ $stats['Pending'] == 0 && $stats['Eligible'] > 0 ? 'Push Existing Leads' : 'Send Cycle Now' }}</button>
+                    <button type="button" wire:click="runNow" @if($stats['Pending'] > 0) wire:confirm="Start one delivery cycle using the saved limits and working hours?" @endif class="h-8 px-3 rounded-lg bg-ink text-white font-semibold">Send Cycle Now</button>
                     @if($plan->state === 'active')<button type="button" wire:click="control('pause')" class="h-8 px-3 rounded-lg border border-border bg-surface">Pause</button>@else<button type="button" wire:click="control('resume')" class="h-8 px-3 rounded-lg border border-border bg-surface">Resume</button>@endif
                     <button type="button" wire:click="control('stop')" wire:confirm="Stop this delivery? Unsent leads will remain in the pending queue." class="h-8 px-3 rounded-lg border border-red-200 text-red-700 bg-surface">Stop</button>
                 @endif
             </div>
         </div>
-        @if($stats['Eligible'] > 0 && $stats['Pending'] == 0)
-            <p class="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink">{{ $stats['Eligible'] }} existing lead(s) have not been queued for this delivery plan. Saving settings does not send them. Use Push Existing Leads to confirm the transfer.</p>
-        @endif
         @if($deliveryHealth)
             <div class="space-y-2 text-xs" aria-live="polite">
                 <p class="font-semibold">Ready for delivery: {{ $deliveryHealth['ready'] }} · Awaiting sharing confirmation: {{ $deliveryHealth['awaiting'] }}</p>
@@ -84,12 +81,11 @@
                 </div>
                 <fieldset class="mt-4"><legend class="font-semibold mb-2">Working Days</legend><div class="flex flex-wrap gap-3">@foreach([0=>'Sun',1=>'Mon',2=>'Tue',3=>'Wed',4=>'Thu',5=>'Fri',6=>'Sat'] as $day => $label)<label class="flex items-center gap-1"><input type="checkbox" wire:model="settings.working_days" value="{{ $day }}">{{ $label }}</label>@endforeach</div></fieldset>
             </details>
-            <p class="text-muted">{{ $settings['frequency'] === 'manual' ? 'Push sends one cycle now. New leads wait until you push them.' : 'Delivery runs automatically at the selected frequency.' }} {{ $settings['daily_enabled'] ? 'The daily limit applies.' : 'No daily limit.' }} Existing queues and duplicate protection are preserved.</p>
+            <p class="text-muted">{{ $settings['frequency'] === 'manual' ? 'Push sends one cycle now. Use Send Cycle Now to send ready leads.' : 'Delivery runs automatically at the selected frequency.' }} {{ $settings['daily_enabled'] ? 'The daily limit applies.' : 'No daily limit.' }} Existing queues and duplicate protection are preserved.</p>
             @if($errors->any())<div role="alert" class="rounded-lg border border-red-200 p-3 text-red-700">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
             <div class="flex flex-wrap gap-2 border-t border-border pt-4">
                 <button type="button" wire:click="saveSettings" @if($settings['quantity_mode'] === 'all' || !$settings['daily_enabled']) wire:confirm="Save these settings? {{ $settings['quantity_mode'] === 'all' ? 'Send All is selected.' : '' }} {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" @endif class="px-4 h-9 rounded-lg border border-border font-semibold">Save Settings</button>
                 <button type="button" wire:click="pushLeads" wire:confirm="Push the selected leads to this client? Confirm that you have permission to share them. {{ $settings['quantity_mode'] === 'all' ? 'Send All is selected.' : '' }} {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" class="px-4 h-9 rounded-lg bg-ink text-white font-semibold">Push Leads</button>
-                <button type="button" wire:click="pushLeads(true)" wire:confirm="Queue all eligible leads for this client? Confirm that you have permission to share them. {{ !$settings['daily_enabled'] ? 'The daily limit is off.' : '' }}" class="px-4 h-9 rounded-lg border border-border font-semibold">Queue All Eligible</button>
             </div>
         </div>
     </x-ui.offcanvas>

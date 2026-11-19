@@ -1,7 +1,11 @@
 <div class="space-y-4" wire:poll.5s="$refresh">
-    <div class="rounded-card border border-border bg-canvas p-4 space-y-3">
+    <details wire:ignore.self wire:key="client-delivery-settings-{{ $organizationId }}" class="rounded-card border border-border bg-canvas p-4">
+        <summary class="text-sm font-semibold text-ink cursor-pointer">
+            Client Delivery
+            <span class="block text-xs font-normal text-muted mt-1">{{ $plan ? ucwords(str_replace('_', ' ', $plan->settings['frequency'])).' · '.($plan->settings['quantity_mode'] === 'all' ? 'Send All Available Leads' : $plan->settings['quantity'].' leads per cycle').' · '.ucfirst($plan->state) : 'Configure a destination and schedule to start pushing leads.' }}</span>
+        </summary>
+        <div class="mt-4 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 class="text-sm font-bold text-ink">Client Delivery</h3><p class="text-xs text-muted mt-1">{{ $plan ? ucwords(str_replace('_', ' ', $plan->settings['frequency'])).' · '.($plan->settings['quantity_mode'] === 'all' ? 'Send All Available Leads' : $plan->settings['quantity'].' leads per cycle').' · '.ucfirst($plan->state) : 'Configure a destination and schedule to start pushing leads.' }}</p></div>
             <div class="flex flex-wrap gap-2 text-xs">
                 <button type="button" wire:click="$set('showConfiguration', true)" class="h-8 px-3 rounded-lg border border-border bg-surface font-semibold">Configure Delivery</button>
                 @if($plan)
@@ -33,7 +37,8 @@
         @if($run)
             <div class="text-xs text-ink space-y-2" role="status"><div class="flex flex-wrap gap-x-4 gap-y-1"><strong>Batch #{{ $run->id }} · {{ ucfirst($run->status) }}</strong><span>Total: {{ $run->total }}</span><span>Processed: {{ $processed }}</span><button type="button" wire:click="$dispatch('open-delivered-batch', { organizationId: {{ $organizationId }}, batchId: {{ $run->id }} })" title="View delivered leads in batch #{{ $run->id }}" class="font-semibold text-primary underline underline-offset-2">Successful / Delivered: {{ $successes }}</button><span>Failed: {{ $failures }}</span><span>Remaining: {{ $remaining }}</span></div><progress class="w-full h-2 accent-primary" max="{{ max(1, $run->total) }}" value="{{ $processed }}"></progress></div>
         @endif
-    </div>
+        </div>
+    </details>
 
     <livewire:leads.delivered-batch-leads :organization-id="$organizationId" :key="'delivered-batch-leads-'.$organizationId" />
 

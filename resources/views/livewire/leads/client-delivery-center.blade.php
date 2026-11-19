@@ -13,7 +13,7 @@
         </div>
         @if($deliveryHealth)
             <div class="space-y-2 text-xs" aria-live="polite">
-                <p class="font-semibold">Ready for delivery: {{ $deliveryHealth['ready'] }} · Awaiting sharing confirmation: {{ $deliveryHealth['awaiting'] }}</p>
+                <p class="font-semibold">Ready for delivery: {{ $deliveryHealth['ready'] }} · Awaiting internal approval: {{ $deliveryHealth['awaiting'] }}</p>
                 <p class="text-muted">Client wallet: {{ number_format($deliveryHealth['balance'],2) }} credits · Expected cost per lead: {{ $deliveryHealth['cost'] !== null ? number_format($deliveryHealth['cost'],2) : 'Unavailable' }}</p>
                 @foreach($deliveryHealth['alerts'] as $alert)<p role="status" class="rounded-lg border border-border bg-surface px-3 py-2 {{ $alert['type']==='error' ? 'text-red-700' : ($alert['type']==='warning' ? 'text-amber-700' : 'text-muted') }}">{{ $alert['message'] }}</p>@endforeach
                 <a href="{{ route('admin.git-sync',['tab'=>'tasks']) }}" class="text-primary font-semibold">Open Scheduled Tasks &amp; Worker Monitoring</a>

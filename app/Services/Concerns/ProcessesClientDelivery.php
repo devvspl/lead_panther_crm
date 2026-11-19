@@ -138,12 +138,29 @@ trait ProcessesClientDelivery
 
     public function eligibleClientDeliveryLeads(int $sourceOrganizationId)
     {
+        return $this->applyClientDeliveryApproval($this->clientDeliveryCandidates($sourceOrganizationId), $sourceOrganizationId);
+    }
+
+    protected function clientDeliveryCandidates(int $sourceOrganizationId)
+    {
         return Lead::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $sourceOrganizationId)->select('id'))
-            ->whereNull('delivered_at')->where('internal_processing_pending', false)
+            ->whereNull('delivered_at')
             ->where(fn($q) => $q->whereNull('delivery_plan_id')->orWhereIn('delivery_plan_id', LeadDeliveryPlan::where('organization_id', $sourceOrganizationId)->select('id')))
             ->whereNotIn('id', CreditTransaction::withoutGlobalScopes()->whereNotNull('lead_id')->select('lead_id'))
             ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
             ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']);
+    }
+
+    /** The saved organization switch controls whether internal approval is required. */
+    public function applyClientDeliveryApproval($query, int $organizationId)
+    {
+        $organization = Organization::find($organizationId);
+        if (!$organization) return $query->whereRaw('1 = 0');
+        if (!$organization->internal_processing_enabled) return $query;
+        return $query->whereHas('internalProcessing', fn ($q) => $q->where('organization_id', $organizationId)
+            ->where('verification_status', 'verified')->whereNotNull('verified_at')
+            ->whereNotNull('handover_requested_at')->whereNotNull('handover_requested_by')
+            ->whereIn('status_code', $organization->internal_processing_config['forward_statuses'] ?? []));
     }
 
     protected function clientDeliveryCampaign(LeadDeliveryPlan $plan, Lead $lead): int
@@ -160,6 +177,19 @@ trait ProcessesClientDelivery
     /** Discover intake and older records without manufacturing sharing consent. Caller holds the plan lock. */
     protected function enrollAutomaticClientDelivery(LeadDeliveryPlan $plan): void
     {
+        if (Organization::find($plan->organization_id)?->internal_processing_enabled) {
+            // Intake that predates enabling the switch must enter the existing internal queue too.
+            $this->clientDeliveryCandidates($plan->organization_id)->whereDoesntHave('internalProcessing')
+                ->orderBy('id')->chunkById(100, function ($leads) use ($plan) {
+                    foreach ($leads as $candidate) {
+                        $lead = $this->clientDeliveryCandidates($plan->organization_id)->whereKey($candidate->id)->lockForUpdate()->first();
+                        if (!$lead || $lead->internalProcessing()->exists()) continue;
+                        $lead->update(['internal_processing_pending' => true, 'delivery_pending' => true, 'delivery_plan_id' => $plan->id, 'delivery_at' => null]);
+                        $this->startInternalProcessing($lead);
+                        $this->captureClientDeliveryLead($lead);
+                    }
+                });
+        }
         $this->eligibleClientDeliveryLeads($plan->organization_id)
             ->whereNotIn('id', LeadDeliveryItem::select('lead_id'))
             ->orderBy('id')->chunkById(100, function ($leads) use ($plan) {
@@ -197,7 +227,7 @@ trait ProcessesClientDelivery
             'status' => 'pending',
         ]);
         if ($item->wasRecentlyCreated) $this->deliveryAudit('delivery.intake_captured', $item, [], $item->getAttributes(), $plan->created_by);
-        if ($lead->delivery_consent_at && $plan->state === 'active' && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') {
+        if ($lead->delivery_consent_at && $this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $plan->organization_id)->exists() && $plan->state === 'active' && $plan->settings['automatic'] && $plan->settings['frequency'] === 'immediate') {
             DB::afterCommit(function () use ($plan) {
                 if ($run = $this->startClientDeliveryCycle($plan->id)) \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id);
             });
@@ -264,11 +294,12 @@ trait ProcessesClientDelivery
         $cost = $project ? (float)app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $owner?->organization)['cost'] : null;
         if ($cost !== null && $balance < $cost) $alerts[] = ['type' => 'error', 'message' => 'Insufficient credits: wallet ' . number_format($balance, 2) . ', expected lead cost ' . number_format($cost, 2) . '. Recharge the destination client wallet.'];
         $items = $plan->items();
-        $awaiting = (clone $items)->whereIn('status', ['pending', 'queued'])->whereHas('lead', fn($q) => $q->whereNull('delivery_consent_at'))->count();
+        $awaiting = (clone $items)->whereIn('status', ['pending', 'queued'])
+            ->whereHas('lead', fn ($q) => $q->whereNotIn('id', $this->applyClientDeliveryApproval(Lead::withoutGlobalScopes(), $plan->organization_id)->select('id')))->count();
         $ready = $this->readyClientDeliveryLeads($plan->organization_id)->count();
         if (!$plan->settings['automatic']) $alerts[] = ['type' => 'warning', 'message' => 'Automatic delivery is disabled.'];
         if ($plan->state !== 'active') $alerts[] = ['type' => 'warning', 'message' => 'Delivery is ' . $plan->state . '. Resume it to send leads.'];
-        if ($awaiting) $alerts[] = ['type' => 'warning', 'message' => $awaiting . ' lead(s) await recorded sharing consent. Automatic delivery will not bypass consent.'];
+        if ($awaiting) $alerts[] = ['type' => 'warning', 'message' => $awaiting . ' lead(s) await Internal Processing verification and handover approval.'];
         if ($plan->settings['daily_enabled']) $alerts[] = ['type' => 'info', 'message' => 'Daily limit: ' . $plan->settings['daily_limit'] . ' successful leads. Remaining today: ' . $this->remainingClientDeliveryCapacity($plan) . '.'];
         if ($this->remainingClientDeliveryCapacity($plan) === 0) $alerts[] = ['type' => 'warning', 'message' => 'Daily capacity is exhausted. Pending leads wait until the next delivery day.'];
         $lastFailure = (clone $items)->where('status', 'failed')->whereNotNull('failure_reason')->latest('updated_at')->first();
@@ -292,8 +323,9 @@ trait ProcessesClientDelivery
             ->whereNotIn('id', LeadDeliveryItem::select('lead_id'))->select('id');
         $waiting = LeadDeliveryItem::whereIn('plan_id', LeadDeliveryPlan::where('organization_id', $organizationId)->select('id'))
             ->whereIn('status', ['pending', 'queued'])->select('lead_id');
-        return Lead::withoutGlobalScopes()->where(fn($q) => $q->whereIn('id', $newLeads)->orWhereIn('id', $waiting))
-            ->whereNull('delivered_at')->whereNotNull('delivery_consent_at')->where('internal_processing_pending', false)
+        return $this->applyClientDeliveryApproval(Lead::withoutGlobalScopes(), $organizationId)
+            ->where(fn($q) => $q->whereIn('id', $newLeads)->orWhereIn('id', $waiting))
+            ->whereNull('delivered_at')
             ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
             ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']);
     }
@@ -312,7 +344,7 @@ trait ProcessesClientDelivery
             // with bounded exponential backoff, while retaining every previous attempt.
             if ($plan->settings['automatic']) {
                 $plan->items()->where('status', 'failed')->whereNull('sent_at')
-                    ->whereHas('lead', fn($q) => $q->whereNull('delivered_at')->whereNotNull('delivery_consent_at')->where('internal_processing_pending', false)
+                    ->whereHas('lead', fn($q) => $this->applyClientDeliveryApproval($q, $plan->organization_id)->whereNull('delivered_at')
                         ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
                         ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']))
                     ->orderBy('id')->chunkById(100, function ($items) use ($plan) {
@@ -326,7 +358,7 @@ trait ProcessesClientDelivery
             }
             $s = $plan->settings;
             $capacity = $this->remainingClientDeliveryCapacity($plan);
-            $pending = $plan->items()->where('status', 'pending')->whereHas('lead', fn($q) => $q->whereNotNull('delivery_consent_at'));
+            $pending = $plan->items()->where('status', 'pending')->whereHas('lead', fn($q) => $this->applyClientDeliveryApproval($q, $plan->organization_id));
             $quantity = $s['quantity_mode'] === 'all' ? (clone $pending)->count() : min((int) $s['quantity'], (int) ($s['max_cycle'] ?: $s['quantity']));
             if ($capacity !== null) $quantity = min($quantity, $capacity);
             if ($quantity < 1) {
@@ -368,7 +400,8 @@ trait ProcessesClientDelivery
         $plan = LeadDeliveryPlan::find($lead->delivery_plan_id);
         return $run && $plan && $run->plan_id === $plan->id && in_array($run->status, ['queued', 'running']) && $plan->state === 'active'
             && $this->insideClientDeliveryWindow($plan) && $this->remainingClientDeliveryCapacity($plan) !== 0
-            && $lead->delivery_consent_at && $plan->items()->where('run_id', $runId)->where('lead_id', $lead->id)->where('status', 'queued')->exists();
+            && $this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $plan->organization_id)->exists()
+            && $plan->items()->where('run_id', $runId)->where('lead_id', $lead->id)->where('status', 'queued')->exists();
     }
 
     public function processClientDeliveryRun(int $runId, int $chunkSize = 100): bool
@@ -399,7 +432,8 @@ trait ProcessesClientDelivery
                 $reason = null;
                 if (!$client || !$this->clientDeliveryRecipients()->whereKey($item->client_id)->exists()) $reason = 'Destination client is ineligible or its organization is inactive.';
                 elseif (!$project || $project->client_id !== $client->id || !Campaign::withoutGlobalScopes()->whereKey($item->campaign_id)->where('project_id', $project->id)->exists()) $reason = 'Destination project or campaign mapping is invalid.';
-                elseif (!$lead || !$lead->delivery_consent_at || $lead->internal_processing_pending || $lead->delivered_at) $reason = 'Lead is already delivered, lacks consent, or awaits internal verification.';
+                elseif (!$lead || $lead->delivered_at) $reason = 'Lead is unavailable or already delivered.';
+                elseif (!$this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $plan->organization_id)->exists()) $reason = 'Lead awaits Internal Processing verification and handover approval.';
                 elseif (in_array($lead->status, ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']) || in_array($lead->current_stage, ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])) $reason = 'Lead is no longer eligible.';
                 elseif (Lead::withoutGlobalScopes()->where('client_id', $client->id)->whereNotNull('delivered_at')->where('id', '!=', $lead->id)->where(function ($q) use ($lead) {
                     $digits = preg_replace('/\D/', '', $lead->mobile ?? '');

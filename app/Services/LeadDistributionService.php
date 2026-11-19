@@ -62,7 +62,7 @@ class LeadDistributionService
             $lead->assigned_to = null;
             return;
         }
-        if (!$internalHandover && !$lead->exists && $organization && ($plan = \App\Models\LeadDeliveryPlan::where('organization_id', $organization->id)->first())) {
+        if (($internalHandover || !$lead->exists) && $organization && ($plan = \App\Models\LeadDeliveryPlan::where('organization_id', $organization->id)->first())) {
             // New intake must not bypass this organization's configured batch/manual schedule.
             $lead->delivery_plan_id = $plan->id;
             $lead->delivery_pending = true;
@@ -120,7 +120,11 @@ class LeadDistributionService
                 $project = $campaign ? Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first() : null;
                 $lead = Lead::withoutGlobalScopes()->whereKey($leadId)->lockForUpdate()->first();
                 if ($lead && !$this->plannedReleaseAllowed($lead, $deliveryRunId)) return false;
-                if ($lead?->internal_processing_pending) {
+                $approvalOrganizationId = $lead?->delivery_plan_id
+                    ? \App\Models\LeadDeliveryPlan::find($lead->delivery_plan_id)?->organization_id
+                    : User::find($lead?->client_id)?->organization_id;
+                if ($lead && $approvalOrganizationId && !$this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $approvalOrganizationId)->exists()) return false;
+                if ($lead?->internal_processing_pending && Organization::find($approvalOrganizationId)?->internal_processing_enabled) {
                     $processing = \App\Models\InternalLeadProcessing::where('lead_id', $lead->id)->lockForUpdate()->first();
                     if (! $processing?->handover_requested_at || $processing->forwarded_at) return false;
                 }

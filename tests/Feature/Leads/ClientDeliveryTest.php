@@ -177,7 +177,8 @@ class ClientDeliveryTest extends TestCase
         $plan=$this->plan(['daily_limit'=>5]); $this->leads(2);
         \App\Models\ScheduledTaskRun::create(['task_key'=>'queue-worker','label'=>'Queue worker','expression'=>'* * * * *','timezone'=>'UTC','origin'=>'scheduled','status'=>'failed','error'=>'proc_open unavailable']);
         $health=$this->service()->clientDeliveryHealth($plan);
-        $this->assertSame(2,$health['awaiting']);
+        $this->assertSame(0,$health['awaiting']);
+        $this->assertSame(2,$health['ready']);
         $this->assertStringContainsString('proc_open',collect($health['alerts'])->pluck('message')->implode(' '));
         Livewire::test(ClientDeliveryCenter::class,['organizationId'=>$this->source->organization_id])->assertSee('Queue worker failed')->assertSee('Daily limit: 5');
     }
@@ -321,15 +322,13 @@ class ClientDeliveryTest extends TestCase
         $this->actingAs($this->destination); Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->source->organization_id])->assertForbidden();
     }
 
-    public function test_new_intake_waits_for_consent_and_manual_release(): void
+    public function test_new_intake_with_processing_disabled_waits_only_for_manual_cycle(): void
     {
         $plan = $this->plan(['frequency' => 'manual', 'automatic' => false]);
         $ids = $this->leads(2);
         $this->assertSame(2, $plan->items()->where('status', 'pending')->count());
         $this->assertFalse($this->service()->releaseDelivery($ids[0]));
         $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
-        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id, true));
-        $this->assertSame(['queued' => 2, 'skipped' => 0], $this->service()->enqueueClientLeads($plan, $ids, true, $this->admin));
         $run = $this->cycle($plan);
         $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
         $this->assertFalse($this->service()->processClientDeliveryRun($run->id));
@@ -360,7 +359,7 @@ class ClientDeliveryTest extends TestCase
         $this->assertSame('completed', $run->fresh()->status);
     }
 
-    public function test_rejected_internal_and_unconsented_leads_cannot_be_sent(): void
+    public function test_disabled_processing_does_not_block_on_stale_internal_flags_or_missing_confirmation(): void
     {
         $plan = $this->plan(['quantity_mode' => 'all', 'daily_enabled' => false]);
         $ids = $this->enroll($plan, 3);
@@ -368,9 +367,81 @@ class ClientDeliveryTest extends TestCase
         Lead::withoutGlobalScopes()->find($ids[1])->update(['internal_processing_pending' => true]);
         Lead::withoutGlobalScopes()->find($ids[2])->update(['delivery_consent_at' => null]);
         $this->cycle($plan);
-        $this->assertSame(0, $plan->items()->where('status', 'sent')->count());
-        $this->assertSame(2, $plan->items()->where('status', 'failed')->count());
-        $this->assertSame(1, $plan->items()->where('status', 'pending')->count());
+        $this->assertSame(2, $plan->items()->where('status', 'sent')->count());
+        $this->assertSame(1, $plan->items()->where('status', 'failed')->count());
+        $this->assertSame(0, $plan->items()->where('status', 'pending')->count());
+        $this->assertFalse(Lead::withoutGlobalScopes()->find($ids[1])->internal_processing_pending);
+        $this->assertNull(Lead::withoutGlobalScopes()->find($ids[2])->delivery_consent_at);
+    }
+
+    public function test_enabled_processing_requires_real_verification_and_handover_before_scheduled_delivery(): void
+    {
+        Queue::fake();
+        $id = $this->leads(1)[0];
+        $plan = $this->plan();
+        $this->source->organization->update(['internal_processing_enabled' => true, 'internal_processing_config' => ['forward_statuses' => ['verified']]]);
+        $lead = Lead::withoutGlobalScopes()->findOrFail($id);
+        $lead->update(['internal_processing_pending' => true, 'delivery_consent_at' => now()]);
+        $record = \App\Models\InternalLeadProcessing::create(['lead_id' => $id, 'organization_id' => $plan->organization_id, 'status_code' => 'received']);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $this->assertSame(0, $this->service()->readyClientDeliveryLeads($plan->organization_id)->count());
+        $record->update(['verification_status' => 'verified', 'verified_at' => now(), 'verified_by' => $this->admin->id, 'status_code' => 'verified']);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id, true));
+        $lead->update(['delivery_consent_at' => null]);
+        $this->service()->requestInternalHandover($record->id, $this->admin);
+        $this->assertNotNull($record->fresh()->handover_requested_at);
+        $this->assertSame($plan->id, $lead->fresh()->delivery_plan_id);
+        $this->assertNull($lead->fresh()->delivered_at);
+        $this->assertNull($record->fresh()->forwarded_at);
+        $this->travel(31)->minutes();
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertNotNull($run);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertNotNull($lead->fresh()->delivered_at);
+        $this->assertNotNull($record->fresh()->forwarded_at);
+        $this->assertSame('sent', $plan->items()->firstOrFail()->status);
+        $this->assertNull($lead->fresh()->delivery_consent_at);
+    }
+
+    public function test_enabled_processing_routes_existing_unverified_intake_to_the_internal_queue(): void
+    {
+        Queue::fake();
+        $id = $this->leads(1)[0];
+        $plan = $this->plan();
+        Organization::findOrFail($plan->organization_id)->update(['internal_processing_enabled' => true, 'internal_processing_config' => ['forward_statuses' => ['verified']]]);
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
+        $lead = Lead::withoutGlobalScopes()->findOrFail($id);
+        $this->assertTrue($lead->internal_processing_pending);
+        $this->assertNotNull($lead->internalProcessing);
+        $this->assertNull($lead->internalProcessing->verified_at);
+        $this->assertSame(1, $this->service()->clientDeliveryHealth($plan)['awaiting']);
+        $this->assertNull($lead->delivered_at);
+        $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertSame(1, $plan->items()->count());
+        $this->assertSame(1, \App\Models\InternalLeadProcessing::where('lead_id', $id)->count());
+    }
+
+    public function test_enabling_processing_after_queue_selection_blocks_release_and_disabling_allows_retry(): void
+    {
+        Queue::fake();
+        $id = $this->leads(1)[0];
+        $plan = $this->plan(['frequency' => 'immediate']);
+        $run = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertNotNull($run);
+        $organization = Organization::findOrFail($plan->organization_id);
+        $organization->update(['internal_processing_enabled' => true]);
+        $this->service()->processClientDeliveryRun($run->id);
+        $this->assertNull(Lead::withoutGlobalScopes()->findOrFail($id)->delivered_at);
+        $this->assertSame('failed', $plan->items()->firstOrFail()->status);
+        $this->assertEquals(10000, CreditWallet::where('client_id', $this->destination->id)->value('balance'));
+        $organization->update(['internal_processing_enabled' => false]);
+        $this->assertSame(0, $this->service()->clientDeliveryHealth($plan)['awaiting']);
+        $this->travel(2)->minutes();
+        $retry = $this->service()->startClientDeliveryCycle($plan->id);
+        $this->assertNotNull($retry);
+        $this->service()->processClientDeliveryRun($retry->id);
+        $this->assertNotNull(Lead::withoutGlobalScopes()->findOrFail($id)->delivered_at);
+        $this->assertSame(2, $plan->items()->firstOrFail()->attemptHistory()->count());
     }
 
     public function test_simple_push_prefills_the_destination_and_delivers_through_the_queue_job(): void
@@ -467,7 +538,7 @@ class ClientDeliveryTest extends TestCase
         $this->assertSame(2, Lead::panelQuery()->whereIn('id', $ids)->count());
     }
 
-    public function test_automatic_discovery_preserves_consent_and_verification_and_respects_batch_interval_and_limit(): void
+    public function test_automatic_discovery_with_processing_disabled_respects_batch_interval_and_limit(): void
     {
         Queue::fake();
         $ids = $this->leads(4);
@@ -476,10 +547,10 @@ class ClientDeliveryTest extends TestCase
         $plan = $this->plan(['quantity' => 1, 'daily_limit' => 1]);
         $run = $this->service()->startClientDeliveryCycle($plan->id);
         $this->assertSame(1, $run->total);
-        $this->assertSame(3, $plan->items()->count());
+        $this->assertSame(4, $plan->items()->count());
         $this->service()->processClientDeliveryRun($run->id);
         $this->assertNull($this->service()->startClientDeliveryCycle($plan->id));
-        $this->assertSame(3, $plan->items()->count());
+        $this->assertSame(4, $plan->items()->count());
         $this->assertSame(1, $plan->items()->whereNotNull('sent_at')->count());
         $this->assertNull(Lead::withoutGlobalScopes()->find($ids[2])->delivery_consent_at);
         $this->assertNull(Lead::withoutGlobalScopes()->find($ids[2])->delivered_at);

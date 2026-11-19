@@ -86,7 +86,7 @@ class ClientDeliveryCenter extends Component
     public function saveSettings(): void
     {
         $this->persistSettings();
-        $this->dispatch('toast', type: 'success', message: 'Settings saved. Eligible leads are detected automatically; delivery requires recorded consent.');
+        $this->dispatch('toast', type: 'success', message: 'Settings saved. Internal verification and handover approval are required only when Internal Processing is enabled.');
     }
 
     public function queueSelected(bool $allEligible = false, bool $startCycle = true): int
@@ -209,11 +209,12 @@ class ClientDeliveryCenter extends Component
         $run = $plan?->runs()->latest('id')->first();
         $items = $this->historyQuery(false);
         $attempts = $run ? LeadDeliveryAttempt::where('run_id', $run->id) : null;
+        $deliveryHealth = $plan ? app(LeadDistributionService::class)->clientDeliveryHealth($plan) : null;
         $stats = [
             'Ready' => app(LeadDistributionService::class)->readyClientDeliveryLeads($this->organizationId)->count(),
             'Delivered' => (clone $items)->whereNotNull('sent_at')->count(), 'Pending' => (clone $items)->whereIn('status', ['pending', 'queued'])->count(),
             'Failed' => (clone $items)->where('status', 'failed')->count(),
-            'Awaiting consent' => (clone $items)->where('status', 'pending')->whereHas('lead', fn ($q) => $q->whereNull('delivery_consent_at'))->count(),
+            'Awaiting internal approval' => $deliveryHealth['awaiting'] ?? 0,
             'Sent this cycle' => $attempts ? (clone $attempts)->where('status', 'sent')->count() : 0,
             'Daily capacity' => $plan ? (app(LeadDistributionService::class)->remainingClientDeliveryCapacity($plan) ?? 'Unlimited') : 'Not configured',
             'Next delivery' => $plan?->next_run_at?->format('d M Y H:i T') ?? 'Not scheduled',
@@ -231,7 +232,7 @@ class ClientDeliveryCenter extends Component
             'historyCampaigns' => Campaign::withoutGlobalScopes()->whereIn('id', (clone $items)->select('campaign_id'))->get(),
             'history' => $this->historyQuery()->latest('id')->paginate(10, ['*'], 'deliveryPage'),
             'inspectedItem' => $this->inspectedItemId ? $this->historyQuery(false)->with(['attemptHistory.run'])->find($this->inspectedItemId) : null,
-            'deliveryHealth'=>$plan ? app(LeadDistributionService::class)->clientDeliveryHealth($plan) : null,
+            'deliveryHealth'=>$deliveryHealth,
         ]);
     }
 }

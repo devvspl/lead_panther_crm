@@ -514,7 +514,12 @@
                 <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
                     </div>
                 </details>
-                <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
+                <details wire:ignore.self wire:key="overview-internal-processing-{{ $organization->id }}" class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
+                    <summary class="text-sm font-bold text-ink cursor-pointer">Lead Panther Internal Processing</summary>
+                    <div class="mt-4">
+                        <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
+                    </div>
+                </details>
 
                 <!-- Recent Members Quick Snapshot -->
                 <div class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-4">

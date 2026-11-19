@@ -508,36 +508,22 @@
                     </div>
                 </div>
 
-                <section class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between gap-4">
-                    <div>
-                        <h3 id="builder-credit-visibility-label" class="text-sm font-bold text-ink">Show Credit Balance</h3>
-                        <p class="text-xs text-muted mt-1">Show available credits and credits consumed on this client's Builder/Developer dashboard.</p>
-                    </div>
-                    <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label" aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
-                        wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})" wire:loading.attr="disabled"
-                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 {{ $organization->show_builder_credit_balance ? 'bg-primary' : 'bg-neutral-300' }}">
-                        <span class="inline-block h-4 w-4 rounded-full bg-surface shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                    </button>
-                </section>
 
-                <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <section>
                     <div class="p-5 rounded-2xl bg-surface border border-border space-y-3">
                         <h3 class="text-sm font-bold text-ink">Lead Delivery Interval</h3>
                         <p class="text-xs text-muted">Controls when leads reach the client panel.</p>
                         <button type="button" wire:click="setTab('campaigns')" class="text-xs font-semibold text-primary">Manage delivery settings</button>
                     </div>
-                    <form wire:submit="saveExecutiveResponseTime" class="p-5 rounded-2xl bg-surface border border-border space-y-3">
-                        <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response Time</label>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <x-text-input id="executive-response-minutes" type="number" min="1" max="10080" wire:model="executiveResponseMinutes" class="w-28" />
-                            <span class="text-xs text-muted">minutes</span>
-                            <button type="submit" wire:loading.attr="disabled" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-semibold">Save</button>
-                        </div>
-                        @error('executiveResponseMinutes')<p role="alert" class="text-xs text-danger">{{ $message }}</p>@enderror
-                        <p class="text-xs text-muted">First response deadline from assignment. Applies to new assignments.</p>
-                    </form>
+
                 </section>
+                <details wire:ignore.self wire:key="overview-assignment-{{ $organization->id }}" class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
+                    <summary class="text-sm font-bold text-ink cursor-pointer">Lead Assignment Configuration</summary>
+                    <div class="mt-4">
                 <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
+                    </div>
+                </details>
                 <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
 
                 <!-- Recent Members Quick Snapshot -->
@@ -672,6 +658,28 @@
                         @endforelse
                     </div>
                 </div>
+                <section class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between gap-4">
+                    <div>
+                        <h3 id="builder-credit-visibility-label" class="text-sm font-bold text-ink">Show Credit Balance</h3>
+                        <p class="text-xs text-muted mt-1">Show available credits and credits consumed on this client's Builder/Developer dashboard.</p>
+                    </div>
+                    <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label" aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
+                        wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})" wire:loading.attr="disabled"
+                        class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 {{ $organization->show_builder_credit_balance ? 'bg-primary' : 'bg-neutral-300' }}">
+                        <span class="inline-block h-4 w-4 rounded-full bg-surface shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                    </button>
+                </section>
+
+                <form wire:submit="saveExecutiveResponseTime" class="p-5 rounded-2xl bg-surface border border-border space-y-3">
+                    <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response Time</label>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-text-input id="executive-response-minutes" type="number" min="1" max="10080" wire:model="executiveResponseMinutes" class="w-28" />
+                        <span class="text-xs text-muted">minutes</span>
+                        <button type="submit" wire:loading.attr="disabled" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-semibold">Save</button>
+                    </div>
+                    @error('executiveResponseMinutes')<p role="alert" class="text-xs text-danger">{{ $message }}</p>@enderror
+                    <p class="text-xs text-muted">First response deadline from assignment. Applies to new assignments.</p>
+                </form>
             </div>
         </div>
     @endif

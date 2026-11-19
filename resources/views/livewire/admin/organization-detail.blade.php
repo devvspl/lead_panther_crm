@@ -508,16 +508,6 @@
                     </div>
                 </div>
 
-
-
-                <section>
-                    <div class="p-5 rounded-2xl bg-surface border border-border space-y-3">
-                        <h3 class="text-sm font-bold text-ink">Lead Delivery Interval</h3>
-                        <p class="text-xs text-muted">Controls when leads reach the client panel.</p>
-                        <button type="button" wire:click="setTab('campaigns')" class="text-xs font-semibold text-primary">Manage delivery settings</button>
-                    </div>
-
-                </section>
                 <details wire:ignore.self wire:key="overview-assignment-{{ $organization->id }}" class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
                     <summary class="text-sm font-bold text-ink cursor-pointer">Lead Assignment Configuration</summary>
                     <div class="mt-4">

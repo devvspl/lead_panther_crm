@@ -1,5 +1,5 @@
-@persist('topbar')
-<header id="topbar-main" wire:persist="topbar"
+{{-- Keep navigation controls in the current layout's Alpine scope. --}}
+<header id="topbar-main"
     class="sticky top-0 z-40 h-16 bg-surface border-b border-border px-4 sm:px-6 flex items-center justify-between flex-shrink-0 w-full">
     <!-- Left Section: Mobile toggle, Desktop toggle & Search -->
     <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 mr-3 sm:mr-6">
@@ -115,4 +115,3 @@
         </x-ui.dropdown>
     </div>
 </header>
-@endpersist

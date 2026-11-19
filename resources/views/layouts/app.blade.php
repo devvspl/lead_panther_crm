@@ -190,11 +190,15 @@
             sidebarOpen: false,
             sidebarCollapsed: JSON.parse(localStorage.getItem('leadpanther_sidebar_collapsed') || 'false'),
             sidebarActiveStyle: localStorage.getItem('leadpanther_sidebar_active_style') || 'highlighted',
+            closeMobileSidebar() {
+                if (window.matchMedia('(min-width: 768px)').matches) return;
+                this.sidebarOpen = false;
+                this.hideSidebarTooltip();
+            },
             closeMobileSidebarOutside(event) {
                 if (!this.sidebarOpen || window.matchMedia('(min-width: 768px)').matches) return;
                 if (event.target.closest('#sidebar-main, [data-mobile-sidebar-toggle]')) return;
-                this.sidebarOpen = false;
-                this.hideSidebarTooltip();
+                this.closeMobileSidebar();
             },
             sidebarTooltip: {
                 show: false,
@@ -229,6 +233,7 @@
         x-on:keydown.escape.window="sidebarOpen = false; hideSidebarTooltip()"
         x-on:resize.window="if (window.matchMedia('(min-width: 768px)').matches) { sidebarOpen = false; hideSidebarTooltip() }"
         x-on:popstate.window="sidebarOpen = false; hideSidebarTooltip()"
+        x-on:livewire:navigating.window="sidebarOpen = false; hideSidebarTooltip()"
         x-on:livewire:navigated.window="sidebarOpen = false; hideSidebarTooltip()"
         class="font-sans antialiased bg-canvas text-ink selection:bg-accent selection:text-white min-h-screen overflow-x-hidden w-full max-w-full"
     >

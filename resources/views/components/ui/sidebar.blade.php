@@ -5,10 +5,9 @@
     $databaseItems = $navSections['database'] ?? [];
 @endphp
 
-@persist('sidebar')
+{{-- Rebuild with the layout: persisted nodes retain the previous body's Alpine scope. --}}
 <aside 
     id="sidebar-main"
-    wire:persist="sidebar"
     :class="{
         'translate-x-0': sidebarOpen,
         '-translate-x-full md:translate-x-0': !sidebarOpen,
@@ -60,7 +59,7 @@
                        @if(isset($item['data_nav_root'])) data-nav-root="true" @endif
                        x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
                        x-on:mouseleave="hideSidebarTooltip()"
-                       x-on:click="hideSidebarTooltip()"
+                       x-on:click="closeMobileSidebar(); hideSidebarTooltip()"
                        :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
                        class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
                     >
@@ -100,7 +99,7 @@
                                data-nav-exact="{{ $item['data_nav_exact'] }}"
                                x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
                                x-on:mouseleave="hideSidebarTooltip()"
-                               x-on:click="hideSidebarTooltip()"
+                               x-on:click="closeMobileSidebar(); hideSidebarTooltip()"
                                :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
                                class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
                             >
@@ -124,7 +123,7 @@
         </nav>
     </div>
 </aside>
-<script>
+<script data-navigate-once>
     (function() {
         function updateSidebarActiveNav() {
             const rawPath = (window.location.pathname.replace(/\/$/, '') || '/').toLowerCase();
@@ -200,4 +199,3 @@
         updateSidebarActiveNav();
     })();
 </script>
-@endpersist

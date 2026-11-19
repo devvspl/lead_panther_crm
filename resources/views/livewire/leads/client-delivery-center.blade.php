@@ -42,23 +42,6 @@
 
     <livewire:leads.delivered-batch-leads :organization-id="$organizationId" :key="'delivered-batch-leads-'.$organizationId" />
 
-    <details class="rounded-card border border-border bg-surface p-4">
-        <summary class="text-sm font-semibold text-ink cursor-pointer">Delivery History & Reports</summary>
-        <div class="mt-4 space-y-3">
-            <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-                <div><label>From</label><x-text-input variant="compact" type="date" wire:model.live="historyFrom" /></div>
-                <div><label>To</label><x-text-input variant="compact" type="date" wire:model.live="historyTo" /></div>
-                <div><label>Client</label><x-ui.themed-select wire:model.live="historyClient" :options="$historyClients->pluck('name','id')->all()" placeholder="All Clients" :searchable="true" /></div>
-                <div><label>Project</label><x-ui.themed-select wire:model.live="historyProject" :options="$historyProjects->pluck('name','id')->all()" placeholder="All Projects" :searchable="true" /></div>
-                <div><label>Campaign</label><x-ui.themed-select wire:model.live="historyCampaign" :options="$historyCampaigns->pluck('name','id')->all()" placeholder="All Campaigns" :searchable="true" /></div>
-                <div><label>Status</label><x-ui.themed-select wire:model.live="historyStatus" :options="[''=>'All Statuses','pending'=>'Pending','queued'=>'Queued','sent'=>'Sent','failed'=>'Failed','accepted'=>'Accepted']" :searchable="true" /></div>
-            </div>
-            <x-ui.export-button target="exportHistory" label="Export Delivery History" />
-            <x-ui.advanced-table :columns="$this->historyColumns()" :rows="$history" :show-search="false" :show-filter-dropdown="false" :show-configurations="false" :show-skeleton="false" table-name="client-delivery-history" empty-title="No delivery history" empty-message="Queued and completed transfers will appear here." />
-            @error('delivery')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
-        </div>
-    </details>
-
     <x-ui.offcanvas wire:model="showConfiguration" name="client-delivery-configuration" title="Push Leads to Client" subtitle="Choose where to send the leads and when." maxWidth="2xl">
         <div class="space-y-5 text-xs">
             @if($selectedLeadIds)<p class="rounded-lg border border-border bg-canvas p-3 font-semibold">{{ count($selectedLeadIds) }} lead(s) selected</p>@endif

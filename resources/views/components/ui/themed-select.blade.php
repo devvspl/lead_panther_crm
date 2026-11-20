@@ -37,7 +37,7 @@
                     $optionValue = is_array($option) ? ($option['value'] ?? $key) : $key;
                     $optionLabel = is_array($option) ? ($option['label'] ?? $option['name'] ?? $optionValue) : $option;
                 @endphp
-                <option value="{{ $optionValue }}" @disabled(is_array($option) && ($option['disabled'] ?? false))>{{ $optionLabel }}</option>
+                <option value="{{ $optionValue }}" @disabled(is_array($option) && ($option['disabled'] ?? false))>{{ \App\Support\ClientFacingText::label($optionLabel) }}</option>
             @endforeach
         @endif
     </select>

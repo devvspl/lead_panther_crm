@@ -12,6 +12,7 @@ class LeadTimeline extends Component
 {
     public bool $isOpen = false;
 
+    #[\Livewire\Attributes\Locked]
     public ?int $leadId = null;
 
     public string $filterType = 'all'; // 'all' | 'status' | 'assignment' | 'credit' | 'sla' | 'replacement' | 'communication'
@@ -22,6 +23,7 @@ class LeadTimeline extends Component
     #[On('show-lead-journey')]
     public function openJourney(int $id): void
     {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
         if (Lead::usesSalesPanel()) {
             abort_unless(Lead::panelQuery()->whereKey($id)->exists(), 403);
         }
@@ -50,6 +52,7 @@ class LeadTimeline extends Component
     {
         $journey = null;
         if ($this->leadId) {
+            abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
             $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'project', 'campaign', 'leadSource', 'assignedTo'])->find($this->leadId);
             if ($lead) {
                 $journey = $journeyService->getJourney($lead);

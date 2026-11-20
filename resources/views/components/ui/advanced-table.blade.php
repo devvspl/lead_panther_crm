@@ -329,7 +329,7 @@
                                             @endphp
                                             <span
                                                 class="px-2 py-0.5 rounded-pill text-[10px] font-bold inline-flex items-center gap-1 {{ $badgeClass }}">
-                                                {{ $badgeLabel }}
+                                                {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                             </span>
                                         @elseif($type === 'avatar-stack')
                                             @php
@@ -408,6 +408,7 @@
                                                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                     </svg>
                                                 </button>
+                                                @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                                                 <button type="button"
                                                     @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadId }} })"
                                                     class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
@@ -417,6 +418,7 @@
                                                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                 </button>
+                                                @endif
                                                 @if(!$isSalesUser)
                                                     @if(!\App\Models\Lead::usesSalesPanel() || (!$row->isTerminalStage() && \App\Models\Lead::normalizeStage($row->current_stage)!=='pending_credit'))
 <button type="button"
@@ -635,7 +637,7 @@
                                                 }
                                                 $formattedText = ($col['prefix'] ?? '') . ($displayVal !== null && $displayVal !== '' ? $displayVal : ($col['default'] ?? '—')) . ($col['suffix'] ?? '');
                                             @endphp
-                                            <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $formattedText }}</span>
+                                            <span class="{{ $col['class'] ?? 'text-ink' }}">{{ \App\Support\ClientFacingText::label($formattedText) }}</span>
                                         @endif
                                     </td>
                                 @endforeach
@@ -810,7 +812,7 @@
                                             $badgeLabel = $col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val));
                                         @endphp
                                         <span class="px-2 py-0.5 rounded-pill text-[10px] font-bold inline-block {{ $badgeClass }}">
-                                            {{ $badgeLabel }}
+                                            {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                         </span>
                                     @elseif($type === 'avatar-stack')
                                         @php
@@ -842,6 +844,7 @@
                                                         d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
                                             </button>
+                                            @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                                             <button type="button"
                                                 @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadIdMob }} })"
                                                 class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
@@ -851,6 +854,7 @@
                                                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </button>
+                                            @endif
                                             @if(!$isSalesUserMob)
                                                 <button type="button"
                                                     @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadIdMob }} })"
@@ -1052,7 +1056,7 @@
                                             }
                                             $formattedTextMobile = ($col['prefix'] ?? '') . ($displayValMobile !== null && $displayValMobile !== '' ? $displayValMobile : ($col['default'] ?? '—')) . ($col['suffix'] ?? '');
                                         @endphp
-                                        <span class="{{ $col['class'] ?? 'text-ink' }}">{{ $formattedTextMobile }}</span>
+                                        <span class="{{ $col['class'] ?? 'text-ink' }}">{{ \App\Support\ClientFacingText::label($formattedTextMobile) }}</span>
                                     @endif
                                 </div>
                             </div>

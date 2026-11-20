@@ -27,6 +27,33 @@ class LeadKanbanTest extends TestCase
         Role::create(['name' => 'channel-partner']);
     }
 
+    public function test_lead_journey_buttons_and_backend_access_are_super_admin_only(): void
+    {
+        $source = LeadSource::create(['name' => 'Journey visibility']);
+        foreach (['Super Admin', 'super-admin', 'Builder/Developer', 'Client', 'Team Leader', 'Sales Executive'] as $role) {
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+            $org = Organization::create(['name' => 'Journey '.$role, 'status' => 'active']);
+            $user = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']); $user->assignRole($role);
+            if ($role === 'Team Leader') {
+                \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'view-team-leads', 'guard_name' => 'web']);
+                $user->givePermissionTo('view-team-leads');
+                \App\Models\SalesTeam::create(['name' => 'Journey team', 'ownable_type' => Organization::class, 'ownable_id' => $org->id, 'leader_id' => $user->id]);
+            }
+            $lead = Lead::create(['lead_code' => Lead::generateUniqueLeadCode(), 'name' => 'Journey Customer', 'mobile' => '9000012345',
+                'client_id' => $user->id, 'assigned_to' => $user->id, 'lead_source_id' => $source->id,
+                'current_stage' => 'assigned', 'status' => 'assigned', 'delivered_at' => now(), 'delivery_pending' => false]);
+            $detail = Livewire::actingAs($user)->test(\App\Livewire\Leads\LeadDetail::class)->call('openLead', $lead->id);
+            $this->assertTrue((bool) $detail->get('isOpen'), $role);
+            if (in_array($role, ['Super Admin', 'super-admin'])) {
+                $detail->assertSee('Lead Journey')->call('showFullJourney')->assertDispatched('show-lead-journey');
+                Livewire::test(\App\Livewire\Leads\LeadTimeline::class)->call('openJourney', $lead->id)->assertSet('isOpen', true);
+            } else {
+                $detail->assertDontSee('wire:click="showFullJourney"', false)->call('showFullJourney')->assertForbidden();
+                Livewire::actingAs($user)->test(\App\Livewire\Leads\LeadTimeline::class)->call('openJourney', $lead->id)->assertForbidden();
+            }
+        }
+    }
+
     public function test_kanban_board_renders_successfully_for_authenticated_users(): void
     {
         $user = User::factory()->create();

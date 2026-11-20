@@ -187,7 +187,7 @@ class CreditWallet extends Component
         $headings = ['Date & Time', 'Transaction Type', 'Lead Code', 'Credit Before', 'Credit Used/Added', 'Credit After'];
         $columns = [
             fn($tx) => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') : '',
-            fn($tx) => $tx->transaction_type,
+            fn($tx) => \App\Support\ClientFacingText::label($tx->transaction_type),
             fn($tx) => $tx->lead?->lead_code ?: 'N/A',
             'credit_before',
             'credit_used',

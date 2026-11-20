@@ -3,7 +3,7 @@
     <button x-ref="trigger" type="button" :aria-expanded="open" aria-haspopup="listbox" @click="open = !open; if(open) $nextTick(() => place())"
         class="inline-flex items-center justify-between gap-2 h-8 text-xs px-3 bg-canvas text-ink rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ink hover:bg-canvas/80 transition w-full min-w-0 whitespace-nowrap">
         <span class="truncate font-semibold {{ $value !== null && $value !== '' ? 'text-ink' : 'text-muted' }}">
-            {{ $selectedLabel ?: $placeholder }}
+            {{ \App\Support\ClientFacingText::label($selectedLabel ?: $placeholder) }}
         </span>
 
         <div class="flex items-center gap-1 shrink-0 text-muted">
@@ -72,7 +72,7 @@
                 @endphp
                 <button type="button" wire:click="selectOption('{{ $itemVal }}')" @click="open = false"
                     class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between gap-3 {{ $isSelected ? 'bg-canvas text-ink font-bold' : 'text-ink' }}">
-                    <span class="truncate">{{ $itemLabel }}</span>
+                    <span class="truncate">{{ \App\Support\ClientFacingText::label($itemLabel) }}</span>
                     @if($isSelected)
                         <span class="text-ink text-xs shrink-0">✓</span>
                     @endif

@@ -1023,12 +1023,14 @@
                                                     <span class="px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 font-semibold text-[9px]">SLA Pending</span>
                                                 @endif
 
+                                                @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                                                 <button type="button"
                                                     @click.stop="$dispatch('open-lead-journey', { id: {{ $lead->id }} })"
                                                     class="p-0.5 rounded hover:bg-canvas text-muted hover:text-ink transition cursor-pointer"
                                                     title="Show Complete Lead Journey Timeline">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                 </button>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -1198,7 +1200,7 @@
             </button>
             <button type="button" wire:click="$set('pullMode', 'manual')"
                 class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'manual' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                Single Manual Entry
+                {{ \App\Support\ClientFacingText::label('Single Manual Entry') }}
             </button>
         </div>
         @endif

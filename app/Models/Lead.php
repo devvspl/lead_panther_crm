@@ -27,7 +27,8 @@ class Lead extends Model
     {
         $data = parent::toArray();
         if (! \App\Support\LeadSourceVisibility::allowed()) {
-            foreach (['lead_source_id', 'lead_source', 'leadSource', 'lead_source_name', 'source_name', 'source', 'metadata', 'meta'] as $key) unset($data[$key]);
+            $data = \App\Support\LeadSourceVisibility::redact($data);
+            if (isset($data['requirement'])) $data['requirement'] = \App\Support\ClientFacingText::label($data['requirement']);
         }
         return $data;
     }

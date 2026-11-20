@@ -67,7 +67,7 @@ class LeadPresenter
             'city' => $lead->city,
             'budget' => $lead->budget,
             'property_type' => $lead->property_type,
-            'requirement' => $lead->requirement,
+            'requirement' => ClientFacingText::label($lead->requirement, $user),
             'current_stage' => $lead->current_stage,
             'status' => $lead->status,
             'project_name' => $lead->project?->name ?? 'N/A',

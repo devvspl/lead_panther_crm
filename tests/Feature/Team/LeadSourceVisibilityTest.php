@@ -16,6 +16,53 @@ class LeadSourceVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_all_client_roles_hide_source_and_use_client_friendly_labels_without_changing_storage(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Client wording', 'status' => 'active']);
+        $source = LeadSource::create(['name' => 'Private source sentinel']);
+        foreach (['Builder/Developer', 'Client', 'client', 'Broker', 'Channel Partner', 'Team Leader', 'Sales Executive'] as $role) {
+            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+            $user = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']); $user->assignRole($role);
+            $lead = Lead::create(['lead_code' => Lead::generateUniqueLeadCode(), 'lead_source_id' => $source->id,
+                'client_id' => $user->id, 'assigned_to' => $user->id, 'name' => 'Wording customer', 'mobile' => '9000000011',
+                'status' => 'assigned', 'current_stage' => 'assigned', 'requirement' => 'Manual lead entry via Lead Manager', 'delivery_pending' => false]);
+            $this->actingAs($user);
+            $this->assertFalse(LeadSourceVisibility::allowed(), $role);
+            $directory = Livewire::test(LeadKanban::class)->assertDontSee('Private source sentinel');
+            $this->assertNotContains('lead_source_name', array_column($directory->instance()->tableColumns(), 'key'));
+            Livewire::test(SourcePerformance::class)->assertForbidden();
+            $this->assertSame('On Demand Assignment', \App\Support\ClientFacingText::label('Manual Assignment'));
+            $this->assertSame('Balance Adjustment', \App\Support\ClientFacingText::label('Manual adjustment'));
+            $this->assertArrayNotHasKey('lead_source_id', $lead->toArray());
+            $lead->setRelation('campaign', new \App\Models\Campaign(['name' => 'Assigned campaign', 'lead_source_id' => $source->id]));
+            $this->assertArrayNotHasKey('lead_source_id', $lead->toArray()['campaign']);
+            $this->assertSame('Assigned campaign', $lead->toArray()['campaign']['name']);
+            $this->assertStringNotContainsString('Manual', LeadPresenter::present($lead, $user)['requirement']);
+            $this->assertSame('Manual lead entry via Lead Manager', $lead->fresh()->getRawOriginal('requirement'));
+            $payload = \App\Support\ClientFacingText::activity(json_encode(['lead_source_id' => $source->id, 'values' => ['source_name' => $source->name, 'method' => 'manual']]));
+            $this->assertStringNotContainsString('lead_source', $payload);
+            $this->assertStringNotContainsString('Private source sentinel', $payload);
+            $this->assertStringNotContainsString('manual', $payload);
+        }
+        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        $admin = User::factory()->create(['status' => 'active']); $admin->assignRole('Super Admin'); $this->actingAs($admin);
+        $this->assertTrue(LeadSourceVisibility::allowed());
+        $this->assertSame('Manual Assignment', \App\Support\ClientFacingText::label('Manual Assignment'));
+        $this->assertSame($source->id, $lead->fresh()->lead_source_id);
+    }
+
+    public function test_client_assignment_labels_are_readable_while_enum_values_are_unchanged(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Client assignment wording', 'status' => 'active',
+            'auto_assign_enabled' => false, 'assignment_config' => ['method' => 'manual']]);
+        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Builder/Developer', 'guard_name' => 'web']);
+        $owner = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']); $owner->assignRole('Builder/Developer');
+        $component = Livewire::actingAs($owner)->test(\App\Livewire\Settings\LeadAssignmentConfiguration::class, ['organizationId' => $org->id])
+            ->assertSee('On Demand');
+        $this->assertDoesNotMatchRegularExpression('/manual/i', html_entity_decode(strip_tags($component->html())));
+        $this->assertSame('manual', $org->fresh()->assignment_config['method']);
+    }
+
     public function test_source_is_hidden_for_owner_leader_and_executive_but_preserved_for_admin(): void
     {
         $this->seed(DeltekSeeder::class);

@@ -975,6 +975,7 @@ class LeadDetail extends Component
 
     public function showFullJourney(): void
     {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
         if ($this->leadId) {
             $this->dispatch('show-lead-journey', id: $this->leadId);
         }
@@ -1033,7 +1034,9 @@ class LeadDetail extends Component
                 $latestReplacement = $lead->replacements()->latest()->first();
                 $assignmentHistory = LeadAssignment::where('lead_id', $this->leadId)->with(['assignee', 'assigner'])->latest('assigned_at')->get();
                 $replacementReasons = ReplacementReason::all();
-                $journey = $journeyService->getJourney($lead);
+                if (auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin'])) {
+                    $journey = $journeyService->getJourney($lead);
+                }
             }
         }
 

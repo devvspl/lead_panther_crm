@@ -36,6 +36,7 @@
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 <x-ui.lead-archive-menu :id="$lead->id" />
+                @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                 <button type="button" wire:click="showFullJourney"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-2xs cursor-pointer">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,6 +45,7 @@
                     </svg>
                     <span class="hidden sm:inline">Lead Journey</span>
                 </button>
+                @endif
                 <button type="button" wire:click="close"
                     class="text-muted hover:text-ink p-1.5 rounded-lg hover:bg-surface cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,7 +163,7 @@
                         <span class="text-[10px] font-bold text-muted uppercase block">Customer Requirement /
                             Inquiry:</span>
                         <p class="text-xs text-ink mt-0.5 leading-relaxed bg-surface p-2.5 rounded-lg border border-border">
-                            {{ $lead->requirement }}
+                            {{ \App\Support\ClientFacingText::label($lead->requirement) }}
                         </p>
                     </div>
                 @endif
@@ -331,7 +333,7 @@
 
                 @if($isBuilder)
                     <div class="text-xs space-y-2">
-                        <p>Requirements: {{ $lead->requirement ?: '—' }} · Budget: {{ $lead->budget ?: '—' }}</p>
+                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} · Budget: {{ $lead->budget ?: '—' }}</p>
                         @if($normalizedStage === 'follow_up')@foreach($leadFollowups as $followup)
                         <p>{{ $followup->due_at }} · {{ $followup->note }} · {{ $followup->status }}</p>@endforeach @endif
                         @if($normalizedStage === 'meeting_scheduled')
@@ -968,17 +970,19 @@
                     <div class="flex items-center justify-between pb-1">
                         <span class="text-xs font-bold text-ink uppercase tracking-wider">Lead Activity Trail &amp; Status
                             Changes</span>
+                        @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                         <button type="button" wire:click="showFullJourney"
                             class="text-xs font-semibold text-primary hover:underline cursor-pointer">Expand Lead Journey
                             &rarr;</button>
+                        @endif
                     </div>
 
                     @foreach($activityLogs as $entry)
                         <div class="p-3 bg-canvas rounded-lg border border-border text-xs space-y-1">
-                            <strong>{{ $entry->action }}</strong>
+                            <strong>{{ \App\Support\ClientFacingText::label($entry->action) }}</strong>
                             <p>{{ $entry->user?->name ?? 'System' }} · {{ $entry->created_at }}</p>
-                            <p class="break-words">Previous: {{ $entry->from_value ?: '—' }}</p>
-                            <p class="break-words">New: {{ $entry->to_value ?: '—' }}</p>
+                            <p class="break-words">Previous: {{ \App\Support\ClientFacingText::activity($entry->from_value ?: '—') }}</p>
+                            <p class="break-words">New: {{ \App\Support\ClientFacingText::activity($entry->to_value ?: '—') }}</p>
                         </div>
                     @endforeach
                     <!-- Stage History -->

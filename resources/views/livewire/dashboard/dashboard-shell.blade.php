@@ -872,7 +872,7 @@
                                 </div>
                                 <div>
                                     <div class="font-bold text-ink text-xs flex items-center gap-1.5">
-                                        <span>#{{ $tx->id }} &bull; {{ ucfirst($tx->transaction_type) }}</span>
+                                        <span>#{{ $tx->id }} &bull; {{ \App\Support\ClientFacingText::label(ucfirst(str_replace('_', ' ', $tx->transaction_type))) }}</span>
                                         <span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-bold {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
                                             {{ $tx->credit_used }} Cr
                                         </span>

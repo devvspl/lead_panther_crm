@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LeadFormMapping extends Model
 {
     protected $guarded = [];
+    protected $casts = ['meta_created_at' => 'datetime'];
+
+    public static function parseMetaCreatedTime($value): ?\Carbon\Carbon
+    {
+        if (!is_string($value) || trim($value) === '') return null;
+        try { return \Carbon\Carbon::parse($value)->setTimezone(config('app.timezone')); }
+        catch (\Throwable) { return null; }
+    }
 
     public function portalAccount(): BelongsTo
     {

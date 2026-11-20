@@ -21,6 +21,51 @@ class IntegrationsPageRedesignTest extends TestCase
         Role::firstOrCreate(['name' => 'Super Admin']);
     }
 
+    public function test_form_directory_displays_real_campaign_and_meta_creation_details(): void
+    {
+        $admin = User::factory()->create(); $admin->assignRole('Super Admin');
+        $account = PortalAccount::create(['name' => 'Details account', 'type' => 'meta', 'status' => 'active']);
+        $project = \App\Models\Project::create(['name' => 'Campaign Project', 'client_id' => $admin->id]);
+        $source = \App\Models\LeadSource::create(['name' => 'Details source']);
+        $campaign = \App\Models\Campaign::create(['name' => 'Saved inactive campaign', 'status' => 'inactive', 'project_id' => $project->id, 'lead_source_id' => $source->id]);
+        \App\Models\LeadFormMapping::create(['portal_account_id' => $account->id, 'form_id' => 'details-111',
+            'form_name' => 'Actual Meta form', 'page_id' => 'page-222', 'status' => 'archived',
+            'campaign_id' => $campaign->id, 'meta_created_at' => '2026-11-01 10:00:00']);
+        $component = Livewire::actingAs($admin)->test(IntegrationsManager::class)
+            ->assertSee('Campaign Project')->assertSee('Saved inactive campaign')->assertSee('Inactive')
+            ->assertSee('page-222')->assertSee('01 Nov 2026, 10:00')->assertSee('ARCHIVED');
+        $this->assertSame((int) $campaign->id, (int) $component->get('formCampaignMap.details-111'));
+        $component->call('exportForms')->assertFileDownloaded();
+    }
+
+    public function test_form_search_resets_pagination_and_keeps_each_rows_mapping_identity(): void
+    {
+        $admin = User::factory()->create(); $admin->assignRole('Super Admin');
+        $account = PortalAccount::create(['name' => 'Search account', 'type' => 'meta', 'status' => 'active']);
+        $project = \App\Models\Project::create(['name' => 'Search project', 'client_id' => $admin->id]);
+        $source = \App\Models\LeadSource::create(['name' => 'Search source']);
+        $campaign = \App\Models\Campaign::create(['name' => 'Inside Campaign', 'project_id' => $project->id, 'lead_source_id' => $source->id]);
+        foreach (range(1, 20) as $i) {
+            \App\Models\LeadFormMapping::create(['portal_account_id' => $account->id, 'form_id' => (string) $i,
+                'form_name' => $i === 19 ? 'Inside Form' : 'Outside Form '.$i, 'status' => 'active',
+                'campaign_id' => $i === 3 ? $campaign->id : null]);
+        }
+        $component = Livewire::actingAs($admin)->test(IntegrationsManager::class)->call('setPage', 2)
+            ->set('search', '  INSIDE  ')->assertSet('paginators.page', 1);
+        $rows = $component->instance()->getFilteredAvailableFormsProperty();
+        $this->assertSame(2, $rows->total());
+        $this->assertEqualsCanonicalizing(['3', '19'], collect($rows->items())->pluck('id')->all());
+        $component->assertSee('meta_page_forms-desktop-row-3', false)->assertSee('meta_page_forms-mobile-row-3', false)
+            ->assertSee('meta-campaign-desktop-3', false)->assertSee('meta-campaign-mobile-3', false);
+        $this->assertEquals($campaign->id, \App\Models\LeadFormMapping::where('portal_account_id', $account->id)->where('form_id', '3')->value('campaign_id'));
+        $component->set('search', 'no-such-form');
+        $this->assertSame(0, $component->instance()->getFilteredAvailableFormsProperty()->total());
+        $component->set('search', '0');
+        $this->assertSame(2, $component->instance()->getFilteredAvailableFormsProperty()->total());
+        $component->set('search', '');
+        $this->assertSame(20, $component->instance()->getFilteredAvailableFormsProperty()->total());
+    }
+
     public function test_integrations_page_http_route_accessible(): void
     {
         $admin = User::factory()->create();

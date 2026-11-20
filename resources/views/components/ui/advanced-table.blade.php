@@ -284,7 +284,7 @@
                                 $rowId = is_object($row) ? ($row->id ?? null) : ($row['id'] ?? null);
                                 $isRowSelected = $rowId && in_array((string) $rowId, $selectedRows);
                             @endphp
-                            <tr class="hover:bg-canvas/50 transition {{ $isRowSelected ? 'bg-primary/5' : '' }}">
+                            <tr wire:key="{{ $tableName }}-desktop-row-{{ $rowId ?? $loop->index }}" class="hover:bg-canvas/50 transition {{ $isRowSelected ? 'bg-primary/5' : '' }}">
                                 @if($showCheckboxes && $rowId)
                                     <td class="py-3 px-3.5 text-center {{ $stickySelection ? 'sticky left-0 z-10 bg-surface' : '' }}">
                                         <input type="checkbox" wire:click="toggleSelectRow('{{ $rowId }}')" @checked($isRowSelected)
@@ -626,7 +626,7 @@
                                                 </button>
                                             </div>
                                         @elseif($type === 'html' || isset($col['render']))
-                                            {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}
+                                            {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val, 'desktop') : $val !!}
                                         @else
                                             @php
                                                 $displayVal = $val;
@@ -733,7 +733,8 @@
 
     <!-- 4. MOBILE RESPONSIVE CARD STACK (Reflow on < md) -->
     @if(!$loading)
-    <div class="block md:hidden space-y-3" @if($showSkeleton) wire:loading.remove @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
+    <div class="block md:hidden">
+    <div class="space-y-3" @if($showSkeleton) wire:loading.remove @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif @endif>
         @if(!empty($rows) && count($rows) > 0)
             @foreach($rows as $row)
                 @php
@@ -741,6 +742,7 @@
                     $isRowSelected = $rowId && in_array((string) $rowId, $selectedRows);
                 @endphp
                 <div
+                    wire:key="{{ $tableName }}-mobile-row-{{ $rowId ?? $loop->index }}"
                     class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 {{ $isRowSelected ? 'border-primary bg-primary/5' : '' }}">
                     <!-- Card Top Row: Checkbox, Primary Title & Action Menu -->
                     <div class="flex items-start justify-between gap-2 pb-2 border-b border-border">
@@ -1041,7 +1043,7 @@
                                             </button>
                                         </div>
                                     @elseif($type === 'html' || isset($col['render']))
-                                        {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val) : $val !!}
+                                        {!! isset($col['render']) && is_callable($col['render']) ? $col['render']($row, $val, 'mobile') : $val !!}
                                     @else
                                         @php
                                             $displayValMobile = $val;
@@ -1064,6 +1066,7 @@
                 <p class="text-xs text-muted">{{ $emptyMessage }}</p>
             </div>
         @endif
+    </div>
     </div>
     @endif
 

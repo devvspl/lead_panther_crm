@@ -14,7 +14,7 @@
     $alpineModel = $attributes->whereStartsWith('x-model');
     $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value']);
     $owner = isset($this) && $this instanceof \Livewire\Component ? $this->getId() : 'page';
-    $popupKey = 'select-popup-'.sha1($owner.'|'.($wireModel ?? $alpineModel->first() ?? $attributes->get('id') ?? $attributes->get('name') ?? $placeholder));
+    $popupKey = 'select-popup-'.sha1($owner.'|'.($wireModel ?? $alpineModel->first() ?? $attributes->get('name') ?? $placeholder).'|'.$attributes->get('id', ''));
 @endphp
 <div x-id="['select-list', 'select-error']" x-modelable="value" {{ $alpineModel }}
     x-data="leadPantherSelect({

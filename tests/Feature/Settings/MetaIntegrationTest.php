@@ -33,7 +33,7 @@ class MetaIntegrationTest extends TestCase
         $account->setCredential('access_token', 'catalog-token');
         LeadFormMapping::create(['portal_account_id' => $account->id, 'form_id' => 'catalog-0', 'form_name' => 'Old name',
             'client_id' => $client->id, 'project_id' => $project->id, 'campaign_id' => $campaign->id, 'status' => 'active']);
-        $page = array_map(fn ($i) => ['id' => 'catalog-'.$i, 'name' => 'Actual form '.$i, 'status' => $i === 0 ? 'ACTIVE' : 'ARCHIVED'], range(0, 99));
+        $page = array_map(fn ($i) => ['id' => 'catalog-'.$i, 'name' => 'Actual form '.$i, 'status' => $i === 0 ? 'ACTIVE' : 'ARCHIVED', 'created_time' => '2026-11-01T10:00:00+0000'], range(0, 99));
         Http::fake(function ($request) use ($page) {
             if (str_contains($request->url(), '/leadgen_forms')) {
                 return Http::response(isset($request['after'])
@@ -44,6 +44,8 @@ class MetaIntegrationTest extends TestCase
         });
         $this->artisan('meta:sync-leads', ['--account' => $account->id])->assertExitCode(0);
         $this->assertSame(101, $account->formMappings()->count());
+        $this->assertTrue($account->formMappings()->where('form_id', 'catalog-0')->firstOrFail()->meta_created_at
+            ->equalTo(\Carbon\Carbon::parse('2026-11-01T10:00:00+0000')));
         $this->assertDatabaseHas('lead_form_mappings', ['portal_account_id' => $account->id, 'form_id' => 'catalog-0',
             'form_name' => 'Actual form 0', 'client_id' => $client->id, 'project_id' => $project->id, 'campaign_id' => $campaign->id]);
         $this->assertDatabaseHas('lead_form_mappings', ['portal_account_id' => $account->id, 'form_id' => 'catalog-100', 'form_name' => 'New final form', 'status' => 'archived', 'campaign_id' => null]);

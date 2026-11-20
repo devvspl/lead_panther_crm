@@ -155,7 +155,7 @@ class MetaLeadSyncService
                         $iteration++;
                         $queryParams = [
                             'access_token' => $accessToken,
-                            'fields' => 'id,name,status,leads_count',
+                            'fields' => 'id,name,status,leads_count,created_time',
                             'limit' => 100,
                         ];
                         if ($afterCursor) {
@@ -184,14 +184,16 @@ class MetaLeadSyncService
                             $formStatus = strtoupper($f['status'] ?? 'ACTIVE');
                             // Persist the complete form catalogue before lead limits/time budgets apply.
                             // Only Meta metadata changes here; administrator routing stays untouched.
-                            LeadFormMapping::updateOrCreate([
-                                'portal_account_id' => $account->id,
-                                'form_id' => (string) $f['id'],
-                            ], [
+                            $metadata = [
                                 'form_name' => trim((string) ($f['name'] ?? '')) ?: 'Form #'.$f['id'],
                                 'page_id' => $pageId,
                                 'status' => strtolower($formStatus),
-                            ]);
+                            ];
+                            if ($createdAt = LeadFormMapping::parseMetaCreatedTime($f['created_time'] ?? null)) $metadata['meta_created_at'] = $createdAt;
+                            LeadFormMapping::updateOrCreate([
+                                'portal_account_id' => $account->id,
+                                'form_id' => (string) $f['id'],
+                            ], $metadata);
                             // Filter out ARCHIVED or INACTIVE forms during full page discovery to prevent 504 timeouts
                             if ($formStatus !== 'ACTIVE') {
                                 continue;

@@ -32,6 +32,19 @@ class ThemedSelectTest extends TestCase
         $this->assertStringContainsString('<option value="2">Slot Option</option>', $slotHtml);
     }
 
+    public function test_responsive_copies_of_one_binding_have_distinct_stable_popup_keys(): void
+    {
+        $render = fn ($id) => view('components.ui.themed-select', [
+            'attributes' => new \Illuminate\View\ComponentAttributeBag(['wire:model.live' => 'formCampaignMap.123', 'id' => $id]),
+            'options' => [1 => 'Campaign'],
+        ])->render();
+        preg_match('/wire:key="([^"]+)"/', $render('campaign-desktop-123'), $desktop);
+        preg_match('/wire:key="([^"]+)"/', $render('campaign-mobile-123'), $mobile);
+        $this->assertNotEmpty($desktop[1]);
+        $this->assertNotSame($desktop[1], $mobile[1]);
+        $this->assertStringContainsString($desktop[0], $render('campaign-desktop-123'));
+    }
+
     public function test_kanban_sort_dropdown_renders_themed_select_and_sorts(): void
     {
         $user = User::factory()->create();

@@ -145,6 +145,7 @@ class IntegrationsManager extends Component
                         'id' => $m->form_id,
                         'name' => $m->form_name,
                         'status' => strtoupper($m->status ?: 'ACTIVE'),
+                        'created_time' => $m->meta_created_at?->toIso8601String(),
                     ];
                 }
                 $this->availableForms = $forms;
@@ -698,6 +699,7 @@ class IntegrationsManager extends Component
                         'id' => (string) $m->form_id,
                         'name' => $m->form_name,
                         'status' => strtoupper($m->status ?: 'ACTIVE'),
+                        'created_time' => $m->meta_created_at?->toIso8601String(),
                     ];
                     $fetchedIds[] = (string) $m->form_id;
                 }
@@ -728,6 +730,9 @@ class IntegrationsManager extends Component
                     'status' => $fStatus,
                 ]
             );
+
+            $createdTime = is_array($formItem) ? ($formItem['created_time'] ?? null) : ($formItem->created_time ?? null);
+            if ($createdAt = LeadFormMapping::parseMetaCreatedTime($createdTime)) $mapping->update(['meta_created_at' => $createdAt]);
 
             if ($mapping->form_name !== $fName || $mapping->status !== $fStatus) {
                 $mapping->update([
@@ -906,15 +911,15 @@ class IntegrationsManager extends Component
     {
         $forms = collect($this->availableForms);
 
-        if (!empty($this->search)) {
-            $term = strtolower(trim($this->search));
+        $term = mb_strtolower(trim($this->search));
+        if ($term !== '') {
             $campaigns = Campaign::pluck('name', 'id')->toArray();
             $forms = $forms->filter(function ($item) use ($term, $campaigns) {
-                $id = strtolower((string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? '')));
-                $name = strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
+                $id = (string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? ''));
+                $name = mb_strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
                 $cId = $this->formCampaignMap[$id] ?? null;
-                $campName = $cId && isset($campaigns[$cId]) ? strtolower($campaigns[$cId]) : '';
-                return str_contains($id, $term) || str_contains($name, $term) || str_contains($campName, $term);
+                $campName = $cId && isset($campaigns[$cId]) ? mb_strtolower($campaigns[$cId]) : '';
+                return str_contains(mb_strtolower($id), $term) || str_contains($name, $term) || str_contains($campName, $term);
             });
         }
 
@@ -969,7 +974,8 @@ class IntegrationsManager extends Component
 
         $clients = Client::with('organization')->get()->keyBy('id');
         $users = \App\Models\User::with('organization')->get()->keyBy('id');
-        $campaigns = Campaign::all()->keyBy('id');
+        $campaigns = Campaign::with('project')->get()->keyBy('id');
+        $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->get()->keyBy('form_id');
 
         $rows = [];
         $srNo = 1;
@@ -992,19 +998,27 @@ class IntegrationsManager extends Component
             }
 
             $campaignName = $campaignId && $campaigns->has($campaignId) ? $campaigns->get($campaignId)->name : 'None';
+            $campaign = $campaigns->get($campaignId);
+            $mapping = $formDetails->get($fId);
+            $created = $mapping?->meta_created_at ?? LeadFormMapping::parseMetaCreatedTime(data_get($formItem, 'created_time'));
 
             $rows[] = [
                 'sr_no' => $srNo++,
                 'campaign' => $campaignName,
+                'project' => $campaign?->project?->name,
+                'campaign_status' => $campaign?->status,
+                'campaign_created' => $campaign?->created_at?->format('Y-m-d H:i'),
                 'form_name' => $fName ?: 'Lead Form #' . $fId,
                 'form_id' => $fId,
                 'status' => strtoupper($status),
+                'page_id' => $mapping?->page_id,
+                'meta_created' => $created?->format('Y-m-d H:i'),
                 'client' => $clientName,
             ];
         }
 
         $filename = "meta_lead_forms_" . now()->format('Y-m-d_His') . ".xlsx";
-        $headings = ['#', 'CRM Campaign', 'Meta Lead Form', 'Form ID', 'Status', 'Client / Organization'];
+        $headings = ['#', 'CRM Campaign', 'Project', 'Campaign Status', 'Campaign Created', 'Meta Lead Form', 'Form ID', 'Form Status', 'Page ID', 'Meta Form Created', 'Client / Organization'];
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading Excel now.');
 
@@ -1014,7 +1028,7 @@ class IntegrationsManager extends Component
                 title: 'Meta Leadgen Forms Routing Directory',
                 subtitle: 'Exported on ' . now()->format('d M Y, h:i A') . ' | Total: ' . count($rows) . ' Forms',
                 headings: $headings,
-                columns: ['sr_no', 'campaign', 'form_name', 'form_id', 'status', 'client'],
+                columns: ['sr_no', 'campaign', 'project', 'campaign_status', 'campaign_created', 'form_name', 'form_id', 'status', 'page_id', 'meta_created', 'client'],
                 statusColumns: ['status']
             ),
             $filename
@@ -1033,7 +1047,10 @@ class IntegrationsManager extends Component
             $clients = \App\Models\User::with('organization')->orderBy('name')->get();
         }
 
-        $campaigns = Campaign::where('status', 'active')->orderBy('name')->get();
+        $campaigns = Campaign::with('project')->where(fn ($q) => $q->where('status', 'active')
+            ->orWhereIn('id', array_filter($this->formCampaignMap)))->orderBy('name')->get();
+        $campaignDetails = $campaigns->keyBy('id');
+        $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->get()->keyBy('form_id');
 
         $clientOptions = ['' => '-- Select Client / Org --'];
         foreach ($clients as $c) {
@@ -1063,17 +1080,24 @@ class IntegrationsManager extends Component
                 'label' => 'CRM Campaign',
                 'width' => '32%',
                 'priority' => 1,
-                'render' => function ($row) use ($campaignOptions) {
+                'render' => function ($row, $value = null, $layout = 'desktop') use ($campaignOptions, $campaignDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    return view('components.ui.themed-select', [
+                    $select = view('components.ui.themed-select', [
                         'attributes' => new \Illuminate\View\ComponentAttributeBag([
                             'wire:model.live' => "formCampaignMap.{$fId}",
+                            'id' => "meta-campaign-{$layout}-{$fId}",
                         ]),
                         'options' => $campaignOptions,
                         'searchable' => true,
                         'placeholder' => '-- Select Campaign --',
                         'class' => 'w-full',
                     ])->render();
+                    $campaign = $campaignDetails->get($this->formCampaignMap[$fId] ?? null);
+                    if (!$campaign) return $select.'<p class="mt-2 text-[10px] text-muted">No campaign assigned</p>';
+                    return $select.'<div class="mt-2 space-y-1 text-[10px] text-muted">'
+                        .'<p>Project: <span class="text-ink">'.e($campaign->project?->name ?? 'Not assigned').'</span></p>'
+                        .'<p>Campaign #'.e($campaign->id).' · '.e(ucfirst($campaign->status ?? 'Unknown')).'</p>'
+                        .'<p>Created: '.e($campaign->created_at?->format('d M Y') ?? 'Not available').'</p></div>';
                 },
             ],
             [
@@ -1081,16 +1105,21 @@ class IntegrationsManager extends Component
                 'label' => 'Meta Lead Form',
                 'width' => '32%',
                 'priority' => 1,
-                'render' => function ($row) {
+                'render' => function ($row) use ($formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: 'Lead Form #' . $fId;
                     $status = (is_array($row) ? ($row['status'] ?? null) : $row->status) ?: 'ACTIVE';
+                    $mapping = $formDetails->get($fId);
+                    $created = $mapping?->meta_created_at ?? LeadFormMapping::parseMetaCreatedTime(data_get($row, 'created_time'));
+                    $statusClass = strtolower($status) === 'active' ? 'text-success border-border' : 'text-muted border-border';
                     return '<div class="min-w-0 pr-1">'
                         . '<div class="flex items-center gap-1.5 flex-wrap">'
                         . '<span class="font-bold text-ink leading-tight text-xs truncate max-w-[240px]" title="' . e($fName) . '">' . e($fName) . '</span>'
-                        . '<span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">' . e($status) . '</span>'
+                        . '<span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full uppercase bg-canvas border shrink-0 '.$statusClass.'">' . e($status) . '</span>'
                         . '</div>'
                         . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>'
+                        . '<div class="text-muted text-[10px] mt-1">Page ID: '.e($mapping?->page_id ?? 'Not available').'</div>'
+                        . '<div class="text-muted text-[10px] mt-1">Meta created: '.e($created?->format('d M Y, H:i') ?? 'Not available').'</div>'
                         . '</div>';
                 },
             ],
@@ -1099,11 +1128,12 @@ class IntegrationsManager extends Component
                 'label' => 'Client / Org',
                 'width' => '24%',
                 'priority' => 1,
-                'render' => function ($row) use ($clientOptions) {
+                'render' => function ($row, $value = null, $layout = 'desktop') use ($clientOptions) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     return view('components.ui.themed-select', [
                         'attributes' => new \Illuminate\View\ComponentAttributeBag([
                             'wire:model.live' => "formClientMap.{$fId}",
+                            'id' => "meta-client-{$layout}-{$fId}",
                         ]),
                         'options' => $clientOptions,
                         'searchable' => true,

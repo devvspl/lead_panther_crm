@@ -8,6 +8,8 @@
 ])
 
 @php
+    // Table formatters may render this view directly rather than through a Blade component tag.
+    $slotContent = $slot ?? '';
     $wireModel = $attributes->wire('model')->value();
     $alpineModel = $attributes->whereStartsWith('x-model');
     $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value']);
@@ -27,8 +29,8 @@
     {{-- Retains HTML form semantics and original change/disabled/required attributes. --}}
     <select x-ref="native" {{ $nativeAttributes }} class="sr-only" tabindex="-1" aria-hidden="true"
         @invalid.prevent="invalid()" @focus="$refs.trigger.focus()">
-        @if(trim((string)$slot) !== '')
-            {{ $slot }}
+        @if(trim((string)$slotContent) !== '')
+            {{ $slotContent }}
         @else
             @foreach($options as $key => $option)
                 @php

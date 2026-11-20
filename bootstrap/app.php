@@ -20,10 +20,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->web(append: [
+            \App\Http\Middleware\EnsureAccountIsActive::class,
             AuditActivityMiddleware::class,
             \App\Http\Middleware\TeamLeaderAccess::class,
         ]);
         $middleware->api(append: [
+            \App\Http\Middleware\EnsureAccountIsActive::class,
             AuditActivityMiddleware::class,
         ]);
         $middleware->alias([
@@ -31,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+        $middleware->appendToPriorityList(\Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class, \App\Http\Middleware\EnsureAccountIsActive::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

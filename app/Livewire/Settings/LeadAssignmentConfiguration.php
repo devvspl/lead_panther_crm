@@ -59,13 +59,25 @@ class LeadAssignmentConfiguration extends Component
         $ids = $leader ? TeamAccess::executives(auth()->user(),false)->pluck('id')->all() : null;
         $projects = $org->projects()->withoutGlobalScopes()->pluck('projects.name','projects.id')->all();
         $effective = $service->assignmentDefaults($org);
+        $activeTeams = $service->assignmentTeams($org->id)->whereHas('members', fn ($members) => $members
+            ->where('is_active', true)->whereHas('user', fn ($users) => $users->where('status', 'active')
+                ->where('organization_id', $org->id)->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['Executive','Sales Executive','sales-executive','sales_executive']))))
+            ->orderBy('name')->get();
+        $rosterTeamIds = $activeTeams->pluck('id')->when($effective['team_id'], fn ($teamIds) => $teamIds->filter(fn ($id) => (int) $id === (int) $effective['team_id']));
+        $activeMemberships = \App\Models\SalesTeamMember::with('salesTeam')->whereIn('sales_team_id', $rosterTeamIds)
+            ->where('is_active', true)->whereHas('user', fn ($users) => $users->where('status', 'active')->where('organization_id', $org->id))->get();
+        $activeIds = $activeMemberships->pluck('user_id')->unique()->all();
+        $ids = $ids === null ? $activeIds : array_values(array_intersect($ids, $activeIds));
         $ownsPendingPool = !$leader || (!empty($effective['team_id']) && TeamAccess::teams(auth()->user())->whereKey($effective['team_id'])->exists());
         if ($leader && $ownsPendingPool) $ids = array_values(array_intersect($ids, \App\Models\SalesTeamMember::where('sales_team_id', $effective['team_id'])->pluck('user_id')->all()));
         return view('livewire.settings.lead-assignment-configuration',[
             'canConfigure'=>auth()->user()->hasRole('Super Admin') || ($leader && $ownsPendingPool && auth()->user()->can('assign-team-leads')),
             'isTeamLeader'=>$leader,
-            'teams'=>$service->assignmentTeams($org->id)->pluck('name','id')->all(),
-            'statistics'=>$service->assignmentStatistics($org,$ids),
+            'teams'=>$activeTeams->pluck('name','id')->all(),
+            'statistics'=>collect($service->assignmentStatistics($org,$ids))->map(function ($row) use ($activeMemberships) {
+                $row['team'] = $activeMemberships->where('user_id', $row['id'])->pluck('salesTeam.name')->unique()->implode(', ');
+                return $row;
+            })->all(),
             'effective'=>$effective,
             'unassigned'=>$ownsPendingPool ? $service->assignmentPendingLeads($org->id)->count() : null,
             'projects'=>$projects,

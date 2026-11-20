@@ -38,6 +38,26 @@ class OrganizationAssignmentTest extends TestCase
         }
     }
     private function service(): LeadDistributionService { return app(LeadDistributionService::class); }
+
+    public function test_configuration_lists_only_active_teams_and_active_memberships(): void
+    {
+        $this->agents[1]->update(['status' => 'inactive']);
+        SalesTeamMember::where('sales_team_id', $this->team->id)->where('user_id', $this->agents[2]->id)->update(['is_active' => false]);
+        $empty = SalesTeam::create(['name' => 'Empty excluded team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id]);
+        $inactive = SalesTeam::create(['name' => 'Inactive excluded team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id]);
+        SalesTeamMember::create(['sales_team_id' => $inactive->id, 'user_id' => $this->agents[1]->id, 'is_active' => true]);
+        $revoked = SalesTeam::create(['name' => 'Revoked excluded team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id]);
+        SalesTeamMember::create(['sales_team_id' => $revoked->id, 'user_id' => $this->agents[2]->id, 'is_active' => false]);
+        $this->configure(['team_id' => $this->team->id, 'members' => [$this->agents[0]->id => ['available' => false, 'priority' => 1]]]);
+        $before = $this->org->fresh()->assignment_config;
+        $component = Livewire::test(LeadAssignmentConfiguration::class, ['organizationId' => $this->org->id]);
+        $component->assertViewHas('teams', fn ($teams) => array_keys($teams) === [$this->team->id]);
+        $component->assertViewHas('statistics', fn ($rows) => count($rows) === 1 && $rows[0]['id'] === $this->agents[0]->id
+            && $rows[0]['team'] === 'Sales' && $rows[0]['available'] === false);
+        $this->assertSame($before, $this->org->fresh()->assignment_config);
+        $this->assertTrue(SalesTeam::whereKey($empty->id)->exists());
+        $this->assertTrue(SalesTeam::whereKey($inactive->id)->exists());
+    }
     private function configure(array $overrides=[]): void
     {
         $settings=array_replace($this->service()->assignmentDefaults($this->org->fresh()),['enabled'=>true,'timezone'=>'UTC'],$overrides);

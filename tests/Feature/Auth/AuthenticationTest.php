@@ -11,6 +11,30 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_inactive_account_cannot_login_even_with_correct_password(): void
+    {
+        $user = User::factory()->create(['status' => 'inactive']);
+        Volt::test('pages.auth.login')->set('form.email', $user->email)
+            ->set('form.password', 'password')->call('login')->assertHasErrors('form.email');
+        $this->assertGuest();
+    }
+
+    public function test_deactivated_account_loses_existing_session_access(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $user->update(['status' => 'inactive']);
+        $this->get('/dashboard')->assertRedirect(route('login'));
+        $this->assertGuest();
+    }
+
+    public function test_inactive_account_is_blocked_from_authenticated_api(): void
+    {
+        $user = User::factory()->create(['status' => 'inactive']);
+        $this->actingAs($user)->getJson('/api/leads/999999')->assertForbidden();
+        $this->assertGuest();
+    }
+
     public function test_login_screen_can_be_rendered(): void
     {
         $response = $this->get('/login');

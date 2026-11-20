@@ -21,6 +21,36 @@ class MetaIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_scheduled_meta_sync_persists_all_discovered_forms_without_overwriting_routing(): void
+    {
+        $org = Organization::create(['name' => 'Catalogue client', 'status' => 'active']);
+        $client = Client::create(['name' => 'Catalogue owner', 'organization_id' => $org->id, 'status' => 'active']);
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Mapped project']);
+        $source = \App\Models\LeadSource::create(['name' => 'meta']);
+        $campaign = Campaign::create(['project_id' => $project->id, 'lead_source_id' => $source->id, 'name' => 'Mapped campaign']);
+        $account = PortalAccount::create(['name' => 'Catalogue account', 'type' => 'meta', 'status' => 'active']);
+        $account->setCredential('page_id', 'catalog-page');
+        $account->setCredential('access_token', 'catalog-token');
+        LeadFormMapping::create(['portal_account_id' => $account->id, 'form_id' => 'catalog-0', 'form_name' => 'Old name',
+            'client_id' => $client->id, 'project_id' => $project->id, 'campaign_id' => $campaign->id, 'status' => 'active']);
+        $page = array_map(fn ($i) => ['id' => 'catalog-'.$i, 'name' => 'Actual form '.$i, 'status' => $i === 0 ? 'ACTIVE' : 'ARCHIVED'], range(0, 99));
+        Http::fake(function ($request) use ($page) {
+            if (str_contains($request->url(), '/leadgen_forms')) {
+                return Http::response(isset($request['after'])
+                    ? ['data' => [['id' => 'catalog-100', 'name' => 'New final form', 'status' => 'ARCHIVED']]]
+                    : ['data' => $page, 'paging' => ['cursors' => ['after' => 'next-catalog-page']]], 200);
+            }
+            return Http::response(['data' => []], 200);
+        });
+        $this->artisan('meta:sync-leads', ['--account' => $account->id])->assertExitCode(0);
+        $this->assertSame(101, $account->formMappings()->count());
+        $this->assertDatabaseHas('lead_form_mappings', ['portal_account_id' => $account->id, 'form_id' => 'catalog-0',
+            'form_name' => 'Actual form 0', 'client_id' => $client->id, 'project_id' => $project->id, 'campaign_id' => $campaign->id]);
+        $this->assertDatabaseHas('lead_form_mappings', ['portal_account_id' => $account->id, 'form_id' => 'catalog-100', 'form_name' => 'New final form', 'status' => 'archived', 'campaign_id' => null]);
+        $this->artisan('meta:sync-leads', ['--account' => $account->id])->assertExitCode(0);
+        $this->assertSame(101, $account->formMappings()->count());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

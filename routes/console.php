@@ -76,8 +76,8 @@ app(\App\Services\ScheduledTaskService::class)->command('operational-notificatio
 // Schedule 4: Auto-offline Inactive Team Members (Every 5 Minutes)
 app(\App\Services\ScheduledTaskService::class)->command('team-availability','team:auto-offline')->everyFiveMinutes();
 
-// Schedule 5: Automatically Sync Meta (Facebook) Lead Ads Leads (Every 10 Minutes)
-app(\App\Services\ScheduledTaskService::class)->command('meta-lead-sync','meta:sync-leads')->everyTenMinutes();
+// Schedule 5: Discover/save Meta forms and sync leads (Every 10 Minutes).
+app(\App\Services\ScheduledTaskService::class)->command('meta-lead-sync','meta:sync-leads')->everyTenMinutes()->withoutOverlapping();
 
 // Schedule 6: Daily Backup of Database + Documents Disk
 app(\App\Services\ScheduledTaskService::class)->command('database-backup','backup:run')->daily();

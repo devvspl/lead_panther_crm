@@ -180,7 +180,18 @@ class MetaLeadSyncService
                         $batchCount = count($data);
                         $activeCountInBatch = 0;
                         foreach ($data as $f) {
+                            if (empty($f['id'])) continue;
                             $formStatus = strtoupper($f['status'] ?? 'ACTIVE');
+                            // Persist the complete form catalogue before lead limits/time budgets apply.
+                            // Only Meta metadata changes here; administrator routing stays untouched.
+                            LeadFormMapping::updateOrCreate([
+                                'portal_account_id' => $account->id,
+                                'form_id' => (string) $f['id'],
+                            ], [
+                                'form_name' => trim((string) ($f['name'] ?? '')) ?: 'Form #'.$f['id'],
+                                'page_id' => $pageId,
+                                'status' => strtolower($formStatus),
+                            ]);
                             // Filter out ARCHIVED or INACTIVE forms during full page discovery to prevent 504 timeouts
                             if ($formStatus !== 'ACTIVE') {
                                 continue;
@@ -233,7 +244,7 @@ class MetaLeadSyncService
             if ($account->formMappings()->exists()) {
                 $existingIds = array_column($targetForms, 'id');
                 $mergedFromDbCount = 0;
-                foreach ($account->formMappings as $mapping) {
+                foreach ($account->formMappings()->get() as $mapping) {
                     $mStatus = strtolower($mapping->status ?? 'active');
                     if ($mStatus === 'active' && !in_array($mapping->form_id, $existingIds)) {
                         $targetForms[] = [

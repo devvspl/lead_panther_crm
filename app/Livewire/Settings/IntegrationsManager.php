@@ -11,6 +11,7 @@ use App\Models\LeadFormMapping;
 use App\Models\Project;
 use App\Models\Campaign;
 use App\Models\Client;
+use App\Models\MetaAdRecord;
 use App\Models\LeadSource;
 use App\Services\GitSyncService;
 use Illuminate\Support\Facades\Http;
@@ -813,12 +814,30 @@ class IntegrationsManager extends Component
         $term = mb_strtolower(trim($this->search));
         if ($term !== '') {
             $campaigns = Campaign::pluck('name', 'id')->toArray();
-            $forms = $forms->filter(function ($item) use ($term, $campaigns) {
+            $clients = Client::pluck('name', 'id')->toArray();
+            $metaAdRecords = MetaAdRecord::where('kind', 'ad')
+                ->whereNotNull('lead_form_id')
+                ->pluck('campaign_id', 'lead_form_id')
+                ->toArray();
+            $metaCampaignNames = MetaAdRecord::where('kind', 'campaign')
+                ->pluck('name', 'remote_id')
+                ->toArray();
+
+            $forms = $forms->filter(function ($item) use ($term, $campaigns, $clients, $metaAdRecords, $metaCampaignNames) {
                 $id = (string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? ''));
                 $name = mb_strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
                 $cId = $this->formCampaignMap[$id] ?? null;
                 $campName = $cId && isset($campaigns[$cId]) ? mb_strtolower($campaigns[$cId]) : '';
-                return str_contains(mb_strtolower($id), $term) || str_contains($name, $term) || str_contains($campName, $term);
+                $clientId = $this->formClientMap[$id] ?? null;
+                $clientName = $clientId && isset($clients[$clientId]) ? mb_strtolower($clients[$clientId]) : '';
+                $metaCampId = $metaAdRecords[$id] ?? null;
+                $metaCampName = $metaCampId && isset($metaCampaignNames[$metaCampId]) ? mb_strtolower($metaCampaignNames[$metaCampId]) : '';
+
+                return str_contains(mb_strtolower($id), $term)
+                    || str_contains($name, $term)
+                    || str_contains($campName, $term)
+                    || str_contains($clientName, $term)
+                    || str_contains($metaCampName, $term);
             });
         }
 
@@ -981,15 +1000,18 @@ class IntegrationsManager extends Component
                 'priority' => 1,
                 'render' => function ($row) use ($formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
+                    $fName = is_array($row) ? ($row['name'] ?? null) : $row->name;
                     $mapping = $formDetails->get($fId);
-                    $linkedAd = $mapping?->ads()->with('campaignRecord')->first();
-                    $campaignName = $linkedAd?->campaignRecord?->name 
-                        ?? data_get($linkedAd?->data, 'campaign_name')
+                    $linkedAds = $mapping?->ads()->with('campaignRecord')->get() ?? collect();
+                    $matchingAd = $linkedAds->first(fn ($a) => $a->campaignRecord && strtolower($a->campaignRecord->name) === strtolower((string) $fName))
+                        ?? $linkedAds->first();
+                    $campaignName = $matchingAd?->campaignRecord?->name 
+                        ?? data_get($matchingAd?->data, 'campaign_name')
                         ?? $mapping?->campaign?->name;
                     if ($campaignName) {
                         return '<div class="min-w-0 pr-1">'
                             . '<span class="font-semibold text-ink text-xs block truncate" title="' . e($campaignName) . '">' . e($campaignName) . '</span>'
-                            . ($linkedAd ? '<span class="text-muted text-[10px] block mt-0.5 font-mono">Linked Ad: ' . e($linkedAd->name ?: $linkedAd->remote_id) . '</span>' : '')
+                            . ($matchingAd ? '<span class="text-muted text-[10px] block mt-0.5 font-mono">Linked Ad: ' . e($matchingAd->name ?: $matchingAd->remote_id) . '</span>' : '')
                             . '</div>';
                     }
                     return '<div class="text-muted text-[11px]">'

@@ -2000,8 +2000,10 @@ class DashboardShell extends Component
         $newLeads = (clone $leadsQuery)->whereIn('current_stage', array_merge(Lead::stageValues('new'), Lead::stageValues('assigned')))->count();
         $inProgress = (clone $leadsQuery)->whereIn('current_stage', array_merge(...array_map([Lead::class, 'stageValues'], ['contacted', 'interested', 'follow_up', 'meeting_scheduled', 'site_visit', 'negotiation', 'booking', 'payment_received'])))->count();
 
+        $leadIdsQuery = (clone $leadsQuery)->select('id');
+
         $followupsDue = Followup::where('status', 'pending')
-            ->whereIn('lead_id', Lead::withoutGlobalScopes()->whereHas('campaign', fn ($q) => $q->where('project_id', $project->id))->select('id'))
+            ->whereIn('lead_id', (clone $leadIdsQuery))
             ->where('due_at', '<=', now()->endOfDay())
             ->count();
 
@@ -2009,7 +2011,7 @@ class DashboardShell extends Component
         $lostLeads = (clone $leadsQuery)->whereIn('current_stage', ['lost', 'closed_lost', 'invalid', 'unreachable'])->count();
 
         $todayFollowups = Followup::where('status', 'pending')
-            ->whereIn('lead_id', Lead::withoutGlobalScopes()->whereHas('campaign', fn ($q) => $q->where('project_id', $project->id))->select('id'))
+            ->whereIn('lead_id', (clone $leadIdsQuery))
             ->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])
             ->with(['lead' => fn ($q) => $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()])])
             ->orderBy('due_at', 'asc')

@@ -369,4 +369,67 @@ class MetaAdsHierarchySyncTest extends TestCase
         $this->assertEquals($projectA->id, $lead->campaign->project_id);
         $this->assertEquals('Prestige Luxury Festival Campaign', $lead->campaign->name);
     }
+
+    public function test_forms_table_searches_by_meta_campaign_and_assigned_client_name(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Deltek Org', 'type' => 'builder', 'status' => 'active']);
+        $deltekClient = \App\Models\Client::create(['name' => 'Deltek Client', 'organization_id' => $org->id, 'status' => 'active']);
+        \Spatie\Permission\Models\Role::findOrCreate('Super Admin', 'web');
+        $admin = \App\Models\User::factory()->create(['organization_id' => $org->id]);
+        $admin->assignRole('Super Admin');
+
+        $account = PortalAccount::create([
+            'name' => 'Meta Main Account',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+
+        $metaAdAccount = MetaAdAccount::create([
+            'portal_account_id' => $account->id,
+            'ad_account_id' => '172678813',
+            'name' => 'Lead Panther Main Ads',
+            'status' => 'active',
+        ]);
+
+        MetaAdRecord::create([
+            'meta_ad_account_id' => $metaAdAccount->id,
+            'ad_account_id' => '172678813',
+            'kind' => 'campaign',
+            'remote_id' => '52584064756875',
+            'name' => 'DHOLERA EMI_01',
+            'status' => 'ACTIVE',
+            'data' => ['objective' => 'LEAD_GENERATION'],
+            'synced_at' => now(),
+        ]);
+
+        MetaAdRecord::create([
+            'meta_ad_account_id' => $metaAdAccount->id,
+            'ad_account_id' => '172678813',
+            'kind' => 'ad',
+            'remote_id' => '52584064756675',
+            'name' => 'DHOLERA EMI_01 Ad',
+            'campaign_id' => '52584064756875',
+            'lead_form_id' => '1971751056790364',
+            'status' => 'ACTIVE',
+            'data' => [],
+            'synced_at' => now(),
+        ]);
+
+        $mapping = LeadFormMapping::create([
+            'portal_account_id' => $account->id,
+            'form_id' => '1971751056790364',
+            'form_name' => 'DHOLERA EMI_01',
+            'client_id' => $deltekClient->id,
+            'status' => 'active',
+        ]);
+
+        \Livewire\Livewire::actingAs($admin)
+            ->test(\App\Livewire\Settings\IntegrationsManager::class)
+            ->set('search', 'Deltek')
+            ->assertSee('DHOLERA EMI_01')
+            ->set('search', 'DHOLERA')
+            ->assertSee('DHOLERA EMI_01')
+            ->set('search', 'NonExistentXYZ')
+            ->assertDontSee('1971751056790364');
+    }
 }

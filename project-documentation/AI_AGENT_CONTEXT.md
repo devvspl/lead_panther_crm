@@ -31,7 +31,7 @@ Laravel12.66/PHP8.2+, Livewire3.8/Volt, Blade/Alpine/Tailwind/Vite monolith. Elo
 | Access/roles | Models/User.php, Models/Scopes/ClientScope.php; Support/TeamAccess.php, NavigationConfig.php; RoleSeeder/TeamLeaderRoleSeeder |
 | SLA | Services/ExecutiveResponseService.php, Observers/FirstResponseObserver.php, Models/LeadAssignment.php |
 | Notifications | Services/NotificationDeliveryService.php, BrowserPushService.php, EmailDesignService.php; Console/Commands/CheckWebNotificationAlerts.php |
-| Meta | Livewire/Settings/IntegrationsManager.php, MetaAdAccounts.php; Services/MetaLeadSyncService.php, MetaAdAccountService.php |
+| Meta | Livewire/Settings/IntegrationsManager.php, MetaAdAccounts.php; Services/MetaLeadSyncService.php, MetaFormSyncService.php, MetaAdAccountService.php |
 | Archive | Services/LeadArchiveService.php; Models/Builders/ArchiveAwareBuilder.php |
 | Schedule/ops | routes/console.php; Services/ScheduledTaskService.php, GitSyncService.php; Jobs and Console/Commands |
 | Audits | Models/AuditLog.php, Observers/AuditLogObserver.php, Support/AuditContext.php, AuditRedactor.php; AppServiceProvider |
@@ -68,3 +68,7 @@ Check status/diff first; preserve existing changes. Follow AGENTS codebase-memor
 ## Detailed references
 
 [Architecture](PROJECT_OVERVIEW.md) · [Source map](PROJECT_STRUCTURE.md) · [Schema](DATABASE_SCHEMA.md) · [Roles](USER_ROLES_PERMISSIONS.md) · [Workflows](BUSINESS_WORKFLOWS.md) · [Distribution](LEAD_DISTRIBUTION_FLOW.md) · [Scheduler](CRON_QUEUE_SYSTEM.md) · [Integrations](API_INTEGRATIONS.md) · [UI](FRONTEND_COMPONENTS.md) · [Issues](KNOWN_ISSUES.md) · [Guidelines](DEVELOPMENT_GUIDELINES.md).
+
+## Meta fetch follow-up (21 November 2026)
+
+Manual Page form fetch and scheduled discovery now share MetaFormSyncService. Cursor pagination follows paging.next even for short/empty pages; cached rows are not reported as fresh API results. Audit actions meta.forms.completed/partial/failed expose safe per-Page counts/errors in settings. Campaign/ad-set sync remains separate under Connected Ad Accounts, with per-edge counts/history and an explicit Sync Campaigns & Ad Sets action. Saved mappings are preserved and fetching forms does not invent CRM campaigns. MetaLeadSyncService uses the configured Graph version; older webhook/connection-test paths still need version review.

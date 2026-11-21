@@ -1,6 +1,6 @@
 <section class="space-y-4 border-t border-border pt-6" wire:poll.30s>
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div><h3 class="font-bold text-ink">Connected Ad Accounts</h3><p class="text-xs text-muted">Independent connections, campaigns and reporting.</p></div>
+        <div><h3 class="font-bold text-ink">Connected Ad Accounts</h3><p class="text-xs text-muted">Fetch campaigns, ad sets, ads and insights here. Page lead forms are fetched separately below.</p></div>
         <button type="button" wire:click="edit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white"><x-ui.team-icon name="add" /> Add Ad Account</button>
     </div>
     @if($message)<p role="status" class="rounded-lg border border-border bg-canvas p-3 text-xs text-ink">{{ $message }}</p>@endif
@@ -14,7 +14,7 @@
                         <td class="p-3 font-mono">act_{{ $account->ad_account_id }}</td>
                         <td class="p-3">{{ $account->business_name ?: '—' }}<span class="block text-muted">{{ $account->business_id }}</span></td>
                         <td class="p-3">{{ $account->connection_name ?: 'Not tested' }}</td>
-                        <td class="p-3"><span @class(['rounded-full px-2 py-1 font-semibold', 'bg-success/10 text-success' => $account->status === 'connected', 'bg-warning/10 text-warning' => $account->status !== 'connected'])>{{ str_replace('_', ' ', ucfirst($account->status)) }}</span>
+                        <td class="p-3"><span @class(['rounded-full px-2 py-1 font-semibold', 'bg-success/10 text-success' => $account->status === 'connected', 'bg-warning/10 text-warning' => $account->status !== 'connected'])>{{ $account->sync_state ? 'Sync in progress' : str_replace('_', ' ', ucfirst($account->status)) }}</span>
                             <span class="block mt-2 text-muted">{{ $account->token_expires_at ? 'Expires '.$account->token_expires_at->format('d M Y H:i') : 'Expiry not supplied' }}</span>
                             @if($account->last_error)<span class="block mt-1 text-muted max-w-xs">{{ $account->last_error }}</span>@endif
                         </td>
@@ -58,7 +58,12 @@
             </tbody></table></div>
             {{ $records->links() }}
             <div class="text-xs space-y-2"><h5 class="font-bold">Associated Pages</h5>@forelse($selected->pages as $page)<p>{{ $page->name }} · {{ $page->getCredential('page_id') }}</p>@empty<p class="text-muted">No accessible Pages discovered. Ad Account access does not grant Page access.</p>@endforelse</div>
-            <details class="text-xs"><summary class="cursor-pointer font-bold">Recent Sync &amp; Connection History</summary><div class="space-y-2 mt-2">@foreach($logs as $log)<p>{{ $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>@endforeach</div></details>
+            <details class="text-xs"><summary class="cursor-pointer font-bold">Recent Sync &amp; Connection History</summary><div class="space-y-2 mt-2">@foreach($logs as $log)@php($details = json_decode($log->to_value ?? '{}', true) ?: [])
+                        <div class="rounded-lg border border-border p-2"><p class="font-semibold">{{ $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>
+                        @if(isset($details['kind']))<p>{{ ucfirst($details['kind']) }}: {{ $details['fetched'] ?? 0 }} fetched · {{ $details['new'] ?? 0 }} new · {{ $details['updated'] ?? 0 }} updated · {{ !empty($details['has_more']) ? 'More pages pending' : 'Edge complete' }}</p>@endif
+                        @if(isset($details['counts']))<p>@foreach($details['counts'] as $kind => $count){{ ucfirst($kind) }}: {{ $count }} @endforeach</p>@endif
+                        @if(isset($details['message']))<p>{{ $details['message'] }}</p>@endif
+                        @if($details['http_status'] ?? null)<p class="text-muted">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>@endif</div>@endforeach</div></details>
         </div>
     @endif
 

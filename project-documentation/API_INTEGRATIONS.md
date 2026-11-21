@@ -70,3 +70,7 @@ Private documents use documents disk and signed authenticated download; proposal
 | Upload | UPLOAD_MAX_FILE_SIZE_KB; individual components also hardcode limits |
 
 Actual .env values were not read. Meta and Git credentials are primarily database-driven. An env name appearing in source does not prove every relevant code path consumes it.
+
+## Form discovery diagnostics update (21 November 2026)
+
+MetaFormSyncService now owns settings/scheduled Page catalogue discovery. It uses the shared configured Graph client and safe cursor extraction; does not stop on fewer than100 records; persists remote metadata without replacing routing; retains saved mappings after API failures. Settings show fresh/new/updated/saved counts, selected Page, API page count and safe permission/expiry/rate-limit codes. AuditLog stores meta.forms.completed/partial/failed; Laravel logs include correlation run IDs and counts without tokens/raw provider messages. Connected Ad Account history records sync_requested/started, per-kind fetched/new/updated counts and completion totals. Form fetch does not fetch campaigns/ad sets; use Sync Campaigns & Ad Sets for linked tested Ad Accounts. MetaLeadSyncService Page/lead polling now reads services.meta.graph_version; other old connection/webhook calls may still use v19.0.

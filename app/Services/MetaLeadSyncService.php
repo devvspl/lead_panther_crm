@@ -85,12 +85,14 @@ class MetaLeadSyncService
         ?int $overrideCampaignId = null,
         ?string $customAccessToken = null
     ): array {
+        $graphVersion = config('services.meta.graph_version', 'v27.0');
         $pageId = $account->getCredential('page_id');
         $accessToken = $customAccessToken ?: $account->getCredential('access_token');
 
         Log::info("[MetaLeadSyncService] [Step 1: Init] Sync initiated for PortalAccount #{$account->id} ('{$account->name}'). Page ID: " . ($pageId ?: 'N/A') . ", Form Filter: " . ($formId ?: 'ALL') . ", Lead Limit: {$limit}, Override Project ID: " . ($overrideProjectId ?: 'None') . ", Override Campaign ID: " . ($overrideCampaignId ?: 'None') . ", Custom Token Provided: " . ($customAccessToken ? 'Yes' : 'No'));
 
         if (empty($accessToken)) {
+            if (!$formId) app(MetaFormSyncService::class)->fetch($account, null, app()->runningInConsole() ? 'scheduler' : 'lead_sync');
             Log::warning("[MetaLeadSyncService] [Step 1: Init] Aborted: Missing Page Access Token for Account #{$account->id}.");
             return [
                 'success' => false,
@@ -108,7 +110,7 @@ class MetaLeadSyncService
         if (!empty($pageId) && !empty($accessToken)) {
             Log::info("[MetaLeadSyncService] [Step 2: Token Probe] Probing Page endpoint for genuine Page Access Token for Page ID: {$pageId}...");
             try {
-                $probe = Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$pageId}", [
+                $probe = Http::timeout(10)->get("https://graph.facebook.com/{$graphVersion}/{$pageId}", [
                     'fields' => 'id,name,access_token',
                     'access_token' => $accessToken,
                 ]);
@@ -141,105 +143,9 @@ class MetaLeadSyncService
             Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Specific Form ID provided: {$formId}");
             $targetForms[] = ['id' => $formId, 'name' => "Form #{$formId}"];
         } else {
-            // First try listing from Meta Graph API if pageId is present
-            if (!empty($pageId)) {
-                Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Querying Meta Graph API endpoint https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms...");
-                try {
-                    $endpoint = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
-                    $afterCursor = null;
-                    $seenCursors = [];
-                    $maxIterations = 500; // Unlimited in practice (up to 50,000 forms)
-                    $iteration = 0;
-
-                    while ($iteration < $maxIterations) {
-                        $iteration++;
-                        $queryParams = [
-                            'access_token' => $accessToken,
-                            'fields' => 'id,name,status,leads_count,created_time',
-                            'limit' => 100,
-                        ];
-                        if ($afterCursor) {
-                            $queryParams['after'] = $afterCursor;
-                        }
-
-                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Requesting forms page #{$iteration}" . ($afterCursor ? " (cursor: {$afterCursor})" : " (initial batch)"));
-
-                        $formsResponse = Http::timeout(20)->get($endpoint, $queryParams);
-                        if (!$formsResponse->successful()) {
-                            $errorMsg = $formsResponse->json('error.message') ?? 'Failed to list lead forms from Meta API';
-                            Log::warning("[MetaLeadSyncService] [Step 3: Discover Forms] Could not list forms for page {$pageId} on iteration {$iteration}: {$errorMsg}");
-                            break;
-                        }
-
-                        $data = $formsResponse->json('data');
-                        if (!is_array($data) || empty($data)) {
-                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} returned empty form data.");
-                            break;
-                        }
-
-                        $batchCount = count($data);
-                        $activeCountInBatch = 0;
-                        foreach ($data as $f) {
-                            if (empty($f['id'])) continue;
-                            $formStatus = strtoupper($f['status'] ?? 'ACTIVE');
-                            // Persist the complete form catalogue before lead limits/time budgets apply.
-                            // Only Meta metadata changes here; administrator routing stays untouched.
-                            $metadata = [
-                                'form_name' => trim((string) ($f['name'] ?? '')) ?: 'Form #'.$f['id'],
-                                'page_id' => $pageId,
-                                'status' => strtolower($formStatus),
-                            ];
-                            if ($createdAt = LeadFormMapping::parseMetaCreatedTime($f['created_time'] ?? null)) $metadata['meta_created_at'] = $createdAt;
-                            LeadFormMapping::updateOrCreate([
-                                'portal_account_id' => $account->id,
-                                'form_id' => (string) $f['id'],
-                            ], $metadata);
-                            // Filter out ARCHIVED or INACTIVE forms during full page discovery to prevent 504 timeouts
-                            if ($formStatus !== 'ACTIVE') {
-                                continue;
-                            }
-                            $targetForms[] = [
-                                'id' => (string) $f['id'],
-                                'name' => $f['name'] ?? "Form #{$f['id']}",
-                                'status' => $formStatus,
-                            ];
-                            $activeCountInBatch++;
-                        }
-
-                        Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] Page #{$iteration} added {$activeCountInBatch} active form(s) out of {$batchCount} total. Cumulative active count: " . count($targetForms));
-
-                        if ($batchCount < 100) {
-                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] End of API pagination reached ({$batchCount} < 100).");
-                            break;
-                        }
-
-                        $nextCursor = $formsResponse->json('paging.cursors.after');
-                        if (!$nextCursor) {
-                            $nextUrl = $formsResponse->json('paging.next');
-                            if ($nextUrl) {
-                                $parsedUrl = parse_url($nextUrl);
-                                if (!empty($parsedUrl['query'])) {
-                                    parse_str($parsedUrl['query'], $parsedQuery);
-                                    if (!empty($parsedQuery['after'])) {
-                                        $nextCursor = $parsedQuery['after'];
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!$nextCursor || in_array($nextCursor, $seenCursors, true)) {
-                            Log::debug("[MetaLeadSyncService] [Step 3: Discover Forms] No new cursor available or already seen. Halting API form discovery.");
-                            break;
-                        }
-
-                        $seenCursors[] = $nextCursor;
-                        $afterCursor = $nextCursor;
-                    }
-
-                    Log::info("[MetaLeadSyncService] [Step 3: Discover Forms] Discovered " . count($targetForms) . " active form(s) from Meta Graph API across {$iteration} request(s).");
-                } catch (Throwable $e) {
-                    Log::error("[MetaLeadSyncService] [Step 3: Discover Forms] Exception listing forms: " . $e->getMessage());
-                }
+            $discovery = app(MetaFormSyncService::class)->fetch($account, $accessToken, app()->runningInConsole() ? 'scheduler' : 'lead_sync');
+            foreach ($discovery['forms'] as $form) {
+                if (strtoupper($form['status']) === 'ACTIVE') $targetForms[] = $form;
             }
 
             // Also merge any mapped active forms in LeadFormMapping if not already added
@@ -299,7 +205,7 @@ class MetaLeadSyncService
         $totalFetched = 0;
         $totalCreated = 0;
         $totalDuplicates = 0;
-        $totalErrors = 0;
+        $totalErrors = isset($discovery) && $discovery['status'] !== 'completed' ? 1 : 0;
         $formSummaries = [];
 
         $metaMapper = new MetaLeadMapper();
@@ -399,7 +305,7 @@ class MetaLeadSyncService
 
                     Log::debug("[MetaLeadSyncService] [Step 6: Form #{$currentFormId}] Requesting leads batch #{$leadBatchIndex} (batch limit: {$batchLimit})" . ($formLeadCursor ? " with cursor {$formLeadCursor}" : " (initial batch)"));
 
-                    $leadsResponse = Http::timeout(20)->get("https://graph.facebook.com/v19.0/{$currentFormId}/leads", $leadParams);
+                    $leadsResponse = Http::timeout(20)->get("https://graph.facebook.com/{$graphVersion}/{$currentFormId}/leads", $leadParams);
 
                     if (!$leadsResponse->successful()) {
                         $errorText = $leadsResponse->json('error.message') ?? 'HTTP ' . $leadsResponse->status();
@@ -666,6 +572,7 @@ class MetaLeadSyncService
         }
 
         $message = "Sync completed: {$totalCreated} new lead(s) ingested from {$formIndex} form(s). ({$totalDuplicates} duplicate(s) skipped).";
+        if (isset($discovery) && $discovery['status'] !== 'completed') $message .= ' Form discovery incomplete: '.$discovery['message'];
         if ($timedOutEarly) {
             $remainingForms = $totalFormCount - $formIndex;
             $message .= " Note: Processing safely paused after {$formIndex} form(s) ({$remainingForms} remaining) to prevent server gateway timeout. You can select specific forms from the dropdown to sync remaining.";

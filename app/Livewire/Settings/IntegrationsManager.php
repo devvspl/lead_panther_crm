@@ -21,6 +21,11 @@ class IntegrationsManager extends Component
 {
     use WithPagination;
 
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
     // Active Tab: 'meta' | 'git'
     public string $activeTab = 'meta';
     public string $portalType = 'meta';
@@ -74,6 +79,7 @@ class IntegrationsManager extends Component
     public array $formProjectMap = [];
     public array $formCampaignMap = [];
     public bool $isFetchingForms = false;
+    #[\Livewire\Attributes\Locked] public array $formFetchSummary = [];
 
     // Advanced Table State for Meta Lead Forms
     public string $search = '';
@@ -90,7 +96,7 @@ class IntegrationsManager extends Component
     public function updatedSelectedMappingAccountId(): void
     {
         $account = PortalAccount::where('type', 'meta')->findOrFail($this->selectedMappingAccountId);
-        $this->reset('availableForms', 'formClientMap', 'formProjectMap', 'formCampaignMap', 'search');
+        $this->reset('availableForms', 'formClientMap', 'formProjectMap', 'formCampaignMap', 'search', 'formFetchSummary');
         foreach ($account->formMappings as $mapping) {
             $this->availableForms[] = ['id' => $mapping->form_id, 'name' => $mapping->form_name,
                 'status' => strtoupper($mapping->status ?: 'ACTIVE'), 'created_time' => $mapping->meta_created_at?->toIso8601String()];
@@ -620,170 +626,42 @@ class IntegrationsManager extends Component
 
     public function fetchLeadForms(?int $accountId = null): void
     {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
         $targetId = $accountId ?: ($this->selectedMappingAccountId ?: $this->selectedAccountId);
-        $this->isFetchingForms = true;
-
         if (!$targetId) {
-            $this->isFetchingForms = false;
+            $this->dispatch('toast', type: 'warning', message: 'Save a Meta Page connection first.');
             return;
         }
-
-        $this->selectedMappingAccountId = $targetId;
-        $account = PortalAccount::with(['credentials', 'formMappings'])->find($targetId);
-
-        if (!$account) {
+        $account = PortalAccount::where('type', 'meta')->findOrFail($targetId);
+        $this->isFetchingForms = true;
+        try {
+            $result = app(\App\Services\MetaFormSyncService::class)->fetch($account);
+            $this->selectedMappingAccountId = $account->id;
+            // Reload the persisted catalogue: old routing is retained even after an API failure.
+            $this->updatedSelectedMappingAccountId();
+            $this->search = '';
+            $this->formFetchSummary = array_diff_key($result, ['forms' => true]);
+            $message = "Meta returned {$result['fetched']} forms ({$result['new']} new); {$result['saved']} saved in CRM. ".$result['message'];
+            $this->dispatch('toast', type: $result['status'] === 'completed' ? 'success' : 'warning', message: $message);
+        } finally {
             $this->isFetchingForms = false;
-            return;
         }
+    }
 
-        $forms = [];
-        $pageId = $account->getCredential('page_id') ?: $this->metaPageId;
-        $accessToken = $account->getCredential('access_token') ?: $this->metaAccessToken;
-
-        if ($account->type === 'meta' && $pageId && $accessToken) {
-            try {
-                $endpoint = "https://graph.facebook.com/v19.0/{$pageId}/leadgen_forms";
-                $afterCursor = null;
-                $seenCursors = [];
-                $maxIterations = 500; // Unlimited in practice (up to 50,000 forms)
-                $iteration = 0;
-
-                while ($iteration < $maxIterations) {
-                    $iteration++;
-                    $params = [
-                        'access_token' => $accessToken,
-                        'fields' => 'id,name,status,created_time',
-                        'limit' => 100,
-                    ];
-                    if ($afterCursor) {
-                        $params['after'] = $afterCursor;
-                    }
-
-                    $response = Http::timeout(20)->get($endpoint, $params);
-                    if (!$response->successful()) {
-                        $errorMsg = $response->json('error.message') ?? $response->body();
-                        \Illuminate\Support\Facades\Log::warning("IntegrationsManager: Meta API error fetching forms on iteration {$iteration}: {$errorMsg}");
-                        break;
-                    }
-
-                    $data = $response->json('data');
-                    if (!is_array($data) || empty($data)) {
-                        break;
-                    }
-
-                    foreach ($data as $item) {
-                        $forms[] = $item;
-                    }
-
-                    // If fewer than limit returned, no more forms exist
-                    if (count($data) < 100) {
-                        break;
-                    }
-
-                    // Extract next cursor from paging.cursors.after or paging.next
-                    $nextCursor = $response->json('paging.cursors.after');
-                    if (!$nextCursor) {
-                        $nextUrl = $response->json('paging.next');
-                        if ($nextUrl) {
-                            $parsedUrl = parse_url($nextUrl);
-                            if (!empty($parsedUrl['query'])) {
-                                parse_str($parsedUrl['query'], $parsedQuery);
-                                if (!empty($parsedQuery['after'])) {
-                                    $nextCursor = $parsedQuery['after'];
-                                }
-                            }
-                        }
-                    }
-
-                    if (!$nextCursor || in_array($nextCursor, $seenCursors, true)) {
-                        break;
-                    }
-
-                    $seenCursors[] = $nextCursor;
-                    $afterCursor = $nextCursor;
-                }
-            } catch (Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("IntegrationsManager: Exception fetching forms: " . $e->getMessage());
-            }
+    public function syncLinkedAdAccounts(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $pageId = $this->selectedMappingAccountId ?: $this->selectedAccountId;
+        $accounts = \App\Models\MetaAdAccount::where(fn ($q) => $q->where('portal_account_id', $pageId)
+            ->orWhereHas('pages', fn ($p) => $p->where('portal_accounts.id', $pageId)))
+            ->whereIn('status', ['connected', 'error', 'rate_limited'])->get();
+        foreach ($accounts as $account) {
+            app(\App\Services\MetaAdAccountService::class)->audit($account, 'sync_requested', ['origin' => 'page_forms', 'page_connection_id' => $pageId]);
+            \App\Jobs\SyncMetaAdAccount::dispatch($account->id);
         }
-
-        // Also merge any existing mappings from database so no previously saved forms are lost
-        $fetchedIds = array_map(fn($f) => (string) (is_array($f) ? $f['id'] : $f->id), $forms);
-        $savedMappings = $account->formMappings;
-        if ($savedMappings->isNotEmpty()) {
-            foreach ($savedMappings as $m) {
-                if (!in_array((string) $m->form_id, $fetchedIds)) {
-                    $forms[] = [
-                        'id' => (string) $m->form_id,
-                        'name' => $m->form_name,
-                        'status' => strtoupper($m->status ?: 'ACTIVE'),
-                        'created_time' => $m->meta_created_at?->toIso8601String(),
-                    ];
-                    $fetchedIds[] = (string) $m->form_id;
-                }
-            }
-        }
-
-        // Auto-store and sync each Form, Project, Campaign, and Client in Database
-        $defaultClientId = $this->metaDefaultClientId ?: (Client::first()?->id ?? (\App\Models\User::first()?->id ?? 1));
-        $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
-
-        foreach ($forms as $formItem) {
-            $fId = (string) (is_array($formItem) ? $formItem['id'] : $formItem->id);
-            $fName = trim((string) (is_array($formItem) ? ($formItem['name'] ?? '') : ($formItem->name ?? '')));
-            if (empty($fName)) {
-                $fName = 'Lead Form #' . $fId;
-            }
-            $rawStatus = (is_array($formItem) ? ($formItem['status'] ?? '') : ($formItem->status ?? '')) ?: 'active';
-            $fStatus = strtolower(trim((string) $rawStatus));
-
-            $mapping = LeadFormMapping::firstOrCreate(
-                [
-                    'portal_account_id' => $account->id,
-                    'form_id' => $fId,
-                ],
-                [
-                    'form_name' => $fName,
-                    'page_id' => $pageId ?? null,
-                    'status' => $fStatus,
-                ]
-            );
-
-            $createdTime = is_array($formItem) ? ($formItem['created_time'] ?? null) : ($formItem->created_time ?? null);
-            if ($createdAt = LeadFormMapping::parseMetaCreatedTime($createdTime)) $mapping->update(['meta_created_at' => $createdAt]);
-
-            if ($mapping->form_name !== $fName || $mapping->status !== $fStatus) {
-                $mapping->update([
-                    'form_name' => $fName,
-                    'status' => $fStatus,
-                ]);
-            }
-
-            // 1. Preserve existing Project / Campaign / Client mapping (Do NOT auto-create projects from code)
-            $projectId = $mapping->project_id;
-            $campaignId = $this->formCampaignMap[$fId] ?? ($mapping->campaign_id ?: null);
-            $clientId = $this->formClientMap[$fId] ?? ($mapping->client_id ?: $defaultClientId);
-
-            // Keep mapping in sync
-            $mapping->update([
-                'form_name' => $fName,
-                'project_id' => $projectId,
-                'campaign_id' => $campaignId,
-                'client_id' => $clientId,
-                'status' => $fStatus,
-            ]);
-
-            $this->formProjectMap[$fId] = $projectId;
-            $this->formCampaignMap[$fId] = $campaignId;
-            $this->formClientMap[$fId] = $clientId;
-        }
-
-        $this->availableForms = $forms;
-        $this->resetPage();
-        $this->isFetchingForms = false;
-
-        $count = count($forms);
-        $this->dispatch('toast', type: 'success', message: "Fetched {$count} Meta forms. Forms, projects, and campaigns stored in database.");
+        $this->dispatch('toast', type: $accounts->isEmpty() ? 'warning' : 'info', message: $accounts->isEmpty()
+            ? 'Add and test the correct Ad Account under Connected Ad Accounts first. A Page token alone does not fetch campaigns or ad sets.'
+            : 'Campaign and ad-set sync queued for '.$accounts->count().' linked Ad Account(s). Open Campaigns & Reporting there to see records and sync history.');
     }
 
     public function updatedFormProjectMap($value, $key): void
@@ -1222,6 +1100,13 @@ class IntegrationsManager extends Component
         }
 
         return view('livewire.settings.integrations-manager', [
+            'formSyncHistory' => \App\Models\AuditLog::where('subject_type', PortalAccount::class)
+                ->where('subject_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
+                ->where('action', 'like', 'meta.forms.%')->latest('id')->limit(10)->get()->map(function ($log) {
+                    $details = json_decode($log->to_value ?? '{}', true) ?: [];
+                    return ['id' => $log->id, 'at' => $log->created_at] + \Illuminate\Support\Arr::only($details,
+                        ['page_id', 'origin', 'status', 'pages', 'fetched', 'new', 'updated', 'saved', 'message', 'http_status', 'meta_code']);
+                }),
             'clients' => $clients,
             'projects' => $projects,
             'campaigns' => $campaigns,

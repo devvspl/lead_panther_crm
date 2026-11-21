@@ -16,7 +16,7 @@ class MetaAdAccountService
         if (!$response->successful() || $response->json('error')) {
             throw new MetaGraphException($response->status() === 429 || $response->serverError()
                 || in_array($code, [1, 2, 4, 17, 32, 613, 80004, 80005]) || (bool) $response->json('error.is_transient'),
-                $code === 190, max(60, min(3600, (int) $response->header('Retry-After') ?: 300)));
+                $code === 190, max(60, min(3600, (int) $response->header('Retry-After') ?: 300)), $response->status(), $code);
         }
         return $response->json() ?: [];
     }
@@ -65,6 +65,7 @@ class MetaAdAccountService
             $account->update(['status' => 'connected', 'retry_after' => null]);
             $deadline = microtime(true) + 25;
             $state = $account->sync_state ?? ['edge' => 0, 'after' => null, 'page_errors' => 0];
+            $this->audit($account, 'sync_started', ['resuming' => $account->sync_state !== null, 'edge' => $state['edge']]);
             $edges = [
                 ['campaign', 'campaigns', 'id,account_id,name,status,objective,created_time,updated_time'],
                 ['adset', 'adsets', 'id,account_id,name,status,campaign_id,daily_budget,lifetime_budget,created_time,updated_time'],
@@ -79,17 +80,22 @@ class MetaAdAccountService
                 if ($kind === 'insight') $params += ['level' => 'campaign', 'date_preset' => 'last_30d', 'time_increment' => 1];
                 $result = $this->get('act_'.$account->ad_account_id.'/'.$edge, $token, $params + ['limit' => 100]);
                 if ($account->fresh()->status !== 'connected' || $account->fresh()->access_token !== $token) return;
+                $new = $updated = 0;
                 foreach ($result['data'] ?? [] as $row) {
                     if ((string) ($row['account_id'] ?? '') !== $account->ad_account_id) throw new \RuntimeException('Unexpected Ad Account in synchronization response.');
                     $id = $kind === 'insight' ? ($row['campaign_id'].'_'.$row['date_start']) : $row['id'];
-                    $account->records()->updateOrCreate(['kind' => $kind, 'remote_id' => $id], [
+                    $record = $account->records()->updateOrCreate(['kind' => $kind, 'remote_id' => $id], [
                         'ad_account_id' => $account->ad_account_id, 'name' => $row['name'] ?? $row['campaign_name'] ?? null,
                         'campaign_id' => $kind === 'campaign' ? $row['id'] : ($row['campaign_id'] ?? null),
                         'adset_id' => $row['adset_id'] ?? null, 'status' => $row['status'] ?? null,
                         'report_date' => $row['date_start'] ?? null, 'data' => $row, 'synced_at' => now(),
                     ]);
+                    if ($record->wasRecentlyCreated) $new++;
+                    elseif ($record->wasChanged()) $updated++;
                 }
                 $next = $this->nextCursor($result);
+                $this->audit($account, 'records_fetched', ['kind' => $kind, 'fetched' => count($result['data'] ?? []),
+                    'new' => $new, 'updated' => $updated, 'has_more' => $next !== null]);
                 if ($next && $next === $state['after']) throw new \RuntimeException('Meta cursor did not advance.');
                 $state['after'] = $next;
                 if (!$next) $state['edge']++;
@@ -102,7 +108,8 @@ class MetaAdAccountService
             $account->update(['last_synced_at' => now(), 'status' => 'connected', 'retry_after' => null,
                 'sync_state' => null,
                 'last_error' => $pageErrors ? 'Ads synced. Some Pages need separate Page access; existing mappings were preserved.' : null]);
-            $this->audit($account, 'synced', ['records' => $account->records()->count(), 'page_access_errors' => $pageErrors]);
+            $this->audit($account, 'synced', ['records' => $account->records()->count(), 'page_access_errors' => $pageErrors,
+                'counts' => $account->records()->selectRaw('kind, COUNT(*) as total')->groupBy('kind')->pluck('total', 'kind')->all()]);
         } catch (\Throwable $e) {
             $this->failure($account, $e);
             // Throw only a sanitized error; queue failed-job payloads must never contain a token URL.
@@ -110,7 +117,7 @@ class MetaAdAccountService
         } finally { $lock->release(); }
     }
 
-    private function nextCursor(array $result): ?string
+    public function nextCursor(array $result): ?string
     {
         if (empty($result['paging']['next'])) return null;
         $after = data_get($result, 'paging.cursors.after');
@@ -191,7 +198,9 @@ class MetaAdAccountService
         $message = $error instanceof MetaGraphException ? $error->getMessage() : 'Synchronization could not finish. Test the connection and retry.';
         $account->update(['status' => $expired ? 'expired' : ($retryable ? 'rate_limited' : 'error'), 'last_error' => $message,
             'retry_after' => $retryable ? now()->addSeconds($error instanceof MetaGraphException ? $error->retryAfter : 300) : null]);
-        $this->audit($account, 'sync_failed', ['message' => $message]);
+        $this->audit($account, 'sync_failed', ['message' => $message,
+            'http_status' => $error instanceof MetaGraphException ? $error->httpStatus : null,
+            'meta_code' => $error instanceof MetaGraphException ? $error->metaCode : null]);
     }
 
     public function campaignRecord(PortalAccount $page, array $mapped): ?MetaAdRecord
@@ -219,6 +228,8 @@ class MetaAdAccountService
 
     public function audit(MetaAdAccount $account, string $action, array $details = []): void
     {
+        \Illuminate\Support\Facades\Log::log(str_contains($action, 'failed') ? 'warning' : 'info',
+            'Meta Ad Account: '.$action, $details + ['connection_id' => $account->id, 'ad_account_id' => $account->ad_account_id]);
         AuditLog::create(['user_id' => auth()->id(), 'action' => 'meta.ad_account.'.$action,
             'subject_type' => MetaAdAccount::class, 'subject_id' => $account->id, 'to_value' => $details + ['ad_account_id' => $account->ad_account_id],
             'context' => ['category' => 'integration', 'status' => str_contains($action, 'failed') ? 'failure' : 'success'], 'created_at' => now()]);

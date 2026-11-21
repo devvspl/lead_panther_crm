@@ -116,6 +116,7 @@ class MetaAdAccounts extends Component
             return;
         }
         SyncMetaAdAccount::dispatch($account->id);
+        app(MetaAdAccountService::class)->audit($account, 'sync_requested', ['origin' => 'ad_accounts']);
         $this->message = 'Synchronization queued.';
     }
 

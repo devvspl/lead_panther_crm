@@ -26,6 +26,9 @@ class MetaAdAccounts extends Component
     public string $tokenExpiry = '';
     public string $search = '';
     public string $kind = 'campaign';
+    public string $insightLevel = 'campaign';
+    public string $insightDatePreset = 'last_30d';
+    public string $statusFilter = '';
     public array $campaignMap = [];
     public string $message = '';
 
@@ -77,8 +80,12 @@ class MetaAdAccounts extends Component
             if ($account->exists && $account->ad_account_id !== $data['adAccountId']) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['adAccountId' => 'Add a separate connection for a different Ad Account.']);
             }
-            $account->fill(['name' => $data['name'], 'ad_account_id' => $data['adAccountId'], 'business_id' => $data['businessId'] ?: null,
-                'token_expires_at' => $this->tokenExpiry ?: null]);
+            $account->fill([
+                'name' => $data['name'],
+                'ad_account_id' => $data['adAccountId'],
+                'business_id' => $data['businessId'] ?: null,
+                'token_expires_at' => $this->tokenExpiry ?: null,
+            ]);
             if ($this->accessToken !== '') $account->access_token = $this->accessToken;
             if ($changed) $account->fill(['status' => 'untested', 'last_error' => null, 'retry_after' => null, 'sync_state' => null]);
             $account->save();
@@ -124,17 +131,33 @@ class MetaAdAccounts extends Component
     {
         $account = $this->account($id);
         $this->viewingId = $id;
-        $this->reset('search', 'kind', 'campaignMap');
+        $this->reset('search', 'kind', 'campaignMap', 'statusFilter', 'insightLevel', 'insightDatePreset');
         $this->campaignMap = $account->records()->where('kind', 'campaign')->pluck('crm_campaign_id', 'id')->all();
         $this->resetPage('metaRecordsPage');
     }
 
     public function updatedSearch(): void { $this->resetPage('metaRecordsPage'); }
+    public function updatedStatusFilter(): void { $this->resetPage('metaRecordsPage'); }
+    public function updatedInsightLevel(): void { $this->resetPage('metaRecordsPage'); }
+    public function updatedInsightDatePreset(): void { $this->resetPage('metaRecordsPage'); }
     public function closeRecords(): void { $this->viewingId = null; }
+
     public function updatedKind(): void
     {
         abort_unless(in_array($this->kind, ['campaign', 'adset', 'ad', 'insight']), 422);
         $this->resetPage('metaRecordsPage');
+    }
+
+    public function syncInsightsNow(): void
+    {
+        if (!$this->viewingId) return;
+        $account = $this->account($this->viewingId);
+        try {
+            $result = app(MetaAdAccountService::class)->syncInsights($account, $this->insightLevel, $this->insightDatePreset);
+            $this->message = "Insights ({$this->insightLevel}) synchronized: {$result['saved']} record(s) updated.";
+        } catch (\Throwable $e) {
+            $this->message = 'Insights sync failed: ' . $e->getMessage();
+        }
     }
 
     public function saveMapping(int $recordId): void
@@ -150,12 +173,41 @@ class MetaAdAccounts extends Component
     public function render()
     {
         $account = $this->viewingId ? $this->account($this->viewingId) : null;
-        $records = $account?->records()->where('kind', $this->kind)
-            ->when(trim($this->search) !== '', fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.trim($this->search).'%')->orWhere('remote_id', 'like', '%'.trim($this->search).'%')))
-            ->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
+        $query = $account?->records()->where('kind', $this->kind);
+
+        if ($query) {
+            if ($this->kind === 'insight') {
+                $query->where(function ($q) {
+                    $q->where('insight_level', $this->insightLevel)
+                      ->orWhereNull('insight_level');
+                });
+            }
+
+            if ($this->statusFilter !== '' && $this->kind !== 'insight') {
+                $query->where(function ($q) {
+                    $q->where('status', $this->statusFilter)
+                      ->orWhere('effective_status', $this->statusFilter);
+                });
+            }
+
+            if (trim($this->search) !== '') {
+                $s = trim($this->search);
+                $query->where(function ($q) use ($s) {
+                    $q->where('name', 'like', '%'.$s.'%')
+                      ->orWhere('remote_id', 'like', '%'.$s.'%')
+                      ->orWhere('campaign_id', 'like', '%'.$s.'%')
+                      ->orWhere('adset_id', 'like', '%'.$s.'%')
+                      ->orWhere('lead_form_id', 'like', '%'.$s.'%');
+                });
+            }
+        }
+
+        $records = $query?->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
+
         return view('livewire.settings.meta-ad-accounts', [
             'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages'])->orderBy('name')->get(),
-            'selected' => $account, 'records' => $records,
+            'selected' => $account,
+            'records' => $records ?: collect(),
             'campaignOptions' => ['' => 'No CRM mapping'] + Campaign::orderBy('name')->pluck('name', 'id')->all(),
             'logs' => $account ? AuditLog::where('subject_type', MetaAdAccount::class)->where('subject_id', $account->id)->latest('created_at')->limit(10)->get() : collect(),
         ]);

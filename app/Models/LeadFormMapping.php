@@ -4,11 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LeadFormMapping extends Model
 {
     protected $guarded = [];
-    protected $casts = ['meta_created_at' => 'datetime'];
+    protected $casts = [
+        'meta_created_at' => 'datetime',
+        'questions' => 'array',
+    ];
 
     public static function parseMetaCreatedTime($value): ?\Carbon\Carbon
     {
@@ -35,5 +39,10 @@ class LeadFormMapping extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(MetaAdRecord::class, 'lead_form_id', 'form_id');
     }
 }

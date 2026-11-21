@@ -50,20 +50,28 @@ class SyncMetaLeadsCommand extends Command
         foreach ($accounts as $account) {
             $this->line("Processing Account #{$account->id} ({$account->name})...");
 
-            $result = $syncService->sync($account, null, $limit);
+            $batchCount = 0;
+            do {
+                $batchCount++;
+                $result = $syncService->sync($account, null, $limit);
 
-            $this->line("  -> Result: {$result['message']}");
+                $this->line("  -> Result: {$result['message']}");
 
-            foreach ($result['forms'] as $f) {
-                if (($f['status'] ?? '') === 'success') {
-                    $this->info("     ✓ {$f['form_name']}: {$f['created']} created, {$f['duplicates']} duplicates");
-                } else {
-                    $this->warn("     ✗ {$f['form_name']}: " . ($f['error'] ?? 'Unknown error'));
+                foreach ($result['forms'] as $f) {
+                    if (($f['status'] ?? '') === 'success') {
+                        $this->info("     ✓ {$f['form_name']}: {$f['created']} created, {$f['duplicates']} duplicates");
+                    } else {
+                        $this->warn("     ✗ {$f['form_name']}: " . ($f['error'] ?? 'Unknown error'));
+                    }
                 }
-            }
 
-            $grandTotalCreated += $result['total_created'];
-            $grandTotalFetched += $result['total_fetched'];
+                $grandTotalCreated += $result['total_created'];
+                $grandTotalFetched += $result['total_fetched'];
+
+                if (!empty($result['continuation_pending'])) {
+                    $this->line("  -> Continuing with next form batch...");
+                }
+            } while (!empty($result['continuation_pending']) && $batchCount < 50);
         }
 
         $this->info("Meta sync complete: {$grandTotalCreated} new leads imported ({$grandTotalFetched} total records checked).");

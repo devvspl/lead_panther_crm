@@ -1,82 +1,421 @@
 <section class="space-y-4 border-t border-border pt-6" wire:poll.30s>
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div><h3 class="font-bold text-ink">Connected Ad Accounts</h3><p class="text-xs text-muted">Fetch campaigns, ad sets, ads and insights here. Page lead forms are fetched separately below.</p></div>
-        <button type="button" wire:click="edit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white"><x-ui.team-icon name="add" /> Add Ad Account</button>
+        <div>
+            <h3 class="font-bold text-ink">Connected Ad Accounts</h3>
+            <p class="text-xs text-muted">Fetch campaigns, ad sets, ads, creatives and insights. Facebook Page lead forms are fetched separately below.</p>
+        </div>
+        <button type="button" wire:click="edit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition">
+            <x-ui.team-icon name="add" /> Add Ad Account
+        </button>
     </div>
-    @if($message)<p role="status" class="rounded-lg border border-border bg-canvas p-3 text-xs text-ink">{{ $message }}</p>@endif
+
+    @if($message)
+        <p role="status" class="rounded-lg border border-border bg-canvas p-3 text-xs text-ink flex items-center justify-between">
+            <span>{{ $message }}</span>
+            <button type="button" wire:click="$set('message', '')" class="text-muted hover:text-ink"><x-ui.team-icon name="close" /></button>
+        </p>
+    @endif
+
     <div class="overflow-x-auto rounded-xl border border-border">
         <table class="w-full text-left text-xs">
-            <thead class="bg-canvas text-muted"><tr>@foreach(['Account Name', 'Ad Account ID', 'Business Portfolio', 'Facebook / Connection', 'Status', 'Last Synced', 'Actions'] as $heading)<th class="p-3 whitespace-nowrap">{{ $heading }}</th>@endforeach</tr></thead>
+            <thead class="bg-canvas text-muted">
+                <tr>
+                    @foreach(['Account Name', 'Ad Account ID', 'Business Portfolio', 'Facebook / Connection', 'Status', 'Last Synced', 'Actions'] as $heading)
+                        <th class="p-3 whitespace-nowrap">{{ $heading }}</th>
+                    @endforeach
+                </tr>
+            </thead>
             <tbody class="divide-y divide-border">
                 @forelse($accounts as $account)
-                    <tr wire:key="meta-ad-{{ $account->id }}">
-                        <td class="p-3 font-semibold">{{ $account->name }}<span class="block text-muted font-normal">{{ $account->pages_count }} Pages · {{ $account->records_count }} records</span></td>
-                        <td class="p-3 font-mono">act_{{ $account->ad_account_id }}</td>
-                        <td class="p-3">{{ $account->business_name ?: '—' }}<span class="block text-muted">{{ $account->business_id }}</span></td>
-                        <td class="p-3">{{ $account->connection_name ?: 'Not tested' }}</td>
-                        <td class="p-3"><span @class(['rounded-full px-2 py-1 font-semibold', 'bg-success/10 text-success' => $account->status === 'connected', 'bg-warning/10 text-warning' => $account->status !== 'connected'])>{{ $account->sync_state ? 'Sync in progress' : str_replace('_', ' ', ucfirst($account->status)) }}</span>
-                            <span class="block mt-2 text-muted">{{ $account->token_expires_at ? 'Expires '.$account->token_expires_at->format('d M Y H:i') : 'Expiry not supplied' }}</span>
-                            @if($account->last_error)<span class="block mt-1 text-muted max-w-xs">{{ $account->last_error }}</span>@endif
+                    <tr wire:key="meta-ad-{{ $account->id }}" class="hover:bg-canvas/40 transition">
+                        <td class="p-3 font-semibold">
+                            <span class="text-ink">{{ $account->name }}</span>
+                            <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted font-normal">
+                                <span>{{ $account->pages_count }} {{ Str::plural('Page', $account->pages_count) }}</span>
+                                <span>·</span>
+                                <span>{{ $account->sync_counts['campaigns'] }} Campaigns</span>
+                                <span>·</span>
+                                <span>{{ $account->sync_counts['adsets'] }} Ad Sets</span>
+                                <span>·</span>
+                                <span>{{ $account->sync_counts['ads'] }} Ads</span>
+                                <span>·</span>
+                                <span>{{ $account->sync_counts['insights'] }} Insights</span>
+                            </div>
                         </td>
-                        <td class="p-3 whitespace-nowrap">{{ $account->last_synced_at?->format('d M Y H:i') ?: 'Never' }}</td>
+                        <td class="p-3 font-mono font-medium text-ink">act_{{ $account->ad_account_id }}</td>
+                        <td class="p-3">
+                            <span class="text-ink font-medium">{{ $account->business_name ?: '—' }}</span>
+                            @if($account->business_id)
+                                <span class="block text-muted font-mono text-[11px]">{{ $account->business_id }}</span>
+                            @endif
+                        </td>
+                        <td class="p-3 text-ink">{{ $account->connection_name ?: 'Not tested' }}</td>
+                        <td class="p-3">
+                            @if($account->sync_state)
+                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                                    <svg class="animate-spin w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    <span>{{ $account->sync_stage_label }}</span>
+                                </span>
+                            @else
+                                <span @class([
+                                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold',
+                                    'bg-emerald-50 text-emerald-700 border border-emerald-200' => $account->status === 'connected',
+                                    'bg-rose-50 text-rose-700 border border-rose-200' => $account->status === 'error',
+                                    'bg-amber-50 text-amber-700 border border-amber-200' => in_array($account->status, ['rate_limited', 'untested']),
+                                    'bg-neutral-100 text-neutral-600 border border-neutral-200' => !in_array($account->status, ['connected', 'error', 'rate_limited', 'untested']),
+                                ])>
+                                    {{ str_replace('_', ' ', ucfirst($account->status)) }}
+                                </span>
+                            @endif
+                            <span class="block mt-1 text-[11px] text-muted">{{ $account->token_expires_at ? 'Expires '.$account->token_expires_at->format('d M Y H:i') : 'Expiry not supplied' }}</span>
+                            @if($account->last_error)
+                                <span class="block mt-1 text-[11px] text-rose-600 max-w-xs break-words" title="{{ $account->last_error }}">{{ Str::limit($account->last_error, 80) }}</span>
+                            @endif
+                        </td>
+                        <td class="p-3 whitespace-nowrap text-muted">{{ $account->last_synced_at?->format('d M Y H:i') ?: 'Never' }}</td>
                         <td class="p-3">
                             <x-ui.dropdown align="right" width="56">
-                                <x-slot:trigger><button type="button" :aria-expanded="open" aria-haspopup="menu" title="Ad Account actions" aria-label="Ad Account actions" class="p-2 text-muted hover:text-primary"><x-ui.team-icon name="more" /></button></x-slot:trigger>
+                                <x-slot:trigger>
+                                    <button type="button" :aria-expanded="open" aria-haspopup="menu" title="Ad Account actions" aria-label="Ad Account actions" class="p-2 text-muted hover:text-primary transition">
+                                        <x-ui.team-icon name="more" />
+                                    </button>
+                                </x-slot:trigger>
                                 <x-slot:content>
                                     <button type="button" wire:click="edit({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Edit / Reconnect</button>
                                     <button type="button" wire:click="testConnection({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Test Connection</button>
                                     <button type="button" wire:click="sync({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Sync Now</button>
-                                    <button type="button" wire:click="showRecords({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Campaigns &amp; Reporting</button>
+                                    <button type="button" wire:click="showRecords({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas font-semibold text-primary">Campaigns &amp; Reporting</button>
                                     <button type="button" wire:click="disconnect({{ $account->id }})" wire:confirm="Disconnect this Ad Account? Existing Page integrations and records will be retained." class="block w-full text-left p-2 text-danger hover:bg-canvas">Disconnect</button>
                                 </x-slot:content>
                             </x-ui.dropdown>
                         </td>
                     </tr>
-                @empty<tr><td colspan="7" class="p-6 text-center text-muted">No Ad Accounts connected. Your existing Page integration remains active.</td></tr>@endforelse
+                @empty
+                    <tr>
+                        <td colspan="7" class="p-6 text-center text-muted">No Ad Accounts connected. Your existing Page integration remains active.</td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
 
     @if($selected)
-        <div class="space-y-3 rounded-xl border border-border p-4">
-            <div class="flex flex-wrap items-center justify-between gap-3"><h4 class="font-bold">{{ $selected->name }} · Campaigns &amp; Reporting</h4><button type="button" wire:click="closeRecords" title="Close records" aria-label="Close records"><x-ui.team-icon name="close" /></button></div>
-            <div class="flex flex-wrap gap-3">
-                <div class="w-full sm:w-48"><x-ui.themed-select wire:model.live="kind" :options="['campaign' => 'Campaigns', 'adset' => 'Ad Sets', 'ad' => 'Ads', 'insight' => 'Daily Insights']" /></div>
-                <input wire:model.live.debounce.300ms="search" aria-label="Search imported records" placeholder="Search name or ID" class="rounded-lg border border-border bg-canvas text-ink px-3 py-2 text-xs w-full sm:w-64" />
+        @php
+            $currCode = data_get($selected->capabilities, 'currency', 'USD');
+            $currSign = ($currCode === 'INR' || $currCode === '₹') ? '₹' : ($currCode === 'USD' ? '$' : $currCode . ' ');
+        @endphp
+        <div class="space-y-4 rounded-xl border border-border p-4 bg-surface shadow-xs">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
+                <div>
+                    <h4 class="font-bold text-sm text-ink">{{ $selected->name }} · Campaigns &amp; Reporting</h4>
+                    <p class="text-xs text-muted mt-0.5">
+                        Ad Account: <span class="font-mono font-medium text-ink">act_{{ $selected->ad_account_id }}</span> ·
+                        {{ $selected->records_count }} total imported records
+                        @if($selected->last_synced_at)
+                            · Last synced: {{ $selected->last_synced_at->format('d M Y H:i') }}
+                        @endif
+                    </p>
+                </div>
+                <button type="button" wire:click="closeRecords" title="Close records" aria-label="Close records" class="p-1.5 rounded-lg border border-border hover:bg-canvas text-muted hover:text-ink transition">
+                    <x-ui.team-icon name="close" />
+                </button>
             </div>
-            <div class="overflow-x-auto"><table class="w-full text-xs text-left"><thead class="text-muted bg-canvas"><tr><th class="p-2">Name / ID</th><th class="p-2">Campaign / Ad Set</th><th class="p-2">{{ $kind === 'insight' ? 'Date' : 'Status' }}</th><th class="p-2">{{ $kind === 'campaign' ? 'CRM Campaign' : 'Details' }}</th></tr></thead><tbody class="divide-y divide-border">
-                @foreach($records as $record)
-                    <tr wire:key="meta-record-{{ $record->id }}"><td class="p-2">{{ $record->name }}<span class="block text-muted font-mono">{{ $record->remote_id }}</span></td><td class="p-2">{{ $record->campaign_id ?: '—' }}<span class="block text-muted">{{ $record->adset_id }}</span></td><td class="p-2">{{ $record->report_date?->format('d M Y') ?: $record->status }}</td><td class="p-2">
-                    @if($kind === 'campaign')
-                        <div class="flex items-center gap-2 min-w-56"><x-ui.themed-select wire:model="campaignMap.{{ $record->id }}" :options="$campaignOptions" /><button type="button" wire:click="saveMapping({{ $record->id }})" title="Save mapping" aria-label="Save mapping" class="text-primary p-2"><x-ui.team-icon name="check" /></button></div>
-                    @elseif($kind === 'insight')
-                        Impressions: {{ number_format((int) data_get($record->data, 'impressions', 0)) }} · Clicks: {{ number_format((int) data_get($record->data, 'clicks', 0)) }} · Spend: {{ data_get($record->data, 'spend', '0') }}
-                    @else {{ data_get($record->data, 'objective', '—') }} @endif
-                    </td></tr>
-                @endforeach
-                @if($records->isEmpty())<tr><td colspan="4" class="p-4 text-muted">No records found.</td></tr>@endif
-            </tbody></table></div>
+
+            <!-- Controls & Filters -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="w-full sm:w-44">
+                    <x-ui.themed-select wire:model.live="kind" :options="['campaign' => 'Campaigns', 'adset' => 'Ad Sets', 'ad' => 'Ads', 'insight' => 'Insights']" />
+                </div>
+
+                @if($kind !== 'insight')
+                    <div class="w-full sm:w-40">
+                        <x-ui.themed-select wire:model.live="statusFilter" :options="['' => 'All Statuses', 'ACTIVE' => 'Active', 'PAUSED' => 'Paused', 'ARCHIVED' => 'Archived']" />
+                    </div>
+                @else
+                    <div class="w-full sm:w-40">
+                        <x-ui.themed-select wire:model.live="insightLevel" :options="['campaign' => 'Campaign Level', 'adset' => 'Ad Set Level', 'ad' => 'Ad Level']" />
+                    </div>
+                    <div class="w-full sm:w-40">
+                        <x-ui.themed-select wire:model.live="insightDatePreset" :options="['last_7d' => 'Last 7 Days', 'last_30d' => 'Last 30 Days', 'last_90d' => 'Last 90 Days', 'this_month' => 'This Month']" />
+                    </div>
+                    <button type="button" wire:click="syncInsightsNow" wire:loading.attr="disabled" class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-2 text-xs font-semibold hover:border-primary hover:text-primary transition disabled:opacity-50">
+                        <svg wire:loading.remove wire:target="syncInsightsNow" class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <svg wire:loading wire:target="syncInsightsNow" class="animate-spin w-3.5 h-3.5 text-ink" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>Fetch Insights</span>
+                    </button>
+                @endif
+
+                <div class="flex-1 min-w-[200px]">
+                    <input wire:model.live.debounce.300ms="search" aria-label="Search imported records" placeholder="Search by name, ID, or form ID..." class="w-full rounded-lg border border-border bg-canvas text-ink px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ink" />
+                </div>
+            </div>
+
+            <!-- Records Table -->
+            <div class="overflow-x-auto rounded-lg border border-border">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-muted bg-canvas">
+                        <tr>
+                            @if($kind === 'campaign')
+                                <th class="p-2.5">Campaign Name / ID</th>
+                                <th class="p-2.5">Objective &amp; Type</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Budget</th>
+                                <th class="p-2.5">CRM Campaign Mapping</th>
+                            @elseif($kind === 'adset')
+                                <th class="p-2.5">Ad Set Name / ID</th>
+                                <th class="p-2.5">Campaign</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Optimization &amp; Billing</th>
+                                <th class="p-2.5">Budget</th>
+                            @elseif($kind === 'ad')
+                                <th class="p-2.5">Ad Name / ID</th>
+                                <th class="p-2.5">Campaign &amp; Ad Set</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Creative Preview</th>
+                                <th class="p-2.5">Destination &amp; Form</th>
+                            @elseif($kind === 'insight')
+                                <th class="p-2.5">Entity / ID</th>
+                                <th class="p-2.5">Level &amp; Date</th>
+                                <th class="p-2.5">Impressions &amp; Reach</th>
+                                <th class="p-2.5">Clicks &amp; CTR</th>
+                                <th class="p-2.5">Spend &amp; CPC</th>
+                                <th class="p-2.5">Leads &amp; Cost / Lead</th>
+                            @endif
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @forelse($records as $record)
+                            <tr wire:key="meta-record-{{ $record->id }}" class="hover:bg-canvas/50 transition">
+                                @if($kind === 'campaign')
+                                    <td class="p-2.5">
+                                        <span class="font-semibold text-ink block">{{ $record->name }}</span>
+                                        <span class="text-muted font-mono text-[11px]">{{ $record->remote_id }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink">{{ $record->objective ?: '—' }}</span>
+                                        @if($record->buying_type)
+                                            <span class="block text-muted text-[11px]">{{ $record->buying_type }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span @class([
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                            'bg-emerald-50 text-emerald-700 border border-emerald-200' => in_array($record->status, ['ACTIVE', 'active']),
+                                            'bg-amber-50 text-amber-700 border border-amber-200' => in_array($record->status, ['PAUSED', 'paused']),
+                                            'bg-neutral-100 text-neutral-600 border border-neutral-200' => !in_array($record->status, ['ACTIVE', 'active', 'PAUSED', 'paused']),
+                                        ])>
+                                            {{ ucfirst(strtolower($record->status)) }}
+                                        </span>
+                                        @if($record->effective_status && strtolower($record->effective_status) !== strtolower($record->status))
+                                            <span class="block text-[10px] text-muted mt-0.5">Effective: {{ ucfirst(strtolower($record->effective_status)) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink">{{ $record->budget_display }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <div class="flex items-center gap-2 min-w-56">
+                                            <x-ui.themed-select wire:model="campaignMap.{{ $record->id }}" :options="$campaignOptions" />
+                                            <button type="button" wire:click="saveMapping({{ $record->id }})" title="Save mapping" aria-label="Save mapping" class="text-primary p-2 hover:bg-canvas rounded-lg transition">
+                                                <x-ui.team-icon name="check" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                @elseif($kind === 'adset')
+                                    <td class="p-2.5">
+                                        <span class="font-semibold text-ink block">{{ $record->name }}</span>
+                                        <span class="text-muted font-mono text-[11px]">{{ $record->remote_id }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink block">{{ $record->campaignRecord?->name ?: 'Campaign' }}</span>
+                                        <span class="text-muted font-mono text-[11px]">{{ $record->campaign_id ?: '—' }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span @class([
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                            'bg-emerald-50 text-emerald-700 border border-emerald-200' => in_array($record->status, ['ACTIVE', 'active']),
+                                            'bg-amber-50 text-amber-700 border border-amber-200' => in_array($record->status, ['PAUSED', 'paused']),
+                                            'bg-neutral-100 text-neutral-600 border border-neutral-200' => !in_array($record->status, ['ACTIVE', 'active', 'PAUSED', 'paused']),
+                                        ])>
+                                            {{ ucfirst(strtolower($record->status)) }}
+                                        </span>
+                                        @if($record->effective_status && strtolower($record->effective_status) !== strtolower($record->status))
+                                            <span class="block text-[10px] text-muted mt-0.5">Effective: {{ ucfirst(strtolower($record->effective_status)) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink block">{{ str_replace('_', ' ', ucfirst(strtolower(data_get($record->data, 'optimization_goal', '—')))) }}</span>
+                                        @if(data_get($record->data, 'billing_event') || data_get($record->data, 'bid_strategy'))
+                                            <span class="text-muted text-[11px] block">{{ data_get($record->data, 'billing_event') }} {{ data_get($record->data, 'bid_strategy') ? '· '.data_get($record->data, 'bid_strategy') : '' }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink">{{ $record->budget_display }}</span>
+                                    </td>
+                                @elseif($kind === 'ad')
+                                    <td class="p-2.5">
+                                        <span class="font-semibold text-ink block">{{ $record->name }}</span>
+                                        <span class="text-muted font-mono text-[11px]">{{ $record->remote_id }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="text-ink block">C: {{ $record->campaignRecord?->name ?: ($record->campaign_id ?: '—') }}</span>
+                                        <span class="text-muted block text-[11px]">Set: {{ $record->adsetRecord?->name ?: ($record->adset_id ?: '—') }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span @class([
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                            'bg-emerald-50 text-emerald-700 border border-emerald-200' => in_array($record->status, ['ACTIVE', 'active']),
+                                            'bg-amber-50 text-amber-700 border border-amber-200' => in_array($record->status, ['PAUSED', 'paused']),
+                                            'bg-neutral-100 text-neutral-600 border border-neutral-200' => !in_array($record->status, ['ACTIVE', 'active', 'PAUSED', 'paused']),
+                                        ])>
+                                            {{ ucfirst(strtolower($record->status)) }}
+                                        </span>
+                                        @if($record->effective_status && strtolower($record->effective_status) !== strtolower($record->status))
+                                            <span class="block text-[10px] text-muted mt-0.5">Effective: {{ ucfirst(strtolower($record->effective_status)) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <div class="flex items-start gap-2 max-w-xs">
+                                            @if($record->creative_thumbnail)
+                                                <img src="{{ $record->creative_thumbnail }}" alt="Creative thumbnail" class="w-9 h-9 object-cover rounded border border-border shrink-0" />
+                                            @endif
+                                            <div class="min-w-0">
+                                                <span class="font-medium text-ink block truncate">{{ $record->creative_title ?: ($record->creative_id ? 'Creative: '.$record->creative_id : 'Standard Ad Creative') }}</span>
+                                                @if($record->creative_body)
+                                                    <span class="text-muted text-[11px] block truncate">{{ $record->creative_body }}</span>
+                                                @endif
+                                                @if($record->destination_url)
+                                                    <a href="{{ $record->destination_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline text-[11px] inline-flex items-center gap-1 mt-0.5">Preview Ad &nearr;</a>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="p-2.5">
+                                        @if($record->lead_form_id)
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary font-semibold text-[11px] border border-primary/20">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                Form: {{ $record->lead_form_id }}
+                                            </span>
+                                            @if($record->leadForm)
+                                                <span class="block text-muted text-[11px] truncate max-w-xs mt-0.5">{{ $record->leadForm->form_name }}</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted text-[11px]">Website / External Link</span>
+                                        @endif
+                                    </td>
+                                @elseif($kind === 'insight')
+                                    <td class="p-2.5">
+                                        <span class="font-semibold text-ink block">{{ $record->name }}</span>
+                                        <span class="text-muted font-mono text-[11px]">{{ $record->remote_id }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-canvas border border-border text-ink">
+                                            {{ $record->insight_level ?: 'campaign' }}
+                                        </span>
+                                        <span class="block text-muted text-[11px] mt-0.5">{{ $record->report_date?->format('d M Y') ?: '—' }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink block">{{ number_format($record->impressions) }} imp</span>
+                                        <span class="text-muted text-[11px] block">{{ number_format($record->reach) }} reach ({{ $record->frequency }}x)</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink block">{{ number_format($record->clicks) }} clicks</span>
+                                        <span class="text-muted text-[11px] block">CTR: {{ number_format($record->ctr, 2) }}% · {{ number_format($record->link_clicks) }} link</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        <span class="font-medium text-ink block">{{ $currSign }}{{ number_format($record->spend, 2) }}</span>
+                                        <span class="text-muted text-[11px] block">CPM: {{ $currSign }}{{ number_format($record->cpm, 2) }} · CPC: {{ $currSign }}{{ number_format($record->cpc, 2) }}</span>
+                                    </td>
+                                    <td class="p-2.5">
+                                        @if($record->leads_count > 0)
+                                            <span class="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                                                {{ number_format($record->leads_count) }} {{ Str::plural('Lead', $record->leads_count) }}
+                                            </span>
+                                            @if($record->cost_per_lead !== null)
+                                                <span class="block text-muted text-[11px] mt-0.5">CPL: {{ $currSign }}{{ number_format($record->cost_per_lead, 2) }}</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">0 Leads</span>
+                                        @endif
+                                    </td>
+                                @endif
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="{{ $kind === 'insight' ? 6 : 5 }}" class="p-6 text-center text-muted">
+                                    No {{ $kind }} records found for the selected criteria.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
             {{ $records->links() }}
-            <div class="text-xs space-y-2"><h5 class="font-bold">Associated Pages</h5>@forelse($selected->pages as $page)<p>{{ $page->name }} · {{ $page->getCredential('page_id') }}</p>@empty<p class="text-muted">No accessible Pages discovered. Ad Account access does not grant Page access.</p>@endforelse</div>
-            <details class="text-xs"><summary class="cursor-pointer font-bold">Recent Sync &amp; Connection History</summary><div class="space-y-2 mt-2">@foreach($logs as $log)@php($details = json_decode($log->to_value ?? '{}', true) ?: [])
-                        <div class="rounded-lg border border-border p-2"><p class="font-semibold">{{ $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>
-                        @if(isset($details['kind']))<p>{{ ucfirst($details['kind']) }}: {{ $details['fetched'] ?? 0 }} fetched · {{ $details['new'] ?? 0 }} new · {{ $details['updated'] ?? 0 }} updated · {{ !empty($details['has_more']) ? 'More pages pending' : 'Edge complete' }}</p>@endif
-                        @if(isset($details['counts']))<p>@foreach($details['counts'] as $kind => $count){{ ucfirst($kind) }}: {{ $count }} @endforeach</p>@endif
-                        @if(isset($details['message']))<p>{{ $details['message'] }}</p>@endif
-                        @if($details['http_status'] ?? null)<p class="text-muted">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>@endif</div>@endforeach</div></details>
+
+            <div class="text-xs space-y-2 pt-2 border-t border-border">
+                <h5 class="font-bold text-ink">Associated Facebook Pages</h5>
+                @forelse($selected->pages as $page)
+                    <p class="text-muted"><span class="font-semibold text-ink">{{ $page->name }}</span> · Page ID: <code class="font-mono text-ink">{{ $page->getCredential('page_id') }}</code></p>
+                @empty
+                    <p class="text-muted">No accessible Pages discovered. Ad Account access does not grant Page access.</p>
+                @endforelse
+            </div>
+
+            <details class="text-xs">
+                <summary class="cursor-pointer font-bold text-ink">Recent Sync &amp; Connection History</summary>
+                <div class="space-y-2 mt-2">
+                    @forelse($logs as $log)
+                        @php($details = json_decode($log->to_value ?? '{}', true) ?: [])
+                        <div class="rounded-lg border border-border p-2 bg-canvas">
+                            <p class="font-semibold text-ink">{{ $log->created_at?->format('d M Y H:i:s') ?? $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>
+                            @if(isset($details['kind']))
+                                <p class="text-muted">{{ ucfirst($details['kind']) }}: {{ $details['fetched'] ?? 0 }} fetched · {{ $details['new'] ?? 0 }} new · {{ $details['updated'] ?? 0 }} updated · {{ !empty($details['has_more']) ? 'More pages pending' : 'Edge complete' }}</p>
+                            @endif
+                            @if(isset($details['counts']))
+                                <p class="text-muted">@foreach($details['counts'] as $k => $c){{ ucfirst($k) }}: {{ $c }} @endforeach</p>
+                            @endif
+                            @if(isset($details['message']))
+                                <p class="text-ink">{{ $details['message'] }}</p>
+                            @endif
+                            @if($details['http_status'] ?? null)
+                                <p class="text-muted text-[11px]">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-muted">No recent sync history.</p>
+                    @endforelse
+                </div>
+            </details>
         </div>
     @endif
 
     <x-ui.modal name="meta-ad-account-editor" maxWidth="2xl" centered>
         <form wire:submit="save" class="p-5 space-y-4">
-            <div class="flex items-center justify-between"><h3 class="font-bold">{{ $editingId ? 'Edit / Reconnect Ad Account' : 'Add Ad Account' }}</h3><button type="button" @click="$dispatch('close-modal', 'meta-ad-account-editor')" title="Close" aria-label="Close"><x-ui.team-icon name="close" /></button></div>
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-ink">{{ $editingId ? 'Edit / Reconnect Ad Account' : 'Add Ad Account' }}</h3>
+                <button type="button" @click="$dispatch('close-modal', 'meta-ad-account-editor')" title="Close" aria-label="Close" class="text-muted hover:text-ink"><x-ui.team-icon name="close" /></button>
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @foreach(['name' => 'Account Display Name', 'adAccountId' => 'Ad Account ID', 'businessId' => 'Business Portfolio ID (optional)', 'tokenExpiry' => 'Token Expiry (optional)'] as $field => $label)
-                    <div><label for="ad-{{ $field }}" class="block text-xs font-semibold mb-1">{{ $label }}</label><input id="ad-{{ $field }}" wire:model="{{ $field }}" type="{{ $field === 'tokenExpiry' ? 'datetime-local' : 'text' }}" class="w-full rounded-lg border border-border bg-canvas text-ink text-sm px-3 py-2" />@error($field)<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror</div>
+                    <div>
+                        <label for="ad-{{ $field }}" class="block text-xs font-semibold mb-1 text-ink">{{ $label }}</label>
+                        <input id="ad-{{ $field }}" wire:model="{{ $field }}" type="{{ $field === 'tokenExpiry' ? 'datetime-local' : 'text' }}" class="w-full rounded-lg border border-border bg-canvas text-ink text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink" />
+                        @error($field)<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror
+                    </div>
                 @endforeach
             </div>
-            <div><label for="ad-access-token" class="block text-xs font-semibold mb-1">Ad Account Access Token</label><input id="ad-access-token" type="password" autocomplete="new-password" wire:model="accessToken" class="w-full rounded-lg border border-border bg-canvas text-ink text-sm px-3 py-2" placeholder="{{ $editingId ? 'Leave blank to keep saved token' : 'User or system-user token with ads_read' }}" />@error('accessToken')<p class="text-danger text-xs">{{ $message }}</p>@enderror<p class="text-xs text-muted mt-1">Use a token authorized for this Ad Account. Page tokens are separate.</p></div>
-            <div class="flex justify-end"><button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-4 py-2 text-xs font-bold disabled:opacity-50"><x-ui.team-icon name="check" /> Save &amp; Test</button></div>
+            <div>
+                <label for="ad-access-token" class="block text-xs font-semibold mb-1 text-ink">Ad Account Access Token</label>
+                <input id="ad-access-token" type="password" autocomplete="new-password" wire:model="accessToken" class="w-full rounded-lg border border-border bg-canvas text-ink text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ink" placeholder="{{ $editingId ? 'Leave blank to keep saved token' : 'User or system-user token with ads_read' }}" />
+                @error('accessToken')<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror
+                <p class="text-xs text-muted mt-1">Use a token authorized for this Ad Account. Page tokens are separate.</p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-4 py-2 text-xs font-bold disabled:opacity-50 hover:bg-primary-hover transition">
+                    <x-ui.team-icon name="check" /> Save &amp; Test
+                </button>
+            </div>
         </form>
     </x-ui.modal>
 </section>

@@ -34,7 +34,7 @@ class MetaFormSyncService
             $forms = [];
             do {
                 $response = $graph->get($pageId.'/leadgen_forms', $token, [
-                    'fields' => 'id,name,status,created_time', 'limit' => 100,
+                    'fields' => 'id,name,status,created_time,questions,locale,leads_count,expired_leads_count', 'limit' => 100,
                 ] + ($after ? ['after' => $after] : []));
                 if (!isset($response['data']) || !is_array($response['data'])) {
                     throw new \DomainException('invalid_response');
@@ -44,17 +44,30 @@ class MetaFormSyncService
                     if (!is_array($form) || empty($form['id'])) throw new \DomainException('invalid_response');
                     $id = (string) $form['id'];
                     if (isset($forms[$id])) continue;
-                    $metadata = ['form_name' => trim((string) ($form['name'] ?? '')) ?: 'Lead Form #'.$id,
-                        'page_id' => $pageId, 'status' => strtolower($form['status'] ?? 'active')];
-                    if ($created = LeadFormMapping::parseMetaCreatedTime($form['created_time'] ?? null)) $metadata['meta_created_at'] = $created;
+                    $metadata = [
+                        'form_name' => trim((string) ($form['name'] ?? '')) ?: 'Lead Form #'.$id,
+                        'page_id' => $pageId,
+                        'status' => strtolower($form['status'] ?? 'active'),
+                    ];
+                    if (isset($form['questions'])) {
+                        $metadata['questions'] = $form['questions'];
+                    }
+                    if ($created = LeadFormMapping::parseMetaCreatedTime($form['created_time'] ?? null)) {
+                        $metadata['meta_created_at'] = $created;
+                    }
                     // Only remote metadata is refreshed. Never overwrite administrator routing.
                     $mapping = DB::transaction(fn () => LeadFormMapping::updateOrCreate([
                         'portal_account_id' => $account->id, 'form_id' => $id,
                     ], $metadata));
                     if ($mapping->wasRecentlyCreated) $result['new']++;
                     elseif ($mapping->wasChanged()) $result['updated']++;
-                    $forms[$id] = ['id' => $id, 'name' => $metadata['form_name'], 'status' => strtoupper($metadata['status']),
-                        'created_time' => $mapping->meta_created_at?->toIso8601String()];
+                    $forms[$id] = [
+                        'id' => $id,
+                        'name' => $metadata['form_name'],
+                        'status' => strtoupper($metadata['status']),
+                        'created_time' => $mapping->meta_created_at?->toIso8601String(),
+                        'questions_count' => is_array($form['questions'] ?? null) ? count($form['questions']) : 0,
+                    ];
                     $result['forms'] = array_values($forms);
                     $result['fetched'] = count($forms);
                 }

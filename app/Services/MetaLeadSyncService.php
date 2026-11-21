@@ -12,6 +12,7 @@ use App\Models\LeadMetadata;
 use App\Models\LeadFormMapping;
 use App\Events\LeadCreated;
 use App\Support\LeadMappers\MetaLeadMapper;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -224,23 +225,34 @@ class MetaLeadSyncService
 
         Log::info("[MetaLeadSyncService] [Step 4: Defaults] System context prepared: Client #{$clientId} ('{$client->name}'), LeadSource 'meta' (ID: {$leadSource->id}), Account Default Project ID: " . ($defaultConfiguredProjectId ?: 'None'));
 
-        $formIndex = 0;
         $totalFormCount = count($targetForms);
         $syncStartTime = microtime(true);
-        $maxExecutionSeconds = 35; // Hostinger Nginx has a 60s gateway timeout. 35s guarantees zero 504 Gateway Timeouts.
+        $maxExecutionSeconds = app()->runningInConsole() ? 120 : 35; // Hostinger Nginx has a 60s gateway timeout on web.
         $timedOutEarly = false;
 
-        foreach ($targetForms as $formInfo) {
-            // Execution time guard to prevent 504 Gateway Timeouts on web requests
+        $stateKey = 'meta_lead_sync_offset_'.$account->id;
+        $startIndex = 0;
+        if (empty($formId) && Cache::has($stateKey)) {
+            $savedOffset = (int) Cache::get($stateKey, 0);
+            if ($savedOffset > 0 && $savedOffset < $totalFormCount) {
+                $startIndex = $savedOffset;
+                Log::info("[MetaLeadSyncService] [Step 5: Resuming] Resuming form batch from offset {$startIndex}/{$totalFormCount}...");
+            } else {
+                Cache::forget($stateKey);
+            }
+        }
+
+        $formsToProcess = empty($formId) ? array_slice($targetForms, $startIndex) : $targetForms;
+        $formIndex = $startIndex;
+
+        foreach ($formsToProcess as $formInfo) {
+            // Execution time guard to prevent timeouts
             if ((microtime(true) - $syncStartTime) > $maxExecutionSeconds) {
                 $timedOutEarly = true;
-                Log::warning("[MetaLeadSyncService] [Step 5: Safety Guard] Execution time reached {$maxExecutionSeconds}s threshold. Gracefully stopping form processing to avoid 504 Gateway Timeout. Processed {$formIndex}/{$totalFormCount} forms.");
-                break;
-            }
-
-            // Stop if overall requested lead limit has been reached
-            if ($limit > 0 && $totalFetched >= $limit) {
-                Log::info("[MetaLeadSyncService] [Step 5: Safety Guard] Requested limit of {$limit} leads reached. Stopping sync across remaining forms.");
+                if (empty($formId)) {
+                    Cache::put($stateKey, $formIndex, 86400);
+                }
+                Log::warning("[MetaLeadSyncService] [Step 5: Safety Guard] Execution time reached {$maxExecutionSeconds}s threshold. Gracefully saving continuation offset {$formIndex}/{$totalFormCount} for subsequent batch.");
                 break;
             }
 
@@ -282,8 +294,7 @@ class MetaLeadSyncService
             Log::info("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Context resolved: Project ID: " . ($projectId ?: 'None') . ", Target Client ID: {$leadClientId}");
 
             try {
-                $remainingToFetch = ($limit > 0) ? max(1, $limit - $totalFetched) : 10000;
-                $maxLeadsForThisForm = min(100, $remainingToFetch);
+                $maxLeadsForThisForm = ($limit > 0) ? min(100, $limit) : 100;
                 $formLeadCursor = null;
                 $formLeadsData = [];
                 $seenLeadCursors = [];
@@ -571,11 +582,15 @@ class MetaLeadSyncService
             }
         }
 
+        if (!$timedOutEarly && empty($formId)) {
+            Cache::forget($stateKey);
+        }
+
         $message = "Sync completed: {$totalCreated} new lead(s) ingested from {$formIndex} form(s). ({$totalDuplicates} duplicate(s) skipped).";
         if (isset($discovery) && $discovery['status'] !== 'completed') $message .= ' Form discovery incomplete: '.$discovery['message'];
         if ($timedOutEarly) {
             $remainingForms = $totalFormCount - $formIndex;
-            $message .= " Note: Processing safely paused after {$formIndex} form(s) ({$remainingForms} remaining) to prevent server gateway timeout. You can select specific forms from the dropdown to sync remaining.";
+            $message .= " Note: Processing safely paused after {$formIndex} form(s) ({$remainingForms} remaining) to prevent server gateway timeout. Subsequent sync runs will continue automatically.";
         }
 
         Log::info("[MetaLeadSyncService] [Complete] Meta Lead Ads Sync finished for Account #{$account->id} ('{$account->name}'): {$totalCreated} created, {$totalDuplicates} duplicates, {$totalFetched} fetched, {$totalErrors} errors across {$formIndex} of {$totalFormCount} form(s)." . ($timedOutEarly ? " (Paused early by timeout guard)" : ""));
@@ -583,10 +598,13 @@ class MetaLeadSyncService
         return [
             'success' => $totalErrors === 0 || $totalCreated > 0,
             'total_forms' => $formIndex,
+            'total_forms_count' => $totalFormCount,
             'total_fetched' => $totalFetched,
             'total_created' => $totalCreated,
             'total_duplicates' => $totalDuplicates,
             'total_errors' => $totalErrors,
+            'continuation_pending' => $timedOutEarly && ($formIndex < $totalFormCount),
+            'next_form_index' => $timedOutEarly ? $formIndex : 0,
             'message' => $message,
             'forms' => $formSummaries,
         ];

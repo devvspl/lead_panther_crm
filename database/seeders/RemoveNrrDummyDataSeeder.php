@@ -234,11 +234,21 @@ class RemoveNrrDummyDataSeeder extends Seeder
             // Stage 7: Notifications, General Settings, Push
             // -------------------------------------------------------------
             if (!empty($userIds)) {
-                $deletedCounts['notifications'] = DB::table('notifications')->where(function ($q) use ($userIds) {
-                    $q->where('organization_id', self::TARGET_ORG_ID)
-                      ->orWhere(function ($sq) use ($userIds) {
-                          $sq->where('notifiable_type', User::class)->whereIn('notifiable_id', $userIds);
-                      });
+                $hasOrgCol = $this->tableHasColumn('notifications', 'organization_id');
+                $deletedCounts['notifications'] = DB::table('notifications')->where(function ($q) use ($userIds, $hasOrgCol) {
+                    if ($hasOrgCol) {
+                        $q->where('organization_id', self::TARGET_ORG_ID);
+                    }
+                    if (!empty($userIds)) {
+                        $userFilter = function ($sq) use ($userIds) {
+                            $sq->where('notifiable_type', User::class)->whereIn('notifiable_id', $userIds);
+                        };
+                        if ($hasOrgCol) {
+                            $q->orWhere($userFilter);
+                        } else {
+                            $userFilter($q);
+                        }
+                    }
                 })->delete();
 
                 if ($this->tableHasColumn('general_settings', 'user_id')) {
@@ -255,19 +265,33 @@ class RemoveNrrDummyDataSeeder extends Seeder
             // -------------------------------------------------------------
             // Stage 8: Audit Logs created by NRR dummy seed operations
             // -------------------------------------------------------------
-            $deletedCounts['audit_logs'] = DB::table('audit_logs')->where(function ($q) use ($userIds) {
-                if (!empty($userIds)) {
-                    $q->whereIn('user_id', $userIds)
-                      ->orWhere(function ($sq) use ($userIds) {
-                          $sq->where('subject_type', User::class)->whereIn('subject_id', $userIds);
-                      });
+            // Note: SeederRunService enforces immutable audit logs during tracked seeder runs
+            // (e.g. when executed via /admin/git-sync UI). If running inside a tracked run,
+            // audit logs must be preserved to maintain compliance and avoid transaction rollback.
+            $isRecording = app()->bound(\App\Services\SeederRunService::class)
+                && app(\App\Services\SeederRunService::class)->isRecording();
+
+            if ($isRecording) {
+                $this->command?->info("  - audit_logs : Preserved (audit trail integrity enforced by seeder tracking system)");
+            } else {
+                try {
+                    $deletedCounts['audit_logs'] = DB::table('audit_logs')->where(function ($q) use ($userIds) {
+                        if (!empty($userIds)) {
+                            $q->whereIn('user_id', $userIds)
+                              ->orWhere(function ($sq) use ($userIds) {
+                                  $sq->where('subject_type', User::class)->whereIn('subject_id', $userIds);
+                              });
+                        }
+                        $q->orWhere(function ($sq) {
+                            $sq->where('subject_type', Organization::class)
+                               ->where('subject_id', self::TARGET_ORG_ID)
+                               ->whereIn('action', ['credit.recharge', 'project.created', 'team.members_assigned', 'replacement.approved']);
+                        });
+                    })->delete();
+                } catch (\Throwable $e) {
+                    $this->command?->warn("  - audit_logs : Skipped deletion (" . $e->getMessage() . ")");
                 }
-                $q->orWhere(function ($sq) {
-                    $sq->where('subject_type', Organization::class)
-                       ->where('subject_id', self::TARGET_ORG_ID)
-                       ->whereIn('action', ['credit.recharge', 'project.created', 'team.members_assigned', 'replacement.approved']);
-                });
-            })->delete();
+            }
 
             // -------------------------------------------------------------
             // Stage 9: Spatie Roles & Permissions for NRR Dummy Users
@@ -326,7 +350,8 @@ class RemoveNrrDummyDataSeeder extends Seeder
         $orgId = self::TARGET_ORG_ID;
 
         // 1. Identify Dummy Users (5 users)
-        $userIds = User::where('organization_id', $orgId)
+        $userIds = User::withoutGlobalScopes()
+            ->where('organization_id', $orgId)
             ->where(function ($q) {
                 $q->whereIn('email', self::DUMMY_EMAILS)
                   ->orWhereIn('id', [83, 87, 88, 89, 90]);
@@ -377,7 +402,8 @@ class RemoveNrrDummyDataSeeder extends Seeder
             ->toArray();
 
         // 5. Identify Dummy Sales Teams (1 team)
-        $salesTeamIds = SalesTeam::where('ownable_type', Organization::class)
+        $salesTeamIds = SalesTeam::withoutGlobalScopes()
+            ->where('ownable_type', Organization::class)
             ->where('ownable_id', $orgId)
             ->pluck('id')
             ->toArray();
@@ -402,6 +428,10 @@ class RemoveNrrDummyDataSeeder extends Seeder
         $leadIds = $scope['leads'];
         $salesTeamIds = $scope['sales_teams'];
 
+        $hasOrgCol = $this->tableHasColumn('notifications', 'organization_id');
+        $isRecording = app()->bound(\App\Services\SeederRunService::class)
+            && app(\App\Services\SeederRunService::class)->isRecording();
+
         $report = [
             'lead_assignments' => !empty($leadIds) ? DB::table('lead_assignments')->whereIn('lead_id', $leadIds)->count() : 0,
             'lead_replacements' => !empty($leadIds) ? DB::table('lead_replacements')->whereIn('lead_id', $leadIds)->count() : 0,
@@ -425,17 +455,24 @@ class RemoveNrrDummyDataSeeder extends Seeder
                 if (!empty($salesTeamIds)) $q->orWhereIn('sales_team_id', $salesTeamIds);
             })->count(),
             'sales_teams' => count($salesTeamIds),
-            'notifications' => DB::table('notifications')->where(function ($q) use ($userIds) {
-                $q->where('organization_id', self::TARGET_ORG_ID);
+            'notifications' => DB::table('notifications')->where(function ($q) use ($userIds, $hasOrgCol) {
+                if ($hasOrgCol) {
+                    $q->where('organization_id', self::TARGET_ORG_ID);
+                }
                 if (!empty($userIds)) {
-                    $q->orWhere(function ($sq) use ($userIds) {
+                    $userFilter = function ($sq) use ($userIds) {
                         $sq->where('notifiable_type', User::class)->whereIn('notifiable_id', $userIds);
-                    });
+                    };
+                    if ($hasOrgCol) {
+                        $q->orWhere($userFilter);
+                    } else {
+                        $userFilter($q);
+                    }
                 }
             })->count(),
             'general_settings' => (!empty($userIds) && $this->tableHasColumn('general_settings', 'user_id')) ? DB::table('general_settings')->whereIn('user_id', $userIds)->count() : 0,
             'model_has_roles' => !empty($userIds) ? DB::table('model_has_roles')->where('model_type', User::class)->whereIn('model_id', $userIds)->count() : 0,
-            'audit_logs' => DB::table('audit_logs')->where(function ($q) use ($userIds) {
+            'audit_logs' => (!$isRecording && \Illuminate\Support\Facades\Schema::hasTable('audit_logs')) ? DB::table('audit_logs')->where(function ($q) use ($userIds) {
                 if (!empty($userIds)) {
                     $q->whereIn('user_id', $userIds)
                       ->orWhere(function ($sq) use ($userIds) {
@@ -447,7 +484,7 @@ class RemoveNrrDummyDataSeeder extends Seeder
                        ->where('subject_id', self::TARGET_ORG_ID)
                        ->whereIn('action', ['credit.recharge', 'project.created', 'team.members_assigned', 'replacement.approved']);
                 });
-            })->count(),
+            })->count() : 0,
             'users' => count($userIds),
         ];
 

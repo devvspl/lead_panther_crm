@@ -63,4 +63,40 @@ class RemoveNrrDummyDataSeederTest extends TestCase
         $cleanup->run();
         $this->assertNotNull(Organization::find(34));
     }
+
+    public function test_cleanup_seeder_executes_successfully_via_tracked_seeder_service(): void
+    {
+        Role::firstOrCreate(['name' => 'Builder/Developer', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'Sales Executive', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        // Seed NRR dummy sample data
+        (new Organization34SampleSeeder())->run();
+        $this->assertNotNull(Organization::find(34));
+        $this->assertGreaterThan(0, User::where('organization_id', 34)->count());
+
+        // Execute via SeederRunService (same path used by GitSync web UI)
+        $service = app(\App\Services\SeederRunService::class);
+        $run = $service->run('RemoveNrrDummyDataSeeder', $admin);
+
+        $this->assertSame('completed', $run->status);
+        $this->assertGreaterThan(0, $run->change_count);
+
+        // Verify NRR Organization is preserved
+        $org = Organization::find(34);
+        $this->assertNotNull($org);
+        $this->assertSame('NRR', $org->name);
+
+        // Verify all dummy data removed
+        $this->assertEquals(0, User::where('organization_id', 34)->count());
+        $this->assertEquals(0, Project::withoutGlobalScopes()->where('name', 'like', 'NRR %')->count());
+
+        // Running it a second time via SeederRunService is idempotent and completes
+        $secondRun = $service->run('RemoveNrrDummyDataSeeder', $admin);
+        $this->assertSame('completed', $secondRun->status);
+        $this->assertSame(0, $secondRun->change_count);
+    }
 }

@@ -1,4 +1,4 @@
-<details class="rounded-card border border-border bg-surface p-4 space-y-4" wire:ignore.self>
+<details class="rounded-card border border-border bg-surface p-4 space-y-4" wire:ignore.self open>
     <summary class="cursor-pointer text-sm font-bold">Reconcile Lead Credits &amp; Manage Disputes</summary>
     <p class="text-xs text-muted">Confirm usable credits, correct dummy entries and resolve disputes without deleting history.</p>
     <div class="max-w-md"><label class="text-xs font-semibold">Client</label><x-ui.themed-select wire:model.live="clientId" :options="$clientOptions" /></div>
@@ -8,13 +8,23 @@
         @if($wallet?->getRawOriginal('legacy_balance') !== null)
             <p class="text-xs text-muted">Preserved legacy reference: {{ $wallet->getRawOriginal('legacy_balance') }}. This is not spendable lead credit.</p>
         @endif
-        <div class="flex flex-wrap gap-3 text-xs"><span>Remaining: <strong>{{ number_format($wallet?->balance ?? 0) }} Creditsedits</strong></span><span class="{{ $wallet && !$wallet->reconciled_at ? 'text-warning' : 'text-success' }}">{{ $wallet && !$wallet->reconciled_at ? 'Needs reconciliation · delivery is held' : 'Verified credits' }}</span></div>
+        <div class="flex flex-wrap gap-3 text-xs"><span>Remaining: <strong>{{ number_format($wallet?->balance ?? 0) }} Credits</strong></span><span class="{{ $wallet && !$wallet->reconciled_at ? 'text-warning' : 'text-success' }}">{{ $wallet && !$wallet->reconciled_at ? 'Needs reconciliation · delivery is held' : 'Verified credits' }}</span></div>
         <form wire:submit="reconcile" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label class="block text-xs font-semibold">Verified remaining lead credits</label><input type="number" min="0" step="1" wire:model="remaining" class="w-full rounded-lg border-border bg-canvas text-ink text-sm" />@error('remaining')<p class="text-xs text-danger">{{ $message }}</p>@enderror</div>
             <div><label class="block text-xs font-semibold">Reconciliation reason</label><input wire:model="reason" class="w-full rounded-lg border-border bg-canvas text-ink text-sm" placeholder="Explain the correction" />@error('reason')<p class="text-xs text-danger">{{ $message }}</p>@enderror</div>
             <label class="flex items-center gap-2 text-xs"><input type="checkbox" wire:model="confirmed" class="rounded border-border text-primary" /> I confirm this is the verified usable quantity.</label>
             <div class="flex justify-end"><x-ui.button type="submit">Confirm Reconciliation</x-ui.button></div>
             @error('confirmed')<p class="text-xs text-danger">{{ $message }}</p>@enderror
+        </form>
+        <form wire:submit="markLegacyConsumption" class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border pt-4">
+            <h4 class="sm:col-span-2 text-sm font-bold">Mark Legacy Delivery as Consumption</h4>
+            <p class="sm:col-span-2 text-xs text-muted">Reconcile the available allocation first, then record credits used by an old delivered lead. This deducts the entered quantity once; it does not resend the lead or convert legacy money.</p>
+            <div><label class="text-xs font-semibold">Legacy ledger entry</label><x-ui.themed-select wire:model="transactionId" :options="$transactionOptions" /></div>
+            <div><label class="text-xs font-semibold">Credits consumed</label><input type="number" min="1" step="1" wire:model="legacyQuantity" class="w-full rounded-lg border-border bg-canvas text-ink text-sm" /></div>
+            <div class="sm:col-span-2"><label class="text-xs font-semibold">Reason</label><input wire:model="legacyReason" class="w-full rounded-lg border-border bg-canvas text-ink text-sm" />@error('legacyReason')<p class="text-xs text-danger">{{ $message }}</p>@enderror</div>
+            <label class="text-xs flex items-center gap-2"><input type="checkbox" wire:model="legacyConfirmed" /> I confirm this quantity should be deducted.</label>
+            <div class="flex justify-end"><x-ui.button type="submit">Mark as Consumption</x-ui.button></div>
+            @foreach(['legacyConfirmed', 'quantity'] as $field) @error($field)<p class="text-xs text-danger">{{ $message }}</p>@enderror @endforeach
         </form>
         <form wire:submit="openDispute" class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border pt-4">
             <div><label class="text-xs font-semibold">Ledger entry to dispute</label><x-ui.themed-select wire:model="transactionId" :options="$transactionOptions" /></div>

@@ -65,6 +65,32 @@ class LeadCreditService
         }, 3);
     }
 
+    public function markLegacyConsumption(CreditTransaction $legacy, mixed $quantity, string $reason, User $actor): CreditTransaction
+    {
+        abort_unless($actor->status === 'active' && $actor->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        return DB::transaction(function () use ($legacy, $quantity, $reason, $actor) {
+            $legacy = CreditTransaction::withoutGlobalScopes()->whereKey($legacy->id)->lockForUpdate()->firstOrFail();
+            if (!$legacy->is_legacy || !$legacy->lead_id || !in_array($legacy->transaction_type, ['lead_consumption', 'reserve', 'deduct'])) {
+                throw ValidationException::withMessages(['legacyReason' => 'Select a legacy lead consumption entry.']);
+            }
+            $lead = \App\Models\Lead::withoutGlobalScopes()->whereKey($legacy->lead_id)->lockForUpdate()->firstOrFail();
+            if ($lead->client_id !== $legacy->client_id || !$lead->delivered_at || $lead->delivery_pending) {
+                throw ValidationException::withMessages(['legacyReason' => 'Only a successfully delivered lead for this client can be recorded.']);
+            }
+            if (CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->where('is_legacy', false)->whereIn('transaction_type', ['lead_consumption', 'reserve', 'deduct'])->exists()) {
+                throw ValidationException::withMessages(['legacyReason' => 'This lead already has credit consumption recorded.']);
+            }
+            Validator::make(['legacyReason' => $reason], ['legacyReason' => 'required|string|min:5|max:900'])->validate();
+            $transaction = $this->adjust(User::findOrFail($legacy->client_id), $quantity, 'deduct', 'Legacy entry #'.$legacy->id.': '.$reason, $actor);
+            $transaction->update(['transaction_type' => 'lead_consumption', 'lead_id' => $lead->id, 'delivery_charge_lead_id' => $lead->id]);
+            AuditLog::create(['user_id' => $actor->id, 'organization_id' => $lead->organization_id,
+                'action' => 'lead_credits.legacy_consumption', 'subject_type' => CreditTransaction::class, 'subject_id' => $transaction->id,
+                'to_value' => ['legacy_transaction_id' => $legacy->id, 'lead_id' => $lead->id, 'quantity' => $transaction->credit_used, 'reason' => $reason],
+                'context' => ['category' => 'lead_credits', 'status' => 'success'], 'created_at' => now()]);
+            return $transaction;
+        }, 3);
+    }
+
     public function dispute(CreditTransaction $transaction, string $reason, User $actor): \App\Models\CreditDispute
     {
         abort_unless($actor->status === 'active' && $actor->hasAnyRole(['Super Admin', 'super-admin']), 403);

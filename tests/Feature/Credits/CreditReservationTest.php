@@ -24,6 +24,38 @@ class CreditReservationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_legacy_wallet_owner_is_selectable_and_consumption_is_applied_once(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        Role::findOrCreate('super-admin');
+        $admin->assignRole('super-admin');
+        $org = Organization::create(['name' => 'Legacy Org', 'type' => 'builder']);
+        $client = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $wallet = CreditWallet::create(['client_id' => $client->id, 'balance' => 0]);
+        DB::table('client_wallets')->where('id', $wallet->id)->update(['reconciled_at' => null, 'legacy_balance' => 20000]);
+        $this->actingAs($admin);
+        Livewire::test(\App\Livewire\Credits\Reconciliation::class, ['organizationId' => $org->id])
+            ->assertSet('clientId', $client->id)->assertSee('Preserved legacy reference')
+            ->set('remaining', 1000)->set('reason', 'Verified credit allocation')->set('confirmed', true)->call('reconcile')->assertHasNoErrors();
+        $source = LeadSource::create(['name' => 'Legacy import']);
+        $lead = Lead::factory()->create(['lead_source_id' => $source->id, 'client_id' => $client->id, 'delivered_at' => now(), 'delivery_pending' => false]);
+        $legacy = CreditTransaction::create(['client_id' => $client->id, 'lead_id' => $lead->id,
+            'transaction_type' => 'lead_consumption', 'is_legacy' => true, 'legacy_credit_used' => 10, 'created_at' => now()]);
+        $service = app(\App\Services\LeadCreditService::class);
+        $service->markLegacyConsumption($legacy, 1, 'Confirmed historical delivery', $admin);
+        $this->assertSame(999, $wallet->fresh()->balance);
+        $this->assertSame(1, $wallet->fresh()->used_credits);
+        $this->assertTrue($legacy->fresh()->is_legacy);
+        $this->assertEquals(10, $legacy->fresh()->getRawOriginal('legacy_credit_used'));
+        try {
+            $service->markLegacyConsumption($legacy, 1, 'Repeated historical delivery', $admin);
+            $this->fail('Repeated consumption must be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('legacyReason', $e->errors());
+        }
+        $this->assertSame(999, $wallet->fresh()->balance);
+    }
+
     public function test_integer_credit_migration_preserves_exact_legacy_values_without_spendable_conversion(): void
     {
         $previous = DB::getDefaultConnection();

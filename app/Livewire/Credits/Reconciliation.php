@@ -14,6 +14,9 @@ class Reconciliation extends Component
     #[Locked] public ?int $resolvingId = null;
     public ?int $clientId = null;
     public $remaining = 0;
+    public $legacyQuantity = 1;
+    public string $legacyReason = '';
+    public bool $legacyConfirmed = false;
     public string $reason = '';
     public bool $confirmed = false;
     public ?int $transactionId = null;
@@ -27,13 +30,21 @@ class Reconciliation extends Component
     {
         abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
     }
-    public function mount(?int $organizationId = null): void { $this->organizationId = $organizationId; }
+    public function mount(?int $organizationId = null): void
+    {
+        $this->organizationId = $organizationId;
+        if ($organizationId) {
+            $this->clientId = $this->clients()->orderBy('id')->value('id');
+            $this->updatedClientId();
+        }
+    }
     private function clients()
     {
         return User::when($this->organizationId, fn ($q, $id) => $q->where('organization_id', $id))
             ->where(function ($q) {
                 $roles = ['Client', 'client', 'Builder/Developer', 'Builder', 'builder', 'Broker', 'broker', 'Channel Partner', 'channel-partner'];
                 $q->whereHas('roles', fn ($r) => $r->whereIn('name', $roles))
+                    ->orWhereIn('id', CreditWallet::withoutGlobalScopes()->select('client_id'))
                     ->orWhereIn('id', \App\Models\Client::whereHas('roles', fn ($r) => $r->whereIn('name', $roles))->select('id'));
             });
     }
@@ -53,6 +64,15 @@ class Reconciliation extends Component
         app(LeadCreditService::class)->reconcile($this->client(), $this->remaining, $this->expected, $this->reason, auth()->user());
         $this->updatedClientId();
         $this->message = 'Verified lead credits saved. Original history is preserved.';
+        $this->dispatch('lead-credits-updated');
+    }
+    public function markLegacyConsumption(): void
+    {
+        $this->validate(['legacyConfirmed' => 'accepted']);
+        $transaction = CreditTransaction::withoutGlobalScopes()->where('client_id', $this->client()->id)->findOrFail($this->transactionId);
+        app(LeadCreditService::class)->markLegacyConsumption($transaction, $this->legacyQuantity, $this->legacyReason, auth()->user());
+        $this->reset('transactionId', 'legacyReason', 'legacyConfirmed');
+        $this->message = 'Legacy delivery recorded as credit consumption. Original history is preserved.';
         $this->dispatch('lead-credits-updated');
     }
     public function openDispute(): void

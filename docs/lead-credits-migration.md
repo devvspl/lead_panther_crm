@@ -36,3 +36,9 @@ Legacy values are hidden from ordinary model serialization. Original immutable a
 4. Resume the existing scheduler/queue. No extra cron or manual queue enrollment is required.
 
 This is a forward migration. Automatic rollback is intentionally disabled to prevent losing financial history or silently interpreting credits as money. A rollback requires a reviewed restore from the deployment backup. Local automated checks use isolated SQLite databases; no live balances are changed by implementation or tests.
+
+## Reviewing legacy delivery consumption
+
+The reconciliation panel opens by default and selects the organization’s billing client, including legacy wallet owners without current billing roles. The duplicate Client Credit Wallets card has been removed from Client Details.
+
+Reconcile the verified allocation first. To count an old successful delivery against it, select its legacy consumption entry, enter a whole credit quantity and reason, confirm, and choose **Mark as Consumption**. This subtracts credits from the reconciled allocation, increases used credits, and links a new consumption entry to the delivered lead. It does not resend the lead or alter the original monetary history. Already-accounted or undelivered leads are rejected, and repeated submissions cannot charge twice. Do not include the same consumption in a net remaining allocation and then deduct it again.

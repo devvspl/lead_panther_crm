@@ -42,3 +42,19 @@ This is a forward migration. Automatic rollback is intentionally disabled to pre
 The reconciliation panel opens by default and selects the organization’s billing client, including legacy wallet owners without current billing roles. The duplicate Client Credit Wallets card has been removed from Client Details.
 
 Reconcile the verified allocation first. To count an old successful delivery against it, select its legacy consumption entry, enter a whole credit quantity and reason, confirm, and choose **Mark as Consumption**. This subtracts credits from the reconciled allocation, increases used credits, and links a new consumption entry to the delivered lead. It does not resend the lead or alter the original monetary history. Already-accounted or undelivered leads are rejected, and repeated submissions cannot charge twice. Do not include the same consumption in a net remaining allocation and then deduct it again.
+
+## Deltek one-time 1,000-credit reconciliation
+
+Opt-in seeder: `database/seeders/DeltekLeadCreditReconciliationSeeder.php`. Deploy it after the integer-credit migration, then run only this seeder:
+
+```sh
+php artisan db:seed --class=DeltekLeadCreditReconciliationSeeder --force
+```
+
+This reconciles the total allocation to 1,000 credits, rather than adding 1,000 to the old dummy balance. It resolves exactly one Deltek organization and its billing owner from wallet/project/lead ownership; ambiguous ownership aborts without changes. An active Super Admin is recorded as actor (authenticated admin, or the first active Super Admin for CLI execution).
+
+Previously recorded nonlegacy lead consumption and refunds remain intact. Missing consumption is backfilled at **1 credit per successfully delivered lead** (delivered timestamp present, not pending/internal, not duplicate/rejected/invalid). Historical delivery reads include archived records because archive itself does not refund consumption. A lead with a recorded refund is not back-charged. Existing recorded credit charges retain their actual quantity, even if that differs from 1. No monetary price conversion is performed.
+
+Remaining = 1,000 minus retained net credit consumption minus newly backfilled consumption. The operation refuses consumption above the allocation instead of allowing a negative balance. It appends reconciliation/lead-consumption ledger rows and a `lead_credits.deltek_1000_reconciled` audit summary, preserving the original legacy money history. Leads, assignments, delivery settings and future credit pricing are not changed.
+
+A locked organization/billing owner plus the durable completion audit makes this a **one-time** operation. Rerunning is a no-op, including after later deliveries or adjustments; it never refills the balance to 1,000. The command prints the actual used/remaining credits. Do not add it to DatabaseSeeder, run demo/reset seeders, delete the completion audit, or use generic tracked-seeder reversal to undo accounting; use audited corrective transactions if a later correction is needed. No production data was changed during implementation tests.

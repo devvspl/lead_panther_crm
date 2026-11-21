@@ -691,22 +691,25 @@ class IntegrationsManager extends Component
     {
         $fId = (string) $key;
         $clientId = !empty($value) ? (int) $value : null;
+        $targetAccountId = $this->selectedMappingAccountId ?: $this->selectedAccountId;
 
-        $mapping = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
-            ->where('form_id', $fId)
-            ->first();
+        if (!$targetAccountId) return;
 
-        if ($mapping) {
-            $mapping->update(['client_id' => $clientId]);
+        $formItem = collect($this->availableForms)->first(fn ($item) => (is_array($item) ? ($item['id'] ?? null) : $item->id) === $fId);
+        $formName = (is_array($formItem) ? ($formItem['name'] ?? null) : $formItem?->name) ?: "Lead Form #{$fId}";
 
-            if ($clientId && $mapping->project_id) {
-                $project = Project::find($mapping->project_id);
-                if ($project && (int) $project->client_id !== $clientId) {
-                    $project->update(['client_id' => $clientId]);
-                }
+        $mapping = LeadFormMapping::updateOrCreate(
+            ['portal_account_id' => $targetAccountId, 'form_id' => $fId],
+            ['client_id' => $clientId, 'form_name' => $formName, 'status' => 'active']
+        );
+
+        if ($clientId && $mapping->project_id) {
+            $project = Project::find($mapping->project_id);
+            if ($project && (int) $project->client_id !== $clientId) {
+                $project->update(['client_id' => $clientId]);
             }
-            $this->dispatch('toast', type: 'success', message: "Client account updated for Form #{$fId}");
         }
+        $this->dispatch('toast', type: 'success', message: "Client mapping saved for Form #{$fId}");
     }
 
     public function updatedFormCampaignMap($value, $key): void
@@ -973,27 +976,25 @@ class IntegrationsManager extends Component
             ],
             [
                 'key' => 'campaign',
-                'label' => 'CRM Campaign',
-                'width' => '32%',
+                'label' => 'Campaign Name',
+                'width' => '28%',
                 'priority' => 1,
-                'render' => function ($row, $value = null, $layout = 'desktop') use ($campaignOptions, $campaignDetails) {
+                'render' => function ($row) use ($formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    $select = view('components.ui.themed-select', [
-                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
-                            'wire:model.live' => "formCampaignMap.{$fId}",
-                            'id' => "meta-campaign-{$layout}-{$fId}",
-                        ]),
-                        'options' => $campaignOptions,
-                        'searchable' => true,
-                        'placeholder' => '-- Select Campaign --',
-                        'class' => 'w-full',
-                    ])->render();
-                    $campaign = $campaignDetails->get($this->formCampaignMap[$fId] ?? null);
-                    if (!$campaign) return $select.'<p class="mt-2 text-[10px] text-muted">No campaign assigned</p>';
-                    return $select.'<div class="mt-2 space-y-1 text-[10px] text-muted">'
-                        .'<p>Project: <span class="text-ink">'.e($campaign->project?->name ?? 'Not assigned').'</span></p>'
-                        .'<p>Campaign #'.e($campaign->id).' · '.e(ucfirst($campaign->status ?? 'Unknown')).'</p>'
-                        .'<p>Created: '.e($campaign->created_at?->format('d M Y') ?? 'Not available').'</p></div>';
+                    $mapping = $formDetails->get($fId);
+                    $linkedAd = $mapping?->ads()->with('campaignRecord')->first();
+                    $campaignName = $linkedAd?->campaignRecord?->name 
+                        ?? data_get($linkedAd?->data, 'campaign_name')
+                        ?? $mapping?->campaign?->name;
+                    if ($campaignName) {
+                        return '<div class="min-w-0 pr-1">'
+                            . '<span class="font-semibold text-ink text-xs block truncate" title="' . e($campaignName) . '">' . e($campaignName) . '</span>'
+                            . ($linkedAd ? '<span class="text-muted text-[10px] block mt-0.5 font-mono">Linked Ad: ' . e($linkedAd->name ?: $linkedAd->remote_id) . '</span>' : '')
+                            . '</div>';
+                    }
+                    return '<div class="text-muted text-[11px]">'
+                        . '<span class="italic text-muted">Auto-detected from Meta</span>'
+                        . '</div>';
                 },
             ],
             [
@@ -1008,25 +1009,28 @@ class IntegrationsManager extends Component
                     $mapping = $formDetails->get($fId);
                     $created = $mapping?->meta_created_at ?? LeadFormMapping::parseMetaCreatedTime(data_get($row, 'created_time'));
                     $statusClass = strtolower($status) === 'active' ? 'text-success border-border' : 'text-muted border-border';
+                    $qCount = is_array($mapping?->questions) ? count($mapping->questions) : (is_array(data_get($row, 'questions')) ? count(data_get($row, 'questions')) : 0);
                     return '<div class="min-w-0 pr-1">'
                         . '<div class="flex items-center gap-1.5 flex-wrap">'
                         . '<span class="font-bold text-ink leading-tight text-xs truncate max-w-[240px]" title="' . e($fName) . '">' . e($fName) . '</span>'
                         . '<span class="px-1.5 py-0.2 text-[9px] font-bold rounded-full uppercase bg-canvas border shrink-0 '.$statusClass.'">' . e($status) . '</span>'
                         . '</div>'
                         . '<div class="font-mono text-muted text-[10px] mt-0.5 select-all">ID: ' . e($fId) . '</div>'
-                        . '<div class="text-muted text-[10px] mt-1">Page ID: '.e($mapping?->page_id ?? 'Not available').'</div>'
-                        . '<div class="text-muted text-[10px] mt-1">Meta created: '.e($created?->format('d M Y, H:i') ?? 'Not available').'</div>'
+                        . '<div class="text-muted text-[10px] mt-1">Page ID: '.e($mapping?->page_id ?? 'Not available').($qCount ? ' · ' . $qCount . ' questions' : '').'</div>'
+                        . '<div class="text-muted text-[10px] mt-0.5">Meta created: '.e($created?->format('d M Y, H:i') ?? 'Not available').'</div>'
                         . '</div>';
                 },
             ],
             [
                 'key' => 'client',
-                'label' => 'Client / Org',
-                'width' => '24%',
+                'label' => 'Assigned Client / Org',
+                'width' => '28%',
                 'priority' => 1,
-                'render' => function ($row, $value = null, $layout = 'desktop') use ($clientOptions) {
+                'render' => function ($row, $value = null, $layout = 'desktop') use ($clientOptions, $formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
-                    return view('components.ui.themed-select', [
+                    $mapping = $formDetails->get($fId);
+                    $assignedClient = $this->formClientMap[$fId] ?? $mapping?->client_id ?? null;
+                    $select = view('components.ui.themed-select', [
                         'attributes' => new \Illuminate\View\ComponentAttributeBag([
                             'wire:model.live' => "formClientMap.{$fId}",
                             'id' => "meta-client-{$layout}-{$fId}",
@@ -1036,6 +1040,10 @@ class IntegrationsManager extends Component
                         'placeholder' => '-- Select Client / Org --',
                         'class' => 'w-full',
                     ])->render();
+                    $badge = $assignedClient 
+                        ? '<p class="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Leads route to this Client</p>'
+                        : '<p class="mt-1.5 text-[10px] text-muted">Routes to integration default client</p>';
+                    return $select . $badge;
                 },
             ],
             [

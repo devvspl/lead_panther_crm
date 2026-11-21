@@ -99,42 +99,65 @@ class ProcessInboundLeadJob implements ShouldQueue
                     ->first();
             }
 
-            // Determine Client & LeadSource
+            // Determine Client & LeadSource (Form mapping with client takes top priority)
             $client = Client::first();
             $defaultClientId = $client?->id ?: (\App\Models\User::first()?->id ?: 1);
-            $targetClientId = $mapping?->client_id ?: ($mapping?->campaign?->project?->client_id ?: $defaultClientId);
-
-            // Inherit project context from campaign or mapping (DO NOT auto-create Project from code)
-            $projectId = $mapping?->campaign?->project_id ?: ($mapping?->project_id ?: null);
-            if (!$projectId) {
-                $projectId = Project::where('client_id', $targetClientId)->value('id') ?: Project::value('id');
+            if ($account) {
+                $accDefault = $account->getCredential('default_client_id');
+                if ($accDefault) $defaultClientId = (int) $accDefault;
             }
 
+            $targetClientId = (!empty($mapping?->client_id))
+                ? (int) $mapping->client_id
+                : ($mapping?->campaign?->project?->client_id ?: $defaultClientId);
+
             $clientId = $targetClientId;
+
+            // Inherit project context belonging to the target client
+            $projectId = null;
+            if (!empty($mapping?->project_id)) {
+                $p = Project::find($mapping->project_id);
+                if ($p && (int) $p->client_id === (int) $clientId) {
+                    $projectId = $p->id;
+                }
+            }
+            if (!$projectId && !empty($mapping?->campaign?->project_id)) {
+                $p = Project::find($mapping->campaign->project_id);
+                if ($p && (int) $p->client_id === (int) $clientId) {
+                    $projectId = $p->id;
+                }
+            }
+            if (!$projectId) {
+                $projectId = Project::where('client_id', $clientId)->value('id') ?: Project::value('id');
+            }
+
             $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
             $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
-            if (!$campaignId && $type === 'meta' && $account) {
+
+            // Only fallback to legacy scoped campaign if form has NO explicit client mapping
+            if (!$campaignId && $type === 'meta' && $account && empty($mapping?->client_id)) {
                 $scoped = app(\App\Services\MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id);
-                if ($scoped) { $campaignId = $scoped->id; $projectId = $scoped->project_id; $clientId = $scoped->project?->client_id ?: $clientId; }
+                if ($scoped) {
+                    $campaignId = $scoped->id;
+                    $projectId = $scoped->project_id;
+                    $clientId = $scoped->project?->client_id ?: $clientId;
+                }
             }
 
-            // Auto-create or map Campaign from Meta campaign name if not explicitly mapped
+            // Auto-create or map Campaign from Meta campaign name under the client's project
             if (!empty($mapped['campaign']) && !$campaignId) {
                 $campaign = \App\Models\Campaign::firstOrCreate(
                     [
+                        'project_id' => $projectId,
                         'name' => $mapped['campaign'],
                     ],
                     [
-                        'project_id' => $projectId,
                         'lead_source_id' => $leadSource->id,
                         'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
                         'status' => 'active',
                     ]
                 );
-                if ($projectId && empty($campaign->project_id)) {
-                    $campaign->update(['project_id' => $projectId]);
-                }
                 $campaignId = $campaign->id;
             }
 

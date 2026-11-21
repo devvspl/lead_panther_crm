@@ -222,6 +222,7 @@ class MetaLeadSyncService
         $clientId = $client->id;
         $leadSource = LeadSource::firstOrCreate(['name' => 'meta']);
         $defaultConfiguredProjectId = $account->getCredential('default_project_id');
+        $defaultConfiguredClientId = $account->getCredential('default_client_id');
 
         Log::info("[MetaLeadSyncService] [Step 4: Defaults] System context prepared: Client #{$clientId} ('{$client->name}'), LeadSource 'meta' (ID: {$leadSource->id}), Account Default Project ID: " . ($defaultConfiguredProjectId ?: 'None'));
 
@@ -270,26 +271,33 @@ class MetaLeadSyncService
                 ->where('form_id', $currentFormId)
                 ->first();
 
-            // Resolve existing Project context if mapped, but DO NOT auto-create any project
+            // Form-to-Client mapping has absolute first priority!
+            $leadClientId = (!empty($mapping?->client_id))
+                ? (int) $mapping->client_id
+                : ($defaultConfiguredClientId ?: $clientId);
+
+            // Resolve existing Project context belonging to the target client
             $project = null;
             if (!empty($overrideProjectId)) {
                 $project = Project::find($overrideProjectId);
             }
-            if (!$project && !empty($mapping?->campaign?->project_id)) {
-                $project = Project::find($mapping->campaign->project_id);
-            }
             if (!$project && !empty($mapping?->project_id)) {
-                $project = Project::find($mapping->project_id);
+                $p = Project::find($mapping->project_id);
+                if ($p && (int) $p->client_id === (int) $leadClientId) {
+                    $project = $p;
+                }
+            }
+            if (!$project && $leadClientId) {
+                $project = Project::where('client_id', $leadClientId)->first();
             }
             if (!$project && !empty($defaultConfiguredProjectId)) {
                 $project = Project::find($defaultConfiguredProjectId);
             }
             if (!$project) {
-                $project = Project::where('client_id', $clientId)->first() ?? Project::first();
+                $project = Project::where('client_id', $leadClientId)->first() ?? Project::first();
             }
 
             $projectId = $project?->id;
-            $leadClientId = $mapping?->client_id ?: ($project?->client_id ?: $clientId);
 
             Log::info("[MetaLeadSyncService] [Step 5: Form #{$currentFormId}] Context resolved: Project ID: " . ($projectId ?: 'None') . ", Target Client ID: {$leadClientId}");
 
@@ -439,9 +447,16 @@ class MetaLeadSyncService
 
                         // Auto-create or map Campaign from Meta campaign_name
                         $remoteCampaign = app(MetaAdAccountService::class)->campaignRecord($account, $mapped);
-                        $scopedCampaign = !$overrideCampaignId && !$mapping?->campaign_id
-                            ? app(MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id) : null;
-                        $targetCampaignId = $overrideCampaignId ?: ($mapping?->campaign_id ?: $scopedCampaign?->id);
+                        $targetCampaignId = $overrideCampaignId;
+
+                        // Only fallback to legacy scoped campaign if the form is NOT explicitly mapped to a client
+                        if (!$targetCampaignId && empty($mapping?->client_id)) {
+                            $scopedCampaign = app(MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id);
+                            if ($scopedCampaign) {
+                                $targetCampaignId = $scopedCampaign->id;
+                            }
+                        }
+
                         if (!$targetCampaignId && !empty($mapped['campaign'])) {
                             $campaign = Campaign::firstOrCreate(
                                 [
@@ -457,7 +472,7 @@ class MetaLeadSyncService
                             $targetCampaignId = $campaign->id;
                             Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from ad payload: Campaign #{$campaign->id} ('{$campaign->name}')");
 
-                            // Automatically link form mapping to this actual Meta campaign if unassigned
+                            // Link form mapping to this actual Meta campaign if unassigned
                             if ($mapping && empty($mapping->campaign_id)) {
                                 $mapping->update(['campaign_id' => $campaign->id]);
                             }
@@ -488,10 +503,10 @@ class MetaLeadSyncService
 
                         $numericBudget = self::parseBudget($mapped['budget']);
 
-                        // Create Lead Master Record (project_id removed; inherited via campaign)
+                        // Create Lead Master Record (strictly pass client_id as mapped on Form)
                         $lead = Lead::create([
                             'lead_code' => Lead::generateUniqueLeadCode(),
-                            'client_id' => $mapping?->client_id ?: ($scopedCampaign?->project?->client_id ?: $leadClientId),
+                            'client_id' => $leadClientId,
                             'campaign_id' => $targetCampaignId,
                             'lead_source_id' => $leadSource->id,
                             'name' => $mapped['name'] ?? 'Meta Lead',

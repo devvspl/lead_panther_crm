@@ -160,7 +160,7 @@
                                 <th class="p-2.5">Objective &amp; Type</th>
                                 <th class="p-2.5">Status</th>
                                 <th class="p-2.5">Budget</th>
-                                <th class="p-2.5">CRM Campaign Mapping</th>
+                                <th class="p-2.5">Schedule / Dates</th>
                             @elseif($kind === 'adset')
                                 <th class="p-2.5">Ad Set Name / ID</th>
                                 <th class="p-2.5">Campaign</th>
@@ -214,12 +214,18 @@
                                         <span class="font-medium text-ink">{{ $record->budget_display }}</span>
                                     </td>
                                     <td class="p-2.5">
-                                        <div class="flex items-center gap-2 min-w-56">
-                                            <x-ui.themed-select wire:model="campaignMap.{{ $record->id }}" :options="$campaignOptions" />
-                                            <button type="button" wire:click="saveMapping({{ $record->id }})" title="Save mapping" aria-label="Save mapping" class="text-primary p-2 hover:bg-canvas rounded-lg transition">
-                                                <x-ui.team-icon name="check" />
-                                            </button>
-                                        </div>
+                                        @php
+                                            $startTime = data_get($record->data, 'start_time');
+                                            $stopTime = data_get($record->data, 'stop_time');
+                                        @endphp
+                                        @if($startTime || $stopTime)
+                                            <span class="text-ink text-xs block font-medium">Start: {{ $startTime ? \Carbon\Carbon::parse($startTime)->format('d M Y') : 'Immediate' }}</span>
+                                            <span class="text-muted text-[11px] block mt-0.5">End: {{ $stopTime ? \Carbon\Carbon::parse($stopTime)->format('d M Y') : 'Ongoing' }}</span>
+                                        @elseif($record->synced_at)
+                                            <span class="text-muted text-xs block">Synced: {{ $record->synced_at->format('d M Y, H:i') }}</span>
+                                        @else
+                                            <span class="text-muted text-xs block">—</span>
+                                        @endif
                                     </td>
                                 @elseif($kind === 'adset')
                                     <td class="p-2.5">

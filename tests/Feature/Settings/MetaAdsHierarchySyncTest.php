@@ -6,6 +6,7 @@ use App\Livewire\Settings\MetaAdAccounts;
 use App\Models\{LeadFormMapping, MetaAdAccount, MetaAdRecord, PortalAccount, User};
 use App\Services\MetaAdAccountService;
 use App\Services\MetaFormSyncService;
+use App\Services\MetaLeadSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -300,5 +301,72 @@ class MetaAdsHierarchySyncTest extends TestCase
             ->set('kind', 'insight')
             ->assertSee('5,000 imp')
             ->assertSee('10 Leads');
+    }
+
+    public function test_leads_are_passed_according_to_form_client_mapping_without_crm_campaign_override(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Elite Realty Org', 'status' => 'active']);
+        $clientA = \App\Models\Client::create(['name' => 'Mapped Client Alpha', 'organization_id' => $org->id]);
+        $clientB = \App\Models\Client::create(['name' => 'Unrelated Client Beta', 'organization_id' => $org->id]);
+
+        $projectA = \App\Models\Project::create(['client_id' => $clientA->id, 'name' => 'Skyline Heights']);
+        $projectB = \App\Models\Project::create(['client_id' => $clientB->id, 'name' => 'Ocean Vista']);
+
+        $page = PortalAccount::create([
+            'name' => 'Client Routing Page',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+        $page->setCredential('page_id', '889900');
+        $page->setCredential('access_token', 'page-routing-token');
+
+        // Form is mapped directly to Client A
+        $formMapping = LeadFormMapping::create([
+            'portal_account_id' => $page->id,
+            'form_id' => 'form_mapped_to_a',
+            'form_name' => 'Skyline Inquiries',
+            'client_id' => $clientA->id,
+            'status' => 'active',
+        ]);
+
+        Http::fake([
+            '*/889900/leadgen_forms*' => Http::response([
+                'data' => [
+                    ['id' => 'form_mapped_to_a', 'name' => 'Skyline Inquiries', 'status' => 'ACTIVE'],
+                ],
+            ]),
+            '*/form_mapped_to_a/leads*' => Http::response([
+                'data' => [
+                    [
+                        'id' => 'lead_meta_routed_1',
+                        'created_time' => '2026-11-21T10:00:00+0000',
+                        'campaign_name' => 'Prestige Luxury Festival Campaign',
+                        'campaign_id' => 'meta_camp_999',
+                        'field_data' => [
+                            ['name' => 'full_name', 'values' => ['Vikramaditya Roy']],
+                            ['name' => 'phone_number', 'values' => ['+919876543210']],
+                            ['name' => 'email', 'values' => ['vikram@example.com']],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $syncService = app(MetaLeadSyncService::class);
+        $result = $syncService->sync($page, 'form_mapped_to_a');
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['total_created']);
+
+        $lead = \App\Models\Lead::where('mobile', '919876543210')->first();
+        $this->assertNotNull($lead);
+
+        // Crucial: The lead MUST be passed to Client A as mapped on the form!
+        $this->assertEquals($clientA->id, $lead->client_id);
+        $this->assertNotEquals($clientB->id, $lead->client_id);
+
+        // Verify Campaign was created under Client A's project
+        $this->assertEquals($projectA->id, $lead->campaign->project_id);
+        $this->assertEquals('Prestige Luxury Festival Campaign', $lead->campaign->name);
     }
 }

@@ -24,6 +24,74 @@ class CreditReservationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_deltek_reconciliation_seeder_applies_allocation_and_delivered_consumption_once(): void
+    {
+        Role::findOrCreate('Super Admin');
+        $admin = User::factory()->create(['status' => 'active']); $admin->assignRole('Super Admin');
+        $org = Organization::create(['name' => 'Deltek', 'status' => 'active']);
+        $client = Client::create(['name' => 'Deltek billing', 'organization_id' => $org->id, 'status' => 'active']);
+        $other = Client::create(['name' => 'Other client']);
+        $wallet = CreditWallet::create(['client_id' => $client->id, 'balance' => 0]);
+        CreditWallet::create(['client_id' => $other->id, 'balance' => 77]);
+        DB::table('client_wallets')->where('id', $wallet->id)->update(['legacy_balance' => 20000, 'reconciled_at' => null]);
+        $source = LeadSource::create(['name' => 'meta']);
+        $make = fn ($values = []) => Lead::factory()->create(array_merge(['client_id' => $client->id, 'lead_source_id' => $source->id,
+            'assigned_to' => null, 'status' => 'new', 'current_stage' => 'new', 'delivered_at' => now(), 'delivery_pending' => false], $values));
+        $charged = $make(); $legacyLead = $make(); $unrecorded = $make(); $refunded = $make();
+        $pending = $make(['delivered_at' => null, 'delivery_pending' => true]);
+        $duplicate = $make(['status' => 'duplicate', 'current_stage' => 'duplicate']);
+        $legacy = CreditTransaction::create(['client_id' => $client->id, 'lead_id' => $legacyLead->id, 'is_legacy' => true,
+            'legacy_credit_used' => 10, 'transaction_type' => 'lead_consumption', 'created_at' => now()]);
+        CreditTransaction::create(['client_id' => $client->id, 'lead_id' => $charged->id, 'credit_before' => 10, 'credit_used' => 1, 'credit_after' => 9,
+            'transaction_type' => 'lead_consumption', 'created_at' => now()]);
+        CreditTransaction::create(['client_id' => $client->id, 'lead_id' => $refunded->id, 'is_legacy' => true,
+            'legacy_credit_used' => 10, 'transaction_type' => 'refund', 'created_at' => now()]);
+        $beforeLeads = DB::table('leads')->orderBy('id')->get()->toJson();
+        $this->seed(\Database\Seeders\DeltekLeadCreditReconciliationSeeder::class);
+        $this->assertSame(997, $wallet->fresh()->balance);
+        $this->assertSame(3, $wallet->fresh()->used_credits);
+        $this->assertSame(1000, $wallet->fresh()->total_credits);
+        $this->assertEquals(20000, $wallet->fresh()->getRawOriginal('legacy_balance'));
+        $this->assertTrue($legacy->fresh()->is_legacy);
+        $this->assertSame($beforeLeads, DB::table('leads')->orderBy('id')->get()->toJson());
+        $this->assertDatabaseHas('client_wallets', ['client_id' => $other->id, 'balance' => 77]);
+        foreach ([$legacyLead, $unrecorded] as $lead) $this->assertDatabaseHas('credit_transactions', ['lead_id' => $lead->id, 'is_legacy' => false, 'credit_used' => 1, 'transaction_type' => 'lead_consumption']);
+        foreach ([$refunded, $pending, $duplicate] as $lead) $this->assertFalse(CreditTransaction::where('lead_id', $lead->id)->where('is_legacy', false)->exists());
+        $ledgerCount = CreditTransaction::count();
+        // A rerun must not reset later legitimate usage or add another 1,000 allocation.
+        app(\App\Services\LeadCreditService::class)->adjust($client, 5, 'deduct', 'Later authorized adjustment', $admin);
+        $this->seed(\Database\Seeders\DeltekLeadCreditReconciliationSeeder::class);
+        $this->assertSame(992, $wallet->fresh()->balance);
+        $this->assertSame($ledgerCount + 1, CreditTransaction::count());
+        $this->assertSame(1, \App\Models\AuditLog::where('action', \Database\Seeders\DeltekLeadCreditReconciliationSeeder::AUDIT_ACTION)->count());
+    }
+
+    public function test_deltek_seeder_refuses_ambiguous_owners_and_insufficient_allocation_without_changes(): void
+    {
+        Role::findOrCreate('Super Admin');
+        $admin = User::factory()->create(['status' => 'active']); $admin->assignRole('Super Admin');
+        $org = Organization::create(['name' => 'Deltek']);
+        $client = Client::create(['name' => 'Deltek', 'organization_id' => $org->id]);
+        $wallet = CreditWallet::create(['client_id' => $client->id, 'balance' => 42]);
+        $source = LeadSource::create(['name' => 'meta']);
+        $lead = Lead::factory()->create(['client_id' => $client->id, 'lead_source_id' => $source->id, 'status' => 'new', 'current_stage' => 'new']);
+        CreditTransaction::create(['client_id' => $client->id, 'lead_id' => $lead->id, 'credit_before' => 1001,
+            'credit_used' => 1001, 'credit_after' => 0, 'transaction_type' => 'lead_consumption', 'created_at' => now()]);
+        try {
+            $this->seed(\Database\Seeders\DeltekLeadCreditReconciliationSeeder::class);
+            $this->fail('An insufficient allocation must not be applied.');
+        } catch (\RuntimeException $e) { $this->assertStringContainsString('exceeds', $e->getMessage()); }
+        $this->assertSame(42, $wallet->fresh()->balance);
+        $this->assertFalse(\App\Models\AuditLog::where('action', \Database\Seeders\DeltekLeadCreditReconciliationSeeder::AUDIT_ACTION)->exists());
+        $other = Client::create(['name' => 'Second owner', 'organization_id' => $org->id]);
+        CreditWallet::create(['client_id' => $other->id, 'balance' => 10]);
+        try {
+            $this->seed(\Database\Seeders\DeltekLeadCreditReconciliationSeeder::class);
+            $this->fail('Ambiguous billing owners must not be selected arbitrarily.');
+        } catch (\RuntimeException $e) { $this->assertStringContainsString('exactly one identifiable billing owner', $e->getMessage()); }
+        $this->assertSame(42, $wallet->fresh()->balance);
+    }
+
     public function test_legacy_wallet_owner_is_selectable_and_consumption_is_applied_once(): void
     {
         $admin = User::factory()->create(['status' => 'active']);

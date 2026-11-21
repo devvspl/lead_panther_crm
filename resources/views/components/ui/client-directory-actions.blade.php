@@ -12,7 +12,7 @@
                 <a role="menuitem" href="{{ route('admin.organizations.show', ['organization'=>$organization->id, 'tab'=>'team']) }}" wire:navigate class="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas"><x-ui.team-icon name="team" />Manage Team</a>
                 <button type="button" role="menuitem" wire:click="toggleStatus({{ $organization->id }})" wire:confirm="{{ $organization->status === 'active' ? 'Suspend' : 'Activate' }} {{ $organization->name }}?" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-canvas {{ $organization->status === 'active' ? 'text-danger' : 'text-success' }}"><x-ui.team-icon name="power" />{{ $organization->status === 'active' ? 'Suspend Client' : 'Activate Client' }}</button>
                 <button type="button" role="menuitem" wire:click="openUserModal({{ $organization->id }})" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-ink hover:bg-canvas"><x-ui.team-icon name="team" />Manage Users</button>
-                <a role="menuitem" href="{{ route('admin.organizations.show', ['organization'=>$organization->id, 'tab'=>'credits']) }}" wire:navigate class="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas"><x-ui.team-icon name="wallet" />Credits & Wallet</a>
+                <a role="menuitem" href="{{ route('admin.organizations.show', ['organization'=>$organization->id, 'tab'=>'credits']) }}" wire:navigate class="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas"><x-ui.team-icon name="wallet" />Lead Credits</a>
             </div>
         </x-slot:content>
     </x-ui.dropdown>

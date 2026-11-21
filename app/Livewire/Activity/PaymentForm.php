@@ -10,6 +10,8 @@ use App\Models\ProjectUnit;
 
 class PaymentForm extends Component
 {
+    public function boot(): void { abort_unless(\App\Support\FinancialVisibility::allowed(), 403); }
+
     public Lead $lead;
 
     public ?int $bookingId = null;

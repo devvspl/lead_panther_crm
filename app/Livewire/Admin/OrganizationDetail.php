@@ -34,6 +34,9 @@ class OrganizationDetail extends Component
     public Organization $organization;
 
     public array $projectRates = [];
+
+    #[\Livewire\Attributes\On('lead-credits-updated')]
+    public function refreshCreditData(): void {}
     public string $mappingProjectName = '';
 
     #[\Livewire\Attributes\On('org-member-updated')]
@@ -100,7 +103,7 @@ class OrganizationDetail extends Component
     {
         abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
         $project = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->findOrFail($projectId);
-        $this->validate(["projectRates.$projectId" => 'nullable|numeric|min:0.01|max:999999.99']);
+        $this->validate(["projectRates.$projectId" => 'nullable|integer|min:1|max:999999']);
         $project->update(['lead_cost' => ($this->projectRates[$projectId] ?? null) === '' ? null : ($this->projectRates[$projectId] ?? null)]);
         $this->dispatch('toast', type: 'success', message: 'Project pricing saved.');
     }
@@ -113,7 +116,7 @@ class OrganizationDetail extends Component
     public bool $isEditing = false;
     public string $editName = '';
     public string $editStatus = 'active';
-    public ?float $orgLeadCost = null;
+    public $orgLeadCost = null;
     public array $deliverySettings = [];
     public string $deliveryTimezone = '';
     public $executiveResponseMinutes = 15;
@@ -243,12 +246,12 @@ class OrganizationDetail extends Component
     public string $newLeadStatus = 'new';
     public string $newLeadRequirement = '';
 
-    // Credits & Wallet Management
+    // Lead Credits Management
     public string $creditFilterType = 'all'; // 'all' | 'recharge' | 'deduct' | 'refund' | 'reserve'
     public bool $showCreditModal = false;
     public ?int $selectedCreditClientId = null;
     public string $creditAdjustmentType = 'recharge'; // 'recharge' | 'refund' | 'deduct'
-    public float $creditAmount = 100.00;
+    public $creditAmount = 100;
     public string $creditReason = 'Manual credit allocation';
 
     public function mount(Organization $organization): void
@@ -259,7 +262,7 @@ class OrganizationDetail extends Component
         $this->executiveResponseMinutes = $organization->executive_response_minutes ?? 15;
         $this->editName = $organization->name;
         $this->editStatus = $organization->status;
-        $this->orgLeadCost = $organization->lead_cost !== null ? (float) $organization->lead_cost : null;
+        $this->orgLeadCost = $organization->lead_cost !== null ? (int) $organization->lead_cost : null;
         foreach (['project' => $this->mappedDeliveryProjects()->get(),
             'campaign' => $this->mappedDeliveryCampaigns()->get()] as $type => $records) {
             foreach ($records as $record) {
@@ -300,14 +303,14 @@ class OrganizationDetail extends Component
     public function updateOrgLeadCost(): void
     {
         $this->validate([
-            'orgLeadCost' => 'nullable|numeric|min:0.01|max:100000',
+            'orgLeadCost' => 'nullable|integer|min:1|max:100000',
         ]);
 
         $this->organization->update([
-            'lead_cost' => $this->orgLeadCost !== null && $this->orgLeadCost > 0 ? (float) $this->orgLeadCost : null,
+            'lead_cost' => $this->orgLeadCost !== null && $this->orgLeadCost > 0 ? (int) $this->orgLeadCost : null,
         ]);
         $this->organization->refresh();
-        $this->orgLeadCost = $this->organization->lead_cost !== null ? (float) $this->organization->lead_cost : null;
+        $this->orgLeadCost = $this->organization->lead_cost !== null ? (int) $this->organization->lead_cost : null;
 
         $this->dispatch('toast', type: 'success', message: "Per-lead pricing override for '{$this->organization->name}' updated successfully.");
     }
@@ -688,7 +691,7 @@ class OrganizationDetail extends Component
     {
         $firstClient = $this->billingClients()->first();
         $this->selectedCreditClientId = $clientId ?: $firstClient?->id;
-        $this->creditAmount = 100.00;
+        $this->creditAmount = 100;
         $this->creditAdjustmentType = in_array($type, ['recharge', 'opening_credit', 'refund', 'manual_adjustment', 'deduct']) ? $type : 'recharge';
         $this->creditReason = match ($this->creditAdjustmentType) {
             'opening_credit' => 'Initial opening balance allocation',
@@ -712,58 +715,15 @@ class OrganizationDetail extends Component
     {
         $this->validate([
             'selectedCreditClientId' => 'required|exists:users,id',
-            'creditAmount' => 'required|numeric|min:0.01',
+            'creditAmount' => 'required|integer|min:1',
             'creditAdjustmentType' => 'required|in:recharge,opening_credit,refund,manual_adjustment,deduct',
             'creditReason' => 'required|string|min:3',
         ]);
 
         $client = $this->billingClients()->findOrFail($this->selectedCreditClientId);
 
-        DB::transaction(function () use ($client) {
-            $wallet = CreditWallet::where('client_id', $client->id)->lockForUpdate()->first();
-            if (!$wallet) {
-                $wallet = CreditWallet::create([
-                    'client_id' => $client->id,
-                    'balance' => 0.00,
-                    'opening_balance' => 0.00,
-                ]);
-            }
-
-            $before = (float) $wallet->balance;
-            $txType = $this->creditAdjustmentType;
-
-            if ($this->creditAdjustmentType === 'opening_credit') {
-                $after = $before + $this->creditAmount;
-                $wallet->update([
-                    'opening_balance' => ((float) $wallet->opening_balance) + $this->creditAmount,
-                    'balance' => $after,
-                ]);
-            } elseif ($this->creditAdjustmentType === 'recharge' || $this->creditAdjustmentType === 'refund') {
-                $after = $before + $this->creditAmount;
-                $wallet->update(['balance' => $after]);
-            } elseif ($this->creditAdjustmentType === 'manual_adjustment') {
-                // If reason contains debit or user is adjusting downwards, or standard addition
-                $after = $before + $this->creditAmount;
-                $wallet->update(['balance' => $after]);
-            } else { // deduct
-                $after = max(0.00, $before - $this->creditAmount);
-                $wallet->update(['balance' => $after]);
-                $txType = 'deduct';
-            }
-
-            CreditTransaction::create([
-                'client_id' => $client->id,
-                'lead_id' => null,
-                'package_id' => null,
-                'credit_before' => $before,
-                'credit_used' => $this->creditAmount,
-                'credit_after' => $after,
-                'transaction_type' => $txType,
-                'description' => $this->creditReason,
-                'created_by' => auth()->id(),
-                'created_at' => now(),
-            ]);
-        });
+        app(\App\Services\LeadCreditService::class)->adjust($client, $this->creditAmount,
+            $this->creditAdjustmentType, $this->creditReason, auth()->user());
 
         $this->closeCreditModal();
         $this->organization->load('clients.wallet');
@@ -876,7 +836,7 @@ class OrganizationDetail extends Component
             $filename = "organization_{$slug}_credits_transactions_{$date}.xlsx";
             return Excel::download(new BaseStyledExport(
                 data: $data,
-                title: 'Credits & Wallet',
+                title: 'Lead Credits',
                 subtitle: "Credit Transactions | {$org->name} | {$exportedAt}",
                 headings: ['Tx ID', 'Client Name', 'Type', 'Lead Code', 'Credit Before', 'Credit In/Out', 'Credit After', 'Date'],
                 columns: [
@@ -890,7 +850,7 @@ class OrganizationDetail extends Component
                     fn($tx) => $tx->created_at ? Carbon::parse($tx->created_at)->format('M d, Y H:i') : '—',
                 ],
                 statusColumns: ['transaction_type'],
-                currencyColumns: ['credit_before', 'credit_used', 'credit_after'],
+                currencyColumns: [],
                 hasTotals: true
             ), $filename);
         }
@@ -1083,8 +1043,12 @@ class OrganizationDetail extends Component
 
         $totalCreditsDeducted = DB::table('credit_transactions')
             ->whereIn('client_id', $clientIds)
+            ->whereNotNull('lead_id')->where('is_legacy', false)
             ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
             ->sum('credit_used') ?? 0;
+
+        $leadRefunds = (int) CreditTransaction::withoutGlobalScopes()->whereIn('client_id', $clientIds)->whereNotNull('lead_id')->where('is_legacy', false)->where('transaction_type', 'refund')->sum('credit_used');
+        $usedLeadCredits = max(0, (int) $totalCreditsDeducted - $leadRefunds);
 
         // 6. Audit Trail
         $auditLogs = collect();
@@ -1124,12 +1088,14 @@ class OrganizationDetail extends Component
             'totalProjectsCount' => $totalProjectsCount,
             'totalLeadsCount' => $totalLeadsCount,
             'directlyAssignedLeadsCount' => $directlyAssignedLeadsCount,
-            'totalOpeningBalance' => (float) $totalOpeningBalance,
-            'totalWalletBalance' => (float) $totalWalletBalance,
-            'globalDefaultLeadCost' => (float) $globalDefaultLeadCost,
-            'totalCreditsRecharged' => (float) $totalCreditsRecharged,
-            'totalCreditsRefunded' => (float) $totalCreditsRefunded,
-            'totalCreditsDeducted' => (float) $totalCreditsDeducted,
+            'totalOpeningBalance' => (int) $totalOpeningBalance,
+            'totalWalletBalance' => (int) $totalWalletBalance,
+            'totalLeadCredits' => (int) $totalWalletBalance + $usedLeadCredits,
+            'usedLeadCredits' => $usedLeadCredits,
+            'globalDefaultLeadCost' => (int) $globalDefaultLeadCost,
+            'totalCreditsRecharged' => (int) $totalCreditsRecharged,
+            'totalCreditsRefunded' => (int) $totalCreditsRefunded,
+            'totalCreditsDeducted' => (int) $totalCreditsDeducted,
             'auditLogs' => $auditLogs,
             'clientProjects' => $clientProjects,
         ])->layout('layouts.app');

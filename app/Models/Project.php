@@ -8,8 +8,11 @@ use App\Traits\ClientScoped;
 
 class Project extends Model
 {
+    use \App\Traits\HidesMonetaryValues;
+
     use ClientScoped;
 
+    use \App\Traits\HasLeadCreditCost;
     protected $guarded = [];
 
     public function client(): BelongsTo

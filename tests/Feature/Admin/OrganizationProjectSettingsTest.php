@@ -30,8 +30,9 @@ class OrganizationProjectSettingsTest extends TestCase
         $project = Project::withoutGlobalScopes()->where('name', 'Mapped Project')->firstOrFail();
         $this->assertEquals($owner->id, $project->client_id);
         $component->set('activeTab', 'credits')->assertSee('Project-wise Lead Pricing')
-            ->set('projectRates.'.$project->id, '23.50')->call('saveProjectRate', $project->id)->assertHasNoErrors();
-        $this->assertEquals(23.5, $project->fresh()->lead_cost);
+            ->set('projectRates.'.$project->id, '23.50')->call('saveProjectRate', $project->id)->assertHasErrors('projectRates.'.$project->id);
+        $component->set('projectRates.'.$project->id, '23')->call('saveProjectRate', $project->id)->assertHasNoErrors();
+        $this->assertEquals(23, $project->fresh()->lead_cost);
         $component->set('projectRates.'.$project->id, '')->call('saveProjectRate', $project->id)->assertHasNoErrors();
         $this->assertNull($project->fresh()->lead_cost);
         $otherOrg = Organization::create(['name' => 'Other Org']);

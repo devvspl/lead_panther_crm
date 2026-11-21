@@ -834,7 +834,7 @@ class OrganizationManager extends Component
     {
         $members = fn() => User::select('id')->whereColumn('users.organization_id', 'organizations.id');
         // Actual wallet movements: consumption less refunds. Funding/adjustments aren't lead usage.
-        $movement = "CASE WHEN transaction_type IN ('lead_consumption','deduct','reserve') THEN CASE WHEN credit_before > credit_after THEN credit_before-credit_after ELSE 0 END WHEN transaction_type = 'refund' THEN CASE WHEN credit_after > credit_before THEN credit_before-credit_after ELSE 0 END ELSE 0 END";
+        $movement = "CASE WHEN lead_id IS NULL THEN 0 WHEN transaction_type IN ('lead_consumption','deduct','reserve') THEN CASE WHEN credit_before > credit_after THEN credit_before-credit_after ELSE 0 END WHEN transaction_type = 'refund' THEN CASE WHEN credit_after > credit_before THEN credit_before-credit_after ELSE 0 END ELSE 0 END";
         $metrics = Organization::query()->select('organizations.*')->withCount(['users', 'projects'])->addSelect([
             'available_credits' => CreditWallet::query()->selectRaw('COALESCE(SUM(balance),0)')->whereIn('client_id', $members()),
             'credits_used' => CreditTransaction::query()->selectRaw("CASE WHEN SUM($movement)>0 THEN SUM($movement) ELSE 0 END")->whereIn('client_id', $members()),
@@ -858,7 +858,7 @@ class OrganizationManager extends Component
         if (in_array($this->statusFilter, ['active', 'suspended'], true)) $query->where('organizations.status', $this->statusFilter);
         foreach (['projects_min' => ['projects_count', '>='], 'projects_max' => ['projects_count', '<='], 'credits_min' => ['available_credits', '>='], 'credits_max' => ['available_credits', '<=']] as $key => [$column, $operator]) {
             $value = $this->columnFilters[$key] ?? '';
-            if (is_numeric($value) && (float)$value >= 0) $query->whereRaw("CAST($column AS DECIMAL(18,2)) $operator ?", [(float)$value]);
+            if (is_numeric($value) && (float)$value >= 0) $query->whereRaw("CAST($column AS DECIMAL(18,0)) $operator ?", [(float)$value]);
         }
         foreach (['created_from' => '>=', 'created_to' => '<='] as $key => $operator) {
             $date = $this->columnFilters[$key] ?? '';
@@ -873,7 +873,7 @@ class OrganizationManager extends Component
 
     private function creditMetrics(Organization $organization): Organization
     {
-        $total = round(max(0, (float)$organization->available_credits + (float)$organization->credits_used), 2);
+        $total = max(0, (int)$organization->available_credits + (int)$organization->credits_used);
         $organization->setAttribute('total_credits', $total);
         $organization->setAttribute('usage_percent', $total > 0 ? round(min(100, (float)$organization->credits_used / $total * 100), 1) : 0);
         return $organization;

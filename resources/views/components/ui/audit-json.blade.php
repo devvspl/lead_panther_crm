@@ -1,4 +1,10 @@
 @props(['value'])
+@php
+    if (!\App\Support\FinancialVisibility::allowed()) {
+        $value = \App\Support\AuditRedactor::payload($value);
+        $value = is_array($value) ? \App\Support\FinancialVisibility::redact($value) : \App\Support\FinancialVisibility::text((string) $value);
+    }
+@endphp
 @if($value === null || $value === [] || $value === '')
     <p class="text-xs text-muted p-3 bg-canvas rounded-lg">Unavailable for this record.</p>
 @else

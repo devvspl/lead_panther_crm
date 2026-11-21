@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Negotiation extends Model
 {
+    use \App\Traits\HidesMonetaryValues;
+
     use \App\Traits\HidesArchivedLeads;
 
     protected $guarded = [];

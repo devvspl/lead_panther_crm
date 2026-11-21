@@ -80,30 +80,30 @@ class LeadReplacement extends Model
 
             // 3. Refund credits to client wallet
             $wallet = CreditWallet::where('client_id', $lead->client_id)->lockForUpdate()->first();
-            if ($wallet) {
-                $cost = (float) CreditTransaction::where('lead_id', $lead->id)
-                    ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+            if ($wallet && $wallet->reconciled_at && !CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->where('is_legacy', false)->where('transaction_type', 'refund')->exists()) {
+                $cost = (int) CreditTransaction::where('lead_id', $lead->id)
+                    ->where('is_legacy', false)->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                     ->value('credit_used');
-                if ($cost <= 0) {
-                    $cost = (float) ($lead->lead_cost ?: 10.00);
+
+
+                if ($cost > 0) {
+                    $before = (int) $wallet->balance;
+                    $after = $before + $cost;
+                    $wallet->update(['balance' => $after]);
+
+                    CreditTransaction::create([
+                        'client_id' => $lead->client_id,
+                        'lead_id' => $lead->id,
+                        'package_id' => null,
+                        'credit_before' => $before,
+                        'credit_used' => $cost,
+                        'credit_after' => $after,
+                        'transaction_type' => 'refund',
+                        'description' => "Replacement approved for lead {$lead->lead_code}: " . ($this->resolution_note ?: ($this->reason?->label ?: 'Lead Replacement')),
+                        'created_by' => $userId,
+                        'created_at' => now(),
+                    ]);
                 }
-
-                $before = (float) $wallet->balance;
-                $after = $before + $cost;
-                $wallet->update(['balance' => $after]);
-
-                CreditTransaction::create([
-                    'client_id' => $lead->client_id,
-                    'lead_id' => $lead->id,
-                    'package_id' => null,
-                    'credit_before' => $before,
-                    'credit_used' => $cost,
-                    'credit_after' => $after,
-                    'transaction_type' => 'refund',
-                    'description' => "Replacement approved for lead {$lead->lead_code}: " . ($this->resolution_note ?: ($this->reason?->label ?: 'Lead Replacement')),
-                    'created_by' => $userId,
-                    'created_at' => now(),
-                ]);
             }
 
             // 4. Create new replacement lead (project_id removed; inherited via campaign)

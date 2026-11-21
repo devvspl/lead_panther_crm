@@ -14,10 +14,29 @@ class CreditTransaction extends Model
 
     public $timestamps = false;
     protected $guarded = [];
+    protected $hidden = ['legacy_credit_before', 'legacy_credit_used', 'legacy_credit_after'];
+    protected $appends = ['quantity', 'action', 'remarks'];
+    public function getQuantityAttribute(): ?int { return $this->is_legacy ? null : (int) $this->credit_used; }
+    public function getActionAttribute(): string { return $this->transaction_type_label; }
+    public function getRemarksAttribute(): ?string { return $this->description; }
 
     protected $casts = [
         'created_at' => 'datetime',
+        'credit_before' => 'integer', 'credit_used' => 'integer', 'credit_after' => 'integer', 'is_legacy' => 'boolean',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+        static::creating(function ($transaction) {
+            if (!$transaction->is_legacy) {
+                foreach (['credit_before', 'credit_used', 'credit_after'] as $field) {
+                    $transaction->{$field} = \App\Support\LeadCredits::quantity($transaction->getAttributes()[$field] ?? 0, $field);
+                }
+                if ($transaction->transaction_type === 'lead_consumption' && $transaction->lead_id) $transaction->delivery_charge_lead_id = $transaction->lead_id;
+            }
+        });
+    }
 
     public function client()
     {
@@ -40,14 +59,17 @@ class CreditTransaction extends Model
     }
 
     /**
-     * Reserve & consume credits for a newly created lead with a pessimistic row lock.
+     * Compatibility entry point for charging a successful delivery under a pessimistic row lock.
      * Prevents duplicate deductions and strictly validates organization status and balance.
      */
     public static function reserveForLead(Lead $lead): bool
     {
         return DB::transaction(function () use ($lead) {
+            $lead = Lead::withoutGlobalScopes()->whereKey($lead->id)->lockForUpdate()->firstOrFail();
+            if (!$lead->delivered_at || $lead->delivery_pending || !$lead->credit_delivery_confirmed || in_array($lead->status, ['duplicate', 'rejected', 'invalid'])) return false;
             // 1. Prevent duplicate deduction for the same lead
             $alreadyCharged = static::withoutGlobalScopes()->where('lead_id', $lead->id)
+                ->where('is_legacy', false)
                 ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                 ->exists();
 
@@ -57,6 +79,7 @@ class CreditTransaction extends Model
 
             // 2. Validate Client & Organization Status
             $client = $lead->client ?: ($lead->client_id ? Client::with('organization')->find($lead->client_id) : null);
+            if (!$client || $client->status !== 'active') return false;
             $organization = $client?->organization;
 
             if ($organization && !$organization->is_active) {
@@ -90,16 +113,17 @@ class CreditTransaction extends Model
                     'opening_balance' => 0.00,
                 ]);
             }
+            if (!$wallet->reconciled_at) return false;
 
             // 4. Calculate effective per-lead pricing following the hierarchy
             $pricingService = app(\App\Services\LeadPricingService::class);
             $resolution = $pricingService->resolveForLead($lead);
-            $cost = (float) $resolution['cost'];
+            $cost = (int) $resolution['cost'];
 
             // 5. Check if wallet has sufficient available credits
             if ($wallet->balance >= $cost) {
-                $before = (float) $wallet->balance;
-                $after = max(0.00, $before - $cost);
+                $before = (int) $wallet->balance;
+                $after = $before - $cost;
 
                 $wallet->update(['balance' => $after]);
                 $lead->update(array_merge(['lead_cost' => $cost], $lead->current_stage === 'pending_credit' ? ['status' => 'new', 'current_stage' => 'new'] : []));
@@ -112,7 +136,7 @@ class CreditTransaction extends Model
                     'credit_used' => $cost,
                     'credit_after' => $after,
                     'transaction_type' => 'lead_consumption',
-                    'description' => "Lead delivery charge for {$lead->lead_code} ({$lead->name})",
+                    'description' => "Lead credits consumed for {$lead->lead_code} ({$lead->name})",
                     'created_by' => auth()->id() ?? $lead->client_id,
                     'created_at' => now(),
                 ]);
@@ -136,7 +160,7 @@ class CreditTransaction extends Model
                     'status' => 'sent',
                     'payload' => json_encode([
                         'title' => 'Recharge required',
-                        'message' => "Insufficient credits (Required: {$cost} Cr, Available: {$wallet->balance} Cr). Lead {$lead->lead_code} placed on pending_credit hold.",
+                        'message' => "Insufficient credits (Required: {$cost} Credits, Available: {$wallet->balance} Credits). Lead {$lead->lead_code} placed on pending_credit hold.",
                     ]),
                     'sent_at' => now(),
                 ]);
@@ -158,26 +182,28 @@ class CreditTransaction extends Model
 
     public function getCreditUsedFormattedAttribute(): string
     {
-        $isCredit = in_array($this->transaction_type, ['recharge', 'refund', 'opening_credit']) 
-            || ($this->transaction_type === 'manual_adjustment' && $this->credit_after >= $this->credit_before);
+        if ($this->is_legacy) return 'Legacy entry';
+        $isCredit = $this->credit_after >= $this->credit_before;
         $prefix = $isCredit ? '+' : '-';
-        return $prefix . number_format((float)$this->credit_used, 1) . ' Cr';
+        return $prefix . number_format((int)$this->credit_used) . ' Credits';
     }
 
     public function getTransactionTypeLabelAttribute(): string
     {
         return match ($this->transaction_type) {
             'opening_credit' => 'Opening Credit',
-            'recharge' => 'Recharge',
-            'lead_consumption', 'deduct', 'reserve' => 'Lead Consumption',
-            'refund' => 'Refund',
-            'manual_adjustment' => 'Manual Adjustment',
+            'recharge' => 'Credits Added',
+            'lead_consumption', 'reserve' => 'Lead Delivery',
+            'deduct' => 'Credits Deducted',
+            'refund' => 'Credit Return',
+            'reconciliation' => 'Reconciliation',
+            'manual_adjustment' => 'Credit Adjustment',
             default => ucwords(str_replace('_', ' ', $this->transaction_type)),
         };
     }
 
     public function getCreditAfterFormattedAttribute(): string
     {
-        return number_format((float)$this->credit_after, 1) . ' Cr';
+        return $this->is_legacy ? 'Legacy entry' : number_format((int)$this->credit_after) . ' Credits';
     }
 }

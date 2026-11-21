@@ -16,8 +16,8 @@
         @endif
     </span>
     <a href="{{ \Illuminate\Support\Facades\Route::has('notifications.open') ? route('notifications.open', ['notification' => $notification->id]) : '#' }}" wire:click.prevent="markAsReadAndNavigate('{{ $notification->id }}')" class="flex-1 min-w-0 space-y-1 hover:text-primary">
-        <p class="text-xs font-bold text-ink break-words">{{ $data['title'] ?? 'Notification' }} @if($unread)<span class="inline-block rounded-full w-2 h-2 bg-primary ml-1" aria-label="Unread"></span>@endif</p>
-        <p class="text-xs text-muted break-words">{{ $data['message'] ?? '' }}</p>
+        <p class="text-xs font-bold text-ink break-words">{{ \App\Support\ClientFacingText::label($data['title'] ?? 'Notification') }} @if($unread)<span class="inline-block rounded-full w-2 h-2 bg-primary ml-1" aria-label="Unread"></span>@endif</p>
+        <p class="text-xs text-muted break-words">{{ \App\Support\ClientFacingText::label($data['message'] ?? '') }}</p>
         <time datetime="{{ $notification->created_at->toIso8601String() }}" title="{{ $when->format('M d, Y H:i:s T') }}" class="block text-[10px] text-muted">{{ $when->diffForHumans() }} · {{ $when->format('M d, Y H:i') }}</time>
     </a>
     @if($unread)<button type="button" wire:click="markAsRead('{{ $notification->id }}')" title="Mark as read" aria-label="Mark notification as read" class="shrink-0 text-xs text-primary p-1 hover:bg-canvas rounded">✓</button>@endif

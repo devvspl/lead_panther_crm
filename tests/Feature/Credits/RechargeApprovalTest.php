@@ -45,7 +45,7 @@ class RechargeApprovalTest extends TestCase
         $rechargeReq = RechargeRequest::create([
             'client_id' => $client->id,
             'package_id' => $package->id,
-            'amount' => 5000.00,
+            'amount' => 500,
             'status' => 'pending',
             'requested_at' => now(),
         ]);

@@ -31,7 +31,7 @@
                 <h2 class="text-lg font-bold text-ink mt-1 truncate">{{ $lead->name }}</h2>
                 <p class="text-xs text-muted truncate">
                     {{ $lead->project?->name ?: 'Direct' }} &bull; {{ $lead->city ?: 'N/A' }} &bull;
-                    ₹{{ number_format($lead->budget / 100000, 1) }}L
+                    @if(\App\Support\FinancialVisibility::allowed())₹{{ number_format($lead->budget / 100000, 1) }}L @endif
                 </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -151,11 +151,13 @@
                         <span
                             class="font-semibold text-ink block mt-0.5">{{ $lead->property_type ?: 'Residential' }}</span>
                     </div>
+                    @if(\App\Support\FinancialVisibility::allowed())
                     <div>
                         <span class="text-[10px] text-muted block">Budget</span>
                         <span class="font-bold text-ink block mt-0.5">₹{{ number_format($lead->budget / 100000, 1) }}
                             Lakhs</span>
                     </div>
+                    @endif
                 </div>
 
                 @if($lead->requirement)
@@ -333,7 +335,7 @@
 
                 @if($isBuilder)
                     <div class="text-xs space-y-2">
-                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} · Budget: {{ $lead->budget ?: '—' }}</p>
+                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} @if(\App\Support\FinancialVisibility::allowed()) Budget: {{ $lead->budget ?: '—' }} @endif</p>
                         @if($normalizedStage === 'follow_up')@foreach($leadFollowups as $followup)
                         <p>{{ $followup->due_at }} · {{ $followup->note }} · {{ $followup->status }}</p>@endforeach @endif
                         @if($normalizedStage === 'meeting_scheduled')
@@ -569,7 +571,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: NEGOTIATION & PROPOSAL                         -->
                         <!-- ----------------------------------------------------- -->
-                    @elseif($actionStage === 'negotiation')
+                    @elseif($actionStage === 'negotiation' && \App\Support\FinancialVisibility::allowed())
                         <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                             <span class="text-xs font-bold text-ink block">Negotiation &amp; Commercial Terms</span>
                             <div class="grid grid-cols-2 gap-3">
@@ -605,7 +607,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: UNIT BOOKING                                   -->
                         <!-- ----------------------------------------------------- -->
-                    @elseif($actionStage === 'booking')
+                    @elseif($actionStage === 'booking' && \App\Support\FinancialVisibility::allowed())
                         <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                             <span class="text-xs font-bold text-ink block">Unit Booking Details</span>
                             @if($latestBooking)
@@ -638,7 +640,7 @@
                         <!-- ----------------------------------------------------- -->
                         <!-- STAGE: PAYMENT RECEIVED                               -->
                         <!-- ----------------------------------------------------- -->
-                    @elseif($actionStage === 'payment_received')
+                    @elseif($actionStage === 'payment_received' && \App\Support\FinancialVisibility::allowed())
                         <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
                             <span class="text-xs font-bold text-ink block">Record Payment &amp; Verify Receipt</span>
                             <div class="grid grid-cols-3 gap-3">
@@ -691,7 +693,7 @@
                                 <div
                                     class="p-2 bg-surface rounded border border-emerald-200 grid grid-cols-2 gap-2 text-[11px] text-ink">
                                     <div><span class="text-muted block text-[10px]">Booking Amount:</span>
-                                        <strong>₹{{ number_format($latestBooking->booking_amount) }}</strong></div>
+                                        @if(\App\Support\FinancialVisibility::allowed())<strong>₹{{ number_format($latestBooking->booking_amount) }}</strong>@endif</div>
                                     <div><span class="text-muted block text-[10px]">Booked Date:</span>
                                         <strong>{{ $latestBooking->booked_at?->format('d M Y') }}</strong></div>
                                 </div>

@@ -545,7 +545,7 @@ php artisan schedule:work</code></pre>
                                 <span>Create builder and agency tenants, toggle status (active/suspended), assign subscription packages.</span>
                             </div>
                             <div class="p-3 rounded-lg bg-canvas border border-border space-y-1">
-                                <span class="font-bold text-ink block">💳 Credits &amp; Wallets (<code class="text-primary font-mono">/admin/credits</code>)</span>
+                                <span class="font-bold text-ink block">💳 Lead Creditss (<code class="text-primary font-mono">/admin/credits</code>)</span>
                                 <span>Monitor tenant wallet balances, review and approve manual credit recharge requests.</span>
                             </div>
                             <div class="p-3 rounded-lg bg-canvas border border-border space-y-1">

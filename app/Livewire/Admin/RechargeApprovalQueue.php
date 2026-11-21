@@ -17,9 +17,15 @@ class RechargeApprovalQueue extends Component
 {
     use HasAdvancedTable;
 
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
     public ?int $selectedRequestId = null;
     public string $referenceNote = '';
     public string $rejectionReason = '';
+    public $approvalQuantity = null;
 
     public bool $showApproveModal = false;
     public bool $showRejectModal = false;
@@ -35,7 +41,6 @@ class RechargeApprovalQueue extends Component
             ['key' => 'id', 'label' => 'Req ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'client_name', 'label' => 'Client / Organization', 'type' => 'text', 'priority' => 1, 'class' => 'font-bold text-ink'],
             ['key' => 'package_name', 'label' => 'Package', 'type' => 'text', 'priority' => 2],
-            ['key' => 'amount_formatted', 'label' => 'Amount', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'credits_formatted', 'label' => 'Credits', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-primary font-bold'],
             ['key' => 'payment_reference', 'label' => 'Reference / UTR', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted text-[11px]'],
             ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
@@ -61,6 +66,7 @@ class RechargeApprovalQueue extends Component
     public function openApproveModal(int $id): void
     {
         $this->selectedRequestId = $id;
+        $this->approvalQuantity = RechargeRequest::findOrFail($id)->amount;
         $this->referenceNote = '';
         $this->showApproveModal = true;
     }
@@ -82,43 +88,21 @@ class RechargeApprovalQueue extends Component
 
         try {
             DB::transaction(function () use ($targetId) {
-                $req = RechargeRequest::with('package')->findOrFail($targetId);
+                $req = RechargeRequest::with('package')->lockForUpdate()->findOrFail($targetId);
 
                 if ($req->status !== 'pending') {
                     throw new \Exception('Recharge request is no longer pending.');
                 }
 
-                // Pessimistic lock on client wallet
-                $wallet = CreditWallet::where('client_id', $req->client_id)->lockForUpdate()->first();
-
-                if (!$wallet) {
-                    $wallet = CreditWallet::create([
-                        'client_id' => $req->client_id,
-                        'balance' => 0.00,
-                    ]);
-                }
-
-                $before = (float) $wallet->balance;
-                $creditToAdd = $req->package ? (float) $req->package->credit_count : ($req->amount / 10.0);
-                $after = $before + $creditToAdd;
-
-                $wallet->update(['balance' => $after]);
-
-                // Create CreditTransaction row
-                CreditTransaction::create([
-                    'client_id' => $req->client_id,
-                    'lead_id' => null,
-                    'package_id' => $req->package_id,
-                    'credit_before' => $before,
-                    'credit_used' => $creditToAdd,
-                    'credit_after' => $after,
-                    'transaction_type' => 'recharge',
-                    'created_at' => now(),
-                ]);
+                $creditToAdd = \App\Support\LeadCredits::quantity($this->approvalQuantity ?? $req->amount, 'quantity', 1);
+                app(\App\Services\LeadCreditService::class)->adjust(
+                    \App\Models\User::findOrFail($req->client_id), $creditToAdd, 'recharge',
+                    $this->referenceNote ?: 'Lead credit request #'.$req->id.' approved', auth()->user());
 
                 // Update recharge_requests row
                 $req->update([
                     'status' => 'approved',
+                    'approved_quantity' => $creditToAdd,
                     'approved_at' => now(),
                     'reference_note' => $this->referenceNote ?: 'Manual approval via Admin Queue',
                 ]);
@@ -144,7 +128,7 @@ class RechargeApprovalQueue extends Component
                     'status' => 'sent',
                     'payload' => json_encode([
                         'title' => 'Recharge Approved 💳',
-                        'message' => "Your recharge of {$creditToAdd} credits (₹{$req->amount}) has been approved.",
+                        'message' => "Your request for {$creditToAdd} lead credits has been approved.",
                     ]),
                     'sent_at' => now(),
                 ]);

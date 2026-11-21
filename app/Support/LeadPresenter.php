@@ -79,6 +79,6 @@ class LeadPresenter
             'is_masked' => $shouldMask,
         ];
         if (! LeadSourceVisibility::allowed($user)) unset($data['source_name']);
-        return $data;
+        return FinancialVisibility::allowed($user) ? $data : FinancialVisibility::redact($data);
     }
 }

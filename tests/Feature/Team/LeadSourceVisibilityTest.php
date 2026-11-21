@@ -16,6 +16,39 @@ class LeadSourceVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_monetary_data_is_super_admin_only_while_integer_credits_remain_visible(): void
+    {
+        $org = \App\Models\Organization::create(['name' => 'Financial privacy', 'status' => 'active']);
+        $source = LeadSource::create(['name' => 'Private source']);
+        foreach (['Builder/Developer', 'Client', 'Team Leader', 'Sales Executive'] as $role) {
+            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
+            $user = User::factory()->create(['organization_id' => $org->id]); $user->assignRole($role);
+            $lead = Lead::withoutEvents(fn () => Lead::create(['lead_code' => Lead::generateUniqueLeadCode(), 'client_id' => $user->id, 'lead_source_id' => $source->id,
+                'name' => 'Private financial lead', 'mobile' => '9000000101', 'budget' => 8999999, 'lead_cost' => 3, 'status' => 'new', 'current_stage' => 'new',
+                'requirement' => "Budget: INR 8999999\nNeeds central location", 'delivery_pending' => false, 'delivered_at' => now()]));
+            $this->actingAs($user);
+            $this->assertArrayNotHasKey('budget', $lead->toArray());
+            $this->assertArrayNotHasKey('budget', LeadPresenter::present($lead, $user));
+            $this->assertSame(3, $lead->toArray()['lead_cost']);
+            $this->assertStringNotContainsString('8999999', $lead->toArray()['requirement']);
+            $this->assertStringContainsString('central location', $lead->toArray()['requirement']);
+            $export = new \App\Exports\BaseStyledExport(collect([$lead]), 'Leads', '', ['Lead ID','Budget','Lead Credits'], ['lead_code','budget','lead_cost']);
+            $this->assertSame(['Lead ID','Lead Credits'], $export->headings());
+            $this->assertNotContains(8999999, $export->map($lead));
+            $restricted = new \App\Exports\BaseStyledExport(collect([['budget' => 8999999]]), 'Private', '', ['Budget'], ['budget']);
+            $this->assertSame([], $restricted->map(['budget' => 8999999]));
+            if ($role === 'Builder/Developer') {
+                Livewire::test(\App\Livewire\Leads\LeadDetail::class)->call('openLead', $lead->id)
+                    ->assertDontSee('8999999')->assertDontSee('₹')->assertSee('central location');
+            }
+            Livewire::test(\App\Livewire\Reports\RevenueAndBookings::class)->assertForbidden();
+        }
+        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin']);
+        $admin = User::factory()->create(); $admin->assignRole('Super Admin'); $this->actingAs($admin);
+        $this->assertEquals(8999999, $lead->fresh()->toArray()['budget']);
+        Livewire::test(\App\Livewire\Reports\RevenueAndBookings::class)->assertOk();
+    }
+
     public function test_all_client_roles_hide_source_and_use_client_friendly_labels_without_changing_storage(): void
     {
         $org = \App\Models\Organization::create(['name' => 'Client wording', 'status' => 'active']);
@@ -32,7 +65,7 @@ class LeadSourceVisibilityTest extends TestCase
             $this->assertNotContains('lead_source_name', array_column($directory->instance()->tableColumns(), 'key'));
             Livewire::test(SourcePerformance::class)->assertForbidden();
             $this->assertSame('On Demand Assignment', \App\Support\ClientFacingText::label('Manual Assignment'));
-            $this->assertSame('Balance Adjustment', \App\Support\ClientFacingText::label('Manual adjustment'));
+            $this->assertSame('Credit Adjustment', \App\Support\ClientFacingText::label('Manual adjustment'));
             $this->assertArrayNotHasKey('lead_source_id', $lead->toArray());
             $lead->setRelation('campaign', new \App\Models\Campaign(['name' => 'Assigned campaign', 'lead_source_id' => $source->id]));
             $this->assertArrayNotHasKey('lead_source_id', $lead->toArray()['campaign']);

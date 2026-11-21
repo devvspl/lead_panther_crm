@@ -47,15 +47,15 @@
         @if($this->selectedNotification)
             @php $notice = $this->selectedNotification; @endphp
             <div class="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-                <h2 class="font-bold text-lg text-ink">{{ $notice->data['title'] ?? 'Notification Details' }}</h2>
-                <p class="text-sm text-ink">{{ $notice->data['message'] ?? '' }}</p>
+                <h2 class="font-bold text-lg text-ink">{{ \App\Support\ClientFacingText::label($notice->data['title'] ?? 'Notification Details') }}</h2>
+                <p class="text-sm text-ink">{{ \App\Support\ClientFacingText::label($notice->data['message'] ?? '') }}</p>
                 @if($failure = $this->deliveryFailureDetails)
                     <div class="rounded-lg border border-border bg-canvas p-4 space-y-2 text-xs text-ink">
                         <p class="font-semibold">Current delivery status: {{ $failure['status'] }}</p>
                         @if($failure['delivered'])<p>This is an earlier failure alert. The lead was delivered on {{ $failure['delivered_at'] }}.</p>@else<p>This notification records a failed attempt. Check the current status and last failure time below to see whether it still needs attention.</p>@endif
                         <p><strong>Last recorded reason:</strong> {{ $failure['reason'] }}</p>
                         @if($failure['last_failure_at'])<p>Last failure: {{ $failure['last_failure_at'] }}</p>@endif
-                        @if($failure['wallet_balance'] !== null)<p>Current client balance: {{ number_format((float) $failure['wallet_balance'], 2) }} credits. This may have changed since the failed attempt.</p>@endif
+                        @if($failure['wallet_balance'] !== null)<p>Available Lead Credits: {{ number_format((int) $failure['wallet_balance']) }} credits. This may have changed since the failed attempt.</p>@endif
                         @if($failure['client_leads_url'])<a href="{{ $failure['client_leads_url'] }}" class="font-semibold text-primary underline">Open Client Leads to push or retry</a>@endif
                     </div>
                 @endif

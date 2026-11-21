@@ -571,9 +571,9 @@
                                         <span class="text-[11px] text-muted font-normal">{{ $org['active_users'] }} agents</span>
                                     </td>
                                     <td class="py-2 text-right font-semibold text-ink">{{ number_format($org['total_leads']) }}</td>
-                                    <td class="py-2 text-right text-muted">{{ number_format($org['credits_consumed']) }} Cr</td>
+                                    <td class="py-2 text-right text-muted">{{ number_format($org['credits_consumed']) }} Credits</td>
                                     <td class="py-2 text-right font-bold {{ $org['wallet_balance'] < 100 ? 'text-rose-600' : 'text-ink' }}">
-                                        {{ number_format($org['wallet_balance']) }} Cr
+                                        {{ number_format($org['wallet_balance']) }} Credits
                                     </td>
                                     <td class="py-2 text-right">
                                         @if($org['sla_breaches'] > 0)
@@ -624,7 +624,7 @@
                                     </td>
                                     <td class="py-2 text-muted truncate max-w-xs">{{ $proj['client_name'] }}</td>
                                     <td class="py-2 text-right font-semibold text-ink">{{ number_format($proj['total_leads']) }}</td>
-                                    <td class="py-2 text-right text-muted">{{ number_format($proj['total_credits_charged']) }} Cr</td>
+                                    <td class="py-2 text-right text-muted">{{ number_format($proj['total_credits_charged']) }} Credits</td>
                                     <td class="py-2 text-right font-bold text-emerald-600">{{ $proj['conversion_rate'] }}%</td>
                                 </tr>
                             @empty
@@ -645,26 +645,26 @@
             <!-- Credit Protection & Wallet Engine -->
             <div class="bg-surface border border-border rounded-xl p-3.5 sm:p-4 space-y-2.5">
                 <div class="flex items-center justify-between border-b border-border/70 pb-2">
-                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Credits & Wallet</h2>
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Credits</h2>
                     <a href="{{ route('admin.credits') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Manage &rarr;</a>
                 </div>
 
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div class="p-2.5 rounded-lg bg-canvas border border-border">
                         <span class="text-[11px] text-muted block">Supply</span>
-                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ number_format($adminCreditAnalytics['global_balance'] ?? 0) }} Cr</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ number_format($adminCreditAnalytics['global_balance'] ?? 0) }} Credits</span>
                     </div>
                     <div class="p-2.5 rounded-lg bg-canvas border border-border">
                         <span class="text-[11px] text-muted block">Avg Cost</span>
-                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ $adminCreditAnalytics['cost_per_lead'] ?? 10 }} Cr</span>
+                        <span class="text-sm font-bold text-ink mt-0.5 block">{{ $adminCreditAnalytics['cost_per_lead'] ?? 10 }} Credits</span>
                     </div>
                     <div class="p-2.5 rounded-lg bg-canvas border border-border">
                         <span class="text-[11px] text-muted block">Consumed</span>
-                        <span class="text-sm font-bold text-neutral-700 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_consumed'] ?? 0) }} Cr</span>
+                        <span class="text-sm font-bold text-neutral-700 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_consumed'] ?? 0) }} Credits</span>
                     </div>
                     <div class="p-2.5 rounded-lg bg-canvas border border-border">
                         <span class="text-[11px] text-muted block">Refunded</span>
-                        <span class="text-sm font-bold text-emerald-600 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_refunded'] ?? 0) }} Cr</span>
+                        <span class="text-sm font-bold text-emerald-600 mt-0.5 block">{{ number_format($adminCreditAnalytics['credits_refunded'] ?? 0) }} Credits</span>
                     </div>
                 </div>
 
@@ -874,11 +874,11 @@
                                     <div class="font-bold text-ink text-xs flex items-center gap-1.5">
                                         <span>#{{ $tx->id }} &bull; {{ \App\Support\ClientFacingText::label(ucfirst(str_replace('_', ' ', $tx->transaction_type))) }}</span>
                                         <span class="inline-flex px-1.5 py-0.2 rounded text-[10px] font-bold {{ $tx->transaction_type === 'refund' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-canvas text-ink border border-border' }}">
-                                            {{ $tx->credit_used }} Cr
+                                            {{ $tx->credit_used }} Credits
                                         </span>
                                     </div>
                                     <div class="text-[11px] text-muted">
-                                        {{ $tx->client?->name ?: 'Client' }} &bull; Bal: {{ $tx->credit_after }} Cr
+                                        {{ $tx->client?->name ?: 'Client' }} &bull; Bal: {{ $tx->credit_after }} Credits
                                     </div>
                                 </div>
                             </div>
@@ -1151,7 +1151,7 @@
         @if($builderData['organization']?->show_builder_credit_balance ?? true)
         <div class="bg-surface rounded-xl border border-border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
             <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Balance</span>
+                <span class="text-xs font-bold text-ink uppercase tracking-wider">Available Lead Credits</span>
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
                     Read-Only
                 </span>
@@ -1160,13 +1160,13 @@
                 <div class="flex items-center gap-1.5">
                     <span class="text-muted">Available Credits:</span>
                     <span class="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        {{ number_format($builderData['credits']['available_credits'] ?? 0, 2) }} Cr
+                        {{ number_format($builderData['credits']['available_credits'] ?? 0, 0) }} Credits
                     </span>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <span class="text-muted">Credits Consumed:</span>
                     <span class="font-mono font-bold text-ink bg-canvas px-2 py-0.5 rounded border border-border">
-                        {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 2) }} Cr
+                        {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 0) }} Credits
                     </span>
                 </div>
             </div>
@@ -1832,6 +1832,7 @@
                                 pointRadius: 3,
                                 pointBackgroundColor: '#0A0A0A',
                             },
+                            @if(\App\Support\FinancialVisibility::allowed())
                             {
                                 label: 'Closed Revenue (₹ Lacs)',
                                 data: chartData.revenue || [],
@@ -1843,6 +1844,7 @@
                                 pointRadius: 3,
                                 pointBackgroundColor: '#6B7280',
                             }
+                            @endif
                         ]
                     },
                     options: {

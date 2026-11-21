@@ -163,7 +163,7 @@
             ['label' => 'Active Projects', 'value' => $activeProjectsCount, 'description' => 'Currently active', 'icon' => 'project'],
             ['label' => 'Total Leads', 'value' => $totalLeadsCount, 'description' => 'Client leads', 'icon' => 'leads'],
             ['label' => 'Assigned Leads', 'value' => $directlyAssignedLeadsCount, 'description' => 'With active members', 'icon' => 'check'],
-            ['label' => 'Available Balance', 'value' => $totalWalletBalance, 'description' => 'Spendable credits', 'icon' => 'wallet', 'balance' => true],
+            ['label' => 'Available Lead Credits', 'value' => $totalWalletBalance, 'description' => 'Remaining credits', 'icon' => 'wallet', 'balance' => true],
         ];
     @endphp
     <div data-organization-kpis class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-stretch">
@@ -174,11 +174,12 @@
                     <span>{{ $metric['label'] }}</span>
                     <x-ui.team-icon :name="$metric['icon']" class="text-primary" />
                 </div>
-                <div class="text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value'], $isBalance ? 2 : 0) }}</div>
+                <div class="text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted">
                     <span>{{ $metric['description'] }}</span>
                     @if($isBalance)
-                        <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Balance' }}</span>
+                        <span class="w-full">Total: {{ number_format($totalLeadCredits) }} / Used: {{ number_format($usedLeadCredits) }} / Remaining: {{ number_format($totalWalletBalance) }} Credits</span>
+                        <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}</span>
                     @endif
                 </div>
             </div>
@@ -233,7 +234,7 @@
                 wire:click.prevent="setTab('leads')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 whitespace-nowrap {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink' }}">Leads</a>
 
-            <!-- Tab 4: Credits & Wallet -->
+            <!-- Tab 4: Lead Credits -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'credits']) }}"
                 wire:click.prevent="setTab('credits')"
                 class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'credits' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
@@ -241,7 +242,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                <span>Credits & Wallet</span>
+                <span>Lead Credits</span>
                 <span
                     class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ number_format($totalWalletBalance) }}
@@ -471,11 +472,11 @@
                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Effective Lead
                                 Cost</span>
                             <div class="text-2xl font-bold font-mono text-purple-700">
-                                {{ $organization->lead_cost !== null ? number_format($organization->lead_cost, 2) : number_format($globalDefaultLeadCost, 2) }}
+                                {{ $organization->lead_cost !== null ? number_format($organization->lead_cost, 0) : number_format($globalDefaultLeadCost, 0) }}
                                 <span class="text-xs font-normal text-muted">Credits</span>
                             </div>
                             <div class="text-[10px] text-muted">
-                                {{ $organization->lead_cost !== null ? 'Clients override active' : 'Global default: ' . number_format($globalDefaultLeadCost, 2) . ' Cr' }}
+                                {{ $organization->lead_cost !== null ? 'Clients override active' : 'Global default: ' . number_format($globalDefaultLeadCost, 0) . ' Credits' }}
                             </div>
                         </div>
 
@@ -484,8 +485,8 @@
                                 Lead)</label>
                             <div class="flex items-center gap-2">
                                 <div class="relative flex-1">
-                                    <input type="number" step="0.01" min="0.01" wire:model="orgLeadCost"
-                                        placeholder="Inherit global default ({{ number_format($globalDefaultLeadCost, 2) }})"
+                                    <input type="number" step="1" min="1" wire:model="orgLeadCost"
+                                        placeholder="Inherit global default ({{ number_format($globalDefaultLeadCost, 0) }})"
                                         class="w-full h-9 px-3 text-xs bg-canvas border border-border rounded-lg text-ink font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                                 </div>
                                 <button type="button" wire:click="updateOrgLeadCost"
@@ -861,7 +862,7 @@
             <div class="bg-surface rounded-2xl border border-border overflow-x-auto">
                 <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th></tr></thead><tbody class="divide-y divide-border">
                     @forelse($projects as $project)
-                        <tr><td class="p-4 font-bold">{{ $project->name }}</td><td class="p-4">{{ $project->client_name }}</td><td class="p-4">{{ ucfirst($project->status) }}</td><td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 2) }} Cr</td></tr>
+                        <tr><td class="p-4 font-bold">{{ $project->name }}</td><td class="p-4">{{ $project->client_name }}</td><td class="p-4">{{ ucfirst($project->status) }}</td><td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</td></tr>
                     @empty
                         <tr><td colspan="4" class="p-8 text-center text-muted">No projects mapped to this organization.</td></tr>
                     @endforelse
@@ -871,18 +872,19 @@
     @endif
     <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
+        <livewire:credits.reconciliation :organization-id="$organization->id" :key="'credits-reconcile-'.$organization->id" />
         <div class="space-y-6">
-            <!-- Credits Header & KPI Strip (5-Card Strip with Opening, Recharged, Consumed, Refunded, and Available Balances) -->
+            <!-- Credits Header & KPI Strip (5-Card Strip with Opening, Recharged, Consumed, Refunded, and Available Lead Creditss) -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <!-- 1. Opening Balance -->
+                <!-- 1. Opening Credits -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
                     <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                        <span>Opening Balance</span>
+                        <span>Opening Credits</span>
                         <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 2) }}</div>
+                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 0) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
                         <span>Baseline allocation</span>
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
@@ -898,7 +900,7 @@
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-emerald-600">
-                        {{ number_format($totalCreditsRecharged, 2) }}
+                        {{ number_format($totalCreditsRecharged, 0) }}
                     </div>
                     <div class="text-[10px] text-muted">Total purchased & deposited</div>
                 </div>
@@ -911,7 +913,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted, 2) }}</div>
+                    <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted, 0) }}</div>
                     <div class="text-[10px] text-muted">Deducted for lead delivery</div>
                 </div>
 
@@ -923,52 +925,44 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-blue-600">{{ number_format($totalCreditsRefunded, 2) }}</div>
+                    <div class="text-2xl font-bold font-mono text-blue-600">{{ number_format($totalCreditsRefunded, 0) }}</div>
                     <div class="text-[10px] text-muted">Returned for claims/SLA</div>
                 </div>
 
-                <!-- 5. Available Balance -->
+                <!-- 5. Available Lead Credits -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 md:col-span-1">
                     <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
-                        <span>Available Balance</span>
+                        <span>Available Lead Credits</span>
                         <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance, 2) }}</div>
+                    <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance, 0) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
                         <span>Live spendable</span>
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
-                            {{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Balance' }}
+                            {{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}
                         </span>
                     </div>
                 </div>
             </div>
 
-            <!-- Ledger Balance Calculation Formula Banner -->
-            <div class="p-3 bg-canvas border border-border rounded-xl flex items-center justify-between text-xs text-muted">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <span><strong class="text-ink">Credit Calculation:</strong> Available Credits = Opening Balance ({{ number_format($totalOpeningBalance, 2) }}) + Total Recharged ({{ number_format($totalCreditsRecharged, 2) }}) + Refunds ({{ number_format($totalCreditsRefunded, 2) }}) - Total Consumed ({{ number_format($totalCreditsDeducted, 2) }}) = <strong class="text-primary font-mono font-bold">{{ number_format($totalWalletBalance, 2) }} Cr</strong></span>
-                </div>
-            </div>
+            <p class="text-xs text-muted rounded-lg border border-border p-3">Total: {{ number_format($totalLeadCredits) }} Credits / Used: {{ number_format($usedLeadCredits) }} Credits / Remaining: {{ number_format($totalWalletBalance) }} Credits. Reconciliations and corrections are recorded in the ledger.</p>
 
             <section class="bg-surface rounded-2xl border border-border p-5 space-y-4">
                 <h3 class="text-sm font-bold text-ink">Project-wise Lead Pricing</h3>
                 <p class="text-xs text-muted">Set a project override or leave it blank to inherit organization pricing. Team pricing, when configured for delivery, follows the existing pricing hierarchy. Wallets belong to billing clients.</p>
                 @forelse($projects as $project)
                     <form wire:submit="saveProjectRate({{ $project->id }})" wire:key="project-rate-{{ $project->id }}" class="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-border pt-3">
-                        <div class="flex-1"><strong class="text-xs">{{ $project->name }}</strong><p class="text-xs text-muted">{{ $project->client_name }} · {{ $project->lead_cost !== null ? 'Project override' : 'Inherited organization/global rate' }}: {{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 2) }} Cr</p></div>
-                        <div><input type="number" step="0.01" min="0.01" wire:model="projectRates.{{ $project->id }}" aria-label="Lead cost for {{ $project->name }}" placeholder="Inherit organization rate" class="w-full sm:w-48 rounded-lg border border-border bg-canvas p-2 text-xs" />@error('projectRates.'.$project->id)<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
+                        <div class="flex-1"><strong class="text-xs">{{ $project->name }}</strong><p class="text-xs text-muted">{{ $project->client_name }} · {{ $project->lead_cost !== null ? 'Project override' : 'Inherited organization/global rate' }}: {{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</p></div>
+                        <div><input type="number" step="1" min="1" wire:model="projectRates.{{ $project->id }}" aria-label="Lead cost for {{ $project->name }}" placeholder="Inherit organization rate" class="w-full sm:w-48 rounded-lg border border-border bg-canvas p-2 text-xs" />@error('projectRates.'.$project->id)<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
                         <button type="submit" class="rounded-lg bg-ink text-white px-4 py-2 text-xs font-semibold">Save Rate</button>
                     </form>
                 @empty
                     <p class="text-xs text-muted">Map projects in the Projects tab to configure project pricing.</p>
                 @endforelse
             </section>
-            <!-- Client Wallets Breakdown Table (Opening vs Available Balances) -->
+            <!-- Client Wallets Breakdown Table (Opening vs Available Lead Creditss) -->
             <div class="bg-surface rounded-2xl border border-border shadow-2xs overflow-hidden">
                 <div class="p-4 border-b border-border flex items-center justify-between">
                     <div>
@@ -984,8 +978,8 @@
                             <tr>
                                 <th class="py-3 px-4">Client Name</th>
                                 <th class="py-3 px-4">Billing Email</th>
-                                <th class="py-3 px-4">Opening Balance</th>
-                                <th class="py-3 px-4">Available Balance</th>
+                                <th class="py-3 px-4">Opening Credits</th>
+                                <th class="py-3 px-4">Available Lead Credits</th>
                                 <th class="py-3 px-4">Status</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
@@ -1001,10 +995,10 @@
                                         {{ $c->billing_email ?: '—' }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-ink text-xs font-semibold">
-                                        {{ number_format((float) ($c->wallet?->opening_balance ?? 0), 2) }}
+                                        {{ number_format((float) ($c->wallet?->opening_balance ?? 0), 0) }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
-                                        {{ number_format((float) ($c->wallet?->balance ?? 0), 2) }}
+                                        {{ number_format((float) ($c->wallet?->balance ?? 0), 0) }}
                                     </td>
                                     <td class="py-3 px-4">
                                         <span
@@ -1016,7 +1010,7 @@
                                         <div class="flex items-center justify-end gap-1.5">
                                             <button type="button" wire:click="openCreditModal({{ $c->id }}, 'opening_credit')"
                                                 class="px-2.5 py-1 rounded-lg bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold transition cursor-pointer shadow-2xs"
-                                                title="Set or Adjust Opening Balance">
+                                                title="Set or Adjust Opening Credits">
                                                 Opening Credit
                                             </button>
                                             <button type="button" wire:click="openCreditModal({{ $c->id }}, 'recharge')"
@@ -1145,13 +1139,13 @@
                                         {{ $tx->description ?: '—' }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
-                                        {{ number_format($tx->credit_before, 2) }}
+                                        {{ ($tx->credit_before === null ? 'Legacy entry' : number_format($tx->credit_before)) }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) || ($tx->transaction_type === 'manual_adjustment' && $tx->credit_after >= $tx->credit_before) ? 'text-emerald-600' : 'text-red-500' }}">
                                         {{ $tx->credit_used_formatted }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
-                                        {{ number_format($tx->credit_after, 2) }}
+                                        {{ ($tx->credit_after === null ? 'Legacy entry' : number_format($tx->credit_after)) }}
                                     </td>
                                     <td class="py-3 px-4 text-muted text-[11px]">
                                         {{ $tx->createdBy?->name ?: 'System Admin' }}
@@ -1536,7 +1530,7 @@
 
                     <div>
                         <label class="font-bold text-ink">Credit Amount <span class="text-red-500">*</span></label>
-                        <input type="number" wire:model="creditAmount" step="0.01" min="0.01"
+                        <input type="number" wire:model="creditAmount" step="1" min="1"
                             class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
                         @error('creditAmount') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
                         @enderror

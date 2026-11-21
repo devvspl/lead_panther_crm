@@ -25,6 +25,7 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
     protected array $statusColumns;
     protected array $currencyColumns;
     protected bool $hasTotals;
+    protected bool $financialColumnsRestricted = false;
 
     /**
      * @param Collection $data
@@ -46,6 +47,19 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
         array $currencyColumns = [],
         bool $hasTotals = false
     ) {
+        if (!\App\Support\FinancialVisibility::allowed()) {
+            foreach ($headings as $index => $heading) {
+                $key = strtolower(str_replace([' ', '/'], '_', (string) $heading));
+                $column = $columns[$index] ?? null;
+                if (\App\Support\FinancialVisibility::sensitive($key) || (is_string($column) && \App\Support\FinancialVisibility::sensitive($column)) || preg_match('/booked_amount|payments_received|revenue|outstanding|ad_spend/i', $key)) {
+                    $this->financialColumnsRestricted = true;
+                    unset($headings[$index], $columns[$index]);
+                }
+            }
+            $headings = array_values($headings);
+            $columns = array_values($columns);
+            $currencyColumns = [];
+        }
         $this->data = $data;
         $this->title = $title;
         $this->subtitle = $subtitle ?: 'Exported ' . now()->format('d M Y, H:i T');
@@ -78,9 +92,10 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
 
     public function map($row): array
     {
+        if ($this->financialColumnsRestricted && empty($this->columns)) return [];
         if (empty($this->columns)) {
             if (is_array($row)) {
-                return array_values($row);
+                return array_values(\App\Support\FinancialVisibility::allowed() ? $row : \App\Support\FinancialVisibility::redact($row));
             }
             if ($row instanceof Collection) {
                 return $row->values()->toArray();

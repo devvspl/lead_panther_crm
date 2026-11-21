@@ -147,8 +147,8 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
 
         $sheets[] = new BaseStyledExport(
             data: $txData,
-            title: 'Credits & Wallet',
-            subtitle: "Credits & Wallet Transactions | {$org->name} | {$exportedAt}",
+            title: 'Lead Credits',
+            subtitle: "Lead Credits Transactions | {$org->name} | {$exportedAt}",
             headings: ['Tx ID', 'Client Name', 'Type', 'Lead Reference', 'Credit Before', 'Credit In/Out', 'Credit After', 'Date & Time'],
             columns: [
                 'id',
@@ -161,7 +161,7 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
                 fn($tx) => $tx->created_at ? Carbon::parse($tx->created_at)->format('M d, Y H:i') : '—',
             ],
             statusColumns: ['transaction_type'],
-            currencyColumns: ['credit_before', 'credit_used', 'credit_after'],
+            currencyColumns: [],
             hasTotals: true
         );
 

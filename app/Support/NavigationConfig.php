@@ -149,7 +149,7 @@ class NavigationConfig
             ],
             'credits' => [
                 'key' => 'credits',
-                'label' => 'Credits & Wallet',
+                'label' => 'Lead Credits',
                 'url' => route('credits.wallet'),
                 'data_nav_route' => 'credits',
                 'data_nav_exact' => 'true',
@@ -236,7 +236,7 @@ class NavigationConfig
             ],
             'recharge-queue' => [
                 'key' => 'recharge-queue',
-                'label' => 'Recharge Queue',
+                'label' => 'Credit Requests',
                 'url' => route('admin.recharge-requests'),
                 'data_nav_route' => 'admin/recharge-requests',
                 'data_nav_exact' => 'true',

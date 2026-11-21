@@ -19,6 +19,7 @@ class Lead extends Model
 
     use ClientScoped, HasFactory;
 
+    use \App\Traits\HasLeadCreditCost;
     protected $guarded = [];
     // Transient service context: the assignment observer has already written the inbox alert.
     public bool $webAssignmentRecorded = false;
@@ -30,7 +31,7 @@ class Lead extends Model
             $data = \App\Support\LeadSourceVisibility::redact($data);
             if (isset($data['requirement'])) $data['requirement'] = \App\Support\ClientFacingText::label($data['requirement']);
         }
-        return $data;
+        return \App\Support\FinancialVisibility::allowed() ? $data : \App\Support\FinancialVisibility::redact($data);
     }
 
     protected $casts = [
@@ -385,6 +386,7 @@ class Lead extends Model
 
     public function getBudgetFormattedAttribute(): string
     {
+        if (!\App\Support\FinancialVisibility::allowed()) return '—';
         return is_numeric($this->budget) ? '₹' . number_format($this->budget / 100000, 1) . 'L' : ($this->budget ?: 'N/A');
     }
 

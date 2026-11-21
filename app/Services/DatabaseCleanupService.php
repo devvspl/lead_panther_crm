@@ -214,10 +214,10 @@ class DatabaseCleanupService
 
                 if (in_array('credit_packages', $availableTables) && DB::table('credit_packages')->count() === 0) {
                     DB::table('credit_packages')->insert([
-                        ['name' => 'Starter Pack', 'credit_count' => 100, 'price' => 5000.00, 'validity_days' => 30, 'created_at' => now(), 'updated_at' => now()],
-                        ['name' => 'Growth Pack', 'credit_count' => 500, 'price' => 22000.00, 'validity_days' => 60, 'created_at' => now(), 'updated_at' => now()],
-                        ['name' => 'Pro Pack', 'credit_count' => 1200, 'price' => 50000.00, 'validity_days' => 90, 'created_at' => now(), 'updated_at' => now()],
-                        ['name' => 'Enterprise Pack', 'credit_count' => 3000, 'price' => 110000.00, 'validity_days' => 120, 'created_at' => now(), 'updated_at' => now()],
+                        ['name' => 'Starter Pack', 'credit_count' => 100, 'validity_days' => 30, 'created_at' => now(), 'updated_at' => now()],
+                        ['name' => 'Growth Pack', 'credit_count' => 500, 'validity_days' => 60, 'created_at' => now(), 'updated_at' => now()],
+                        ['name' => 'Pro Pack', 'credit_count' => 1200, 'validity_days' => 90, 'created_at' => now(), 'updated_at' => now()],
+                        ['name' => 'Enterprise Pack', 'credit_count' => 3000, 'validity_days' => 120, 'created_at' => now(), 'updated_at' => now()],
                     ]);
                 }
 

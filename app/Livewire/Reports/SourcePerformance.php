@@ -25,7 +25,7 @@ class SourcePerformance extends Component
         return [
             ['key' => 'source_name', 'label' => 'Lead Source', 'class' => 'font-bold text-ink', 'sortable' => false, 'priority' => 1],
             ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-semibold', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
-            ['key' => 'cost_per_lead', 'label' => 'Average Lead Cost (Credits)', 'prefix' => '', 'formatter' => fn ($v) => $v === null ? '—' : number_format((float) $v, 2), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credits_used', 'label' => 'Credits Used', 'prefix' => '', 'formatter' => fn ($v) => $v === null ? '—' : number_format((int) $v), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'closed_won', 'label' => 'Closed Won', 'class' => 'font-mono text-success font-bold', 'formatter' => fn ($v) => number_format((float) $v), 'sortable' => false, 'priority' => 1],
             ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
@@ -39,8 +39,8 @@ class SourcePerformance extends Component
     public function exportExcel()
     {
         $rows = collect($this->getReportData());
-        $headings = ['Lead Source', 'Total Leads', 'Average Lead Cost (Credits)', 'Closed Won', 'Conversion Rate (%)'];
-        $columns = ['source_name', 'total_leads', 'cost_per_lead', 'closed_won', fn ($r) => $r['conversion_rate'].'%'];
+        $headings = ['Lead Source', 'Total Leads', 'Credits Used', 'Closed Won', 'Conversion Rate (%)'];
+        $columns = ['source_name', 'total_leads', 'credits_used', 'closed_won', fn ($r) => $r['conversion_rate'].'%'];
 
         $filename = 'source-performance-report_'.now()->format('Y-m-d').'.xlsx';
         $subtitle = 'Exported '.now()->format('d M Y, H:i T')." | Timeframe: Last {$this->days} Days";
@@ -80,7 +80,7 @@ class SourcePerformance extends Component
         $results = $query->select(
             'lead_source_id',
             DB::raw('count(*) as total_leads'),
-            DB::raw('AVG(lead_cost) as actual_cost'),
+            DB::raw("SUM(COALESCE((SELECT SUM(CASE WHEN transaction_type = 'refund' THEN -credit_used ELSE credit_used END) FROM credit_transactions WHERE credit_transactions.lead_id = leads.id AND is_legacy = 0 AND transaction_type IN ('lead_consumption','reserve','deduct','refund')),0)) as actual_cost"),
             DB::raw("sum(case when LOWER(REPLACE(current_stage, ' ', '_')) IN ('closed_won','won') or status = 'closed_won' then 1 else 0 end) as closed_won")
         )->groupBy('lead_source_id')->with('leadSource')->get();
 
@@ -89,13 +89,13 @@ class SourcePerformance extends Component
             $sourceName = $row->leadSource?->name ?: 'Direct Ingestion';
             $total = $row->total_leads ?: 1;
             $won = $row->closed_won ?: 0;
-            $costPerLead = $row->actual_cost !== null ? round((float) $row->actual_cost, 2) : null; // Stored credit charge; unknown costs remain empty.
+            $costPerLead = $row->actual_cost !== null ? max(0, (int) $row->actual_cost) : null; // Stored credit charge; unknown costs remain empty.
             $conversionRate = round(($won / $total) * 100, 1);
 
             $data[] = [
                 'source_name' => ucfirst($sourceName),
                 'total_leads' => $total,
-                'cost_per_lead' => $costPerLead,
+                'credits_used' => $costPerLead,
                 'closed_won' => $won,
                 'conversion_rate' => $conversionRate,
             ];

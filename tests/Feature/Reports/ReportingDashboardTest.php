@@ -84,9 +84,9 @@ class ReportingDashboardTest extends TestCase
         $this->actingAs($admin);
 
         $sourceReport=Livewire::test(SourcePerformance::class);
-        $sourceReport->assertViewHas('chartReportData',fn($rows)=>count($rows)===1 && $rows[0]['total_leads']===2 && (float)$rows[0]['cost_per_lead']===20.0 && (float)$rows[0]['conversion_rate']===50.0);
+        $sourceReport->assertViewHas('chartReportData',fn($rows)=>count($rows)===1 && $rows[0]['total_leads']===2 && (float)$rows[0]['credits_used']===10.0 && (float)$rows[0]['conversion_rate']===50.0);
         $second->update(['lead_cost'=>50]);
-        $sourceReport->call('$refresh')->assertViewHas('chartReportData',fn($rows)=>(float)$rows[0]['cost_per_lead']===30.0);
+        $sourceReport->call('$refresh')->assertViewHas('chartReportData',fn($rows)=>(float)$rows[0]['credits_used']===10.0);
         Livewire::test(SlaDashboard::class)->assertViewHas('buckets',['excellent'=>1,'acceptable'=>0,'breached'=>1]);
         Livewire::test(SalesExecutivePerformance::class)->assertViewHas('executives',fn($rows)=>$rows[0]['assigned_leads']===2 && (float)$rows[0]['sla_contacted_rate']===50.0 && $rows[0]['site_visits']===1 && $rows[0]['bookings_closed']===1);
         Livewire::test(FollowupPerformance::class)->assertViewHas('followupData',fn($rows)=>$rows[0]['on_time']===1 && $rows[0]['overdue']===1 && (float)$rows[0]['on_time_rate']===50.0);

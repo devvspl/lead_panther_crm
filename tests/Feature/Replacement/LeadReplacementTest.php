@@ -57,6 +57,17 @@ class LeadReplacementTest extends TestCase
             'current_stage' => 'contacted',
         ]);
 
+        // A replacement returns actual consumed credits, never a pricing default.
+        \App\Models\CreditTransaction::create([
+            'client_id' => $client->id,
+            'lead_id' => $lead->id,
+            'transaction_type' => 'lead_consumption',
+            'credit_before' => 60,
+            'credit_used' => 10,
+            'credit_after' => 50,
+            'created_at' => now(),
+        ]);
+
         $replacement = LeadReplacement::create([
             'lead_id' => $lead->id,
             'reason_id' => $reason->id,

@@ -1,4 +1,6 @@
 <div class="space-y-6">
+    <livewire:credits.reconciliation />
+
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -33,14 +35,14 @@
                         </svg>
                     </span>
                     <div>
-                        <h2 class="text-sm font-bold text-ink">Global Default Per-Lead Cost Setting</h2>
-                        <p class="text-[11px] text-muted">Baseline cost deducted per ingested lead when no project,
+                        <h2 class="text-sm font-bold text-ink">Global Default Credits Per Delivered Lead Setting</h2>
+                        <p class="text-[11px] text-muted">Baseline cost deducted per successfully delivered lead when no project,
                             team, or clients override exists.</p>
                     </div>
                 </div>
                 <span
                     class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-950 border border-purple-300 w-fit">
-                    Active: {{ number_format($globalDefaultLeadCost, 2) }} Credits
+                    Active: {{ number_format($globalDefaultLeadCost, 0) }} Creditsedits
                 </span>
             </div>
 
@@ -69,11 +71,11 @@
             <form wire:submit.prevent="updateGlobalDefaultCost"
                 class="flex flex-col sm:flex-row items-end gap-3 text-xs pt-1">
                 <div class="flex-1 w-full">
-                    <label class="font-bold text-ink block mb-1">Global Default Per-Lead Cost (Credits) <span
+                    <label class="font-bold text-ink block mb-1">Global Default Credits Per Delivered Lead (Credits) <span
                             class="text-red-500">*</span></label>
-                    <input type="number" step="0.01" min="0.01" wire:model="globalDefaultLeadCost"
+                    <input type="number" step="1" min="1" wire:model="globalDefaultLeadCost"
                         class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                        placeholder="10.00">
+                        placeholder="1">
                     @error('globalDefaultLeadCost') <span
                     class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
@@ -92,9 +94,9 @@
                 <div class="mt-3 space-y-3">
                     <div class="p-3 rounded-xl bg-canvas/50 border border-border flex items-center justify-between">
                         <div>
-                            <span class="text-[10px] font-bold uppercase text-muted">System Opening Balance</span>
+                            <span class="text-[10px] font-bold uppercase text-muted">System Opening Credits</span>
                             <div class="text-lg font-bold font-mono text-ink">
-                                {{ number_format($totalSystemOpeningBalance, 2) }} Cr
+                                {{ number_format($totalSystemOpeningBalance, 0) }} Credits
                             </div>
                         </div>
                         <span
@@ -103,9 +105,9 @@
 
                     <div class="p-3 rounded-xl bg-canvas/50 border border-border flex items-center justify-between">
                         <div>
-                            <span class="text-[10px] font-bold uppercase text-muted">System Available Balance</span>
+                            <span class="text-[10px] font-bold uppercase text-muted">System Available Lead Credits</span>
                             <div class="text-lg font-bold font-mono text-emerald-600">
-                                {{ number_format($totalSystemAvailableBalance, 2) }} Cr
+                                {{ number_format($totalSystemAvailableBalance, 0) }} Credits
                             </div>
                         </div>
                         <span
@@ -115,7 +117,7 @@
             </div>
 
             <div class="text-[10px] text-muted flex items-center justify-between border-t border-border pt-2.5">
-                <span>Total Active Wallets: <strong class="text-ink font-mono">{{ $clients->count() }}</strong></span>
+                <span>Client credit accounts: <strong class="text-ink font-mono">{{ $clients->count() }}</strong></span>
                 <span class="text-primary font-semibold">Real-Time Ledger</span>
             </div>
         </div>
@@ -192,9 +194,10 @@
                             <x-ui.themed-select wire:model="adjustmentType" :options="['credit' => 'Add Credits (Credit)', 'debit' => 'Deduct Credits (Debit)']" placeholder="Adjustment Type" />
                         </div>
                         <div>
-                            <label class="text-xs font-bold text-ink">Credits Amount</label>
-                            <input type="number" wire:model="adjustmentAmount"
+                            <label class="text-xs font-bold text-ink">Credits Quantity</label>
+                            <input type="number" wire:model="adjustmentAmount" min="1" step="1"
                                 class="w-full text-xs h-9 px-3 rounded-lg border border-border bg-canvas text-ink mt-1">
+                            @error('quantity') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                             @error('adjustmentAmount') <span class="text-[10px] text-danger">{{ $message }}</span> @enderror
                         </div>
                     </div>

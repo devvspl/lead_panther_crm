@@ -17,11 +17,19 @@ class AdminCredits extends Component
     public bool $showAdjustModal = false;
     public ?int $selectedClientId = null;
     public string $adjustmentType = 'credit'; 
-    public float $adjustmentAmount = 100.00;
+    public $adjustmentAmount = 100;
     public string $reason = '';
 
     public string $filterClient = '';
-    public float $globalDefaultLeadCost = 10.00;
+    public $globalDefaultLeadCost = 1;
+
+    public function boot(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
+    #[\Livewire\Attributes\On('lead-credits-updated')]
+    public function refreshCredits(): void {}
 
     public function mount(): void
     {
@@ -32,15 +40,15 @@ class AdminCredits extends Component
     public function updateGlobalDefaultCost(): void
     {
         $this->validate([
-            'globalDefaultLeadCost' => 'required|numeric|min:0.01|max:100000',
+            'globalDefaultLeadCost' => 'required|integer|min:1|max:100000',
         ]);
 
         app(\App\Services\LeadPricingService::class)->setGlobalDefaultCost(
-            (float) $this->globalDefaultLeadCost,
+            (int) $this->globalDefaultLeadCost,
             auth()->id() ?? 1
         );
 
-        $this->dispatch('toast', type: 'success', message: 'Global default per-lead cost updated successfully to ' . number_format($this->globalDefaultLeadCost, 2) . ' Credits.');
+        $this->dispatch('toast', type: 'success', message: 'Global default per-lead cost updated successfully to ' . number_format($this->globalDefaultLeadCost) . ' Credits.');
     }
 
     public function tableColumns(): array
@@ -57,7 +65,7 @@ class AdminCredits extends Component
             ]],
             ['key' => 'lead_summary', 'label' => 'Associated Lead', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted'],
             ['key' => 'credit_used_formatted', 'label' => 'Credits In / Out', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
-            ['key' => 'credit_after_formatted', 'label' => 'Balance After', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-primary font-bold'],
+            ['key' => 'credit_after_formatted', 'label' => 'Remaining Credits', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-primary font-bold'],
         ];
     }
 
@@ -90,56 +98,14 @@ class AdminCredits extends Component
     {
         $this->validate([
             'selectedClientId' => 'required|exists:users,id',
-            'adjustmentAmount' => 'required|numeric|min:1',
+            'adjustmentAmount' => 'required|integer|min:1',
             'adjustmentType' => 'required|in:credit,debit',
             'reason' => 'required|string|min:5',
         ]);
 
-        DB::transaction(function () {
-            $wallet = CreditWallet::where('client_id', $this->selectedClientId)->lockForUpdate()->first();
-
-            if (!$wallet) {
-                $wallet = CreditWallet::create([
-                    'client_id' => $this->selectedClientId,
-                    'balance' => 0.00,
-                ]);
-            }
-
-            $before = (float) $wallet->balance;
-            if ($this->adjustmentType === 'credit') {
-                $after = $before + $this->adjustmentAmount;
-                $txType = 'recharge';
-            } else {
-                $after = max(0.00, $before - $this->adjustmentAmount);
-                $txType = 'refund';
-            }
-
-            $wallet->update(['balance' => $after]);
-
-            CreditTransaction::create([
-                'client_id' => $this->selectedClientId,
-                'lead_id' => null,
-                'package_id' => null,
-                'credit_before' => $before,
-                'credit_used' => $this->adjustmentAmount,
-                'credit_after' => $after,
-                'transaction_type' => $txType,
-                'created_at' => now(),
-            ]);
-
-            // Audit log record (required for manual overrides bypassing standard flow)
-            AuditLog::create([
-                'user_id' => auth()->id() ?? 1,
-                'action' => 'credit.manual_adjustment',
-                'subject_type' => CreditWallet::class,
-                'subject_id' => $wallet->id,
-                'from_value' => json_encode(['balance' => $before]),
-                'to_value' => json_encode(['balance' => $after, 'reason' => $this->reason]),
-                'ip_address' => request()->ip() ?? '127.0.0.1',
-                'user_agent' => request()->userAgent() ?? 'LeadPantherAdmin/1.0',
-                'created_at' => now(),
-            ]);
-        });
+        app(\App\Services\LeadCreditService::class)->adjust(
+            \App\Models\User::findOrFail($this->selectedClientId), $this->adjustmentAmount,
+            $this->adjustmentType === 'credit' ? 'recharge' : 'deduct', $this->reason, auth()->user());
 
         $this->dispatch('toast', type: 'success', message: 'Manual credit adjustment completed and logged to audit trail.');
         $this->closeAdjustModal();
@@ -164,7 +130,7 @@ class AdminCredits extends Component
         if ($this->statusFilter === 'recharge') {
             $query->where('transaction_type', 'recharge');
         } elseif ($this->statusFilter === 'reserve') {
-            $query->whereIn('transaction_type', ['reserve', 'deduct']);
+            $query->whereIn('transaction_type', ['lead_consumption', 'reserve', 'deduct']);
         } elseif ($this->statusFilter === 'refund') {
             $query->where('transaction_type', 'refund');
         }
@@ -182,8 +148,8 @@ class AdminCredits extends Component
     {
         $transactions = $this->getFilteredQuery()->paginate($this->perPage);
         $clients = Client::all();
-        $totalSystemOpeningBalance = (float) CreditWallet::sum('opening_balance');
-        $totalSystemAvailableBalance = (float) CreditWallet::sum('balance');
+        $totalSystemOpeningBalance = (int) CreditWallet::sum('opening_balance');
+        $totalSystemAvailableBalance = (int) CreditWallet::sum('balance');
 
         return view('livewire.admin.admin-credits', [
             'transactions' => $transactions,
@@ -221,7 +187,7 @@ class AdminCredits extends Component
                 headings: $headings,
                 columns: $columns,
                 statusColumns: ['transaction_type'],
-                currencyColumns: ['credit_before', 'credit_used', 'credit_after'],
+                currencyColumns: [],
                 hasTotals: true
             ),
             $filename

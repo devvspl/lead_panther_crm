@@ -30,6 +30,7 @@
 ])
 
 @php
+    if (!\App\Support\FinancialVisibility::allowed()) $columns = array_values(array_filter($columns, fn ($column) => !\App\Support\FinancialVisibility::sensitive($column['key'])));
     $visibleCols = !empty($visibleColumns) ? $visibleColumns : array_map(fn($c) => $c['key'], $columns);
     $activeColumns = array_values(array_filter($columns, fn($c) => in_array($c['key'], $visibleCols)));
     $hasFilterConfig = isset($this) && method_exists($this, 'filterConfig') && !empty($this->filterConfig());

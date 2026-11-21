@@ -151,8 +151,13 @@ class LeadDistributionService
                     $last = (clone $queue)->max('delivered_at');
                     if ($config['interval'] && $last && \Carbon\Carbon::parse($last)->addMinutes($config['interval'])->isFuture()) return false;
                 }
+                // Visibility and credit consumption commit together. Any downstream failure
+                // rolls both back, so an undelivered lead can never consume credits.
+                $wasInternalProcessing = $lead->internal_processing_pending;
+                $wasCreditDeliveryConfirmed = $lead->credit_delivery_confirmed;
+                $lead->update(['delivery_pending' => false, 'delivered_at' => now(), 'credit_delivery_confirmed' => true, 'delivery_failed_at' => null, 'delivery_error' => null, 'internal_processing_pending' => false]);
                 if (! \App\Models\CreditTransaction::reserveForLead($lead)) {
-                    $lead->update(['delivery_failed_at' => now(), 'delivery_error' => 'Credit reservation failed: check organization status and available balance.']);
+                    $lead->update(['delivery_pending' => true, 'delivered_at' => null, 'credit_delivery_confirmed' => $wasCreditDeliveryConfirmed, 'internal_processing_pending' => $wasInternalProcessing, 'delivery_failed_at' => now(), 'delivery_error' => 'Delivery held: check organization status, reconciliation and available lead credits.']);
                     if (isset($processing)) $this->internalForwardingFailed($processing, $lead->delivery_error);
                     return false;
                 }

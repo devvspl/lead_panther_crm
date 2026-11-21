@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Organization extends Model
 {
+    use \App\Traits\HasLeadCreditCost;
     protected $guarded = [];
-    protected $casts = ['show_builder_credit_balance' => 'boolean', 'internal_processing_enabled' => 'boolean', 'internal_processing_config' => 'array', 'assignment_config' => 'array', 'auto_assign_enabled' => 'boolean'];
+    protected $casts = ['min_credit_threshold' => 'integer', 'show_builder_credit_balance' => 'boolean', 'internal_processing_enabled' => 'boolean', 'internal_processing_config' => 'array', 'assignment_config' => 'array', 'auto_assign_enabled' => 'boolean'];
 
     public function clients(): HasMany
     {

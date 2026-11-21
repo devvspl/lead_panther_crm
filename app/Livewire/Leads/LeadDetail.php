@@ -163,8 +163,8 @@ class LeadDetail extends Component
         $latestBooking = $lead->bookings()->latest()->first();
         if ($latestBooking) {
             $this->bookingUnit = $latestBooking->unit?->unit_number ?? '';
-            $this->bookingAmount = (string) $latestBooking->booking_amount;
-            $this->paymentAmount = (string) $latestBooking->booking_amount;
+            $this->bookingAmount = \App\Support\FinancialVisibility::allowed() ? (string) $latestBooking->booking_amount : '';
+            $this->paymentAmount = \App\Support\FinancialVisibility::allowed() ? (string) $latestBooking->booking_amount : '';
         }
 
         $firstReason = ReplacementReason::first();

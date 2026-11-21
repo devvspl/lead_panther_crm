@@ -16,11 +16,15 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class RevenueAndBookings extends Component
 {
+    public function boot(): void
+    {
+        abort_unless(\App\Support\FinancialVisibility::allowed(), 403);
+    }
     public function tableColumns(): array
     {
         return [
             ['key' => 'client_name', 'label' => 'Lead Owner', 'priority' => 1],
-            ['key' => 'credits_spent', 'label' => 'Credits Consumed', 'priority' => 1, 'formatter' => fn ($v) => number_format((float) $v, 2)],
+            ['key' => 'credits_spent', 'label' => 'Credits Used', 'priority' => 1, 'formatter' => fn ($v) => number_format((int) $v)],
             ['key' => 'bookings_closed', 'label' => 'Confirmed Bookings', 'priority' => 1],
             ['key' => 'booking_value', 'label' => 'Booked Amount', 'priority' => 1, 'formatter' => fn ($v) => '₹'.number_format((float) $v, 2)],
             ['key' => 'revenue', 'label' => 'Payments Received', 'priority' => 1, 'formatter' => fn ($v) => '₹'.number_format((float) $v, 2)],

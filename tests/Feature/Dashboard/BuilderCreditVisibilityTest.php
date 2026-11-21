@@ -38,7 +38,7 @@ class BuilderCreditVisibilityTest extends TestCase
         Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org->fresh()])
             ->call('setBuilderCreditBalanceVisibility', true)->assertHasNoErrors();
         Livewire::actingAs($builder)->test(DashboardShell::class, ['role' => 'builder'])
-            ->assertSee('Credit Balance')->assertSee('Available Credits');
+            ->assertSee('Available Lead Credits')->assertSee('Available Credits');
         $this->assertDatabaseHas('audit_logs', ['organization_id' => $org->id, 'action' => 'organization.credit_balance_visibility_updated']);
     }
 

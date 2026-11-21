@@ -60,9 +60,9 @@ class OrganizationOverviewMetricsTest extends TestCase
         Project::create(['name'=>'Second active A','client_id'=>$ownerA2->id,'status'=>'active']);
         Project::create(['name'=>'Inactive A','client_id'=>$ownerA->id,'status'=>'inactive']);
         Project::create(['name'=>'Active B','client_id'=>$ownerB->id,'status'=>'active']);
-        CreditWallet::create(['client_id'=>$ownerA->id,'balance'=>40.25,'opening_balance'=>1000]);
+        CreditWallet::create(['client_id'=>$ownerA->id,'balance'=>40,'opening_balance'=>1000]);
         CreditWallet::create(['client_id'=>$ownerA2->id,'balance'=>10,'opening_balance'=>500]);
-        CreditWallet::create(['client_id'=>$ownerB->id,'balance'=>7.5,'opening_balance'=>900]);
+        CreditWallet::create(['client_id'=>$ownerB->id,'balance'=>7,'opening_balance'=>900]);
         $this->lead($ownerA,$executive);
         $this->lead($ownerA2);
         $this->lead($ownerA,$inactive); // Received but not assigned to an active member.
@@ -77,9 +77,9 @@ class OrganizationOverviewMetricsTest extends TestCase
             ->assertViewHas('activeProjectsCount',2)
             ->assertViewHas('totalLeadsCount',3)
             ->assertViewHas('directlyAssignedLeadsCount',1)
-            ->assertViewHas('totalWalletBalance',50.25);
+            ->assertViewHas('totalWalletBalance',50);
         $kpis = explode('<!-- Tabbed Navigation Bar -->',explode('data-organization-kpis',$component->html(),2)[1],2)[0];
-        foreach (['Team Members','Active Projects','Total Leads','Assigned Leads','Available Balance','Sufficient'] as $label) $this->assertStringContainsString($label,$kpis);
+        foreach (['Team Members','Active Projects','Total Leads','Assigned Leads','Available Lead Credits','Sufficient'] as $label) $this->assertStringContainsString($label,$kpis);
         foreach (['<span>Clients</span>','Opening Balance','Projects & Rate'] as $label) $this->assertStringNotContainsString($label,$kpis);
         $this->assertSame(5,substr_count($kpis,'<svg'));
         $component->set('userSearch','No matching name')->assertViewHas('activeTeamMembersCount',3)->assertViewHas('totalLeadsCount',3);
@@ -87,7 +87,7 @@ class OrganizationOverviewMetricsTest extends TestCase
         Livewire::test(OrganizationDetail::class,['organization'=>$b])
             ->assertViewHas('activeTeamMembersCount',1)->assertViewHas('activeProjectsCount',1)
             ->assertViewHas('totalLeadsCount',1)->assertViewHas('directlyAssignedLeadsCount',0)
-            ->assertViewHas('totalWalletBalance',7.5)->assertSee('Low Balance');
+            ->assertViewHas('totalWalletBalance',7)->assertSee('Low Credits');
         Livewire::test(OrganizationDetail::class,['organization'=>$empty])
             ->assertViewHas('activeTeamMembersCount',0)->assertViewHas('activeProjectsCount',0)
             ->assertViewHas('totalLeadsCount',0)->assertViewHas('directlyAssignedLeadsCount',0)
@@ -108,10 +108,10 @@ class OrganizationOverviewMetricsTest extends TestCase
             ->assertViewHas('directlyAssignedLeadsCount',1)->assertViewHas('totalWalletBalance',50.0)->assertSee('Sufficient');
         $executive->update(['status'=>'inactive']);
         $project->update(['status'=>'inactive']);
-        $wallet->update(['balance'=>23.75]);
+        $wallet->update(['balance'=>23]);
         $component->call('$refresh')->assertViewHas('activeTeamMembersCount',1)->assertViewHas('activeProjectsCount',0)
             ->assertViewHas('totalLeadsCount',1)->assertViewHas('directlyAssignedLeadsCount',0)
-            ->assertViewHas('totalWalletBalance',23.75)->assertSee('Low Balance');
+            ->assertViewHas('totalWalletBalance',23)->assertSee('Low Credits');
         $lead->update(['assigned_to'=>null]);
         $component->call('$refresh')->assertViewHas('directlyAssignedLeadsCount',0);
     }

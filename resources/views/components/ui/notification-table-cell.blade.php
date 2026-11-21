@@ -2,8 +2,8 @@
     @case('summary')
         <div class="min-w-60 max-w-xl space-y-1">
             <span class="text-[10px] font-semibold uppercase tracking-wide text-muted">{{ ucwords(str_replace('_', ' ', $notification->data['type'] ?? $notification->type)) }}</span>
-            <p class="font-semibold text-ink">{{ $notification->data['title'] ?? '' }}</p>
-            <p class="text-xs text-muted leading-relaxed break-words">{{ $notification->data['message'] ?? '' }}</p>
+            <p class="font-semibold text-ink">{{ \App\Support\ClientFacingText::label($notification->data['title'] ?? '') }}</p>
+            <p class="text-xs text-muted leading-relaxed break-words">{{ \App\Support\ClientFacingText::label($notification->data['message'] ?? '') }}</p>
         </div>
         @break
     @case('recipient_info')

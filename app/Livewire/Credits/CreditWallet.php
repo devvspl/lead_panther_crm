@@ -22,6 +22,18 @@ class CreditWallet extends Component
     public ?string $customFrom = null;
     public ?string $customTo = null;
 
+    private function billingClient(): ?Client
+    {
+        $user = auth()->user();
+        if (!$user) return null;
+        $own = Client::whereKey($user->id)->whereHas('wallet')->first();
+        if ($own) return $own;
+        if ($user->organization_id) {
+            return Client::where('organization_id', $user->organization_id)->orderBy('id')->first() ?? Client::find($user->id);
+        }
+        return Client::find($user->id);
+    }
+
     public function tableColumns(): array
     {
         return [
@@ -33,14 +45,15 @@ class CreditWallet extends Component
                 'deduct' => 'bg-blue-50 text-blue-700 border border-blue-200',
             ], 'sortable' => true, 'priority' => 1],
             ['key' => 'lead', 'label' => 'Associated Lead', 'render' => fn($row) => $row->lead ? '<a href="' . route('leads.index') . '" class="font-semibold font-mono text-ink hover:underline">' . e($row->lead->lead_code) . '</a>' : '<span class="text-muted">—</span>', 'sortable' => false, 'priority' => 1],
-            ['key' => 'credit_before', 'label' => 'Credit Before', 'formatter' => fn($v) => number_format((float)$v), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credit_before', 'label' => 'Credit Before', 'formatter' => fn($v) => $v === null ? 'Legacy entry' : number_format((int)$v), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
             ['key' => 'credit_used', 'label' => 'Used / Added', 'render' => function($row) {
-                $isPlus = $row->transaction_type === 'recharge' || $row->transaction_type === 'refund';
+                if ($row->is_legacy) return '<span class="text-muted">Legacy entry</span>';
+                $isPlus = $row->credit_after >= $row->credit_before;
                 $sign = $isPlus ? '+' : '-';
                 $color = $isPlus ? 'text-success' : 'text-danger';
-                return '<span class="font-mono font-bold ' . $color . '">' . $sign . number_format((float)$row->credit_used) . '</span>';
+                return '<span class="font-mono font-bold ' . $color . '">' . $sign . number_format((int)$row->credit_used) . '</span>';
             }, 'sortable' => false, 'priority' => 1],
-            ['key' => 'credit_after', 'label' => 'Credit After', 'formatter' => fn($v) => number_format((float)$v), 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credit_after', 'label' => 'Credit After', 'formatter' => fn($v) => $v === null ? 'Legacy entry' : number_format((int)$v), 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 2],
         ];
     }
 
@@ -65,7 +78,7 @@ class CreditWallet extends Component
     public function submitRechargeRequest(): void
     {
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?? Client::first();
+        $client = $this->billingClient();
 
         if (!$client || !$this->selectedPackageId) {
             $this->dispatch('toast', type: 'error', message: 'Please select a valid package.');
@@ -77,7 +90,7 @@ class CreditWallet extends Component
             RechargeRequest::create([
                 'client_id' => $client->id,
                 'package_id' => $package->id,
-                'amount' => $package->price,
+                'amount' => (int) $package->credit_count,
                 'status' => 'pending',
                 'requested_at' => now(),
             ]);
@@ -90,9 +103,9 @@ class CreditWallet extends Component
     public function render()
     {
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?? Client::first();
+        $client = $this->billingClient();
 
-        $wallet = $client ? WalletModel::firstOrCreate(['client_id' => $client->id], ['balance' => 5000.00]) : null;
+        $wallet = $client ? WalletModel::firstOrCreate(['client_id' => $client->id], ['balance' => 0]) : null;
 
         $lastRecharge = $client ? CreditTransaction::where('client_id', $client->id)
             ->where('transaction_type', 'recharge')
@@ -159,7 +172,7 @@ class CreditWallet extends Component
     public function exportExcel()
     {
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?? Client::first();
+        $client = $this->billingClient();
 
         $txQuery = $client ? CreditTransaction::with(['lead', 'package'])->where('client_id', $client->id) : CreditTransaction::query()->whereRaw('1 = 0');
 
@@ -206,7 +219,7 @@ class CreditWallet extends Component
                 headings: $headings,
                 columns: $columns,
                 statusColumns: ['transaction_type'],
-                currencyColumns: ['credit_before', 'credit_used', 'credit_after'],
+                currencyColumns: [],
                 hasTotals: true
             ),
             $filename

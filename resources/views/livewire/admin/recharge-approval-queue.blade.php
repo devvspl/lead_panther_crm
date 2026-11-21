@@ -3,7 +3,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-center space-x-2 text-xs text-muted mb-1">
-                <span>Billing &amp; Credits</span>
+                <span>Lead Credits</span>
                 <span>/</span>
                 <span class="text-ink font-semibold">Recharge Requests</span>
             </div>
@@ -11,9 +11,9 @@
                 <svg class="w-6 h-6 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                <span>Recharge Approval Queue</span>
+                <span>Credit Request Approvals</span>
             </h1>
-            <p class="text-xs text-muted">Review, verify payment references, and approve wallet recharge requests.</p>
+            <p class="text-xs text-muted">Review quantities and approve lead credit requests.</p>
         </div>
     </div>
 
@@ -27,7 +27,7 @@
         :sortField="$sortField"
         :sortDirection="$sortDirection"
         :filterCount="$this->activeFilterCount"
-        searchPlaceholder="Search client name, amount, or reference UTR..."
+        searchPlaceholder="Search client, credit quantity or reference..."
         emptyTitle="No Recharge Requests Found"
         emptyMessage="No wallet recharge requests match your current filters."
     />
@@ -37,11 +37,12 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
             <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <h3 class="text-base font-bold text-ink">Approve Credit Recharge Request</h3>
-                <p class="text-xs text-muted">Confirming this request will immediately credit the client's wallet with the requested credit balance.</p>
+                <p class="text-xs text-muted">Confirming this request will immediately credit the client's wallet with the approved lead credit quantity.</p>
 
+                <div><label class="block text-xs font-semibold text-ink mb-1">Approved Lead Credits</label><input type="number" min="1" step="1" wire:model="approvalQuantity" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink" /></div>
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">Payment Reference / Note (Optional)</label>
-                    <input type="text" wire:model="referenceNote" placeholder="e.g. Bank Transfer Ref #12345 or Cash Payment" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <label class="block text-xs font-semibold text-ink mb-1">Approval note (optional)</label>
+                    <input type="text" wire:model="referenceNote" placeholder="Reason or allocation reference" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary">
                 </div>
 
                 <div class="flex justify-end space-x-2 pt-2 border-t border-border">
@@ -61,7 +62,7 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-ink mb-1">Rejection Reason <span class="text-rose-500">*</span></label>
-                    <textarea wire:model="rejectionReason" rows="3" placeholder="e.g. Payment receipt not verified or incorrect amount." class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
+                    <textarea wire:model="rejectionReason" rows="3" placeholder="Explain why the credit request is declined." class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
                     @error('rejectionReason') <span class="text-rose-500 text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
 

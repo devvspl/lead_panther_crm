@@ -12,6 +12,8 @@ use Throwable;
 
 class BookingForm extends Component
 {
+    public function boot(): void { abort_unless(\App\Support\FinancialVisibility::allowed(), 403); }
+
     public Lead $lead;
 
     public ?int $projectUnitId = null;

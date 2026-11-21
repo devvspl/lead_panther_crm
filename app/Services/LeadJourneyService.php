@@ -95,13 +95,13 @@ class LeadJourneyService
             $events->push([
                 'id' => 'credit_' . $tx->id,
                 'type' => 'credit',
-                'category' => 'Credits & Wallet',
+                'category' => 'Lead Credits',
                 'timestamp' => $txTime,
-                'title' => $isRefund ? 'Credit Refund Credited' : 'Lead Credit Fee Deducted',
-                'details' => "Transaction #{$tx->id}: {$sign}" . number_format((float)$tx->credit_used, 2) . " Credits. Balance before: " . number_format((float)$tx->credit_before, 2) . ", Balance after: " . number_format((float)$tx->credit_after, 2) . " Credits.",
-                'icon' => 'currency-rupee',
+                'title' => $isRefund ? 'Credit Refund Credited' : 'Lead Credits Consumed',
+                'details' => $tx->is_legacy ? 'Legacy transaction preserved for Super Admin reconciliation.' : "Transaction #{$tx->id}: {$sign}" . number_format((int)$tx->credit_used) . " Credits. Credits before: " . number_format((int)$tx->credit_before) . ", Credits after: " . number_format((int)$tx->credit_after) . " Credits.",
+                'icon' => 'credit-card',
                 'color' => $isRefund ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-amber-100 text-amber-950 border-amber-300',
-                'badge' => "{$sign}" . number_format((float)$tx->credit_used, 1) . ' Credits',
+                'badge' => $tx->is_legacy ? 'Legacy entry' : "{$sign}" . number_format((int)$tx->credit_used) . ' Credits',
                 'actor' => 'Wallet Engine',
             ]);
         }

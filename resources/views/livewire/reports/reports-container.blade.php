@@ -34,12 +34,14 @@
         >
             Follow-up Performance
         </button>
+        @if(\App\Support\FinancialVisibility::allowed())
         <button 
             wire:click="setTab('revenue')" 
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap {{ $activeTab === 'revenue' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"
         >
             Revenue & Bookings
         </button>
+        @endif
         <button 
             wire:click="setTab('executive')" 
             class="px-4 py-2 text-xs font-bold rounded-t-lg transition border-b-2 whitespace-nowrap {{ $activeTab === 'executive' ? 'border-ink text-ink bg-surface' : 'border-transparent text-muted hover:text-ink' }}"

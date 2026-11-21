@@ -1377,6 +1377,7 @@
                         <input type="text" wire:model="manualCity" placeholder="Mumbai"
                             class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                     </div>
+                    @if(\App\Support\FinancialVisibility::allowed())
                     <div>
                         <label class="font-bold text-ink">Budget</label>
                         <input type="text" wire:model="manualBudget" placeholder="₹75.0L"
@@ -1384,6 +1385,7 @@
                         @error('manualBudget') <span class="text-rose-500 text-[10px]">{{ $message }}</span> @enderror
                         <p class="text-[10px] text-muted mt-1">Rupees, lakh or crore (e.g. 5000000 or 50 Lakh).</p>
                     </div>
+                    @endif
                     <div>
                         <label class="font-bold text-ink">Property Type</label>
                         <input type="text" wire:model="manualPropertyType" placeholder="2 BHK"

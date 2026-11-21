@@ -67,7 +67,7 @@ class DashboardShell extends Component
     // Builder Specific State
     public bool $showBuilderRechargeModal = false;
 
-    public float $builderRechargeAmount = 1000.00;
+    public $builderRechargeAmount = 1000;
 
     public string $builderRechargeNote = '';
 
@@ -315,7 +315,7 @@ class DashboardShell extends Component
             $orgUserIds = User::where('organization_id', $this->filterOrganizationId)->pluck('id');
             $walletQuery->whereIn('client_id', $orgUserIds);
         }
-        $totalCreditsAvailable = (float) $walletQuery->sum('balance');
+        $totalCreditsAvailable = (int) $walletQuery->sum('balance');
 
         $creditTxQuery = CreditTransaction::query();
         if ($this->filterOrganizationId) {
@@ -326,14 +326,14 @@ class DashboardShell extends Component
             $creditTxQuery->where('transaction_type', $this->filterTransactionType);
         }
 
-        $currConsumed = (float) (clone $creditTxQuery)->whereBetween('created_at', [$start, $end])
+        $currConsumed = (int) (clone $creditTxQuery)->whereBetween('created_at', [$start, $end])
             ->whereIn('transaction_type', ['reserve', 'deduct'])->sum('credit_used');
-        $prevConsumed = (float) (clone $creditTxQuery)->whereBetween('created_at', [$prevStart, $prevEnd])
+        $prevConsumed = (int) (clone $creditTxQuery)->whereBetween('created_at', [$prevStart, $prevEnd])
             ->whereIn('transaction_type', ['reserve', 'deduct'])->sum('credit_used');
 
-        $currRefunded = (float) (clone $creditTxQuery)->whereBetween('created_at', [$start, $end])
+        $currRefunded = (int) (clone $creditTxQuery)->whereBetween('created_at', [$start, $end])
             ->where('transaction_type', 'refund')->sum('credit_used');
-        $prevRefunded = (float) (clone $creditTxQuery)->whereBetween('created_at', [$prevStart, $prevEnd])
+        $prevRefunded = (int) (clone $creditTxQuery)->whereBetween('created_at', [$prevStart, $prevEnd])
             ->where('transaction_type', 'refund')->sum('credit_used');
 
         // 5. Total Revenue (Bookings + Completed Payments + Approved Recharges)
@@ -609,11 +609,11 @@ class DashboardShell extends Component
             [
                 'id' => 'credit_supply',
                 'title' => 'Available Credits',
-                'value' => $kpis['credits_available']['value'] ?? '0 Cr',
-                'delta' => '-' . ($kpis['credits_consumed']['value'] ?? '0 Cr'),
+                'value' => $kpis['credits_available']['value'] ?? '0 Credits',
+                'delta' => '-' . ($kpis['credits_consumed']['value'] ?? '0 Credits'),
                 'isPositive' => true,
                 'period' => 'consumed',
-                'subtext' => 'Refunded: ' . ($kpis['credits_refunded']['value'] ?? '0 Cr'),
+                'subtext' => 'Refunded: ' . ($kpis['credits_refunded']['value'] ?? '0 Credits'),
                 'icon' => 'wallet',
                 'route' => route('admin.credits'),
             ],
@@ -668,9 +668,9 @@ class DashboardShell extends Component
                 'title' => 'Credit & Revenue',
                 'icon' => 'dollar-sign',
                 'metrics' => [
-                    ['label' => 'Available Credits', 'value' => $kpis['credits_available']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
-                    ['label' => 'Credits Consumed', 'value' => $kpis['credits_consumed']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => null, 'route' => route('admin.credits')],
-                    ['label' => 'Credits Refunded', 'value' => $kpis['credits_refunded']['value'] ?? '0 Cr', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
+                    ['label' => 'Available Credits', 'value' => $kpis['credits_available']['value'] ?? '0 Credits', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
+                    ['label' => 'Credits Consumed', 'value' => $kpis['credits_consumed']['value'] ?? '0 Credits', 'delta' => null, 'isPositive' => null, 'route' => route('admin.credits')],
+                    ['label' => 'Credits Refunded', 'value' => $kpis['credits_refunded']['value'] ?? '0 Credits', 'delta' => null, 'isPositive' => true, 'route' => route('admin.credits')],
                     ['label' => 'Revenue', 'value' => $kpis['total_revenue']['value'] ?? '₹0.00', 'delta' => $kpis['total_revenue']['delta'] ?? '0%', 'isPositive' => true, 'route' => route('reports.index')],
                 ],
             ],
@@ -1029,8 +1029,8 @@ class DashboardShell extends Component
                 'converted_leads' => $converted,
                 'conversion_rate' => $convRate,
                 'sla_breaches' => (int) ($leadStats->sla_breached ?? 0),
-                'credits_consumed' => (float) $creditsConsumed,
-                'wallet_balance' => (float) $walletBalance,
+                'credits_consumed' => (int) $creditsConsumed,
+                'wallet_balance' => (int) $walletBalance,
                 'active_users' => $org->users->count(),
             ];
         })->toArray();
@@ -1064,7 +1064,7 @@ class DashboardShell extends Component
             $totalLeads = (int) ($leadStats->total ?? 0);
             $converted = (int) ($leadStats->converted ?? 0);
             $convRate = $totalLeads > 0 ? round(($converted / $totalLeads) * 100, 1) : 0;
-            $creditsCharged = $totalLeads * (float) ($project->lead_cost ?: 10);
+            $creditsCharged = (int) CreditTransaction::withoutGlobalScopes()->whereIn('lead_id', Lead::withoutGlobalScopes()->whereHas('campaign', fn ($q) => $q->where('project_id', $project->id))->select('id'))->where('is_legacy', false)->where('transaction_type', 'lead_consumption')->sum('credit_used');
 
             return [
                 'id' => $project->id,
@@ -1077,7 +1077,7 @@ class DashboardShell extends Component
                 'unassigned_leads' => (int) ($leadStats->unassigned ?? 0),
                 'converted_leads' => $converted,
                 'conversion_rate' => $convRate,
-                'lead_cost' => (float) ($project->lead_cost ?: 10),
+                'lead_cost' => (int) app(\App\Services\LeadPricingService::class)->resolveCost($project)['cost'],
                 'total_credits_charged' => $creditsCharged,
                 'sla_breaches' => (int) ($leadStats->sla_breached ?? 0),
             ];
@@ -1092,12 +1092,12 @@ class DashboardShell extends Component
         abort_if(Lead::usesSalesPanel(), 403);
         [$start, $end] = $this->getDateBounds();
 
-        $globalBalance = (float) CreditWallet::sum('balance');
-        $creditsPurchased = (float) RechargeRequest::where('status', 'approved')
+        $globalBalance = (int) CreditWallet::sum('balance');
+        $creditsPurchased = (int) RechargeRequest::where('status', 'approved')
             ->whereBetween('approved_at', [$start, $end])->sum('amount');
-        $creditsConsumed = (float) CreditTransaction::whereIn('transaction_type', ['reserve', 'deduct'])
+        $creditsConsumed = (int) CreditTransaction::whereIn('transaction_type', ['reserve', 'deduct'])
             ->whereBetween('created_at', [$start, $end])->sum('credit_used');
-        $creditsRefunded = (float) CreditTransaction::where('transaction_type', 'refund')
+        $creditsRefunded = (int) CreditTransaction::where('transaction_type', 'refund')
             ->whereBetween('created_at', [$start, $end])->sum('credit_used');
 
         $totalLeads = (int) $this->getFilteredLeadsQuery($start, $end)->count();
@@ -1107,7 +1107,7 @@ class DashboardShell extends Component
 
         // Organization wallet breakdown
         $orgBalances = Organization::with('users')->take(6)->get()->map(function ($org) {
-            $balance = (float) DB::table('client_wallets')
+            $balance = (int) DB::table('client_wallets')
                 ->whereIn('client_id', $org->users->pluck('id'))
                 ->sum('balance');
             return [
@@ -1430,7 +1430,7 @@ class DashboardShell extends Component
             ],
             'broker' => [
                 ['label' => 'My Buyer Leads', 'url' => route('leads.index'), 'icon' => 'leads', 'primary' => true],
-                ['label' => 'Credits & Wallet', 'url' => route('credits.wallet'), 'icon' => 'wallet', 'primary' => false],
+                ['label' => 'Lead Credits', 'url' => route('credits.wallet'), 'icon' => 'wallet', 'primary' => false],
                 ['label' => 'Performance Reports', 'url' => route('reports.index'), 'icon' => 'reports', 'primary' => false],
             ],
             'partner' => [
@@ -1501,7 +1501,7 @@ class DashboardShell extends Component
 
             return [
                 ['title' => 'My Buyer Leads Today', 'label' => 'My Buyer Leads Today', 'value' => number_format($leadsToday), 'delta' => 'Live', 'isPositive' => true, 'icon' => 'users'],
-                ['title' => 'My Wallet Balance', 'label' => 'My Wallet Balance', 'value' => number_format($walletBalance), 'delta' => 'Credits', 'isPositive' => $walletBalance > 0, 'icon' => 'wallet'],
+                ['title' => 'Available Lead Credits', 'label' => 'Available Lead Credits', 'value' => number_format($walletBalance), 'delta' => 'Credits', 'isPositive' => $walletBalance > 0, 'icon' => 'wallet'],
                 ['title' => 'Site Visits Scheduled', 'label' => 'Site Visits Scheduled', 'value' => number_format($siteVisits), 'delta' => 'Active', 'isPositive' => true, 'icon' => 'chart'],
                 ['title' => 'Closed Bookings', 'label' => 'Closed Bookings', 'value' => number_format($closedDeals), 'delta' => 'Pipeline', 'isPositive' => true, 'icon' => 'check-circle'],
             ];
@@ -1604,7 +1604,7 @@ class DashboardShell extends Component
 
     public function openBuilderRechargeModal(): void
     {
-        $this->builderRechargeAmount = 1000.00;
+        $this->builderRechargeAmount = 1000;
         $this->builderRechargeNote = '';
         $this->showBuilderRechargeModal = true;
     }
@@ -1618,12 +1618,12 @@ class DashboardShell extends Component
     {
         abort_if(Lead::usesSalesPanel(), 403);
         $this->validate([
-            'builderRechargeAmount' => 'required|numeric|min:10',
+            'builderRechargeAmount' => 'required|integer|min:1',
             'builderRechargeNote' => 'nullable|string|max:500',
         ]);
 
         $user = auth()->user();
-        $client = Client::where('organization_id', $user?->organization_id)->first() ?: $user;
+        $client = $user;
 
         RechargeRequest::create([
             'client_id' => $client->id,
@@ -1812,9 +1812,9 @@ class DashboardShell extends Component
             $orgPrimaryUserId = User::where('organization_id', $orgId)->orderBy('id')->value('id');
             $userWallet = CreditWallet::where('client_id', $orgPrimaryUserId)->value('balance') ?? 0;
         }
-        $availableCredits = (float) ($userWallet ?? 0);
+        $availableCredits = (int) ($userWallet ?? 0);
 
-        $creditsConsumed = (float) CreditTransaction::where(function ($q) use ($orgUserIds, $baseQuery) {
+        $creditsConsumed = (int) CreditTransaction::where(function ($q) use ($orgUserIds, $baseQuery) {
             $q->whereIn('client_id', $orgUserIds)
               ->orWhereIn('lead_id', (clone $baseQuery)->pluck('id'));
         })
@@ -1934,7 +1934,7 @@ class DashboardShell extends Component
                 $labels[] = $p->format('M Y');
                 $received[] = (clone $baseQuery)->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->count();
                 $assigned[] = (clone $baseQuery)->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->whereNotNull('assigned_to')->count();
-                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                $credits[] = (int) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                     ->whereMonth('created_at', $p->month)->whereYear('created_at', $p->year)->sum('credit_used');
             }
         } elseif ($this->trendInterval === 'weekly' || $days > 14) {
@@ -1945,7 +1945,7 @@ class DashboardShell extends Component
                 $wEnd = (clone $w)->endOfWeek();
                 $received[] = (clone $baseQuery)->whereBetween('created_at', [$wStart, $wEnd])->count();
                 $assigned[] = (clone $baseQuery)->whereBetween('created_at', [$wStart, $wEnd])->whereNotNull('assigned_to')->count();
-                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                $credits[] = (int) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                     ->whereBetween('created_at', [$wStart, $wEnd])->sum('credit_used');
             }
         } else {
@@ -1955,7 +1955,7 @@ class DashboardShell extends Component
                 $labels[] = $d->format('d M');
                 $received[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->count();
                 $assigned[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->whereNotNull('assigned_to')->count();
-                $credits[] = (float) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                $credits[] = (int) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
                     ->whereDate('created_at', $d->toDateString())->sum('credit_used');
             }
         }
@@ -1980,7 +1980,7 @@ class DashboardShell extends Component
                 ->count();
         })->toArray();
 
-        $revenueCounts = array_map(fn($c) => (int) round($c * 0.7), $leadCounts);
+        $revenueCounts = \App\Support\FinancialVisibility::allowed() ? $months->map(fn ($month) => (float) \App\Models\PaymentReceived::whereIn('booking_id', \App\Models\Booking::whereIn('lead_id', (clone $this->getScopedLeadsQuery())->select('id'))->select('id'))->where('status', 'completed')->whereMonth('paid_at', $month->month)->whereYear('paid_at', $month->year)->sum('amount') / 100000)->all() : [];
 
         return [
             'labels' => $labels,
@@ -2001,7 +2001,7 @@ class DashboardShell extends Component
         $inProgress = (clone $leadsQuery)->whereIn('current_stage', array_merge(...array_map([Lead::class, 'stageValues'], ['contacted', 'interested', 'follow_up', 'meeting_scheduled', 'site_visit', 'negotiation', 'booking', 'payment_received'])))->count();
 
         $followupsDue = Followup::where('status', 'pending')
-            ->whereIn('lead_id', (clone $leadsQuery)->select('id'))
+            ->whereIn('lead_id', Lead::withoutGlobalScopes()->whereHas('campaign', fn ($q) => $q->where('project_id', $project->id))->select('id'))
             ->where('due_at', '<=', now()->endOfDay())
             ->count();
 
@@ -2009,7 +2009,7 @@ class DashboardShell extends Component
         $lostLeads = (clone $leadsQuery)->whereIn('current_stage', ['lost', 'closed_lost', 'invalid', 'unreachable'])->count();
 
         $todayFollowups = Followup::where('status', 'pending')
-            ->whereIn('lead_id', (clone $leadsQuery)->select('id'))
+            ->whereIn('lead_id', Lead::withoutGlobalScopes()->whereHas('campaign', fn ($q) => $q->where('project_id', $project->id))->select('id'))
             ->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])
             ->with(['lead' => fn ($q) => $q->withoutGlobalScopes()->with(['project' => fn ($p) => $p->withoutGlobalScopes()])])
             ->orderBy('due_at', 'asc')
@@ -2075,7 +2075,7 @@ class DashboardShell extends Component
         return view('livewire.dashboard.dashboard-shell', [
             'headerInfo' => $this->headerInfo,
             'quickActions' => $this->quickActions,
-            'stats' => $this->roleStats,
+            'stats' => \App\Support\FinancialVisibility::allowed() ? $this->roleStats : array_values(array_filter($this->roleStats, fn ($stat) => !preg_match('/revenue|payment|deal.value|commission|earning/i', ($stat['id'] ?? '').' '.($stat['title'] ?? '').' '.($stat['label'] ?? '')))),
             'upcomingEvents' => $this->upcomingEvents,
             'auditLogs' => Lead::usesSalesPanel() ? collect() : $this->auditLogs,
             'chartData' => Lead::usesSalesPanel() ? [] : $this->chartData,

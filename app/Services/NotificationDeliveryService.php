@@ -70,6 +70,11 @@ class NotificationDeliveryService
         }
         if ($recipient->status !== 'active' || ! $this->webAllowed($recipient, $category, $important)) return null;
         $hash = hash('sha256', $recipient->id.'|'.$eventKey);
+        if (!\App\Support\FinancialVisibility::allowed($recipient)) {
+            $title = \App\Support\FinancialVisibility::text($title);
+            $message = \App\Support\FinancialVisibility::text($message);
+            $context = \App\Support\FinancialVisibility::redact($context);
+        }
         $id = substr($hash, 0, 8).'-'.substr($hash, 8, 4).'-'.substr($hash, 12, 4).'-'.substr($hash, 16, 4).'-'.substr($hash, 20, 12);
         $payload = ['type' => $type, 'title' => $title, 'message' => $message, 'category' => $category,
             'organization_id' => $organizationId, 'recipient_user_id' => $recipient->id,
@@ -195,6 +200,11 @@ class NotificationDeliveryService
         $subject = $template?->subject ?: "Notification: " . ucwords(str_replace('_', ' ', $templateKey));
         foreach ($tokens as $key => $value) $subject = str_replace('{{'.$key.'}}', (string) $value, $subject);
         $body = $template ? $template->render($tokens) : $this->generateFallbackBody($templateKey, $tokens);
+        if (!($notifiable instanceof User && \App\Support\FinancialVisibility::allowed($notifiable))) {
+            $tokens = \App\Support\FinancialVisibility::redact($tokens);
+            $subject = \App\Support\FinancialVisibility::text($subject);
+            $body = \App\Support\FinancialVisibility::text($body);
+        }
 
         // 2. Initial Pending Log
         $log = NotificationLog::create([

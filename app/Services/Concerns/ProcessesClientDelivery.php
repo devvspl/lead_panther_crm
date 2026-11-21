@@ -146,7 +146,7 @@ trait ProcessesClientDelivery
         return Lead::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $sourceOrganizationId)->select('id'))
             ->whereNull('delivered_at')
             ->where(fn($q) => $q->whereNull('delivery_plan_id')->orWhereIn('delivery_plan_id', LeadDeliveryPlan::where('organization_id', $sourceOrganizationId)->select('id')))
-            ->whereNotIn('id', CreditTransaction::withoutGlobalScopes()->whereNotNull('lead_id')->select('lead_id'))
+            ->whereNotIn('id', CreditTransaction::withoutGlobalScopes()->where('is_legacy', false)->whereNotNull('lead_id')->select('lead_id'))
             ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
             ->whereNotIn('current_stage', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']);
     }
@@ -290,9 +290,10 @@ trait ProcessesClientDelivery
         if (!$this->clientDeliveryRecipients()->whereKey($plan->client_id)->exists()) $alerts[] = ['type' => 'error', 'message' => 'Destination client is inactive, unauthorized or belongs to an inactive organization.'];
         if (!$project || $project->client_id !== $plan->client_id || $project->status !== 'active' || !$project->delivery_enabled) $alerts[] = ['type' => 'error', 'message' => 'Destination project is inactive, delivery is disabled, or its client mapping is invalid.'];
         if ($plan->campaign_id && !Campaign::withoutGlobalScopes()->whereKey($plan->campaign_id)->where('project_id', $plan->project_id)->where('status', 'active')->exists()) $alerts[] = ['type' => 'error', 'message' => 'Selected destination campaign is inactive or mapped to another project.'];
-        $balance = (float)(\App\Models\CreditWallet::withoutGlobalScopes()->where('client_id', $plan->client_id)->value('balance') ?? 0);
-        $cost = $project ? (float)app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $owner?->organization)['cost'] : null;
-        if ($cost !== null && $balance < $cost) $alerts[] = ['type' => 'error', 'message' => 'Insufficient credits: wallet ' . number_format($balance, 2) . ', expected lead cost ' . number_format($cost, 2) . '. Recharge the destination client wallet.'];
+        $balance = (int)(\App\Models\CreditWallet::withoutGlobalScopes()->where('client_id', $plan->client_id)->value('balance') ?? 0);
+        $cost = $project ? (int)app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $owner?->organization)['cost'] : null;
+        if ($cost !== null && $balance < $cost) $alerts[] = ['type' => 'error', 'message' => 'Insufficient credits: wallet ' . number_format($balance) . ', credits per delivered lead ' . number_format($cost) . '. Add lead credits for the destination client.'];
+        if (\App\Models\CreditWallet::where('client_id', $plan->client_id)->whereNull('reconciled_at')->exists()) $alerts[] = ['type' => 'error', 'message' => 'Lead credits need Super Admin reconciliation before delivery.'];
         $items = $plan->items();
         $awaiting = (clone $items)->whereIn('status', ['pending', 'queued'])
             ->whereHas('lead', fn ($q) => $q->whereNotIn('id', $this->applyClientDeliveryApproval(Lead::withoutGlobalScopes(), $plan->organization_id)->select('id')))->count();

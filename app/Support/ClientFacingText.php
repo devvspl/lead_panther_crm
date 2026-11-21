@@ -11,9 +11,10 @@ class ClientFacingText
         $text = (string) ($value ?? '');
         $user ??= auth()->user();
         if (!$user || NavigationConfig::getRoleKey($user) === 'super-admin') return $text;
+        $text = FinancialVisibility::text($text);
         return preg_replace(
             ['/manual[ _-]+adjustment/i', '/manual[ _-]+lead[ _-]+entry/i', '/manually/i', '/manual/i'],
-            ['Balance Adjustment', 'Lead entry', 'on request', 'On Demand'], $text
+            ['Credit Adjustment', 'Lead entry', 'on request', 'On Demand'], $text
         );
     }
 
@@ -22,7 +23,7 @@ class ClientFacingText
         if (LeadSourceVisibility::allowed()) return (string) ($value ?? '');
         $data = json_decode((string) $value, true);
         if (is_array($data)) {
-            return self::label(json_encode(LeadSourceVisibility::redact($data), JSON_UNESCAPED_UNICODE));
+            return self::label(json_encode(FinancialVisibility::redact(LeadSourceVisibility::redact($data)), JSON_UNESCAPED_UNICODE));
         }
         return self::label($value);
     }

@@ -9,6 +9,11 @@ class PortalAccount extends Model
 {
     protected $guarded = [];
 
+    public function adAccounts(): HasMany
+    {
+        return $this->hasMany(MetaAdAccount::class);
+    }
+
     public function credentials(): HasMany
     {
         return $this->hasMany(IntegrationCredential::class);

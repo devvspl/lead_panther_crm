@@ -87,6 +87,20 @@ class IntegrationsManager extends Component
         $this->resetPage();
     }
 
+    public function updatedSelectedMappingAccountId(): void
+    {
+        $account = PortalAccount::where('type', 'meta')->findOrFail($this->selectedMappingAccountId);
+        $this->reset('availableForms', 'formClientMap', 'formProjectMap', 'formCampaignMap', 'search');
+        foreach ($account->formMappings as $mapping) {
+            $this->availableForms[] = ['id' => $mapping->form_id, 'name' => $mapping->form_name,
+                'status' => strtoupper($mapping->status ?: 'ACTIVE'), 'created_time' => $mapping->meta_created_at?->toIso8601String()];
+            $this->formClientMap[$mapping->form_id] = $mapping->client_id;
+            $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
+            $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
+        }
+        $this->resetPage();
+    }
+
     public function mount(): void
     {
         $this->loadMetaConfiguration();
@@ -117,10 +131,9 @@ class IntegrationsManager extends Component
             $this->accountName = $account->name ?? '';
             $this->metaPageId = $account->getCredential('page_id') ?? '';
             $this->metaAppId = $account->getCredential('app_id') ?? '';
-            $rawSecret = $account->getCredential('app_secret') ?? '';
-            // If previous bug saved browser login password ("password"), reset to empty
-            $this->metaAppSecret = ($rawSecret === 'password') ? '' : $rawSecret;
-            $this->metaAccessToken = $account->getCredential('access_token') ?? '';
+            // Saved secrets stay server-side; blank inputs retain existing credentials.
+            $this->metaAppSecret = '';
+            $this->metaAccessToken = '';
             $this->metaVerifyToken = $account->getCredential('verify_token') ?? '';
             $defaultProj = $account->getCredential('default_project_id');
             $this->metaDefaultProjectId = $defaultProj ? (int) $defaultProj : null;
@@ -210,6 +223,9 @@ class IntegrationsManager extends Component
         }
 
         // Meta Ads saving
+        $savedAccount = $this->selectedAccountId ? PortalAccount::where('type', 'meta')->find($this->selectedAccountId) : null;
+        $accessToken = $this->metaAccessToken ?: ($savedAccount?->getCredential('access_token') ?? '');
+        $appSecret = $this->metaAppSecret ?: ($savedAccount?->getCredential('app_secret') ?? '');
         if (!empty($this->apiSecret) && empty($this->metaPageId)) {
             $this->validate([
                 'accountName' => 'required|string|max:255',
@@ -219,7 +235,7 @@ class IntegrationsManager extends Component
             $this->validate([
                 'accountName' => 'required|string|max:255',
                 'metaPageId' => 'required|string',
-                'metaAccessToken' => 'required|string',
+                'metaAccessToken' => ($accessToken !== '' ? 'nullable' : 'required').'|string',
                 'metaVerifyToken' => 'nullable|string',
                 'metaAppId' => 'nullable|string',
                 'metaAppSecret' => 'nullable|string',
@@ -256,10 +272,10 @@ class IntegrationsManager extends Component
             try {
                 $probe = Http::timeout(8)->get("https://graph.facebook.com/v19.0/{$this->metaPageId}", [
                     'fields' => 'id,name,access_token',
-                    'access_token' => $this->metaAccessToken,
+                    'access_token' => $accessToken,
                 ]);
                 if ($probe->successful() && $probe->json('access_token')) {
-                    $this->metaAccessToken = $probe->json('access_token');
+                    $accessToken = $probe->json('access_token');
                 }
             } catch (Throwable $e) {
                 // Proceed with existing token if network fails
@@ -267,10 +283,10 @@ class IntegrationsManager extends Component
 
             $credentials = [
                 'page_id' => $this->metaPageId,
-                'access_token' => $this->metaAccessToken,
+                'access_token' => $accessToken,
                 'verify_token' => $this->metaVerifyToken,
                 'app_id' => $this->metaAppId,
-                'app_secret' => $this->metaAppSecret,
+                'app_secret' => $appSecret,
                 'default_project_id' => $this->metaDefaultProjectId ? (string) $this->metaDefaultProjectId : '',
                 'default_client_id' => $this->metaDefaultClientId ? (string) $this->metaDefaultClientId : '',
             ];
@@ -289,7 +305,7 @@ class IntegrationsManager extends Component
             }
 
             // Keep apiSecret in sync so any caller referencing it gets the new token
-            $this->apiSecret = $this->metaAccessToken;
+            $this->apiSecret = '';
         } elseif (!empty($this->apiSecret)) {
             // Legacy/Test fallback: only apiSecret was set directly
             IntegrationCredential::updateOrCreate(
@@ -299,6 +315,7 @@ class IntegrationsManager extends Component
         }
 
         $this->selectedAccountId = $account->id;
+        $this->reset('metaAccessToken', 'metaAppSecret', 'apiSecret');
         $this->metaLastSyncedTime = now()->format('d M Y, h:i A');
         $this->dispatch('toast', type: 'success', message: 'Meta Ads credentials saved securely (Encrypted at rest).');
     }
@@ -340,7 +357,9 @@ class IntegrationsManager extends Component
         $this->isTesting = true;
 
         if ($this->activeTab === 'meta') {
-            if (empty($this->metaPageId) || empty($this->metaAccessToken)) {
+            $savedAccount = $this->selectedAccountId ? PortalAccount::where('type', 'meta')->find($this->selectedAccountId) : null;
+            $accessToken = $this->metaAccessToken ?: ($savedAccount?->getCredential('access_token') ?? '');
+            if (empty($this->metaPageId) || empty($accessToken)) {
                 $this->dispatch('toast', type: 'error', title: 'Missing Credentials', message: 'Please enter Facebook Page ID and Page Access Token before testing.');
                 $this->isTesting = false;
                 return;
@@ -349,7 +368,7 @@ class IntegrationsManager extends Component
             try {
                 $response = Http::timeout(10)->get("https://graph.facebook.com/v19.0/{$this->metaPageId}", [
                     'fields' => 'id,name,access_token',
-                    'access_token' => $this->metaAccessToken,
+                    'access_token' => $accessToken,
                 ]);
 
                 if ($response->successful() && $response->json('id')) {
@@ -360,9 +379,7 @@ class IntegrationsManager extends Component
 
                     // If Meta returned a dedicated Page Access Token, auto-upgrade and save it
                     $pageAccessToken = $response->json('access_token');
-                    if ($pageAccessToken && $pageAccessToken !== $this->metaAccessToken) {
-                        $this->metaAccessToken = $pageAccessToken;
-                        $this->apiSecret = $pageAccessToken;
+                    if ($pageAccessToken && $pageAccessToken !== $accessToken) {
                         if ($this->selectedAccountId) {
                             IntegrationCredential::updateOrCreate(
                                 ['portal_account_id' => $this->selectedAccountId, 'key_name' => 'access_token'],
@@ -406,6 +423,7 @@ class IntegrationsManager extends Component
                 }
                 $this->dispatch('toast', type: 'error', title: 'Connection Error', message: $msg);
             } finally {
+                $this->reset('metaAccessToken', 'metaAppSecret', 'apiSecret');
                 $this->isTesting = false;
             }
             return;
@@ -602,7 +620,7 @@ class IntegrationsManager extends Component
 
     public function fetchLeadForms(?int $accountId = null): void
     {
-        $targetId = $accountId ?: $this->selectedAccountId;
+        $targetId = $accountId ?: ($this->selectedMappingAccountId ?: $this->selectedAccountId);
         $this->isFetchingForms = true;
 
         if (!$targetId) {
@@ -1209,6 +1227,7 @@ class IntegrationsManager extends Component
             'campaigns' => $campaigns,
             'clientOptions' => $clientOptions,
             'projectOptions' => $projectOptions,
+            'metaPageOptions' => PortalAccount::where('type', 'meta')->orderBy('name')->pluck('name', 'id')->all(),
         ])->layout('layouts.app');
     }
 }

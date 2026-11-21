@@ -33,6 +33,7 @@ class ProcessInboundLeadJob implements ShouldQueue
 
     public function handle(): void
     {
+        $metaLeadLock = null;
         try {
             $account = $this->webhookLog->portalAccount;
             $type = strtolower($account?->type ?: 'meta');
@@ -42,6 +43,16 @@ class ProcessInboundLeadJob implements ShouldQueue
 
             // If Meta webhook with leadgen_id, fetch full lead field data from Meta Graph API
             if ($type === 'meta') {
+                $pageId = $raw['entry'][0]['id'] ?? null;
+                if ($pageId && $account?->getCredential('page_id') && $account->getCredential('page_id') !== (string) $pageId) {
+                    // A shared app webhook can receive events for any linked Page.
+                    $linkedIds = \App\Models\MetaAdAccount::where('portal_account_id', $account->id)->pluck('id');
+                    $page = \App\Models\PortalAccount::whereHas('credentials', fn ($q) => $q->where('key_name', 'page_id'))
+                        ->whereIn('id', \Illuminate\Support\Facades\DB::table('meta_ad_account_pages')->whereIn('meta_ad_account_id', $linkedIds)->select('portal_account_id'))
+                        ->get()->first(fn ($p) => $p->getCredential('page_id') === (string) $pageId);
+                    if (!$page) throw new \RuntimeException('Webhook Page is not associated with this integration.');
+                    $account = $page;
+                }
                 $leadgenId = $raw['entry'][0]['changes'][0]['value']['leadgen_id'] ?? $raw['leadgen_id'] ?? null;
                 $hasFieldData = !empty($raw['field_data']) || !empty($raw['entry'][0]['changes'][0]['value']['field_data']);
 
@@ -72,6 +83,14 @@ class ProcessInboundLeadJob implements ShouldQueue
             };
 
             // Check form mapping for project and campaign routing
+            if ($type === 'meta' && !empty($mapped['leadgen_id'])) {
+                $metaLeadLock = \Illuminate\Support\Facades\Cache::lock('meta-lead-import-'.$mapped['leadgen_id'], 60);
+                $metaLeadLock->block(5);
+            }
+            if ($type === 'meta' && !empty($mapped['leadgen_id']) && LeadMetadata::where('key', 'meta_leadgen_id')->where('value', (string) $mapped['leadgen_id'])->exists()) {
+                $this->webhookLog->update(['processed' => true, 'error_message' => 'Meta lead already imported.']);
+                return;
+            }
             $formId = $mapped['form'] ?? null;
             $mapping = null;
             if ($account && $formId) {
@@ -94,6 +113,11 @@ class ProcessInboundLeadJob implements ShouldQueue
             $clientId = $targetClientId;
             $campaignId = $mapping?->campaign_id;
             $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
+            $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
+            if (!$campaignId && $type === 'meta' && $account) {
+                $scoped = app(\App\Services\MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id);
+                if ($scoped) { $campaignId = $scoped->id; $projectId = $scoped->project_id; $clientId = $scoped->project?->client_id ?: $clientId; }
+            }
 
             // Auto-create or map Campaign from Meta campaign name if not explicitly mapped
             if (!empty($mapped['campaign']) && !$campaignId) {
@@ -207,6 +231,7 @@ class ProcessInboundLeadJob implements ShouldQueue
             if (!empty($mapped['campaign_id'])) {
                 LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_id', 'value' => (string) $mapped['campaign_id']]);
             }
+            if ($remoteCampaign) LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_account_id', 'value' => $remoteCampaign->ad_account_id]);
             if (!empty($mapped['ad_set'])) {
                 LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
             }
@@ -235,6 +260,6 @@ class ProcessInboundLeadJob implements ShouldQueue
                 'error_message' => 'Processing exception: ' . $e->getMessage(),
             ]);
             throw $e;
-        }
+        } finally { $metaLeadLock?->release(); }
     }
 }

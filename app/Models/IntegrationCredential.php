@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class IntegrationCredential extends Model
 {
     protected $guarded = [];
+    protected $hidden = ['encrypted_value'];
 
     protected $casts = [
         'encrypted_value' => 'encrypted',

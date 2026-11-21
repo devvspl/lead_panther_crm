@@ -66,7 +66,30 @@ class MetaWebhookController extends Controller
             return response()->json(['error' => 'Unauthorized signature'], 401);
         }
 
-        ProcessInboundLeadJob::dispatch($log);
+        $events = [];
+        foreach ($request->input('entry', []) as $entry) {
+            foreach ($entry['changes'] ?? [] as $change) {
+                if (($change['field'] ?? '') !== 'leadgen') continue;
+                $event = $entry;
+                $event['changes'] = [$change];
+                $events[] = $event;
+            }
+        }
+        if (count($events) > 1) {
+            // Meta can batch events from several Pages into one app webhook.
+            // Keep the original request and give each event its own retryable log/job.
+            foreach ($events as $event) {
+                $child = \App\Models\WebhookLog::create([
+                    'portal_account_id' => $portalAccount->id,
+                    'payload' => json_encode(['object' => 'page', 'entry' => [$event]]),
+                    'received_at' => now(), 'processed' => false, 'error_message' => null,
+                ]);
+                ProcessInboundLeadJob::dispatch($child);
+            }
+            $log->update(['processed' => true, 'error_message' => 'Batch split into '.count($events).' individual event logs.']);
+        } else {
+            ProcessInboundLeadJob::dispatch($log);
+        }
 
         return response()->json(['status' => 'queued', 'log_id' => $log->id], 200);
     }

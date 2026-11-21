@@ -22,6 +22,7 @@ class ScheduledTaskService
         'operational-notifications'=>['Operational Notifications','Check operational alerts, SLA reminders and daily summaries using stored notification preferences.'],
         'team-availability'=>['Team Availability','Mark inactive executives offline using the existing team availability rules.'],
         'meta-lead-sync'=>['Meta Lead Sync','Synchronize configured Meta forms and route actual leads using integration mappings.'],
+        'meta-ad-accounts-sync'=>['Meta Ad Accounts Sync','Queue independent Ad Account campaign, ad set, ad and insights synchronization.'],
         'database-backup'=>['Database Backup','Run the existing configured database/document backup.'],
         'backup-cleanup'=>['Backup Cleanup','Remove old backups according to the configured backup retention policy.'],
     ];

@@ -78,6 +78,7 @@ app(\App\Services\ScheduledTaskService::class)->command('team-availability','tea
 
 // Schedule 5: Discover/save Meta forms and sync leads (Every 10 Minutes).
 app(\App\Services\ScheduledTaskService::class)->command('meta-lead-sync','meta:sync-leads')->everyTenMinutes()->withoutOverlapping();
+app(\App\Services\ScheduledTaskService::class)->command('meta-ad-accounts-sync', 'meta:sync-ad-accounts')->everyTenMinutes()->withoutOverlapping();
 
 // Schedule 6: Daily Backup of Database + Documents Disk
 app(\App\Services\ScheduledTaskService::class)->command('database-backup','backup:run')->daily();

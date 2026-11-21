@@ -43,6 +43,11 @@
     </div>
 
     <!-- Single Configuration Form Card -->
+    @if($activeTab === 'meta' && $selectedAccountId)
+        <div class="bg-surface rounded-2xl border border-border p-4 sm:p-6">
+            <livewire:settings.meta-ad-accounts :integration-id="$selectedAccountId" :key="'ad-accounts-'.$selectedAccountId" />
+        </div>
+    @endif
     <div class="bg-surface rounded-2xl border border-border p-6 shadow-xs space-y-6">
 
         <!-- Hidden inputs to prevent aggressive browser autofill -->
@@ -380,6 +385,9 @@
                         </button>
                     </div>
 
+                    @if(count($metaPageOptions) > 1)
+                        <div class="max-w-md"><label class="block text-xs font-semibold mb-1">Facebook Page</label><x-ui.themed-select wire:model.live="selectedMappingAccountId" :options="$metaPageOptions" /></div>
+                    @endif
                     <x-ui.advanced-table 
                         :columns="$this->availableFormsTableColumns()"
                         :rows="$this->filteredAvailableForms"

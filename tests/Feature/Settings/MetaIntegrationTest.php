@@ -21,6 +21,166 @@ class MetaIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_shared_app_webhook_queues_each_page_event_independently(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $page = PortalAccount::create(['name' => 'Root', 'type' => 'meta']);
+        $payload = ['object' => 'page', 'entry' => [
+            ['id' => '111', 'changes' => [['field' => 'leadgen', 'value' => ['leadgen_id' => 'lead-1']]]],
+            ['id' => '222', 'changes' => [['field' => 'leadgen', 'value' => ['leadgen_id' => 'lead-2']]]],
+        ]];
+        $this->postJson('/api/webhooks/meta/'.$page->id, $payload)->assertOk();
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ProcessInboundLeadJob::class, 2);
+        $this->assertSame(3, \App\Models\WebhookLog::count());
+        $this->assertSame(2, \App\Models\WebhookLog::where('processed', false)->count());
+    }
+
+    public function test_campaign_identity_and_mapping_are_scoped_to_the_connected_ad_account(): void
+    {
+        $org = Organization::create(['name' => 'Scoped org', 'status' => 'active']);
+        $client = Client::create(['name' => 'Scoped client', 'organization_id' => $org->id, 'status' => 'active']);
+        $project = Project::create(['name' => 'Scoped project', 'client_id' => $client->id]);
+        $source = \App\Models\LeadSource::create(['name' => 'meta']);
+        $page = PortalAccount::create(['name' => 'Shared Page', 'type' => 'meta']);
+        $records = [];
+        foreach (['111', '222'] as $id) {
+            $account = \App\Models\MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => $id, 'ad_account_id' => $id, 'status' => 'connected']);
+            $account->pages()->attach($page->id);
+            $records[] = $account->records()->create(['ad_account_id' => $id, 'kind' => 'campaign', 'remote_id' => $id.'c', 'name' => 'Same campaign name', 'data' => [], 'synced_at' => now()]);
+        }
+        $service = app(\App\Services\MetaAdAccountService::class);
+        $one = $service->campaignForLead($page, ['campaign_id' => '111c'], $project->id, $source->id);
+        $two = $service->campaignForLead($page, ['campaign_id' => '222c'], $project->id, $source->id);
+        $this->assertNotSame($one->id, $two->id);
+        $this->assertSame($one->id, $service->campaignForLead($page, ['campaign_id' => '111c'], $project->id, $source->id)->id);
+        Role::firstOrCreate(['name' => 'Super Admin']);
+        $admin = User::factory()->create(); $admin->assignRole('Super Admin');
+        Livewire::actingAs($admin)->test(\App\Livewire\Settings\MetaAdAccounts::class, ['integrationId' => $page->id])
+            ->call('showRecords', $records[0]->meta_ad_account_id)->assertSee('Same campaign name')->assertDontSee('222c')
+            ->set('campaignMap.'.$records[0]->id, $one->id)->call('saveMapping', $records[0]->id)->assertHasNoErrors()
+            ->call('closeRecords')->assertSet('viewingId', null);
+        $this->assertSame($two->id, $records[1]->fresh()->crm_campaign_id);
+    }
+
+    public function test_ad_sync_resumes_a_saved_cursor_and_discovers_page_credentials_separately(): void
+    {
+        $integration = PortalAccount::create(['name' => 'Original Page', 'type' => 'meta']);
+        $account = \App\Models\MetaAdAccount::create(['portal_account_id' => $integration->id, 'name' => 'Resuming', 'ad_account_id' => '111', 'access_token' => 'ads-only-token', 'status' => 'connected',
+            'sync_state' => ['edge' => 3, 'after' => 'saved-cursor', 'page_errors' => 0]]);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/insights')) {
+                $this->assertSame('saved-cursor', $request['after']);
+                return Http::response(['data' => []]);
+            }
+            if (str_contains($request->url(), '/promote_pages')) return Http::response(['data' => [['id' => '333', 'name' => 'New Page']]]);
+            return Http::response(['id' => '333', 'name' => 'New Page', 'access_token' => 'separate-page-token']);
+        });
+        app(\App\Services\MetaAdAccountService::class)->sync($account);
+        $newPage = $account->pages()->firstOrFail();
+        $this->assertSame('separate-page-token', $newPage->getCredential('access_token'));
+        $this->assertNull($account->fresh()->sync_state);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/campaigns') || str_contains($request->url(), '/adsets'));
+    }
+
+    public function test_ad_connection_checks_token_permissions_and_expiry_per_account(): void
+    {
+        $integration = PortalAccount::create(['name' => 'Meta app', 'type' => 'meta']);
+        $integration->setCredential('app_id', 'app-id'); $integration->setCredential('app_secret', 'app-secret');
+        $account = \App\Models\MetaAdAccount::create(['portal_account_id' => $integration->id, 'name' => 'Expired', 'ad_account_id' => '111', 'access_token' => 'expired-token']);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/debug_token')) return Http::response(['data' => ['is_valid' => false]]);
+            if (str_contains($request->url(), '/me')) return Http::response(['id' => 'facebook-user', 'name' => 'User']);
+            if (str_contains($request->url(), '/campaigns')) return Http::response(['data' => []]);
+            return Http::response(['account_id' => '111']);
+        });
+        try { app(\App\Services\MetaAdAccountService::class)->test($account); $this->fail('Invalid token must fail'); }
+        catch (\RuntimeException $e) { $this->assertStringNotContainsString('expired-token', $e->getMessage()); }
+        $this->assertSame('expired', $account->fresh()->status);
+    }
+
+    public function test_multiple_ad_accounts_sync_independently_with_pagination_and_preserve_page_forms(): void
+    {
+        $page = PortalAccount::create(['name' => 'Existing Page', 'type' => 'meta', 'status' => 'active']);
+        $page->setCredential('page_id', '555');
+        $page->setCredential('access_token', 'existing-page-token');
+        foreach (range(1, 209) as $i) LeadFormMapping::create(['portal_account_id' => $page->id, 'form_id' => (string) $i, 'form_name' => 'Form '.$i]);
+        $first = \App\Models\MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'First', 'ad_account_id' => '111', 'access_token' => 'token-one', 'status' => 'connected']);
+        $second = \App\Models\MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'Second', 'ad_account_id' => '222', 'access_token' => 'token-two', 'status' => 'connected']);
+        $this->assertNotSame('token-one', \Illuminate\Support\Facades\DB::table('meta_ad_accounts')->where('id', $first->id)->value('access_token'));
+        $this->assertArrayNotHasKey('access_token', $first->toArray());
+        Http::fake(function ($request) {
+            preg_match('~/act_(111|222)/(\w+)~', $request->url(), $matches);
+            $id = $matches[1] ?? '111';
+            $edge = $matches[2] ?? '';
+            $this->assertTrue($request->hasHeader('Authorization', 'Bearer '.($id === '111' ? 'token-one' : 'token-two')));
+            if ($edge === 'promote_pages') return Http::response(['data' => [['id' => '555', 'name' => 'Existing Page']]]);
+            if ($edge === 'insights') return Http::response(['data' => [['account_id' => $id, 'campaign_id' => $id.'c', 'campaign_name' => 'Same name', 'date_start' => '2026-11-20', 'date_stop' => '2026-11-20', 'spend' => '12.50']]]);
+            $row = ['id' => $id.$edge.(isset($request['after']) ? '2' : '1'), 'account_id' => $id, 'name' => 'Same name', 'status' => 'ACTIVE', 'campaign_id' => $id.'c'];
+            return Http::response(['data' => [$row]] + ($edge === 'campaigns' && !isset($request['after']) ? ['paging' => ['cursors' => ['after' => 'next'], 'next' => 'https://graph.facebook.com/ignored?access_token=must-not-follow']] : []));
+        });
+        $service = app(\App\Services\MetaAdAccountService::class);
+        $service->sync($first);
+        $service->sync($second);
+        $service->sync($first);
+        $this->assertSame(5, $first->records()->count());
+        $this->assertSame(5, $second->records()->count());
+        $this->assertSame(['111'], $first->records()->pluck('ad_account_id')->unique()->values()->all());
+        $this->assertSame(['222'], $second->records()->pluck('ad_account_id')->unique()->values()->all());
+        $this->assertSame(209, $page->formMappings()->count());
+        $this->assertSame('existing-page-token', $page->getCredential('access_token'));
+        $this->assertSame(1, PortalAccount::count());
+        $this->assertSame(1, $first->pages()->count());
+        $this->assertNotNull($first->fresh()->last_synced_at);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'meta.ad_account.synced', 'subject_id' => $second->id]);
+    }
+
+    public function test_ad_account_management_hides_saved_tokens_and_disconnect_keeps_records(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        Role::firstOrCreate(['name' => 'Super Admin']);
+        $admin = User::factory()->create(); $admin->assignRole('Super Admin');
+        $page = PortalAccount::create(['name' => 'Existing', 'type' => 'meta']);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/campaigns')) return Http::response(['data' => []]);
+            if (str_contains($request->url(), '/me')) return Http::response(['id' => 'user-a', 'name' => 'Different Facebook User']);
+            return Http::response(['id' => 'act_111', 'account_id' => '111', 'business' => ['id' => '900', 'name' => 'Portfolio A']]);
+        });
+        $component = Livewire::actingAs($admin)->test(\App\Livewire\Settings\MetaAdAccounts::class, ['integrationId' => $page->id])
+            ->call('edit')->set('name', 'Account A')->set('adAccountId', 'act_111')->set('accessToken', 'secret-ad-token')->call('save')->assertHasNoErrors()
+            ->assertSet('accessToken', '')->assertDontSee('secret-ad-token')->assertSee('Different Facebook User');
+        $account = \App\Models\MetaAdAccount::firstOrFail();
+        $this->assertSame('connected', $account->status);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SyncMetaAdAccount::class, fn ($job) => $job->accountId === $account->id);
+        $component->call('edit', $account->id)->assertSet('accessToken', '');
+        $component->call('disconnect', $account->id);
+        $this->assertSame('disconnected', $account->fresh()->status);
+        $this->assertNull($account->fresh()->access_token);
+        $this->assertSame(1, PortalAccount::count());
+        foreach (['Client', 'Builder/Developer', 'Team Leader', 'Sales Executive'] as $role) {
+            Role::firstOrCreate(['name' => $role]);
+            $user = User::factory()->create(); $user->assignRole($role);
+            Livewire::actingAs($user)->test(\App\Livewire\Settings\MetaAdAccounts::class, ['integrationId' => $page->id])->assertForbidden();
+        }
+    }
+
+    public function test_meta_ad_rate_limits_are_isolated_logged_and_retried_without_exposing_tokens(): void
+    {
+        $page = PortalAccount::create(['name' => 'Existing', 'type' => 'meta']);
+        $account = \App\Models\MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'Limited', 'ad_account_id' => '111', 'access_token' => 'secret-ad-token', 'status' => 'connected']);
+        Http::fake(['*' => Http::response(['error' => ['code' => 4, 'message' => 'secret-ad-token']], 429, ['Retry-After' => '600'])]);
+        try { app(\App\Services\MetaAdAccountService::class)->sync($account); $this->fail('Expected retryable failure'); }
+        catch (\RuntimeException $e) { $this->assertStringNotContainsString('secret-ad-token', $e->getMessage()); }
+        $this->assertSame('rate_limited', $account->fresh()->status);
+        $this->assertTrue($account->fresh()->retry_after->isFuture());
+        $this->assertStringNotContainsString('secret-ad-token', \App\Models\AuditLog::where('subject_type', \App\Models\MetaAdAccount::class)->get()->toJson());
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->artisan('meta:sync-ad-accounts')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+        $this->travel(11)->minutes();
+        $this->artisan('meta:sync-ad-accounts')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SyncMetaAdAccount::class);
+    }
+
     public function test_scheduled_meta_sync_persists_all_discovered_forms_without_overwriting_routing(): void
     {
         $org = Organization::create(['name' => 'Catalogue client', 'status' => 'active']);
@@ -699,6 +859,7 @@ class MetaIntegrationTest extends TestCase
 
     public function test_forms_table_has_sr_no_pagination_and_export(): void
     {
+        $this->freezeTime();
         \Maatwebsite\Excel\Facades\Excel::fake();
 
         $admin = User::factory()->create();

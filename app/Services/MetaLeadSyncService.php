@@ -467,10 +467,20 @@ class MetaLeadSyncService
                 $leadIndex = 0;
                 foreach ($leadsData as $rawLead) {
                     $leadIndex++;
+                    $metaLeadLock = null;
                     try {
+                        if (!empty($rawLead['id'])) {
+                            $metaLeadLock = \Illuminate\Support\Facades\Cache::lock('meta-lead-import-'.$rawLead['id'], 60);
+                            $metaLeadLock->block(5);
+                        }
                         $rawLead['form_id'] = $currentFormId;
                         $rawLead['form_name'] = $formName;
                         $mapped = $metaMapper->map($rawLead);
+                        if (!empty($rawLead['id']) && LeadMetadata::where('key', 'meta_leadgen_id')->where('value', (string) $rawLead['id'])->exists()) {
+                            $formDuplicates++;
+                            $totalDuplicates++;
+                            continue;
+                        }
 
                         $mobile = $mapped['mobile'] ?: '';
                         $email = $mapped['email'] ?: '';
@@ -511,7 +521,10 @@ class MetaLeadSyncService
                         }
 
                         // Auto-create or map Campaign from Meta campaign_name
-                        $targetCampaignId = $overrideCampaignId;
+                        $remoteCampaign = app(MetaAdAccountService::class)->campaignRecord($account, $mapped);
+                        $scopedCampaign = !$overrideCampaignId && !$mapping?->campaign_id
+                            ? app(MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id) : null;
+                        $targetCampaignId = $overrideCampaignId ?: ($mapping?->campaign_id ?: $scopedCampaign?->id);
                         if (!$targetCampaignId && !empty($mapped['campaign'])) {
                             $campaign = Campaign::firstOrCreate(
                                 [
@@ -561,7 +574,7 @@ class MetaLeadSyncService
                         // Create Lead Master Record (project_id removed; inherited via campaign)
                         $lead = Lead::create([
                             'lead_code' => Lead::generateUniqueLeadCode(),
-                            'client_id' => $leadClientId,
+                            'client_id' => $mapping?->client_id ?: ($scopedCampaign?->project?->client_id ?: $leadClientId),
                             'campaign_id' => $targetCampaignId,
                             'lead_source_id' => $leadSource->id,
                             'name' => $mapped['name'] ?? 'Meta Lead',
@@ -595,6 +608,9 @@ class MetaLeadSyncService
                         }
                         if (!empty($mapped['campaign_id'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_id', 'value' => (string) $mapped['campaign_id']]);
+                        }
+                        if ($remoteCampaign) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_account_id', 'value' => $remoteCampaign->ad_account_id]);
                         }
                         if (!empty($mapped['ad_set'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
@@ -630,7 +646,7 @@ class MetaLeadSyncService
                     } catch (Throwable $e) {
                         $totalErrors++;
                         Log::error("[MetaLeadSyncService] [Step 7: Ingestion] Error creating lead for Form {$currentFormId} (Meta ID: " . ($rawLead['id'] ?? 'unknown') . "): " . $e->getMessage());
-                    }
+                    } finally { $metaLeadLock?->release(); }
                 }
 
                 Log::info("[MetaLeadSyncService] [Step 8: Summary] Finished Form #{$currentFormId} ('{$formName}'): {$formCreated} created, {$formDuplicates} duplicates, {$formFetched} fetched from Meta.");

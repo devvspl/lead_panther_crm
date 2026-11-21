@@ -116,8 +116,10 @@ class IntegrationsPageRedesignTest extends TestCase
             ->assertSet('accountName', 'Luxury Homes Meta Account')
             ->assertSet('metaPageId', '109283746501928')
             ->assertSet('metaAppId', '987654321098765')
-            ->assertSet('metaAppSecret', 'sec_meta_secret_123')
-            ->assertSet('metaAccessToken', 'token_page_access_999')
+            ->assertSet('metaAppSecret', '')
+            ->assertSet('metaAccessToken', '')
+            ->assertDontSee('sec_meta_secret_123')
+            ->assertDontSee('token_page_access_999')
             ->assertSet('metaVerifyToken', 'verify_token_custom_abc')
             ->assertSee('Luxury Homes Meta Account')
             ->assertSee('109283746501928');

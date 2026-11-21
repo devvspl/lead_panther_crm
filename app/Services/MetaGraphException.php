@@ -9,6 +9,6 @@ class MetaGraphException extends \RuntimeException
     {
         parent::__construct($expired ? 'Token expired or revoked. Reconnect this Ad Account.' : ($retryable
             ? 'Meta is temporarily unavailable or rate limited. Synchronization will retry.'
-            : 'Meta denied access. Check this token’s Ad Account and Page permissions.'));
+            : ($metaCode === 100 ? 'Meta rejected a field, object or parameter. Check the failed request stage.' : 'Meta denied this request. Check access for the failed stage.')));
     }
 }

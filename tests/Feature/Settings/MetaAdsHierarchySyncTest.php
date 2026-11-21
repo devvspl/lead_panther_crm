@@ -432,4 +432,55 @@ class MetaAdsHierarchySyncTest extends TestCase
             ->set('search', 'NonExistentXYZ')
             ->assertDontSee('1971751056790364');
     }
+    public function test_optional_metadata_denial_does_not_block_campaign_connection(): void
+    {
+        $page = PortalAccount::create(['name' => 'Page', 'type' => 'meta', 'status' => 'active']);
+        $account = MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'Ads', 'ad_account_id' => '123', 'access_token' => 'secret', 'status' => 'error']);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/campaigns')) return Http::response(['data' => []]);
+            if (($request['fields'] ?? '') === 'id,account_id,name,account_status') return Http::response(['account_id' => '123']);
+            return Http::response(['error' => ['code' => 200]], 403);
+        });
+        app(MetaAdAccountService::class)->test($account);
+        $this->assertSame('connected', $account->fresh()->status);
+        $this->assertNull($account->fresh()->last_error);
+    }
+
+    public function test_optional_ad_fields_fallback_and_insight_denial_preserve_core_import(): void
+    {
+        $page = PortalAccount::create(['name' => 'Page', 'type' => 'meta', 'status' => 'active']);
+        $account = MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'Ads', 'ad_account_id' => '123', 'access_token' => 'secret', 'status' => 'connected', 'last_error' => 'Old permission error']);
+        Http::fake(function ($request) use ($account) {
+            $this->assertNull($account->fresh()->last_error);
+            if (str_contains($request->url(), '/insights')) return Http::response(['error' => ['code' => 200]], 403);
+            if (str_contains($request->url(), '/ads?')) {
+                if (str_contains($request['fields'], 'asset_feed_spec')) return Http::response(['error' => ['code' => 100]], 400);
+                return Http::response(['data' => [['id' => 'ad1', 'account_id' => '123', 'name' => 'Ad', 'creative' => ['id' => 'creative1', 'object_story_spec' => ['link_data' => ['call_to_action' => ['value' => ['lead_gen_form_id' => 'form1']]]]]]]]);
+            }
+            return Http::response(['data' => []]);
+        });
+        app(MetaAdAccountService::class)->sync($account);
+        $account->refresh();
+        $this->assertSame('connected', $account->status);
+        $this->assertNull($account->sync_state);
+        $this->assertStringContainsString('Insights unavailable', $account->last_error);
+        $this->assertSame('form1', $account->records()->where('remote_id', 'ad1')->firstOrFail()->lead_form_id);
+    }
+
+    public function test_real_campaign_denial_reports_stage_without_syncing_label(): void
+    {
+        $page = PortalAccount::create(['name' => 'Page', 'type' => 'meta', 'status' => 'active']);
+        $account = MetaAdAccount::create(['portal_account_id' => $page->id, 'name' => 'Ads', 'ad_account_id' => '123', 'access_token' => 'secret', 'status' => 'connected', 'sync_state' => ['edge' => 0, 'after' => null, 'page_errors' => 0]]);
+        Http::fake(['*' => Http::response(['error' => ['code' => 200]], 403)]);
+        try {
+            app(MetaAdAccountService::class)->sync($account);
+            $this->fail('Access denial should fail the core synchronization.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Campaigns:', $e->getMessage());
+            $this->assertStringContainsString('Meta code 200', $e->getMessage());
+        }
+        $this->assertSame('error', $account->fresh()->status);
+        $this->assertSame('Error', $account->fresh()->sync_stage_label);
+        $this->assertStringNotContainsString('secret', $account->fresh()->last_error);
+    }
 }

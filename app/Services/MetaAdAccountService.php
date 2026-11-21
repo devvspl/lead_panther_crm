@@ -23,19 +23,32 @@ class MetaAdAccountService
 
     public function test(MetaAdAccount $account): void
     {
+        $stage = 'account_access';
         try {
             if (!$account->access_token) throw new \RuntimeException('Add an Ad Account access token to reconnect.');
             $token = $account->access_token;
             $root = $this->get('act_'.$account->ad_account_id, $token, [
-                'fields' => 'id,account_id,name,account_status,currency,timezone_name,business{id,name},amount_spent,balance,capabilities',
+                'fields' => 'id,account_id,name,account_status',
             ]);
             if ((string) ($root['account_id'] ?? '') !== $account->ad_account_id) throw new \RuntimeException('Meta returned a different Ad Account.');
+            $stage = 'campaign_access';
             $this->get('act_'.$account->ad_account_id.'/campaigns', $token, ['fields' => 'id', 'limit' => 1]);
-            $user = $this->get('me', $token, ['fields' => 'id,name']);
+            $user = [];
+            // Identity/business metadata are not prerequisites for read access to campaigns.
+            foreach (['connection_identity' => ['me', 'id,name'], 'business_metadata' => ['act_'.$account->ad_account_id, 'business{id,name}']] as $optionalStage => [$path, $fields]) {
+                try {
+                    $metadata = $this->get($path, $token, ['fields' => $fields]);
+                    if ($optionalStage === 'connection_identity') $user = $metadata;
+                    else $root = array_replace($root, $metadata);
+                } catch (MetaGraphException $e) {
+                    $this->audit($account, 'metadata_unavailable', ['stage' => $optionalStage, 'http_status' => $e->httpStatus, 'meta_code' => $e->metaCode]);
+                }
+            }
             $expiry = $account->token_expires_at;
             $appId = $account->integration->getCredential('app_id');
             $secret = $account->integration->getCredential('app_secret');
             if ($appId && $secret) {
+                $stage = 'token_validation';
                 $debug = $this->get('debug_token', $appId.'|'.$secret, ['input_token' => $token]);
                 if (!data_get($debug, 'data.is_valid') || data_get($debug, 'data.type') === 'PAGE') throw new MetaGraphException(false, true);
                 $scopes = data_get($debug, 'data.scopes', []);
@@ -49,20 +62,21 @@ class MetaAdAccountService
                 'business_id' => data_get($root, 'business.id') ?: $account->business_id,
                 'business_name' => data_get($root, 'business.name'),
                 'facebook_user_id' => $user['id'] ?? null,
-                'connection_name' => $user['name'] ?? $account->connection_name,
+                'connection_name' => $user['name'] ?? $account->connection_name ?? $account->name,
                 'token_expires_at' => $expiry,
                 'last_error' => null,
                 'retry_after' => null,
             ]);
             $this->audit($account, 'tested');
         } catch (\Throwable $e) {
-            $this->failure($account, $e);
+            $this->failure($account, $e, $stage);
             throw new \RuntimeException($account->fresh()->last_error);
         }
     }
 
     public function sync(MetaAdAccount $account): void
     {
+        $stage = 'synchronization';
         $lock = Cache::lock('meta-ad-account-'.$account->id, 75);
         if (!$lock->get()) return;
         try {
@@ -70,7 +84,7 @@ class MetaAdAccountService
             if (!in_array($account->status, ['connected', 'error', 'rate_limited']) || $account->retry_after?->isFuture()) return;
             if (!$account->access_token || $account->token_expires_at?->isPast()) throw new MetaGraphException(false, true);
             $token = $account->access_token;
-            $account->update(['status' => 'connected', 'retry_after' => null]);
+            $account->update(['status' => 'connected', 'retry_after' => null, 'last_error' => null]);
             $deadline = microtime(true) + 25;
             $state = $account->sync_state ?? ['edge' => 0, 'after' => null, 'page_errors' => 0];
             $this->audit($account, 'sync_started', ['resuming' => $account->sync_state !== null, 'edge' => $state['edge']]);
@@ -78,19 +92,42 @@ class MetaAdAccountService
             $edges = [
                 ['campaign', 'campaigns', 'id,account_id,name,status,effective_status,objective,buying_type,daily_budget,lifetime_budget,budget_remaining,start_time,stop_time,created_time,updated_time'],
                 ['adset', 'adsets', 'id,account_id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,start_time,end_time,targeting,created_time,updated_time'],
-                ['ad', 'ads', 'id,account_id,name,status,effective_status,campaign_id,adset_id,creative{id,name,title,body,image_url,thumbnail_url,object_story_spec,asset_feed_spec,lead_gen_form_id},preview_shareable_link,created_time,updated_time'],
+                ['ad', 'ads', 'id,account_id,name,status,effective_status,campaign_id,adset_id,creative{id,name,title,body,image_url,thumbnail_url,object_story_spec,asset_feed_spec},preview_shareable_link,created_time,updated_time'],
                 ['insight', 'insights', 'account_id,campaign_id,campaign_name,impressions,reach,clicks,inline_link_clicks,spend,cpm,cpc,ctr,frequency,actions,cost_per_action_type,date_start,date_stop'],
             ];
 
             while ($state['edge'] < count($edges)) {
                 if ($account->fresh()->status !== 'connected' || $account->fresh()->access_token !== $token) return;
                 [$kind, $edge, $fields] = $edges[$state['edge']];
+                $stage = $edge;
                 $params = ['fields' => $fields];
                 if ($state['after']) $params['after'] = $state['after'];
                 if ($kind === 'insight') {
                     $params += ['level' => 'campaign', 'date_preset' => 'last_30d', 'time_increment' => 1];
                 }
-                $result = $this->get('act_'.$account->ad_account_id.'/'.$edge, $token, $params + ['limit' => 100]);
+                try {
+                    $result = $this->get('act_'.$account->ad_account_id.'/'.$edge, $token, $params + ['limit' => 100]);
+                } catch (MetaGraphException $e) {
+                    if ($e->expired || $e->retryable || !in_array($e->metaCode, [10, 100, 200])) throw $e;
+                    if ($kind === 'insight') {
+                        $state['warnings']['insights'] = 'Insights unavailable; campaigns, ad sets and ads remain imported.';
+                        $this->audit($account, 'optional_stage_unavailable', ['stage' => $edge, 'http_status' => $e->httpStatus, 'meta_code' => $e->metaCode]);
+                        $state['edge']++; $state['after'] = null;
+                        $account->update(['sync_state' => $state]);
+                        continue;
+                    }
+                    // Optional expanded fields may be unsupported on old creatives/API versions.
+                    // Retry code100 with a supported core projection; a genuine access denial still fails.
+                    if ($e->metaCode !== 100) throw $e;
+                    $coreFields = match ($kind) {
+                        'campaign' => 'id,account_id,name,status,objective,created_time,updated_time',
+                        'adset' => 'id,account_id,name,status,campaign_id,created_time,updated_time',
+                        'ad' => 'id,account_id,name,status,campaign_id,adset_id,creative{id,object_story_spec},created_time,updated_time',
+                    };
+                    $result = $this->get('act_'.$account->ad_account_id.'/'.$edge, $token, array_replace($params, ['fields' => $coreFields, 'limit' => 100]));
+                    $state['warnings'][$edge] = 'Some optional '.$edge.' fields were unavailable; core records were synchronized.';
+                    $this->audit($account, 'fields_fallback', ['stage' => $edge, 'http_status' => $e->httpStatus, 'meta_code' => $e->metaCode]);
+                }
                 if ($account->fresh()->status !== 'connected' || $account->fresh()->access_token !== $token) return;
                 $new = $updated = 0;
                 foreach ($result['data'] ?? [] as $row) {
@@ -100,6 +137,10 @@ class MetaAdAccountService
                     }
                     
                     $id = $kind === 'insight' ? ($row['campaign_id'].'_'.$row['date_start']) : $row['id'];
+                    if (isset($state['warnings'][$edge]) && $kind !== 'insight') {
+                        $previous = $account->records()->where('kind', $kind)->where('remote_id', $id)->first();
+                        $row = array_replace_recursive($previous?->data ?? [], $row);
+                    }
                     $recordAttributes = [
                         'ad_account_id' => $account->ad_account_id,
                         'name' => $row['name'] ?? $row['campaign_name'] ?? null,
@@ -161,6 +202,7 @@ class MetaAdAccountService
                 if (microtime(true) >= $deadline) return;
             }
 
+            $stage = 'pages';
             if (!$this->syncPages($account, $state, $deadline)) return;
             if ($account->fresh()->status !== 'connected' || $account->fresh()->access_token !== $token) return;
             $pageErrors = $state['page_errors'];
@@ -169,15 +211,16 @@ class MetaAdAccountService
                 'status' => 'connected',
                 'retry_after' => null,
                 'sync_state' => null,
-                'last_error' => $pageErrors ? 'Ads synced. Some Pages need separate Page access; existing mappings were preserved.' : null,
+                'last_error' => implode(' ', array_merge(array_values($state['warnings'] ?? []), $pageErrors ? ['Ads synced. Some Pages need separate Page access; existing mappings were preserved.'] : [])) ?: null,
             ]);
             $this->audit($account, 'synced', [
                 'records' => $account->records()->count(),
                 'page_access_errors' => $pageErrors,
+                'warnings' => $state['warnings'] ?? [],
                 'counts' => $account->records()->selectRaw('kind, COUNT(*) as total')->groupBy('kind')->pluck('total', 'kind')->all(),
             ]);
         } catch (\Throwable $e) {
-            $this->failure($account, $e);
+            $this->failure($account, $e, $stage);
             throw new \RuntimeException($account->fresh()->last_error);
         } finally { $lock->release(); }
     }
@@ -355,11 +398,13 @@ class MetaAdAccountService
         return false;
     }
 
-    private function failure(MetaAdAccount $account, \Throwable $error): void
+    private function failure(MetaAdAccount $account, \Throwable $error, string $stage = 'synchronization'): void
     {
         $expired = $error instanceof MetaGraphException && $error->expired;
         $retryable = !($error instanceof MetaGraphException) || $error->retryable;
         $message = $error instanceof MetaGraphException ? $error->getMessage() : 'Synchronization could not finish. Test the connection and retry.';
+        $message = ucfirst(str_replace('_', ' ', $stage)).': '.$message;
+        if ($error instanceof MetaGraphException && $error->httpStatus) $message .= ' (HTTP '.$error->httpStatus.', Meta code '.($error->metaCode ?? 'unknown').').';
         $account->update([
             'status' => $expired ? 'expired' : ($retryable ? 'rate_limited' : 'error'),
             'last_error' => $message,
@@ -367,6 +412,7 @@ class MetaAdAccountService
         ]);
         $this->audit($account, 'sync_failed', [
             'message' => $message,
+            'stage' => $stage,
             'http_status' => $error instanceof MetaGraphException ? $error->httpStatus : null,
             'meta_code' => $error instanceof MetaGraphException ? $error->metaCode : null,
         ]);

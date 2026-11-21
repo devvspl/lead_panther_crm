@@ -104,7 +104,7 @@ class MetaAdAccounts extends Component
             app(MetaAdAccountService::class)->test($account);
             $this->message = 'Connection verified. Synchronization queued.';
             SyncMetaAdAccount::dispatch($account->id);
-        } catch (\RuntimeException $e) { $this->message = $e->getMessage(); }
+        } catch (\RuntimeException $e) { $this->message = 'Connection test failed. See the account status and Recent Sync & Connection History for the failed stage and error code.'; }
     }
 
     public function disconnect(int $id): void

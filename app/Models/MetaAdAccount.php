@@ -56,7 +56,7 @@ class MetaAdAccount extends Model
 
     public function getSyncStageLabelAttribute(): string
     {
-        if (!empty($this->sync_state)) {
+        if ($this->status === 'connected' && !empty($this->sync_state)) {
             $edge = (int) ($this->sync_state['edge'] ?? 0);
             if (isset($this->sync_state['pages'])) {
                 return 'Syncing Pages...';

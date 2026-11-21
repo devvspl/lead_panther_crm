@@ -51,7 +51,7 @@
                         </td>
                         <td class="p-3 text-ink">{{ $account->connection_name ?: 'Not tested' }}</td>
                         <td class="p-3">
-                            @if($account->sync_state)
+                            @if($account->status === 'connected' && $account->sync_state)
                                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
                                     <svg class="animate-spin w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                     <span>{{ $account->sync_stage_label }}</span>
@@ -69,7 +69,7 @@
                             @endif
                             <span class="block mt-1 text-[11px] text-muted">{{ $account->token_expires_at ? 'Expires '.$account->token_expires_at->format('d M Y H:i') : 'Expiry not supplied' }}</span>
                             @if($account->last_error)
-                                <span class="block mt-1 text-[11px] text-rose-600 max-w-xs break-words" title="{{ $account->last_error }}">{{ Str::limit($account->last_error, 80) }}</span>
+                                <span class="block mt-1 text-[11px] {{ $account->status === 'connected' ? 'text-warning' : 'text-danger' }} max-w-xs break-words" title="{{ $account->last_error }}">{{ Str::limit($account->last_error, 80) }}</span>
                             @endif
                         </td>
                         <td class="p-3 whitespace-nowrap text-muted">{{ $account->last_synced_at?->format('d M Y H:i') ?: 'Never' }}</td>
@@ -384,6 +384,7 @@
                             @if(isset($details['message']))
                                 <p class="text-ink">{{ $details['message'] }}</p>
                             @endif
+                            @if($details['stage'] ?? null)<p>Stage: {{ $details['stage'] }}</p>@endif
                             @if($details['http_status'] ?? null)
                                 <p class="text-muted text-[11px]">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>
                             @endif

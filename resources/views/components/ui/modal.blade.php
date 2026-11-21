@@ -17,11 +17,12 @@ $maxWidthClass = match ($maxWidth) {
 @endphp
 
 <div
-    x-data="{ show: @js($show), destroy() { window.LeadPantherUI.lock(this.$el,false); } }"
+    wire:ignore.self
+    x-data="{ show: @js($show), modalName: @js($name), matches(detail) { return (typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail[0] : detail?.name)) === this.modalName; }, destroy() { window.LeadPantherUI.lock(this.$el,false); } }"
     x-effect="window.LeadPantherUI.lock($el,show)"
     x-show="show"
-    x-on:open-modal.window="$event.detail === '{{ $name }}' ? show = true : null"
-    x-on:close-modal.window="$event.detail === '{{ $name }}' ? show = false : null"
+    x-on:open-modal.window="if (matches($event.detail)) show = true"
+    x-on:close-modal.window="if (matches($event.detail)) show = false"
     x-on:close.stop="show = false"
     x-on:keydown.escape.window="show = false"
     role="dialog" aria-modal="true" aria-label="{{ str_replace('-', ' ', $name) }}"

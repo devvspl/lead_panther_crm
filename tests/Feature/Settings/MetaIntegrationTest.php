@@ -146,7 +146,9 @@ class MetaIntegrationTest extends TestCase
             return Http::response(['id' => 'act_111', 'account_id' => '111', 'business' => ['id' => '900', 'name' => 'Portfolio A']]);
         });
         $component = Livewire::actingAs($admin)->test(\App\Livewire\Settings\MetaAdAccounts::class, ['integrationId' => $page->id])
-            ->call('edit')->set('name', 'Account A')->set('adAccountId', 'act_111')->set('accessToken', 'secret-ad-token')->call('save')->assertHasNoErrors()
+            ->call('edit')->assertDispatched('open-modal', fn ($event, $params) => $params === ['meta-ad-account-editor'])
+            ->set('name', 'Account A')->set('adAccountId', 'act_111')->set('accessToken', 'secret-ad-token')->call('save')->assertHasNoErrors()
+            ->assertDispatched('close-modal', fn ($event, $params) => $params === ['meta-ad-account-editor'])
             ->assertSet('accessToken', '')->assertDontSee('secret-ad-token')->assertSee('Different Facebook User');
         $account = \App\Models\MetaAdAccount::firstOrFail();
         $this->assertSame('connected', $account->status);

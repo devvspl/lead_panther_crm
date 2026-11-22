@@ -101,20 +101,9 @@
         @endphp
 
         @if($isBuilder)
-            <!-- 6 Compact Filters for Builder / Developer -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 items-start">
-                <!-- 1. Date Range -->
-                <div class="flex flex-col space-y-1 w-full">
-                    <label class="block text-[11px] font-semibold text-muted truncate">Date Range</label>
-                    <x-ui.date-range-picker 
-                        wire:model.live="analyticsRange" 
-                        wire:custom-from="analyticsCustomFrom"
-                        wire:custom-to="analyticsCustomTo" 
-                        class="w-full"
-                    />
-                </div>
-
-                <!-- 2. Project -->
+            <!-- 5 Compact Filters for Builder / Developer -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 items-start">
+                <!-- 1. Project -->
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Project</label>
                     <livewire:shared.searchable-select 

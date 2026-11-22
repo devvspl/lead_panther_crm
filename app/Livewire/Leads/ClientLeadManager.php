@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 
 /** The existing lead manager, pinned to the Client Details organization. */
 class ClientLeadManager extends LeadKanban
@@ -36,6 +37,26 @@ class ClientLeadManager extends LeadKanban
     }
 
     public function isClientContext(): bool { return true; }
+
+    public function openClientImport(): void
+    {
+        $this->showClientImport = true;
+    }
+
+    #[On('close-client-import')]
+    public function closeClientImport(): void
+    {
+        $this->showClientImport = false;
+        $this->refreshBoard();
+        $this->resetPage();
+    }
+
+    #[On('bulk-import-completed')]
+    public function handleBulkImportCompleted(): void
+    {
+        $this->refreshBoard();
+        $this->resetPage();
+    }
 
     public function pushSelectedToClient(): void
     {

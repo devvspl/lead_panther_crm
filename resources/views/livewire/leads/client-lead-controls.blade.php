@@ -7,8 +7,8 @@
         </div>
         <div class="flex items-center gap-2"><button type="button" wire:click="resetFilters"
                 class="px-3 h-8 rounded-lg border border-border text-xs font-semibold text-ink">Reset
-                Filters</button><button type="button" wire:click="$toggle('showClientImport')"
-                class="px-3 h-8 rounded-lg border border-border text-xs font-semibold text-ink">Import Excel /
+                Filters</button><button type="button" wire:click="openClientImport"
+                class="px-3 h-8 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas transition cursor-pointer">Import Excel /
                 CSV</button></div>
     </div>
     @error('selectedRows')
@@ -40,10 +40,35 @@
                 wire:model.live.debounce.300ms="search" placeholder="Lead ID, name, mobile, email or city"
                 class="w-full h-8 !bg-canvas !text-xs !shadow-none" /></div>
     </div>
-    @if($showClientImport)
-        <livewire:leads.bulk-lead-upload :organization-id="$this->clientOrganizationId"
-            :key="'client-lead-import-' . $this->clientOrganizationId" />
-    @endif
+    <x-modal name="client-lead-import-modal" wire:model.live="showClientImport" :show="$showClientImport" maxWidth="5xl">
+        <div class="p-5 sm:p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 01-2 2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Import Excel / CSV Leads</h3>
+                        <p class="text-xs text-muted">Upload multi-lead spreadsheets, map column headers, and import directly into this organization.</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeClientImport"
+                    class="text-muted hover:text-ink cursor-pointer p-1.5 rounded-lg hover:bg-canvas transition"
+                    aria-label="Close modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            @if($showClientImport)
+                <livewire:leads.bulk-lead-upload :organization-id="$this->clientOrganizationId"
+                    :key="'client-lead-import-' . $this->clientOrganizationId" />
+            @endif
+        </div>
+    </x-modal>
     @if(count($selectedRows))
         <div class="flex flex-wrap items-end gap-2 border-t border-border pt-3">
             <div class="min-w-48"><label class="block text-xs text-muted mb-1">Selected leads:

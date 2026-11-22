@@ -1,12 +1,14 @@
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h1 class="text-xl font-bold tracking-tight text-ink">Bulk Lead CSV / Excel Import</h1>
-            <p class="text-xs text-muted">Upload multi-lead spreadsheets, map column headers, and run through duplicate protection.</p>
-        </div>
+        @if(!$organizationId)
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-ink">Bulk Lead CSV / Excel Import</h1>
+                <p class="text-xs text-muted">Upload multi-lead spreadsheets, map column headers, and run through duplicate protection.</p>
+            </div>
+        @endif
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-3 {{ $organizationId ? 'w-full justify-between' : '' }}">
             <a 
                 href="{{ route('leads.download-template') }}" 
                 download="Lead_Import_Template.xlsx"
@@ -219,10 +221,24 @@
                 </div>
             @endif
 
-            <div class="flex justify-end pt-2">
-                <a href="{{ route('leads.kanban') }}" class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-black transition">
-                    View Leads
+            <div class="flex items-center justify-between pt-2 border-t border-border">
+                <a href="{{ route('leads.upload-history') }}" wire:navigate class="text-xs font-bold text-primary hover:underline">
+                    View Upload History &rarr;
                 </a>
+
+                <div class="flex items-center gap-2">
+                    @if($organizationId)
+                        <button type="button" 
+                            wire:click="finishAndClose" 
+                            class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-black transition cursor-pointer">
+                            Close &amp; View Leads
+                        </button>
+                    @else
+                        <a href="{{ route('leads.kanban') }}" class="px-4 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-black transition">
+                            View Leads
+                        </a>
+                    @endif
+                </div>
             </div>
         </div>
     @endif

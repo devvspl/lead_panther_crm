@@ -325,11 +325,18 @@ class BulkLeadUpload extends Component
 
             $this->step = 3;
             $this->dispatch('lead-updated');
+            $this->dispatch('bulk-import-completed', batchId: $this->completedBatch->id);
             $this->dispatch('toast', type: 'success', message: "Batch import completed! Imported {$importedCount} leads, skipped {$skippedCount} duplicates, {$failedCount} failed validation.");
             });
         } catch (Throwable $e) {
             $this->dispatch('toast', type: 'error', message: "Import execution error: {$e->getMessage()}");
         }
+    }
+
+    public function finishAndClose(): void
+    {
+        $this->dispatch('close-client-import');
+        $this->dispatch('lead-updated');
     }
 
     public function downloadErrorCsv(int $batchId): StreamedResponse

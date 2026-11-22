@@ -423,7 +423,6 @@
 
                 @if($isBuilder)
                     <div class="text-xs space-y-2">
-                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} @if(\App\Support\FinancialVisibility::allowed()) Budget: {{ $lead->actual_budget ? \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($lead->actual_budget) : '—' }} @endif</p>
                         @if($normalizedStage === 'follow_up')@foreach($leadFollowups as $followup)
                         <p>{{ $followup->due_at }} · {{ $followup->note }} · {{ $followup->status }}</p>@endforeach @endif
                         @if($normalizedStage === 'meeting_scheduled')

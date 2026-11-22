@@ -109,10 +109,15 @@ class MetaLeadMapper
                         continue;
                     }
 
-                    $allFieldAnswers[$rawKey] = $cleanVal;
-
                     // Normalize question key for pattern matching
                     $keyNormalized = strtolower(trim(str_replace(['?', ':', '-', '_'], ' ', $rawKey)));
+
+                    // Ignore internal meta parameters like inbox_url or facebook URLs
+                    if ($keyNormalized === 'inbox url' || str_contains($keyNormalized, 'inbox url') || str_contains($cleanVal, 'business.facebook.com')) {
+                        continue;
+                    }
+
+                    $allFieldAnswers[$rawKey] = $cleanVal;
 
                     // Match Full Name
                     if ($keyNormalized === 'full name' || $keyNormalized === 'name' || str_contains($keyNormalized, 'full name') || str_contains($keyNormalized, 'your name')) {

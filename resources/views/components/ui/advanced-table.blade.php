@@ -386,7 +386,7 @@
                                                     $badgeLabel = $col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val));
                                                 @endphp
                                                 <span
-                                                    class="px-2 py-0.5 rounded-pill text-[10px] font-bold inline-flex items-center gap-1 {{ $badgeClass }}">
+                                                    class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
                                             @elseif($type === 'avatar-stack')
@@ -919,7 +919,7 @@
                                                     $badgeClass = is_callable($badgeStyle) ? $badgeStyle($val, $row) : ($col['badgeMap'][$val] ?? 'bg-canvas text-ink border border-border');
                                                     $badgeLabel = $col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val));
                                                 @endphp
-                                                <span class="px-2 py-0.5 rounded-pill text-[10px] font-bold inline-block {{ $badgeClass }}">
+                                                <span class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
                                             @elseif($type === 'avatar-stack')

@@ -28,6 +28,6 @@ $colorClasses = match(true) {
 };
 @endphp
 
-<span {{ $attributes->merge(['class' => 'inline-flex items-center px-2.5 py-0.5 rounded-pill text-xs font-semibold ' . $colorClasses]) }}>
+<span {{ $attributes->merge(['class' => 'inline-flex items-center px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-semibold whitespace-nowrap ' . $colorClasses]) }}>
     {{ $slot->isEmpty() ? ucwords(str_replace('_', ' ', $status)) : $slot }}
 </span>

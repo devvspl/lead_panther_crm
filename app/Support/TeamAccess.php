@@ -3,6 +3,39 @@ namespace App\Support;
 use App\Models\{User, SalesTeam, SalesTeamMember, Organization};
 class TeamAccess {
     public static function isLeader(?User $user): bool { return $user && NavigationConfig::getRoleKey($user)==='team-leader'; }
+
+    public static function ensureLeaderTeams(int $organizationId): void
+    {
+        $leaderRoles = ['Team Leader', 'team-leader', 'team_leader', 'Team-Leader'];
+        $leaders = User::where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', $leaderRoles))
+            ->get();
+
+        foreach ($leaders as $leader) {
+            $team = SalesTeam::where(fn ($q) => $q
+                ->where(fn ($sub) => $sub->where('ownable_type', Organization::class)->where('ownable_id', $organizationId))
+                ->orWhere(fn ($sub) => $sub->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $organizationId)->select('id')))
+            )->where('leader_id', $leader->id)->first();
+
+            if (! $team) {
+                $team = SalesTeam::create([
+                    'ownable_type' => Organization::class,
+                    'ownable_id' => $organizationId,
+                    'leader_id' => $leader->id,
+                    'name' => $leader->name . "'s Team",
+                ]);
+            }
+
+            SalesTeamMember::firstOrCreate([
+                'sales_team_id' => $team->id,
+                'user_id' => $leader->id,
+            ], [
+                'role' => 'Team Leader',
+                'is_active' => true,
+            ]);
+        }
+    }
     public static function teams(User $user) {
         $q=SalesTeam::query();
         if (! $user->is_active || ! $user->organization_id || ! $user->can('view-team-leads')) return $q->whereRaw('1=0');

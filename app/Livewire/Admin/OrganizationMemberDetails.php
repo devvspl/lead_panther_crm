@@ -26,11 +26,11 @@ class OrganizationMemberDetails extends Component
     public function assignMemberToTeam(): void
     {
         $member = $this->member();
-        abort_unless($member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive']) && !$member->hasAnyRole(['Team Leader', 'Super Admin', 'super-admin', 'Builder/Developer', 'Builder']), 403);
+        abort_unless($member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive', 'sales_executive']) && !$member->hasAnyRole(['Team Leader', 'team-leader', 'team_leader', 'Team-Leader', 'Super Admin', 'super-admin', 'Builder/Developer', 'Builder', 'builder']), 403);
         $this->validate(['leadershipTeamId' => 'required|integer']);
         DB::transaction(function () use ($member) {
             $team = $this->teams()->with('leader')->lockForUpdate()->find($this->leadershipTeamId);
-            abort_unless($team && $team->leader && $team->leader->organization_id === $this->organizationId && $team->leader->status === 'active' && $team->leader->hasRole('Team Leader'), 404);
+            abort_unless($team && $team->leader && $team->leader->organization_id === $this->organizationId && $team->leader->status === 'active' && $team->leader->hasAnyRole(['Team Leader', 'team-leader', 'team_leader', 'Team-Leader']), 404);
             // This explicit administrator assignment confirms the active named leader.
             // Repair an imported/revoked duplicate pivot so all team panels agree.
             $leaderMembership = SalesTeamMember::updateOrCreate(['sales_team_id' => $team->id, 'user_id' => $team->leader_id], ['role' => 'Team Leader', 'is_active' => true]);
@@ -55,8 +55,8 @@ class OrganizationMemberDetails extends Component
     public function assignTeamLeader(): void
     {
         $member = $this->member();
-        abort_unless($member->status === 'active' && $member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive', 'Team Leader', 'team-leader'])
-            && !$member->hasAnyRole(['Super Admin', 'super-admin', 'Builder/Developer', 'Builder']), 403);
+        abort_unless($member->status === 'active' && $member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive', 'sales_executive', 'Team Leader', 'team-leader', 'team_leader', 'Team-Leader'])
+            && !$member->hasAnyRole(['Super Admin', 'super-admin', 'Builder/Developer', 'Builder', 'builder']), 403);
         $this->validate(['leadershipTeamId' => 'required|integer']);
         DB::transaction(function () use ($member) {
             $team = $this->teams()->lockForUpdate()->find($this->leadershipTeamId);
@@ -91,6 +91,7 @@ class OrganizationMemberDetails extends Component
     {
         $this->memberId = $memberId;
         $member = $this->member();
+        \App\Support\TeamAccess::ensureLeaderTeams($this->organizationId);
         $this->resetValidation();
         $this->reset('password', 'password_confirmation', 'editing', 'changingPassword');
         foreach (['name', 'email', 'phone', 'status'] as $field) $this->$field = (string) $member->$field;
@@ -148,7 +149,19 @@ class OrganizationMemberDetails extends Component
 
     public function render()
     {
-        return view('livewire.admin.organization-member-details', ['member' => $this->show ? $this->member() : null,
-            'teams' => $this->show ? $this->teams()->with('leader')->whereHas('leader', fn ($q) => $q->where('organization_id', $this->organizationId)->where('status', 'active')->role('Team Leader'))->get() : collect()]);
+        if ($this->show) {
+            \App\Support\TeamAccess::ensureLeaderTeams($this->organizationId);
+        }
+
+        $teams = $this->show ? $this->teams()->with('leader')
+            ->whereHas('leader', fn ($q) => $q->where('organization_id', $this->organizationId)
+                ->where('status', 'active')
+                ->whereHas('roles', fn ($r) => $r->whereIn('name', ['Team Leader', 'team-leader', 'team_leader', 'Team-Leader'])))
+            ->get() : collect();
+
+        return view('livewire.admin.organization-member-details', [
+            'member' => $this->show ? $this->member() : null,
+            'teams' => $teams,
+        ]);
     }
 }

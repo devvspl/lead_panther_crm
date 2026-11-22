@@ -464,6 +464,10 @@ class OrganizationDetail extends Component
             } else {
                 $user->assignRole($this->newUserRole);
             }
+
+            if (in_array(strtolower(str_replace([' ', '_'], '-', $this->newUserRole)), ['team-leader'])) {
+                \App\Support\TeamAccess::ensureLeaderTeams($this->organization->id);
+            }
         } catch (Throwable $e) {
             // Handled safely
         }
@@ -921,6 +925,7 @@ class OrganizationDetail extends Component
         $teamMembers = $usersQuery->orderBy('name')->get();
         $teamMembershipDetails = [];
         if ($this->activeTab === 'team') {
+            \App\Support\TeamAccess::ensureLeaderTeams($orgId);
             $teams = \App\Models\SalesTeam::where(fn ($q) => $q
                 ->where(fn ($q) => $q->where('ownable_type', Organization::class)->where('ownable_id', $orgId))
                 ->orWhere(fn ($q) => $q->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $orgId)->select('id'))))

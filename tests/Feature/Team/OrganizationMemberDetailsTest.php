@@ -79,4 +79,68 @@ class OrganizationMemberDetailsTest extends TestCase
         $component->call('open', $other->id)->assertNotFound();
         Livewire::actingAs($member)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])->assertForbidden();
     }
+
+    public function test_team_leader_without_preexisting_sales_team_automatically_appears_in_dropdown_and_can_be_assigned(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'H&S Investors', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        // Create Team Leader WITHOUT creating a SalesTeam
+        $leader = User::factory()->create([
+            'name' => 'H&S Team Leader',
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
+        $leader->assignRole('Team Leader');
+
+        // Create Executive
+        $executive = User::factory()->create([
+            'name' => 'H&S Executive 01',
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
+        $executive->assignRole('Executive');
+
+        // Ensure initially no sales teams exist
+        $this->assertSame(0, \App\Models\SalesTeam::where('ownable_id', $org->id)->count());
+
+        // Open modal for Executive - Leader must appear in the options!
+        $component = Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $executive->id)
+            ->assertSee('H&S Team Leader')
+            ->assertDontSee('Add an active Team Leader to this organization first.');
+
+        $team = \App\Models\SalesTeam::where('ownable_id', $org->id)->where('leader_id', $leader->id)->firstOrFail();
+        $this->assertSame($leader->id, $team->leader_id);
+
+        // Assign executive to the team leader
+        $component->set('leadershipTeamId', $team->id)
+            ->call('assignMemberToTeam')
+            ->assertHasNoErrors();
+
+        // Check memberships
+        $this->assertDatabaseHas('sales_team_members', [
+            'sales_team_id' => $team->id,
+            'user_id' => $executive->id,
+            'role' => 'Executive',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('sales_team_members', [
+            'sales_team_id' => $team->id,
+            'user_id' => $leader->id,
+            'role' => 'Team Leader',
+            'is_active' => true,
+        ]);
+
+        // Verify leader access
+        $this->assertTrue(\App\Support\TeamAccess::executives($leader->fresh())->whereKey($executive->id)->exists());
+
+        // Verify organization detail team tab shows the leader and team
+        Livewire::actingAs($admin)->test(\App\Livewire\Admin\OrganizationDetail::class, ['organization' => $org])
+            ->set('activeTab', 'team')
+            ->assertSee('H&S Team Leader')
+            ->assertSee('H&S Executive 01');
+    }
 }

@@ -30,13 +30,13 @@
                         @endforeach
                     </dl>
                 @endif
-                @if($member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive']) && !$member->hasAnyRole(['Team Leader', 'Super Admin', 'super-admin', 'Builder/Developer', 'Builder']))
+                @if($member->hasAnyRole(['Executive', 'Sales Executive', 'sales-executive', 'sales_executive']) && !$member->hasAnyRole(['Team Leader', 'team-leader', 'team_leader', 'Team-Leader', 'Super Admin', 'super-admin', 'Builder/Developer', 'Builder', 'builder']))
                     <form wire:submit="assignMemberToTeam" class="border-t border-border pt-4 space-y-3">
                         <h3 class="text-sm font-semibold text-ink">Team Leader</h3>
                         <label class="block text-xs text-muted">Select the Team Leader responsible for this executive.</label>
-                        <livewire:shared.searchable-select wire:model.live="leadershipTeamId" :value="$leadershipTeamId" :options="$teams->mapWithKeys(fn ($team) => [$team->id => $team->leader->name])->all()" placeholder="Choose Team Leader" class="block w-full" :key="'member-leader-team-'.$memberId" />
+                        <livewire:shared.searchable-select wire:model.live="leadershipTeamId" :value="$leadershipTeamId" :options="$teams->mapWithKeys(fn ($team) => [$team->id => $team->leader->name])->all()" placeholder="Choose Team Leader" class="block w-full" :key="'member-leader-team-'.$memberId.'-'.count($teams).'-'.($leadershipTeamId ?? 0)" />
                         <x-input-error :messages="$errors->get('leadershipTeamId')" />
-                        @if($teams->isEmpty())<p class="text-xs text-muted">Assign an active Team Leader to a client team first.</p>@endif
+                        @if($teams->isEmpty())<p class="text-xs text-muted">Add an active Team Leader to this organization first.</p>@endif
                         <button type="submit" wire:loading.attr="disabled" @disabled($teams->isEmpty() || $member->status !== 'active') class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs disabled:opacity-50">Save Team Leader</button>
                     </form>
                 @endif

@@ -183,4 +183,38 @@ class MetaSubmissionParserTest extends TestCase
         $this->assertEquals('Team Size Preference', $result['questions'][2]['question']);
         $this->assertEquals('5-10 Members, Flexible', $result['questions'][2]['answer']);
     }
+
+    public function test_parses_single_line_bulleted_requirement_without_newlines(): void
+    {
+        $rawSingleLine = "Meta Lead Submission: • Would You Like To Schedule A Site Visit To Dholera: Yes, I Want A Site Visit • When Are You Planning To Purchase: Immediately (0-30 Days) • Suitable Time For Call ☎: 12 Noon To 4 PM • Which Type Of Plot Are You Interested In At Dholera: 488 Sq. Yard Commercial Plot ₹moneyplant: 155-600 Sq. Yard × ₹11, 500 = ₹17.83 लाख से ₹69 लाख कुल निवेश l/sq. Yard Total Investment: ₹19.5 Lakh Approx. • Meta Context: Campaign: SIR Inside Plots 1- Palacio | AdSet: SIR Inside Plots | Ad: SIR Inside Plots | Form: #3198112120381812";
+
+        $lead = Lead::factory()->create([
+            'lead_source_id' => $this->source->id,
+            'requirement' => $rawSingleLine,
+        ]);
+
+        $result = MetaSubmissionParser::parse($lead);
+
+        $this->assertTrue($result['is_meta']);
+        $this->assertTrue($result['has_submission_data']);
+        $this->assertCount(4, $result['questions']);
+
+        $this->assertEquals('Would You Like To Schedule A Site Visit To Dholera', $result['questions'][0]['question']);
+        $this->assertEquals('Yes, I Want A Site Visit', $result['questions'][0]['answer']);
+
+        $this->assertEquals('When Are You Planning To Purchase', $result['questions'][1]['question']);
+        $this->assertEquals('Immediately (0-30 Days)', $result['questions'][1]['answer']);
+
+        $this->assertEquals('Suitable Time For Call ☎', $result['questions'][2]['question']);
+        $this->assertEquals('12 Noon To 4 PM', $result['questions'][2]['answer']);
+
+        $this->assertEquals('Which Type Of Plot Are You Interested In At Dholera', $result['questions'][3]['question']);
+        $this->assertStringContainsString('₹17.83 लाख से ₹69 लाख कुल निवेश', $result['questions'][3]['answer']);
+
+        $this->assertEquals('SIR Inside Plots 1- Palacio', $result['context']['campaign']);
+        $this->assertEquals('SIR Inside Plots', $result['context']['adset']);
+        $this->assertEquals('SIR Inside Plots', $result['context']['ad']);
+        $this->assertEquals('#3198112120381812', $result['context']['form']);
+        $this->assertEquals('3198112120381812', $result['context']['form_id']);
+    }
 }

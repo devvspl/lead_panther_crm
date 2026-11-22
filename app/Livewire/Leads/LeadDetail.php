@@ -112,6 +112,12 @@ class LeadDetail extends Component
 
     public string $replacementRemarks = '';
 
+    #[On('lead-display-config-updated')]
+    public function refreshDisplayPreferences(): void
+    {
+        // Re-renders the lead details drawer with the updated organization display preferences
+    }
+
     #[On('open-lead-detail')]
     public function openLead(int $id): void
     {

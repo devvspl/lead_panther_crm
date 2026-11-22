@@ -1488,4 +1488,7 @@
             </form>
         </div>
     </x-modal>
+
+    <!-- Lead Details Display Configuration Modal -->
+    <livewire:leads.lead-display-config-modal />
 </div>

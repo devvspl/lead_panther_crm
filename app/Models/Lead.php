@@ -414,6 +414,16 @@ class Lead extends Model
     public function getClientResponseStartAttribute() { return $this->delivered_at ? ($this->internalProcessing?->forwarded_at ?? $this->created_at) : $this->created_at; }
     public static function clientSlaStartExpression(): string { return '(CASE WHEN leads.internal_processing_pending = 1 THEN NULL ELSE COALESCE((SELECT forwarded_at FROM internal_lead_processing WHERE internal_lead_processing.lead_id = leads.id), leads.created_at) END)'; }
 
+    public function getOrganizationAttribute(): ?Organization
+    {
+        return $this->client?->organization ?: $this->assignedTo?->organization;
+    }
+
+    public function getEffectiveDisplayConfigAttribute(): array
+    {
+        return $this->organization?->getLeadDisplayConfig() ?? Organization::defaultLeadDisplayConfig();
+    }
+
     public function getOrganizationNameAttribute(): string
     {
         return $this->client?->organization?->name ?: ($this->assignedTo?->organization?->name ?: '-');

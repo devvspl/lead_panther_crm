@@ -136,4 +136,33 @@ class LeadDetailMetaSubmissionTest extends TestCase
             ->assertSee('Customer Requirement / Inquiry:')
             ->assertSee('Client is interested in ready-to-move commercial office spaces.');
     }
+
+    public function test_renders_single_line_bulleted_meta_requirement_without_raw_concatenated_block(): void
+    {
+        $rawSingleLine = "Meta Lead Submission: • Would You Like To Schedule A Site Visit To Dholera: Yes, I Want A Site Visit • When Are You Planning To Purchase: Immediately (0-30 Days) • Suitable Time For Call ☎: 12 Noon To 4 PM • Which Type Of Plot Are You Interested In At Dholera: 488 Sq. Yard Commercial Plot ₹moneyplant: 155-600 Sq. Yard × ₹11, 500 = ₹17.83 लाख से ₹69 लाख कुल निवेश l/sq. Yard Total Investment: ₹19.5 Lakh Approx. • Meta Context: Campaign: SIR Inside Plots 1- Palacio | AdSet: SIR Inside Plots | Ad: SIR Inside Plots | Form: #3198112120381812";
+
+        $lead = Lead::factory()->create([
+            'lead_source_id' => $this->metaSource->id,
+            'name' => 'Harsh Kant Saxena',
+            'mobile' => '918003476637',
+            'requirement' => $rawSingleLine,
+        ]);
+
+        Livewire::test(LeadDetail::class)
+            ->set('isOpen', true)
+            ->set('leadId', $lead->id)
+            ->assertSee('Meta Lead Submission')
+            ->assertSee('Would You Like To Schedule A Site Visit To Dholera')
+            ->assertSee('Yes, I Want A Site Visit')
+            ->assertSee('When Are You Planning To Purchase')
+            ->assertSee('Immediately (0-30 Days)')
+            ->assertSee('Suitable Time For Call ☎')
+            ->assertSee('12 Noon To 4 PM')
+            ->assertSee('Which Type Of Plot Are You Interested In At Dholera')
+            ->assertSee('Meta Context Attribution')
+            ->assertSee('SIR Inside Plots 1- Palacio')
+            ->assertSee('#3198112120381812')
+            // Should NOT display raw unparsed requirement block under generic Customer Requirement
+            ->assertDontSee('Customer Requirement / Inquiry:');
+    }
 }

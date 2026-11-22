@@ -28,13 +28,42 @@
                         </span>
                     @endif
                 </div>
+                @php
+                    $displayConfig = $lead->effective_display_config ?? \App\Models\Organization::defaultLeadDisplayConfig();
+                    $subtitleParts = [];
+                    if ($displayConfig['project'] ?? true) {
+                        $subtitleParts[] = $lead->project?->name ?: 'Direct';
+                    }
+                    if ($displayConfig['city'] ?? true) {
+                        $subtitleParts[] = $lead->city ?: 'N/A';
+                    }
+                    if (($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed()) {
+                        $subtitleParts[] = '₹' . number_format($lead->budget / 100000, 1) . 'L';
+                    }
+                @endphp
                 <h2 class="text-lg font-bold text-ink mt-1 truncate">{{ $lead->name }}</h2>
+                @if(!empty($subtitleParts))
                 <p class="text-xs text-muted truncate">
-                    {{ $lead->project?->name ?: 'Direct' }} &bull; {{ $lead->city ?: 'N/A' }} &bull;
-                    @if(\App\Support\FinancialVisibility::allowed())₹{{ number_format($lead->budget / 100000, 1) }}L @endif
+                    {{ implode(' • ', $subtitleParts) }}
                 </p>
+                @endif
             </div>
             <div class="flex items-center gap-2 shrink-0">
+                @php
+                    $canConfigDrawer = auth()->user() && (auth()->user()->hasAnyRole(['Super Admin', 'super-admin', 'Client', 'client', 'Builder', 'builder', 'Builder/Developer']) || auth()->user()->organization_id);
+                @endphp
+                @if($canConfigDrawer)
+                    <button type="button"
+                        @click.stop="$dispatch('open-display-config', { leadId: {{ $lead->id }} })"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-canvas hover:bg-neutral-200/60 border border-border text-ink hover:text-primary transition shadow-2xs cursor-pointer"
+                        title="Configure Organization Lead Details Display">
+                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="hidden md:inline">Configure Display</span>
+                    </button>
+                @endif
                 <x-ui.lead-archive-menu :id="$lead->id" />
                 @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                 <button type="button" wire:click="showFullJourney"
@@ -108,10 +137,14 @@
             <!-- ========================================================= -->
             <!-- SECTION 1 & 2: CUSTOMER & PROJECT INFORMATION             -->
             <!-- ========================================================= -->
+            @php
+                $displayConfig = $lead->effective_display_config ?? \App\Models\Organization::defaultLeadDisplayConfig();
+            @endphp
             <div class="p-4 bg-canvas rounded-xl border border-border space-y-3">
                 <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">1 &bull; Customer &amp;
                     Project Info</span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    @if($displayConfig['phone'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Phone / Mobile</span>
                         <div class="flex items-center gap-1.5 mt-0.5">
@@ -132,26 +165,35 @@
                             </a>
                         </div>
                     </div>
+                    @endif
+                    @if($displayConfig['email'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Email Address</span>
                         <span class="font-semibold text-ink truncate block mt-0.5">{{ $lead->email ?: 'N/A' }}</span>
                     </div>
+                    @endif
+                    @if($displayConfig['city'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">City / Location</span>
                         <span class="font-semibold text-ink block mt-0.5">{{ $lead->city ?: 'N/A' }}
                             {{ $lead->location ? '(' . $lead->location . ')' : '' }}</span>
                     </div>
+                    @endif
+                    @if($displayConfig['project'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Project</span>
                         <span
                             class="font-bold text-ink block mt-0.5">{{ $lead->project?->name ?: 'Direct Inbound' }}</span>
                     </div>
+                    @endif
+                    @if($displayConfig['property_type'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Property Type</span>
                         <span
                             class="font-semibold text-ink block mt-0.5">{{ $lead->property_type ?: 'Residential' }}</span>
                     </div>
-                    @if(\App\Support\FinancialVisibility::allowed())
+                    @endif
+                    @if(($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed())
                     <div>
                         <span class="text-[10px] text-muted block">Budget</span>
                         <span class="font-bold text-ink block mt-0.5">₹{{ number_format($lead->budget / 100000, 1) }}
@@ -164,7 +206,7 @@
                     $metaSubmission = \App\Support\MetaSubmissionParser::parse($lead);
                 @endphp
 
-                @if($metaSubmission['is_meta'] && ($metaSubmission['has_submission_data'] || !empty($metaSubmission['questions'])))
+                @if(($displayConfig['meta_submission'] ?? true) && $metaSubmission['is_meta'] && ($metaSubmission['has_submission_data'] || !empty($metaSubmission['questions'])))
                     <div class="pt-3 border-t border-border space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
@@ -193,6 +235,7 @@
                         </div>
 
                         <!-- Meta Context Section -->
+                        @if($displayConfig['meta_context'] ?? true)
                         <div class="p-3 bg-blue-50/60 rounded-lg border border-blue-200/70 text-[11px] space-y-2">
                             <span class="font-bold text-blue-900 block text-[10px] uppercase tracking-wider">
                                 Meta Context Attribution
@@ -224,8 +267,14 @@
                                 </div>
                             </div>
                         </div>
+                        @endif
                     </div>
-                @elseif($lead->requirement)
+                @endif
+
+                @php
+                    $isPureMetaRequirement = str_starts_with(trim($lead->requirement ?? ''), 'Meta Lead Submission:') || str_contains($lead->requirement ?? '', 'Meta Context:');
+                @endphp
+                @if(($displayConfig['requirement'] ?? true) && $lead->requirement && (! $metaSubmission['is_meta'] || ! $isPureMetaRequirement))
                     <div class="pt-2 border-t border-border">
                         <span class="text-[10px] font-bold text-muted uppercase block">Customer Requirement / Inquiry:</span>
                         <p class="text-xs text-ink mt-0.5 leading-relaxed bg-surface p-2.5 rounded-lg border border-border break-words whitespace-pre-line">

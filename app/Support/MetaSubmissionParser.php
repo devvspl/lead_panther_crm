@@ -136,15 +136,21 @@ class MetaSubmissionParser
         // 3. Fallback approach: parse from requirement text if questions still empty
         if (empty($questions) && (str_contains($req, 'Meta Lead Submission:') || str_contains($req, 'Meta Context:'))) {
             $normalizedReq = str_replace(["\r\n", "\r"], "\n", $req);
+            // Bullet characters (•, â€¢, Ã¢â‚¬Â¢) separate items even if all on a single line without newlines
+            $normalizedReq = preg_replace('/(?:\s*(?:Ã¢â‚¬Â¢|â€¢|•)\s*|\n+)/u', "\n", $normalizedReq);
             $lines = explode("\n", $normalizedReq);
 
             foreach ($lines as $line) {
                 $cleanLine = trim($line);
+                // Strip leading "Meta Lead Submission:" prefix if present
+                if (str_starts_with($cleanLine, 'Meta Lead Submission:')) {
+                    $cleanLine = trim(substr($cleanLine, strlen('Meta Lead Submission:')));
+                }
                 // Strip leading bullet characters (handling double-encoded Ã¢â‚¬Â¢, â€¢, standard •, -, *)
                 $cleanLine = preg_replace('/^(?:Ã¢â‚¬Â¢|â€¢|[-*•]|\s)+/u', '', $cleanLine);
                 $cleanLine = trim((string) $cleanLine);
 
-                if (empty($cleanLine) || str_starts_with($cleanLine, 'Meta Lead Submission:')) {
+                if (empty($cleanLine)) {
                     continue;
                 }
 
@@ -170,8 +176,9 @@ class MetaSubmissionParser
 
         // Also check if requirement contains Meta Context line to enrich missing context fields
         if (str_contains($req, 'Meta Context:')) {
-            $contextLine = '';
-            foreach (explode("\n", str_replace(["\r\n", "\r"], "\n", $req)) as $l) {
+            $normalizedReq = str_replace(["\r\n", "\r"], "\n", $req);
+            $normalizedReq = preg_replace('/(?:\s*(?:Ã¢â‚¬Â¢|â€¢|•)\s*|\n+)/u', "\n", $normalizedReq);
+            foreach (explode("\n", $normalizedReq) as $l) {
                 $trimmed = trim($l);
                 $cleanL = preg_replace('/^(?:Ã¢â‚¬Â¢|â€¢|[-*•]|\s)+/u', '', $trimmed);
                 if (str_starts_with($cleanL, 'Meta Context:')) {
@@ -290,8 +297,13 @@ class MetaSubmissionParser
                     $context['adset'] = $v;
                 } elseif (($k === 'ad' || $k === 'creative') && (empty($context['ad']) || $context['ad'] === 'N/A')) {
                     $context['ad'] = $v;
-                } elseif ($k === 'form' && (empty($context['form']) || $context['form'] === 'N/A')) {
-                    $context['form'] = $v;
+                } elseif ($k === 'form') {
+                    if (empty($context['form']) || $context['form'] === 'N/A') {
+                        $context['form'] = $v;
+                    }
+                    if (str_starts_with($v, '#') && (empty($context['form_id']) || $context['form_id'] === 'N/A')) {
+                        $context['form_id'] = ltrim($v, '#');
+                    }
                 }
             }
         }

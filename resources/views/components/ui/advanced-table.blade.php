@@ -447,14 +447,60 @@
                                                     title="{{ $val ? \Carbon\Carbon::parse($val)->toDayDateTimeString() : '' }}">
                                                     {{ $val ? \Carbon\Carbon::parse($val)->format($col['format'] ?? 'M d, Y H:i') : '—' }}
                                                 </span>
+                                            @elseif($type === 'phone' || ($col['key'] ?? '') === 'mobile')
+                                                @php
+                                                    $rawPhone = $val ?? (is_object($row) ? ($row->mobile ?? '') : ($row['mobile'] ?? ''));
+                                                    $digitsOnly = preg_replace('/[^0-9]/', '', (string)$rawPhone);
+                                                    $waNumber = $digitsOnly;
+                                                    if (strlen($waNumber) === 10) {
+                                                        $waNumber = '91' . $waNumber;
+                                                    }
+                                                    $isValidPhone = !empty($rawPhone) && $rawPhone !== '—' && strlen($digitsOnly) >= 5;
+                                                @endphp
+                                                @if($isValidPhone)
+                                                    <div class="flex items-center gap-1.5 whitespace-nowrap">
+                                                        <a href="tel:{{ $rawPhone }}"
+                                                           class="font-mono text-xs font-semibold text-ink hover:text-primary transition-colors cursor-pointer"
+                                                           title="Call {{ $rawPhone }}"
+                                                           @click.stop>
+                                                            {{ $val ?: $rawPhone }}
+                                                        </a>
+                                                        <a href="https://wa.me/{{ $waNumber }}"
+                                                           target="_blank"
+                                                           rel="noopener noreferrer"
+                                                           class="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition cursor-pointer shrink-0 inline-flex items-center"
+                                                           title="Chat on WhatsApp"
+                                                           @click.stop>
+                                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                                                            </svg>
+                                                        </a>
+                                                    </div>
+                                                @else
+                                                    <span class="text-muted font-mono text-xs">—</span>
+                                                @endif
                                             @elseif($type === 'lead_actions')
                                                 @php
                                                     $actionLeadId = is_object($row) ? $row->id : $row['id'];
                                                     $actionUser = auth()->user();
                                                     $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                                 @endphp
-                                                <div class="flex items-center justify-end gap-1">
-                                                    <x-ui.lead-archive-menu :id="$actionLeadId" />
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    @php
+                                                        $canConfigDisplay = $actionUser && ($actionUser->hasAnyRole(['Super Admin', 'super-admin', 'Client', 'client', 'Builder', 'builder', 'Builder/Developer']) || $actionUser->organization_id);
+                                                    @endphp
+                                                    @if($canConfigDisplay)
+                                                        <button type="button"
+                                                            @click.stop="$dispatch('open-display-config', { leadId: {{ $actionLeadId }} })"
+                                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-canvas hover:bg-neutral-200/60 border border-border text-ink hover:text-primary transition shadow-2xs cursor-pointer whitespace-nowrap"
+                                                            title="Configure Lead Details Display">
+                                                            <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            </svg>
+                                                            <span>Configure Display</span>
+                                                        </button>
+                                                    @endif
                                                     <button type="button"
                                                         @click="$dispatch('open-lead-detail', { id: {{ $actionLeadId }} })"
                                                         class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
@@ -950,14 +996,60 @@
                                             @elseif($type === 'date')
                                                 <span
                                                     class="font-mono text-muted text-[11px]">{{ $val ? \Carbon\Carbon::parse($val)->format('M d, Y') : '—' }}</span>
+                                            @elseif($type === 'phone' || ($col['key'] ?? '') === 'mobile')
+                                                @php
+                                                    $rawPhone = $val ?? (is_object($row) ? ($row->mobile ?? '') : ($row['mobile'] ?? ''));
+                                                    $digitsOnly = preg_replace('/[^0-9]/', '', (string)$rawPhone);
+                                                    $waNumber = $digitsOnly;
+                                                    if (strlen($waNumber) === 10) {
+                                                        $waNumber = '91' . $waNumber;
+                                                    }
+                                                    $isValidPhone = !empty($rawPhone) && $rawPhone !== '—' && strlen($digitsOnly) >= 5;
+                                                @endphp
+                                                @if($isValidPhone)
+                                                    <div class="flex items-center gap-1.5 whitespace-nowrap">
+                                                        <a href="tel:{{ $rawPhone }}"
+                                                           class="font-mono text-xs font-semibold text-ink hover:text-primary transition-colors cursor-pointer"
+                                                           title="Call {{ $rawPhone }}"
+                                                           @click.stop>
+                                                            {{ $val ?: $rawPhone }}
+                                                        </a>
+                                                        <a href="https://wa.me/{{ $waNumber }}"
+                                                           target="_blank"
+                                                           rel="noopener noreferrer"
+                                                           class="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition cursor-pointer shrink-0 inline-flex items-center"
+                                                           title="Chat on WhatsApp"
+                                                           @click.stop>
+                                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                                                            </svg>
+                                                        </a>
+                                                    </div>
+                                                @else
+                                                    <span class="text-muted font-mono text-xs">—</span>
+                                                @endif
                                             @elseif($type === 'lead_actions')
                                                 @php
                                                     $actionLeadIdMob = is_object($row) ? $row->id : $row['id'];
                                                     $actionUserMob = auth()->user();
                                                     $isSalesUserMob = $actionUserMob && (\App\Support\NavigationConfig::getRoleKey($actionUserMob) === 'sales-executive' || $actionUserMob->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                                 @endphp
-                                                <div class="flex items-center justify-end gap-1">
-                                                    <x-ui.lead-archive-menu :id="$actionLeadIdMob" />
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    @php
+                                                        $canConfigDisplayMob = $actionUserMob && ($actionUserMob->hasAnyRole(['Super Admin', 'super-admin', 'Client', 'client', 'Builder', 'builder', 'Builder/Developer']) || $actionUserMob->organization_id);
+                                                    @endphp
+                                                    @if($canConfigDisplayMob)
+                                                        <button type="button"
+                                                            @click.stop="$dispatch('open-display-config', { leadId: {{ $actionLeadIdMob }} })"
+                                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-canvas hover:bg-neutral-200/60 border border-border text-ink hover:text-primary transition shadow-2xs cursor-pointer whitespace-nowrap"
+                                                            title="Configure Lead Details Display">
+                                                            <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            </svg>
+                                                            <span>Configure Display</span>
+                                                        </button>
+                                                    @endif
                                                     <button type="button"
                                                         @click="$dispatch('open-lead-detail', { id: {{ $actionLeadIdMob }} })"
                                                         class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"

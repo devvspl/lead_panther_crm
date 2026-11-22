@@ -2031,14 +2031,14 @@ class LeadKanban extends Component
     protected function clientTableColumns(): array
     {
         if ($this->isSalesExecutive) {
-            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : ($key === 'lead_code' ? 'lead_id' : 'text'), 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
+            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : ($key === 'lead_code' ? 'lead_id' : ($key === 'mobile' ? 'phone' : 'text')), 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
         }
 
         if ($this->isSalesExecutive) {
             return [
                 ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
                 ['key' => 'current_stage', 'label' => 'Current Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                     'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -2075,7 +2075,7 @@ class LeadKanban extends Component
             return [
                 ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+                ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
                 ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Lead Source', 'type' => 'text', 'priority' => 2]] : []),
                 ['key' => 'created_at', 'label' => 'Received Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
@@ -2114,7 +2114,7 @@ class LeadKanban extends Component
         return [
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
+            ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
             ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
             ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2]] : []),
             ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted text-xs'],

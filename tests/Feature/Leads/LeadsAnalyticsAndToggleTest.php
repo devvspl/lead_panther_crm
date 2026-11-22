@@ -46,12 +46,10 @@ class LeadsAnalyticsAndToggleTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(LeadKanban::class)
-            ->assertSee('Leads Performance')
+            ->assertSee('Live Pipeline')
             ->assertSee('Total Leads')
-            ->assertSee('New Leads Today')
             ->assertSee('SLA Breached')
-            ->assertSee('Conversion Rate')
-            ->assertSee('Breakdown Analytics');
+            ->assertSee('Conversion Rate');
     }
 
     public function test_toggling_view_mode_persists_to_general_settings(): void

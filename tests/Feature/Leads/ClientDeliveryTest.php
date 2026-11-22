@@ -47,6 +47,7 @@ class ClientDeliveryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['app.timezone' => 'UTC']);
         $this->travelTo(\Carbon\Carbon::parse('2026-11-17 10:00:00', 'UTC'));
         $this->seed(RoleSeeder::class);
         $this->admin = User::factory()->create(['status' => 'active']); $this->admin->assignRole('Super Admin');

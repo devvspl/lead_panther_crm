@@ -230,7 +230,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                         }
                     }
                 }
-                $budget = $cleanBudget ?: 7500000.00;
+                $budget = $cleanBudget ?: null;
 
                 // 3. Create New Lead Master Record (project_id removed; inherited via campaign)
                 $lead = Lead::create([
@@ -244,7 +244,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                     'city' => $mapped['city'] ?? 'Mumbai',
                     'location' => $mapped['location'] ?? null,
                     'budget' => $budget,
-                    'property_type' => $mapped['property_type'] ?? '2 BHK',
+                    'property_type' => !empty($mapped['property_type']) ? $mapped['property_type'] : null,
                     'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
                     'status' => 'new',
                     'current_stage' => 'new',

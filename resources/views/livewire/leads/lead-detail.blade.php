@@ -37,8 +37,9 @@
                     if ($displayConfig['city'] ?? true) {
                         $subtitleParts[] = $lead->city ?: 'N/A';
                     }
-                    if (($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed()) {
-                        $subtitleParts[] = '₹' . number_format($lead->budget / 100000, 1) . 'L';
+                    $actualBudget = $lead->actual_budget;
+                    if (($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed() && $actualBudget !== null && $actualBudget > 0) {
+                        $subtitleParts[] = \App\Support\LeadPropertyAndBudgetExtractor::formatShortBudget($actualBudget);
                     }
                 @endphp
                 <h2 class="text-lg font-bold text-ink mt-1 truncate">{{ $lead->name }}</h2>
@@ -175,14 +176,13 @@
                     <div>
                         <span class="text-[10px] text-muted block">Property Type</span>
                         <span
-                            class="font-semibold text-ink block mt-0.5">{{ $lead->property_type ?: 'Residential' }}</span>
+                            class="font-semibold text-ink block mt-0.5">{{ $lead->actual_property_type ?: '—' }}</span>
                     </div>
                     @endif
                     @if(($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed())
                     <div>
                         <span class="text-[10px] text-muted block">Budget</span>
-                        <span class="font-bold text-ink block mt-0.5">₹{{ number_format($lead->budget / 100000, 1) }}
-                            Lakhs</span>
+                        <span class="font-bold text-ink block mt-0.5">{{ \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($lead->actual_budget) }}</span>
                     </div>
                     @endif
                 </div>
@@ -423,7 +423,7 @@
 
                 @if($isBuilder)
                     <div class="text-xs space-y-2">
-                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} @if(\App\Support\FinancialVisibility::allowed()) Budget: {{ $lead->budget ?: '—' }} @endif</p>
+                        <p>Requirements: {{ \App\Support\ClientFacingText::label($lead->requirement ?: '—') }} @if(\App\Support\FinancialVisibility::allowed()) Budget: {{ $lead->actual_budget ? \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($lead->actual_budget) : '—' }} @endif</p>
                         @if($normalizedStage === 'follow_up')@foreach($leadFollowups as $followup)
                         <p>{{ $followup->due_at }} · {{ $followup->note }} · {{ $followup->status }}</p>@endforeach @endif
                         @if($normalizedStage === 'meeting_scheduled')

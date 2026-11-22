@@ -25,7 +25,7 @@ class MetaLeadSyncService
      * Supports formats like '1 Cr - 1.5 Cr', '1_cr_-_1.5_cr', '₹1.5 Cr',
      * '50 Lakh - 1 Cr', 'under 50 lakh', '2.5 Cr+', etc.
      */
-    public static function parseBudget(mixed $rawBudget): float
+    public static function parseBudget(mixed $rawBudget): ?float
     {
         if (is_numeric($rawBudget)) {
             return (float) $rawBudget;
@@ -55,7 +55,7 @@ class MetaLeadSyncService
             }
         }
 
-        return 7500000.00;
+        return null;
     }
 
     /**
@@ -509,7 +509,7 @@ class MetaLeadSyncService
                             Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from Project context: Campaign #{$campaign->id} ('{$campaign->name}')");
                         }
 
-                        $numericBudget = self::parseBudget($mapped['budget']);
+                        $numericBudget = self::parseBudget($mapped['budget'] ?? null);
 
                         // Create Lead Master Record (strictly pass client_id as mapped on Form)
                         $lead = Lead::create([
@@ -523,7 +523,7 @@ class MetaLeadSyncService
                             'city' => $mapped['city'] ?? '',
                             'location' => $mapped['location'] ?? null,
                             'budget' => $numericBudget,
-                            'property_type' => $mapped['property_type'] ?? '',
+                            'property_type' => !empty($mapped['property_type']) ? $mapped['property_type'] : null,
                             'requirement' => $mapped['requirement'] ?? "Meta Ads sync from form '{$formName}' (#{$currentFormId})",
                             'status' => 'new',
                             'current_stage' => 'new',

@@ -1066,7 +1066,7 @@
                                                 {{ $lead->name }}
                                             </h4>
                                             <p class="text-[11px] text-muted truncate">
-                                                {{ $lead->city ?: 'Location N/A' }} • {{ $lead->property_type ?: 'Property' }}
+                                                {{ $lead->city ?: 'Location N/A' }} • {{ $lead->actual_property_type ?: ($lead->property_type ?: '—') }}
                                             </p>
                                         </div>
 

@@ -389,10 +389,28 @@ class Lead extends Model
         return $this->leadSource?->name ?: 'Direct';
     }
 
+    public function getActualPropertyTypeAttribute(): ?string
+    {
+        return \App\Support\LeadPropertyAndBudgetExtractor::resolvePropertyType($this);
+    }
+
+    public function getActualBudgetAttribute(): ?float
+    {
+        return \App\Support\LeadPropertyAndBudgetExtractor::resolveBudget($this);
+    }
+
     public function getBudgetFormattedAttribute(): string
     {
         if (!\App\Support\FinancialVisibility::allowed()) return '—';
-        return is_numeric($this->budget) ? '₹' . number_format($this->budget / 100000, 1) . 'L' : ($this->budget ?: 'N/A');
+        $actual = $this->actual_budget;
+        return $actual ? \App\Support\LeadPropertyAndBudgetExtractor::formatShortBudget($actual) : '—';
+    }
+
+    public function getBudgetDisplayAttribute(): string
+    {
+        if (!\App\Support\FinancialVisibility::allowed()) return '—';
+        $actual = $this->actual_budget;
+        return \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($actual);
     }
 
     public function getAssignedToUserAttribute(): array

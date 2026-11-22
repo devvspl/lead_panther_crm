@@ -146,13 +146,27 @@ class MetaLeadMapper
                         $customQuestions[$rawKey] = $cleanVal;
                     }
                     // Match Property Type / Unit Configuration
-                    elseif (str_contains($keyNormalized, 'property') || str_contains($keyNormalized, 'configuration') || str_contains($keyNormalized, 'bhk') || str_contains($keyNormalized, 'flat') || str_contains($keyNormalized, 'unit') || str_contains($keyNormalized, 'apartment')) {
-                        $propertyType = $cleanVal;
+                    elseif (str_contains($keyNormalized, 'property') || str_contains($keyNormalized, 'configuration') || str_contains($keyNormalized, 'bhk') || str_contains($keyNormalized, 'flat') || str_contains($keyNormalized, 'unit') || str_contains($keyNormalized, 'space size')) {
+                        $isPurpose = preg_match('/\b(rental\s+income|self\s+use|investment|personal\s+use|own\s+use|yes|no)\b/i', $cleanVal);
+                        if (!$isPurpose) {
+                            $propertyType = $cleanVal;
+                        }
                         $customQuestions[$rawKey] = $cleanVal;
                     } else {
                         $customQuestions[$rawKey] = $cleanVal;
                     }
                 }
+            }
+        }
+
+        // Run smart extractor over collected fields if budget or propertyType is still empty or non-specific
+        if (empty($budget) || empty($propertyType) || preg_match('/(?:₹|rs\.?|inr|\blakh|\bcr|\bcrore|\brental\s+income|\bself\s+use|\binvestment|\byes|\bno)\b/i', (string) $propertyType)) {
+            $extracted = \App\Support\LeadPropertyAndBudgetExtractor::extractFromQuestions($allFieldAnswers);
+            if (empty($budget) && !empty($extracted['budget'])) {
+                $budget = $extracted['budget'];
+            }
+            if (!empty($extracted['property_type'])) {
+                $propertyType = $extracted['property_type'];
             }
         }
 

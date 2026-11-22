@@ -282,9 +282,12 @@ class MetaLeadSyncService
                 $project = Project::find($overrideProjectId);
             }
             if (!$project && !empty($mapping?->project_id)) {
-                $p = Project::find($mapping->project_id);
-                if ($p && (int) $p->client_id === (int) $leadClientId) {
+                $p = Project::withoutGlobalScopes()->find($mapping->project_id);
+                if ($p) {
                     $project = $p;
+                    if (empty($mapping->client_id) && $p->client_id) {
+                        $leadClientId = $p->client_id;
+                    }
                 }
             }
             if (!$project && $leadClientId) {
@@ -489,6 +492,20 @@ class MetaLeadSyncService
                             $targetCampaignId = $mapping?->campaign_id ?: null;
                             if ($targetCampaignId) {
                                 Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Campaign resolved from Form Mapping: Campaign #{$targetCampaignId}");
+                            }
+                        }
+
+                        if ($targetCampaignId && $projectId) {
+                            $camp = Campaign::withoutGlobalScopes()->find($targetCampaignId);
+                            if ($camp && (int) $camp->project_id !== (int) $projectId) {
+                                $matchedCamp = Campaign::withoutGlobalScopes()->where('project_id', $projectId)->where('name', $camp->name)->first();
+                                $targetCampaignId = $matchedCamp ? $matchedCamp->id : Campaign::create([
+                                    'project_id' => $projectId,
+                                    'name' => $camp->name,
+                                    'lead_source_id' => $leadSource->id,
+                                    'utm_campaign' => Str::slug($camp->name),
+                                    'status' => 'active',
+                                ])->id;
                             }
                         }
 

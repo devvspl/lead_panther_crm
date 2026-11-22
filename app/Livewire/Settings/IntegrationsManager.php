@@ -101,8 +101,8 @@ class IntegrationsManager extends Component
         foreach ($account->formMappings as $mapping) {
             $this->availableForms[] = ['id' => $mapping->form_id, 'name' => $mapping->form_name,
                 'status' => strtoupper($mapping->status ?: 'ACTIVE'), 'created_time' => $mapping->meta_created_at?->toIso8601String()];
-            $this->formClientMap[$mapping->form_id] = $mapping->client_id;
-            $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
+            $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
+            $this->formProjectMap[$mapping->form_id] = $mapping->project_id ?: ($mapping->campaign?->project_id ?? null);
             $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
         }
         $this->resetPage();
@@ -153,7 +153,7 @@ class IntegrationsManager extends Component
                 if ($mapping->campaign && !empty($mapping->form_name) && $mapping->campaign->name === $mapping->form_name . ' Campaign') {
                     $mapping->campaign->update(['name' => $mapping->form_name]);
                 }
-                $this->formProjectMap[$mapping->form_id] = $mapping->project_id;
+                $this->formProjectMap[$mapping->form_id] = $mapping->project_id ?: ($mapping->campaign?->project_id ?? null);
                 $this->formClientMap[$mapping->form_id] = $mapping->client_id ?: ($mapping->project?->client_id ?? null);
                 $this->formCampaignMap[$mapping->form_id] = $mapping->campaign_id;
             }
@@ -669,22 +669,29 @@ class IntegrationsManager extends Component
     {
         $fId = (string) $key;
         $projectId = !empty($value) ? (int) $value : null;
+        $targetAccountId = $this->selectedMappingAccountId ?: $this->selectedAccountId;
 
-        $mapping = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId ?: $this->selectedAccountId)
-            ->where('form_id', $fId)
-            ->first();
+        if (!$targetAccountId) return;
 
-        if ($mapping) {
-            $mapping->update(['project_id' => $projectId]);
+        $formItem = collect($this->availableForms)->first(fn ($item) => (is_array($item) ? ($item['id'] ?? null) : $item->id) === $fId);
+        $formName = (is_array($formItem) ? ($formItem['name'] ?? null) : $formItem?->name) ?: "Lead Form #{$fId}";
 
-            if ($projectId) {
-                $project = Project::find($projectId);
-                if ($project && $project->client_id) {
-                    $this->formClientMap[$fId] = $project->client_id;
-                    $mapping->update(['client_id' => $project->client_id]);
-                }
+        $this->formProjectMap[$fId] = $projectId;
+
+        $mapping = LeadFormMapping::updateOrCreate(
+            ['portal_account_id' => $targetAccountId, 'form_id' => $fId],
+            ['project_id' => $projectId, 'form_name' => $formName, 'status' => 'active']
+        );
+
+        if ($projectId) {
+            $project = Project::withoutGlobalScopes()->with('client')->find($projectId);
+            if ($project && $project->client_id) {
+                $this->formClientMap[$fId] = $project->client_id;
+                $mapping->update(['client_id' => $project->client_id]);
             }
-            $this->dispatch('toast', type: 'success', message: "Assigned project updated for Form #{$fId}");
+            $this->dispatch('toast', type: 'success', message: "Assigned project updated for Form #{$fId}" . ($project ? " ({$project->name})" : ''));
+        } else {
+            $this->dispatch('toast', type: 'info', message: "Project unassigned for Form #{$fId}");
         }
     }
 
@@ -699,17 +706,57 @@ class IntegrationsManager extends Component
         $formItem = collect($this->availableForms)->first(fn ($item) => (is_array($item) ? ($item['id'] ?? null) : $item->id) === $fId);
         $formName = (is_array($formItem) ? ($formItem['name'] ?? null) : $formItem?->name) ?: "Lead Form #{$fId}";
 
+        $this->formClientMap[$fId] = $clientId;
+
         $mapping = LeadFormMapping::updateOrCreate(
             ['portal_account_id' => $targetAccountId, 'form_id' => $fId],
             ['client_id' => $clientId, 'form_name' => $formName, 'status' => 'active']
         );
 
-        if ($clientId && $mapping->project_id) {
-            $project = Project::find($mapping->project_id);
-            if ($project && (int) $project->client_id !== $clientId) {
-                $project->update(['client_id' => $clientId]);
+        if ($clientId) {
+            $currentProjId = $this->formProjectMap[$fId] ?? $mapping->project_id;
+            $proj = $currentProjId ? Project::withoutGlobalScopes()->with('client')->find($currentProjId) : null;
+
+            $client = Client::find($clientId) ?? \App\Models\User::find($clientId);
+            $orgId = $client?->organization_id;
+
+            $projBelongsToClient = false;
+            if ($proj) {
+                if ((int) $proj->client_id === (int) $clientId) {
+                    $projBelongsToClient = true;
+                } elseif ($orgId && $proj->client?->organization_id === $orgId) {
+                    $projBelongsToClient = true;
+                }
+            }
+
+            if (!$projBelongsToClient) {
+                $cId = $this->formCampaignMap[$fId] ?? $mapping->campaign_id;
+                $campaign = $cId ? Campaign::withoutGlobalScopes()->find($cId) : null;
+                $searchName = $campaign?->name ?: $formName;
+
+                $matchedProject = Project::withoutGlobalScopes()
+                    ->where(function ($q) use ($clientId, $orgId) {
+                        $q->where('client_id', $clientId);
+                        if ($orgId) {
+                            $q->orWhereHas('client', fn ($c) => $c->where('organization_id', $orgId));
+                        }
+                    })
+                    ->where('name', 'like', "%{$searchName}%")
+                    ->first();
+
+                if (!$matchedProject) {
+                    $matchedProject = Project::withoutGlobalScopes()
+                        ->where('client_id', $clientId)
+                        ->first();
+                }
+
+                if ($matchedProject) {
+                    $this->formProjectMap[$fId] = $matchedProject->id;
+                    $mapping->update(['project_id' => $matchedProject->id]);
+                }
             }
         }
+
         $this->dispatch('toast', type: 'success', message: "Client mapping saved for Form #{$fId}");
     }
 
@@ -756,18 +803,12 @@ class IntegrationsManager extends Component
         $campaignId = $this->formCampaignMap[$formId] ?? null;
 
         if (!$projectId && $campaignId) {
-            $camp = Campaign::find($campaignId);
+            $camp = Campaign::withoutGlobalScopes()->find($campaignId);
             $projectId = $camp?->project_id;
         }
 
-        // If client was specified and project exists, link project to client
-        if ($projectId && $clientId) {
-            $proj = Project::find($projectId);
-            if ($proj && (int) $proj->client_id !== (int) $clientId) {
-                $proj->update(['client_id' => (int) $clientId]);
-            }
-        } elseif ($projectId && !$clientId) {
-            $proj = Project::find($projectId);
+        if ($projectId && !$clientId) {
+            $proj = Project::withoutGlobalScopes()->find($projectId);
             if ($proj?->client_id) {
                 $clientId = $proj->client_id;
                 $this->formClientMap[$formId] = $clientId;
@@ -813,8 +854,9 @@ class IntegrationsManager extends Component
 
         $term = mb_strtolower(trim($this->search));
         if ($term !== '') {
-            $campaigns = Campaign::pluck('name', 'id')->toArray();
+            $campaigns = Campaign::withoutGlobalScopes()->pluck('name', 'id')->toArray();
             $clients = Client::pluck('name', 'id')->toArray();
+            $projects = Project::withoutGlobalScopes()->pluck('name', 'id')->toArray();
             $metaAdRecords = MetaAdRecord::where('kind', 'ad')
                 ->whereNotNull('lead_form_id')
                 ->pluck('campaign_id', 'lead_form_id')
@@ -823,13 +865,15 @@ class IntegrationsManager extends Component
                 ->pluck('name', 'remote_id')
                 ->toArray();
 
-            $forms = $forms->filter(function ($item) use ($term, $campaigns, $clients, $metaAdRecords, $metaCampaignNames) {
+            $forms = $forms->filter(function ($item) use ($term, $campaigns, $clients, $projects, $metaAdRecords, $metaCampaignNames) {
                 $id = (string) (is_array($item) ? ($item['id'] ?? '') : ($item->id ?? ''));
                 $name = mb_strtolower((string) (is_array($item) ? ($item['name'] ?? '') : ($item->name ?? '')));
                 $cId = $this->formCampaignMap[$id] ?? null;
                 $campName = $cId && isset($campaigns[$cId]) ? mb_strtolower($campaigns[$cId]) : '';
                 $clientId = $this->formClientMap[$id] ?? null;
                 $clientName = $clientId && isset($clients[$clientId]) ? mb_strtolower($clients[$clientId]) : '';
+                $pId = $this->formProjectMap[$id] ?? null;
+                $projName = $pId && isset($projects[$pId]) ? mb_strtolower($projects[$pId]) : '';
                 $metaCampId = $metaAdRecords[$id] ?? null;
                 $metaCampName = $metaCampId && isset($metaCampaignNames[$metaCampId]) ? mb_strtolower($metaCampaignNames[$metaCampId]) : '';
 
@@ -837,6 +881,7 @@ class IntegrationsManager extends Component
                     || str_contains($name, $term)
                     || str_contains($campName, $term)
                     || str_contains($clientName, $term)
+                    || str_contains($projName, $term)
                     || str_contains($metaCampName, $term);
             });
         }
@@ -892,7 +937,8 @@ class IntegrationsManager extends Component
 
         $clients = Client::with('organization')->get()->keyBy('id');
         $users = \App\Models\User::with('organization')->get()->keyBy('id');
-        $campaigns = Campaign::with('project')->get()->keyBy('id');
+        $projects = Project::withoutGlobalScopes()->get()->keyBy('id');
+        $campaigns = Campaign::withoutGlobalScopes()->with('project')->get()->keyBy('id');
         $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->get()->keyBy('form_id');
 
         $rows = [];
@@ -904,6 +950,7 @@ class IntegrationsManager extends Component
             $status = (string) (is_array($formItem) ? ($formItem['status'] ?? 'ACTIVE') : ($formItem->status ?? 'ACTIVE'));
 
             $clientId = $this->formClientMap[$fId] ?? null;
+            $projectId = $this->formProjectMap[$fId] ?? null;
             $campaignId = $this->formCampaignMap[$fId] ?? null;
 
             $clientName = 'Unassigned';
@@ -920,10 +967,13 @@ class IntegrationsManager extends Component
             $mapping = $formDetails->get($fId);
             $created = $mapping?->meta_created_at ?? LeadFormMapping::parseMetaCreatedTime(data_get($formItem, 'created_time'));
 
+            $mappedProject = ($projectId && $projects->has($projectId)) ? $projects->get($projectId) : null;
+            $projectName = $mappedProject?->name ?? ($campaign?->project?->name ?: 'Unassigned');
+
             $rows[] = [
                 'sr_no' => $srNo++,
                 'campaign' => $campaignName,
-                'project' => $campaign?->project?->name,
+                'project' => $projectName,
                 'campaign_status' => $campaign?->status,
                 'campaign_created' => $campaign?->created_at?->format('Y-m-d H:i'),
                 'form_name' => $fName ?: 'Lead Form #' . $fId,
@@ -965,10 +1015,22 @@ class IntegrationsManager extends Component
             $clients = \App\Models\User::with('organization')->orderBy('name')->get();
         }
 
-        $campaigns = Campaign::with('project')->where(fn ($q) => $q->where('status', 'active')
+        $campaigns = Campaign::withoutGlobalScopes()->with('project')->where(fn ($q) => $q->where('status', 'active')
             ->orWhereIn('id', array_filter($this->formCampaignMap)))->orderBy('name')->get();
         $campaignDetails = $campaigns->keyBy('id');
         $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->get()->keyBy('form_id');
+
+        $allProjects = Project::withoutGlobalScopes()->with(['client.organization'])->orderBy('name')->get();
+        $clientProjectsMap = [];
+        $projectsByOrg = [];
+        foreach ($allProjects as $proj) {
+            if ($proj->client_id) {
+                $clientProjectsMap[$proj->client_id][] = $proj;
+            }
+            if ($proj->client?->organization_id) {
+                $projectsByOrg[$proj->client->organization_id][] = $proj;
+            }
+        }
 
         $clientOptions = ['' => '-- Select Client / Org --'];
         foreach ($clients as $c) {
@@ -985,7 +1047,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'sr_no',
                 'label' => '#',
-                'width' => '6%',
+                'width' => '4%',
                 'align' => 'center',
                 'priority' => 1,
                 'render' => function ($row) {
@@ -996,7 +1058,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'campaign',
                 'label' => 'Campaign Name',
-                'width' => '28%',
+                'width' => '22%',
                 'priority' => 1,
                 'render' => function ($row) use ($formDetails, $campaignDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1036,7 +1098,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'form_name',
                 'label' => 'Meta Lead Form',
-                'width' => '32%',
+                'width' => '26%',
                 'priority' => 1,
                 'render' => function ($row) use ($formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1060,7 +1122,7 @@ class IntegrationsManager extends Component
             [
                 'key' => 'client',
                 'label' => 'Assigned Client / Org',
-                'width' => '28%',
+                'width' => '23%',
                 'priority' => 1,
                 'render' => function ($row, $value = null, $layout = 'desktop') use ($clientOptions, $formDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
@@ -1083,9 +1145,80 @@ class IntegrationsManager extends Component
                 },
             ],
             [
+                'key' => 'project',
+                'label' => 'Client Project',
+                'width' => '20%',
+                'priority' => 1,
+                'render' => function ($row, $value = null, $layout = 'desktop') use ($formDetails, $campaignDetails, $allProjects, $clients, $clientProjectsMap, $projectsByOrg) {
+                    $fId = is_array($row) ? $row['id'] : $row->id;
+                    $fName = (is_array($row) ? ($row['name'] ?? null) : $row->name) ?: '';
+                    $mapping = $formDetails->get($fId);
+                    $assignedClient = $this->formClientMap[$fId] ?? $mapping?->client_id ?? null;
+                    $assignedProject = $this->formProjectMap[$fId] ?? $mapping?->project_id ?? null;
+
+                    $campaign = $campaignDetails->get($this->formCampaignMap[$fId] ?? null) ?? $mapping?->campaign;
+                    $campaignProject = $campaign?->project;
+                    if (!$campaignProject && $fName) {
+                        $campaignProject = $allProjects->first(fn ($p) => strtolower($p->name) === strtolower($fName));
+                    }
+
+                    $projectOptions = ['' => '-- Select Client Project --'];
+                    if ($campaignProject) {
+                        $projectOptions[(string) $campaignProject->id] = '★ ' . $campaignProject->name . ' (Campaign Project)';
+                    }
+
+                    $clientProjects = [];
+                    if ($assignedClient) {
+                        $clientObj = $clients->firstWhere('id', $assignedClient);
+                        if ($clientObj && $clientObj->organization_id && isset($projectsByOrg[$clientObj->organization_id])) {
+                            $clientProjects = $projectsByOrg[$clientObj->organization_id];
+                        } elseif (isset($clientProjectsMap[$assignedClient])) {
+                            $clientProjects = $clientProjectsMap[$assignedClient];
+                        }
+                    }
+
+                    if (!empty($clientProjects)) {
+                        foreach ($clientProjects as $p) {
+                            if ($campaignProject && (int) $p->id === (int) $campaignProject->id) continue;
+                            $projectOptions[(string) $p->id] = $p->name;
+                        }
+                        foreach ($allProjects as $p) {
+                            if (isset($projectOptions[(string) $p->id])) continue;
+                            $clientLabel = $p->client?->name ? ' (' . $p->client->name . ')' : '';
+                            $projectOptions[(string) $p->id] = $p->name . $clientLabel;
+                        }
+                    } else {
+                        foreach ($allProjects as $p) {
+                            if ($campaignProject && (int) $p->id === (int) $campaignProject->id) continue;
+                            $clientLabel = $p->client?->name ? ' (' . $p->client->name . ')' : '';
+                            $projectOptions[(string) $p->id] = $p->name . $clientLabel;
+                        }
+                    }
+
+                    $select = view('components.ui.themed-select', [
+                        'attributes' => new \Illuminate\View\ComponentAttributeBag([
+                            'wire:model.live' => "formProjectMap.{$fId}",
+                            'id' => "meta-project-{$layout}-{$fId}",
+                        ]),
+                        'options' => $projectOptions,
+                        'searchable' => true,
+                        'placeholder' => '-- Select Client Project --',
+                        'class' => 'w-full',
+                    ])->render();
+
+                    $badge = $assignedProject
+                        ? '<p class="mt-1.5 text-[10px] text-emerald-700 font-semibold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Leads route to this Project</p>'
+                        : ($campaignProject
+                            ? '<p class="mt-1.5 text-[10px] text-amber-700 font-medium flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Campaign: ' . e($campaignProject->name) . '</p>'
+                            : '<p class="mt-1.5 text-[10px] text-muted">Routes to client default project</p>');
+
+                    return $select . $badge;
+                },
+            ],
+            [
                 'key' => 'action',
                 'label' => 'Sync',
-                'width' => '6%',
+                'width' => '5%',
                 'align' => 'center',
                 'priority' => 1,
                 'render' => function ($row) {

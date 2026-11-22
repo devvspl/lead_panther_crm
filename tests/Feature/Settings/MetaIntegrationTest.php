@@ -1055,10 +1055,10 @@ class MetaIntegrationTest extends TestCase
             ->test(IntegrationsManager::class)
             ->set('availableForms', $forms);
 
-        // Verify column layout: Sr No -> Campaign (Left) -> Form Name (Right) -> Client -> Sync (Project column removed)
+        // Verify column layout: Sr No -> Campaign -> Form Name -> Client -> Project -> Sync
         $columns = $component->instance()->availableFormsTableColumns();
         $colKeys = array_column($columns, 'key');
-        $this->assertEquals(['sr_no', 'campaign', 'form_name', 'client', 'action'], $colKeys);
+        $this->assertEquals(['sr_no', 'campaign', 'form_name', 'client', 'project', 'action'], $colKeys);
 
         // Verify pagination partitions into pages (page 1 has 15 items, total 35)
         $paginated = $component->instance()->filteredAvailableForms;
@@ -1337,5 +1337,81 @@ class MetaIntegrationTest extends TestCase
         $this->assertStringContainsString('When Are You Planning To Purchase: Just Exploring', $mapped4['requirement']);
         $this->assertStringContainsString('Suitable Time For Call ☎️: 4 PM To 6 PM', $mapped4['requirement']);
         $this->assertStringContainsString('Remarks: Call Him At Monday', $mapped4['requirement']);
+    }
+
+    public function test_form_mapping_to_client_project_and_inbound_routing(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Apex Realty Group', 'status' => 'active']);
+        $client = Client::create(['name' => 'Apex Builder Client', 'status' => 'active', 'organization_id' => $org->id]);
+        $project = Project::create(['name' => 'Apex Highline Tower', 'client_id' => $client->id]);
+
+        $account = PortalAccount::create([
+            'name' => 'Apex Meta Page',
+            'type' => 'meta',
+            'status' => 'active',
+        ]);
+        $account->setCredential('page_id', 'page_apex_999');
+        $account->setCredential('access_token', 'token_apex_999');
+
+        $component = Livewire::actingAs($admin)
+            ->test(IntegrationsManager::class)
+            ->set('availableForms', [
+                ['id' => 'form_apex_777', 'name' => 'Apex Highline Brochure Form', 'status' => 'ACTIVE', 'created_time' => now()->toIso8601String()]
+            ])
+            ->set('formProjectMap.form_apex_777', $project->id);
+
+        $this->assertEquals($client->id, $component->get('formClientMap.form_apex_777'));
+
+        $this->assertDatabaseHas('lead_form_mappings', [
+            'portal_account_id' => $account->id,
+            'form_id' => 'form_apex_777',
+            'project_id' => $project->id,
+            'client_id' => $client->id,
+        ]);
+
+        // Inbound lead through webhook for this form
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'id' => 'lead_apex_123',
+                'created_time' => now()->toIso8601String(),
+                'field_data' => [
+                    ['name' => 'full_name', 'values' => ['Karan Malhotra']],
+                    ['name' => 'phone_number', 'values' => ['9876500112']],
+                    ['name' => 'email', 'values' => ['karan@example.com']],
+                ],
+                'form_id' => 'form_apex_777',
+            ], 200),
+        ]);
+
+        $log = \App\Models\WebhookLog::create([
+            'portal_account_id' => $account->id,
+            'received_at' => now(),
+            'payload' => json_encode([
+                'entry' => [[
+                    'id' => 'page_apex_999',
+                    'changes' => [[
+                        'field' => 'leadgen',
+                        'value' => [
+                            'leadgen_id' => 'lead_apex_123',
+                            'form_id' => 'form_apex_777',
+                        ],
+                    ]],
+                ]],
+            ]),
+        ]);
+
+        (new \App\Jobs\ProcessInboundLeadJob($log))->handle();
+
+        $this->assertDatabaseHas('leads', [
+            'client_id' => $client->id,
+            'mobile' => '9876500112',
+        ]);
+
+        $createdLead = \App\Models\Lead::where('mobile', '9876500112')->first();
+        $this->assertNotNull($createdLead);
+        $this->assertEquals($project->id, $createdLead->project_id);
     }
 }

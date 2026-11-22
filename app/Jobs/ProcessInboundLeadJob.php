@@ -11,6 +11,7 @@ use App\Models\WebhookLog;
 use App\Models\Lead;
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\Campaign;
 use App\Models\LeadSource;
 use App\Models\LeadMetadata;
 use App\Events\LeadCreated;
@@ -126,19 +127,25 @@ class ProcessInboundLeadJob implements ShouldQueue
                 // Inherit project context belonging to the target client
                 $projectId = null;
                 if (!empty($mapping?->project_id)) {
-                    $p = Project::find($mapping->project_id);
-                    if ($p && (int) $p->client_id === (int) $clientId) {
+                    $p = Project::withoutGlobalScopes()->find($mapping->project_id);
+                    if ($p) {
                         $projectId = $p->id;
+                        if (empty($mapping->client_id) && $p->client_id) {
+                            $clientId = $p->client_id;
+                        }
                     }
                 }
                 if (!$projectId && !empty($mapping?->campaign?->project_id)) {
-                    $p = Project::find($mapping->campaign->project_id);
-                    if ($p && (int) $p->client_id === (int) $clientId) {
+                    $p = Project::withoutGlobalScopes()->find($mapping->campaign->project_id);
+                    if ($p) {
                         $projectId = $p->id;
+                        if (empty($mapping->client_id) && $p->client_id) {
+                            $clientId = $p->client_id;
+                        }
                     }
                 }
                 if (!$projectId) {
-                    $projectId = Project::where('client_id', $clientId)->value('id') ?: Project::value('id');
+                    $projectId = Project::withoutGlobalScopes()->where('client_id', $clientId)->value('id') ?: Project::withoutGlobalScopes()->value('id');
                 }
 
                 $campaignId = $campaignRoute instanceof \App\Models\Campaign ? $campaignRoute->id : ($mapping?->campaign_id ?? null);
@@ -158,16 +165,32 @@ class ProcessInboundLeadJob implements ShouldQueue
                     }
                 }
 
+                // Ensure campaign belongs to the resolved project context
+                if ($campaignId && $projectId) {
+                    $camp = Campaign::withoutGlobalScopes()->find($campaignId);
+                    if ($camp && (int) $camp->project_id !== (int) $projectId) {
+                        $matchedCamp = Campaign::withoutGlobalScopes()->where('project_id', $projectId)->where('name', $camp->name)->first();
+                        $campaignId = $matchedCamp ? $matchedCamp->id : Campaign::create([
+                            'project_id' => $projectId,
+                            'name' => $camp->name,
+                            'lead_source_id' => $leadSource->id,
+                            'utm_campaign' => \Illuminate\Support\Str::slug($camp->name),
+                            'status' => 'active',
+                        ])->id;
+                    }
+                }
+
                 // Auto-create or map Campaign from Meta campaign name under the client's project
-                if (!empty($mapped['campaign']) && !$campaignId) {
+                if (!$campaignId && $projectId) {
+                    $campaignName = !empty($mapped['campaign']) ? $mapped['campaign'] : ($mapping?->form_name ?: 'Meta Lead Campaign');
                     $campaign = \App\Models\Campaign::firstOrCreate(
                         [
                             'project_id' => $projectId,
-                            'name' => $mapped['campaign'],
+                            'name' => $campaignName,
                         ],
                         [
                             'lead_source_id' => $leadSource->id,
-                            'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
+                            'utm_campaign' => \Illuminate\Support\Str::slug($campaignName),
                             'status' => 'active',
                         ]
                     );

@@ -618,37 +618,6 @@
                     </button>
                 </section>
 
-                <section class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs space-y-3">
-                    <div class="flex items-center justify-between gap-4">
-                        <h3 id="lead-assignment-mode-label" class="text-sm font-bold text-ink">Lead Assignment Mode</h3>
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold {{ $organization->isAutomaticAssignment() ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200' }}">
-                            {{ $organization->isAutomaticAssignment() ? 'Automatic' : 'Manual' }}
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <button type="button"
-                            wire:click="setLeadAssignmentMode('automatic')"
-                            wire:loading.attr="disabled"
-                            class="p-2.5 rounded-xl border text-center transition cursor-pointer {{ $organization->isAutomaticAssignment() ? 'border-primary bg-primary/10 text-primary font-bold' : 'border-border text-muted hover:border-border-hover' }}">
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="w-2 h-2 rounded-full {{ $organization->isAutomaticAssignment() ? 'bg-primary' : 'bg-muted/40' }}"></span>
-                                <span>Automatic Assignment</span>
-                            </div>
-                        </button>
-
-                        <button type="button"
-                            wire:click="setLeadAssignmentMode('manual')"
-                            wire:loading.attr="disabled"
-                            class="p-2.5 rounded-xl border text-center transition cursor-pointer {{ $organization->isManualAssignment() ? 'border-primary bg-primary/10 text-primary font-bold' : 'border-border text-muted hover:border-border-hover' }}">
-                            <div class="flex items-center justify-center gap-2">
-                                <span class="w-2 h-2 rounded-full {{ $organization->isManualAssignment() ? 'bg-primary' : 'bg-muted/40' }}"></span>
-                                <span>Manual Assignment</span>
-                            </div>
-                        </button>
-                    </div>
-                </section>
-
                 <form wire:submit="saveExecutiveResponseTime" class="p-5 rounded-2xl bg-surface border border-border space-y-3">
                     <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response Time</label>
                     <div class="flex flex-wrap items-center gap-2">

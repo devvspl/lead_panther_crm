@@ -45,7 +45,9 @@ class ClientScope implements Scope
                 $q->where(function ($sub) use ($clientId, $orgId) {
                     $sub->where('client_id', $clientId);
                     if ($orgId) {
-                        $sub->orWhere('client_id', $orgId);
+                        $sub->orWhere('client_id', $orgId)
+                            ->orWhereIn('client_id', \App\Models\User::where('organization_id', $orgId)->select('id'))
+                            ->orWhereHas('client', fn ($c) => $c->where('organization_id', $orgId));
                     }
                 });
             });
@@ -53,7 +55,11 @@ class ClientScope implements Scope
             $builder->where(function ($q) use ($model, $clientId, $orgId) {
                 $q->where($model->getTable() . '.client_id', $clientId);
                 if ($orgId) {
-                    $q->orWhere($model->getTable() . '.client_id', $orgId);
+                    $q->orWhere($model->getTable() . '.client_id', $orgId)
+                        ->orWhereIn($model->getTable() . '.client_id', \App\Models\User::where('organization_id', $orgId)->select('id'));
+                    if (method_exists($model, 'client')) {
+                        $q->orWhereHas('client', fn ($c) => $c->where('organization_id', $orgId));
+                    }
                 }
             });
         }

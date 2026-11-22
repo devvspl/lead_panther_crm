@@ -1,16 +1,23 @@
 <div class="space-y-6">
     @if($canInternalQueue)
-        <div class="flex gap-2 text-xs"><button wire:click="$set('queue', 'client')" class="rounded-lg border border-border px-4 py-2 {{ $queue !== 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Client Leads</button><button wire:click="$set('queue', 'internal')" class="rounded-lg border border-border px-4 py-2 {{ $queue === 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Internal Processing Queue</button></div>
+        <div class="flex gap-2 text-xs"><button wire:click="$set('queue', 'client')"
+                class="rounded-lg border border-border px-4 py-2 {{ $queue !== 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Client
+                Leads</button><button wire:click="$set('queue', 'internal')"
+                class="rounded-lg border border-border px-4 py-2 {{ $queue === 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Internal
+                Processing Queue</button></div>
     @endif
     @if($queue === 'internal' && $canInternalQueue)
         <livewire:leads.internal-processing-queue />
     @else
     <!-- 1. COMPACT PAGE HEADER -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
+    <div
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
         <div>
             <div class="flex items-center gap-2">
-                <h1 class="text-lg font-bold tracking-tight text-ink">{{ ($isBuilder || $isSalesExecutive) ? 'My Leads' : 'Leads' }}</h1>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <h1 class="text-lg font-bold tracking-tight text-ink">
+                    {{ ($isBuilder || $isSalesExecutive) ? 'My Leads' : 'Leads' }}</h1>
+                <span
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     {{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Pipeline' : ($isSalesExecutive ? 'My Assigned Pipeline' : ($isBuilder ? 'Organization Pipeline' : 'Live Pipeline')) }}
                 </span>
             </div>
@@ -20,12 +27,10 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            <x-ui.date-range-picker 
-                wire:model.live="analyticsRange" 
-                wire:custom-from="analyticsCustomFrom"
-                wire:custom-to="analyticsCustomTo" 
-                placeholder="This Month" 
-            />
+            @if(!$isBuilder)
+                <x-ui.date-range-picker wire:model.live="analyticsRange" wire:custom-from="analyticsCustomFrom"
+                    wire:custom-to="analyticsCustomTo" placeholder="This Month" />
+            @endif
 
             <x-ui.export-button target="exportExcel" label="Export Excel" />
 
@@ -35,8 +40,8 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>Add / Ingest Lead</span>
-                </button>
+                    <span>Add Lead</span>
+                    </button>
             @endif
         </div>
     </div>
@@ -97,13 +102,25 @@
                 'Plot' => 'Plot',
             ];
 
-            $stageOptions = array_merge(['' => 'All Stages'], $mainStages);
+            $stageOptions = array_merge(['' => 'All Stages'], $mainStages, $otherStages ?? []);
         @endphp
 
         @if($isBuilder)
             <!-- 5 Compact Filters for Builder / Developer -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 items-start">
-                <!-- 1. Project -->
+                <!-- 1. Date Range -->
+                <div class="flex flex-col space-y-1 w-full">
+                    <label class="block text-[11px] font-semibold text-muted truncate">Date Range</label>
+                    <x-ui.date-range-picker 
+                        wire:model.live="analyticsRange" 
+                        wire:custom-from="analyticsCustomFrom"
+                        wire:custom-to="analyticsCustomTo" 
+                        placeholder="This Month"
+                        class="w-full"
+                    />
+                </div>
+
+                <!-- 2. Project -->
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Project</label>
                     <livewire:shared.searchable-select 
@@ -111,33 +128,33 @@
                         :options="$allProjects->pluck('name', 'id')->toArray()" 
                         placeholder="All Projects" 
                         class="w-full"
-                        :key="'b-leads-proj-'.($project ?? 'none')" 
+                        :key="'b-leads-proj-' . ($project ?? 'none')" 
                     />
                 </div>
 
-                <!-- 3. Lead Source -->
+                <!-- 3. Lead Source (only if permitted) -->
                 @canViewLeadSource
-<div class="flex flex-col space-y-1 w-full">
-                    <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
-                    <livewire:shared.searchable-select 
-                        wire:model.live="source" 
-                        model="App\Models\LeadSource" 
-                        placeholder="All Sources" 
-                        class="w-full"
-                        :key="'b-leads-src-'.($source ?? 'none')" 
-                    />
-                </div>
-@endcanViewLeadSource
+                    <div class="flex flex-col space-y-1 w-full">
+                        <label class="block text-[11px] font-semibold text-muted truncate">Lead Source</label>
+                        <livewire:shared.searchable-select 
+                            wire:model.live="source" 
+                            model="App\Models\LeadSource" 
+                            placeholder="All Sources" 
+                            class="w-full"
+                            :key="'b-leads-src-' . ($source ?? 'none')" 
+                        />
+                    </div>
+                @endcanViewLeadSource
 
                 <!-- 4. Team Member / Assigned -->
                 <div class="flex flex-col space-y-1 w-full">
                     <label class="block text-[11px] font-semibold text-muted truncate">Team Member</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="executive" 
-                        :options="$eligibleAssignees->pluck('name', 'id')->toArray()" 
+                        :options="($builderTeamMembers ?? $eligibleAssignees)->pluck('name', 'id')->toArray()" 
                         placeholder="All Members" 
                         class="w-full"
-                        :key="'b-leads-exec-'.($executive ?? 'none').'-'.md5($eligibleAssignees->pluck('name', 'id')->toJson())"
+                        :key="'b-leads-exec-' . ($executive ?? 'none') . '-' . md5(($builderTeamMembers ?? $eligibleAssignees)->pluck('name', 'id')->toJson())"
                     />
                 </div>
 
@@ -146,12 +163,12 @@
                     <label class="block text-[11px] font-semibold text-muted truncate">Lead Status</label>
                     <livewire:shared.searchable-select 
                         wire:model.live="statusFilter"
-                    :show-clear-option="false"
-                    clear-value="all"
+                        :show-clear-option="false"
+                        clear-value="all"
                         :options="$statusOptions" 
                         placeholder="All Statuses" 
                         class="w-full"
-                        :key="'b-leads-status-'.($statusFilter ?? 'none')" 
+                        :key="'b-leads-status-' . ($statusFilter ?? 'none')" 
                     />
                 </div>
 
@@ -163,11 +180,11 @@
                         :options="$stageOptions" 
                         placeholder="All Stages" 
                         class="w-full"
-                        :key="'b-leads-stage-'.($stageFilter ?? 'none')" 
+                        :key="'b-leads-stage-' . ($stageFilter ?? 'none')" 
                     />
                 </div>
             </div>
-        @else
+                @else
         <!-- 10 Filters Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 items-start">
             <!-- 1. Organization -->
@@ -178,7 +195,7 @@
                     model="App\Models\Organization" 
                     placeholder="All Organizations" 
                     class="w-full"
-                    :key="'leads-filter-org-'.($filterOrganizationId ?? 'none')" 
+                    :key="'leads-filter-org-' . ($filterOrganizationId ?? 'none')" 
                 />
             </div>
 
@@ -190,7 +207,7 @@
                     model="App\Models\Project" 
                     placeholder="All Projects" 
                     class="w-full"
-                    :key="'leads-filter-proj-'.($project ?? 'none')" 
+                    :key="'leads-filter-proj-' . ($project ?? 'none')" 
                 />
             </div>
 
@@ -202,7 +219,7 @@
                     model="App\Models\Campaign" 
                     placeholder="All Campaigns" 
                     class="w-full"
-                    :key="'leads-filter-camp-'.($campaign ?? 'none')" 
+                    :key="'leads-filter-camp-' . ($campaign ?? 'none')" 
                 />
             </div>
 
@@ -215,7 +232,7 @@
                     model="App\Models\LeadSource" 
                     placeholder="All Sources" 
                     class="w-full"
-                    :key="'leads-filter-src-'.($source ?? 'none')" 
+                    :key="'leads-filter-src-' . ($source ?? 'none')" 
                 />
             </div>
 @endcanViewLeadSource
@@ -228,7 +245,7 @@
                     model="App\Models\SalesTeam" 
                     placeholder="All Teams" 
                     class="w-full"
-                    :key="'leads-filter-team-'.($team ?? 'none')" 
+                    :key="'leads-filter-team-' . ($team ?? 'none')" 
                 />
             </div>
 
@@ -240,7 +257,7 @@
                     model="App\Models\User" 
                     placeholder="All Agents" 
                     class="w-full"
-                    :key="'leads-filter-user-'.($executive ?? 'none')" 
+                    :key="'leads-filter-user-' . ($executive ?? 'none')" 
                 />
             </div>
 
@@ -254,7 +271,7 @@
                     :options="$statusOptions" 
                     placeholder="All Statuses" 
                     class="w-full"
-                    :key="'leads-filter-status-'.($statusFilter ?? 'none')" 
+                    :key="'leads-filter-status-' . ($statusFilter ?? 'none')" 
                 />
             </div>
 
@@ -266,7 +283,7 @@
                     :options="$stageOptions" 
                     placeholder="All Stages" 
                     class="w-full"
-                    :key="'leads-filter-stage-'.($stageFilter ?? 'none')" 
+                    :key="'leads-filter-stage-' . ($stageFilter ?? 'none')" 
                 />
             </div>
 
@@ -278,7 +295,7 @@
                     :options="$typeOptions" 
                     placeholder="All Types" 
                     class="w-full"
-                    :key="'leads-filter-type-'.($leadType ?? 'none')" 
+                    :key="'leads-filter-type-' . ($leadType ?? 'none')" 
                 />
             </div>
 
@@ -316,13 +333,13 @@
                 @endif
                 @if($project)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Project: #{{ $project }}
+                        Project: {{ $allProjects->firstWhere('id', $project)?->name ?? '#'.$project }}
                         <button type="button" wire:click="$set('project', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($campaign)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Campaign: #{{ $campaign }}
+                        Campaign: {{ $allCampaigns->firstWhere('id', $campaign)?->name ?? '#'.$campaign }}
                         <button type="button" wire:click="$set('campaign', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
@@ -334,19 +351,19 @@
                 @endif
                 @if($executive)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Executive: #{{ $executive }}
+                        Team Member: {{ ($builderTeamMembers ?? $eligibleAssignees)->firstWhere('id', $executive)?->name ?? '#'.$executive }}
                         <button type="button" wire:click="$set('executive', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($statusFilter !== 'all')
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Status: {{ ucfirst(str_replace('_', ' ', $statusFilter)) }}
+                        Status: {{ $statusOptions[$statusFilter] ?? ucfirst(str_replace('_', ' ', $statusFilter)) }}
                         <button type="button" wire:click="$set('statusFilter', 'all')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($stageFilter)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Stage: {{ $mainStages[$stageFilter] ?? ucfirst(str_replace('_', ' ', $stageFilter)) }}
+                        Stage: {{ $stageOptions[$stageFilter] ?? ($mainStages[$stageFilter] ?? ucfirst(str_replace('_', ' ', $stageFilter))) }}
                         <button type="button" wire:click="$set('stageFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
@@ -394,439 +411,439 @@
             </div>
         </div>
     @elseif(!$isSalesExecutive)
-    <!-- 3. LEAD OVERVIEW KPI CARDS -->
-    <div class="space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Lead Overview</h2>
-                <p class="text-[11px] text-muted">Click any metric card to filter leads directory below.</p>
+        <!-- 3. LEAD OVERVIEW KPI CARDS -->
+        <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Lead Overview</h2>
+                    <p class="text-[11px] text-muted">Click any metric card to filter leads directory below.</p>
+                </div>
+
+                <!-- Group Filter Tabs -->
+                <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
+                    @foreach([
+                            'all' => 'All Metrics',
+                            'intake' => 'Intake',
+                            'assignment' => 'Assignment',
+                            'progress' => 'Progress',
+                            'conversion' => 'Conversion',
+                            'quality' => 'Quality'
+                        ] as $grpKey => $grpLabel)
+                            <button type="button" wire:click="$set('activeKpiGroup', '{{ $grpKey }}')"
+                                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $activeKpiGroup === $grpKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                {{ $grpLabel }}
+                            </button>
+                    @endforeach
+                </div>
             </div>
 
-            <!-- Group Filter Tabs -->
-            <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
-                @foreach([
-                    'all' => 'All Metrics',
-                    'intake' => 'Intake',
-                    'assignment' => 'Assignment',
-                    'progress' => 'Progress',
-                    'conversion' => 'Conversion',
-                    'quality' => 'Quality'
-                ] as $grpKey => $grpLabel)
-                    <button type="button" wire:click="$set('activeKpiGroup', '{{ $grpKey }}')"
-                        class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $activeKpiGroup === $grpKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        {{ $grpLabel }}
-                    </button>
+            @php
+                $displayCards = [];
+                if ($activeKpiGroup === 'all') {
+                    // Show selected highlights from each group
+                    $displayCards = array_merge(
+                        $kpis['intake'],
+                        $kpis['assignment'],
+                        $kpis['progress'],
+                        $kpis['conversion'],
+                        $kpis['quality']
+                    );
+                } else {
+                    $displayCards = $kpis[$activeKpiGroup] ?? [];
+                }
+            @endphp
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                @foreach($displayCards as $kpi)
+                    <div wire:click="applyKpiFilter('{{ $kpi['status'] }}', '{{ $kpi['stage'] ?? '' }}')"
+                        class="bg-surface hover:bg-canvas border border-border hover:border-ink/30 rounded-xl p-3 transition flex flex-col justify-between cursor-pointer shadow-2xs group">
+                        <div class="flex items-center justify-between gap-1.5">
+                            <span class="text-[11px] font-semibold text-muted truncate" title="{{ $kpi['title'] }}">{{ $kpi['title'] }}</span>
+                            <div class="p-1 rounded-md bg-canvas border border-border text-muted group-hover:text-ink transition shrink-0">
+                                @if($kpi['icon'] === 'users')
+                                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                @elseif($kpi['icon'] === 'sparkles')
+                                    <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                                @elseif($kpi['icon'] === 'user-check')
+                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                @elseif($kpi['icon'] === 'user-x')
+                                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM18 10l5 5m0-5l-5 5"/></svg>
+                                @elseif($kpi['icon'] === 'trophy')
+                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                                @elseif($kpi['icon'] === 'alert-triangle')
+                                    <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                @else
+                                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <div class="text-xl font-extrabold text-ink tracking-tight">
+                                {{ $kpi['value'] }}
+                            </div>
+                            <div class="flex items-center gap-1 mt-1 text-[10px]">
+                                @if($kpi['isPositive'] === true)
+                                    <span class="font-bold text-emerald-600 inline-flex items-center">
+                                        ↑ {{ $kpi['delta'] }}
+                                    </span>
+                                @elseif($kpi['isPositive'] === false)
+                                    <span class="font-bold text-rose-600 inline-flex items-center">
+                                        ↓ {{ $kpi['delta'] }}
+                                    </span>
+                                @else
+                                    <span class="text-muted font-mono">0%</span>
+                                @endif
+                                <span class="text-muted truncate font-normal">{{ $kpi['period'] }}</span>
+                            </div>
+                        </div>
+                    </div>
                 @endforeach
             </div>
         </div>
-
-        @php
-            $displayCards = [];
-            if ($activeKpiGroup === 'all') {
-                // Show selected highlights from each group
-                $displayCards = array_merge(
-                    $kpis['intake'],
-                    $kpis['assignment'],
-                    $kpis['progress'],
-                    $kpis['conversion'],
-                    $kpis['quality']
-                );
-            } else {
-                $displayCards = $kpis[$activeKpiGroup] ?? [];
-            }
-        @endphp
-
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-            @foreach($displayCards as $kpi)
-                <div wire:click="applyKpiFilter('{{ $kpi['status'] }}', '{{ $kpi['stage'] ?? '' }}')"
-                    class="bg-surface hover:bg-canvas border border-border hover:border-ink/30 rounded-xl p-3 transition flex flex-col justify-between cursor-pointer shadow-2xs group">
-                    <div class="flex items-center justify-between gap-1.5">
-                        <span class="text-[11px] font-semibold text-muted truncate" title="{{ $kpi['title'] }}">{{ $kpi['title'] }}</span>
-                        <div class="p-1 rounded-md bg-canvas border border-border text-muted group-hover:text-ink transition shrink-0">
-                            @if($kpi['icon'] === 'users')
-                                <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                            @elseif($kpi['icon'] === 'sparkles')
-                                <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-                            @elseif($kpi['icon'] === 'user-check')
-                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            @elseif($kpi['icon'] === 'user-x')
-                                <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM18 10l5 5m0-5l-5 5"/></svg>
-                            @elseif($kpi['icon'] === 'trophy')
-                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-                            @elseif($kpi['icon'] === 'alert-triangle')
-                                <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            @else
-                                <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            @endif
-                        </div>
-                    </div>
-
-                    <div class="mt-2">
-                        <div class="text-xl font-extrabold text-ink tracking-tight">
-                            {{ $kpi['value'] }}
-                        </div>
-                        <div class="flex items-center gap-1 mt-1 text-[10px]">
-                            @if($kpi['isPositive'] === true)
-                                <span class="font-bold text-emerald-600 inline-flex items-center">
-                                    ↑ {{ $kpi['delta'] }}
-                                </span>
-                            @elseif($kpi['isPositive'] === false)
-                                <span class="font-bold text-rose-600 inline-flex items-center">
-                                    ↓ {{ $kpi['delta'] }}
-                                </span>
-                            @else
-                                <span class="text-muted font-mono">0%</span>
-                            @endif
-                            <span class="text-muted truncate font-normal">{{ $kpi['period'] }}</span>
-                        </div>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-    </div>
 
     @endif
 
     @if(!$isBuilder && !$isSalesExecutive && !$this->isClientContext())
-    <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
-    <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-            <div>
-                <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Complete Lead Lifecycle Funnel</h2>
-                <p class="text-[11px] text-muted">13-stage journey: Intake → Duplicate → Credit → Assignment → Engagement → Conversion. Click any stage to filter records.</p>
+        <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
+        <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+                <div>
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Complete Lead Lifecycle Funnel</h2>
+                    <p class="text-[11px] text-muted">13-stage journey: Intake → Duplicate → Credit → Assignment → Engagement → Conversion. Click any stage to filter records.</p>
+                </div>
+                <div class="text-[11px] font-semibold text-muted">
+                    Horizontal pipeline scroll ⇄
+                </div>
             </div>
-            <div class="text-[11px] font-semibold text-muted">
-                Horizontal pipeline scroll ⇄
-            </div>
-        </div>
 
-        <!-- Horizontally Scrollable Stage Cards -->
-        <div class="overflow-x-auto pb-2 -mx-1 px-1">
-            <div class="flex items-center gap-2 min-w-max">
-                @foreach($funnel as $stg)
-                    <div wire:click="filterByLifecycleStage('{{ $stg['stage_key'] }}')"
-                        class="w-48 bg-canvas hover:bg-surface border {{ $stg['is_alert'] ? 'border-amber-300 ring-1 ring-amber-300' : 'border-border' }} hover:border-ink/40 rounded-xl p-3 transition cursor-pointer flex flex-col justify-between shadow-2xs group relative">
-                        
-                        <!-- Top Row: Step & SLA Time -->
-                        <div class="flex items-center justify-between text-[10px] text-muted font-mono">
-                            <span class="font-bold text-ink bg-surface border border-border px-1.5 py-0.2 rounded">
-                                {{ sprintf('%02d', $stg['step']) }}
-                            </span>
-                            <span class="text-[10px] text-muted font-medium">⏱ {{ $stg['avg_time'] }}</span>
-                        </div>
+            <!-- Horizontally Scrollable Stage Cards -->
+            <div class="overflow-x-auto pb-2 -mx-1 px-1">
+                <div class="flex items-center gap-2 min-w-max">
+                    @foreach($funnel as $stg)
+                        <div wire:click="filterByLifecycleStage('{{ $stg['stage_key'] }}')"
+                            class="w-48 bg-canvas hover:bg-surface border {{ $stg['is_alert'] ? 'border-amber-300 ring-1 ring-amber-300' : 'border-border' }} hover:border-ink/40 rounded-xl p-3 transition cursor-pointer flex flex-col justify-between shadow-2xs group relative">
 
-                        <!-- Stage Title -->
-                        <div class="mt-2">
-                            <h4 class="text-xs font-bold text-ink group-hover:text-primary transition truncate">
-                                {{ $stg['name'] }}
-                            </h4>
-                            <div class="text-lg font-black text-ink mt-0.5">
-                                {{ number_format($stg['count']) }}
-                            </div>
-                        </div>
-
-                        <!-- Bottom Stats: Conv % & Drop-off -->
-                        <div class="mt-2.5 pt-2 border-t border-border flex items-center justify-between text-[10px]">
-                            <span class="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                {{ $stg['conversion_rate'] }}%
-                            </span>
-
-                            @if($stg['drop_off'] > 0)
-                                <span class="font-bold text-rose-600" title="{{ $stg['drop_off'] }} drop-offs from previous step">
-                                    -{{ number_format($stg['drop_off']) }} drop
+                            <!-- Top Row: Step & SLA Time -->
+                            <div class="flex items-center justify-between text-[10px] text-muted font-mono">
+                                <span class="font-bold text-ink bg-surface border border-border px-1.5 py-0.2 rounded">
+                                    {{ sprintf('%02d', $stg['step']) }}
                                 </span>
-                            @else
-                                <span class="text-muted font-mono">0 drop</span>
+                                <span class="text-[10px] text-muted font-medium">⏱ {{ $stg['avg_time'] }}</span>
+                            </div>
+
+                            <!-- Stage Title -->
+                            <div class="mt-2">
+                                <h4 class="text-xs font-bold text-ink group-hover:text-primary transition truncate">
+                                    {{ $stg['name'] }}
+                                </h4>
+                                <div class="text-lg font-black text-ink mt-0.5">
+                                    {{ number_format($stg['count']) }}
+                                </div>
+                            </div>
+
+                            <!-- Bottom Stats: Conv % & Drop-off -->
+                            <div class="mt-2.5 pt-2 border-t border-border flex items-center justify-between text-[10px]">
+                                <span class="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    {{ $stg['conversion_rate'] }}%
+                                </span>
+
+                                @if($stg['drop_off'] > 0)
+                                    <span class="font-bold text-rose-600" title="{{ $stg['drop_off'] }} drop-offs from previous step">
+                                        -{{ number_format($stg['drop_off']) }} drop
+                                    </span>
+                                @else
+                                    <span class="text-muted font-mono">0 drop</span>
+                                @endif
+                            </div>
+
+                            @if($stg['is_alert'])
+                                <div class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center text-[8px] text-white font-bold" title="High drop-off rate alert">
+                                    !
+                                </div>
                             @endif
                         </div>
 
-                        @if($stg['is_alert'])
-                            <div class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center text-[8px] text-white font-bold" title="High drop-off rate alert">
-                                !
+                        @if($stg['step'] < 13)
+                            <div class="text-muted/40 font-bold select-none shrink-0">
+                                →
                             </div>
                         @endif
-                    </div>
-
-                    @if($stg['step'] < 13)
-                        <div class="text-muted/40 font-bold select-none shrink-0">
-                            →
-                        </div>
-                    @endif
-                @endforeach
-            </div>
-        </div>
-    </div>
-
-    <!-- 5. LEAD ANALYTICS SECTION -->
-    <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
-            <div>
-                <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Analytics &amp; Breakdown</h2>
-                <p class="text-[11px] text-muted">Lead volume generation trends and dimension breakdowns.</p>
-            </div>
-
-            <!-- Breakdown Dimension Tabs -->
-            <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
-                @foreach([
-                    'project' => 'By Project',
-                    'source' => 'By Source',
-                    'executive' => 'By Agent',
-                    'team' => 'By Team',
-                    'organization' => 'By Org',
-                    'overview' => 'By Type',
-                ] as $tabKey => $tabLabel)
-                    @continue($tabKey === 'source' && ! \App\Support\LeadSourceVisibility::allowed())
-                    <button type="button" wire:click="$set('breakdownTab', '{{ $tabKey }}')"
-                        class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $breakdownTab === $tabKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                        {{ $tabLabel }}
-                    </button>
-                @endforeach
-            </div>
-        </div>
-
-        <!-- 2-Column Analytics Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <!-- Left Chart: Lead Generation Trend -->
-            <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-xs font-bold text-ink">Lead Intake vs Conversion Trend</span>
-                    <span class="text-[10px] text-muted font-medium">Daily Timeline</span>
+                    @endforeach
                 </div>
-                <div x-data="{
-                        chart: null,
-                        initChart(labels, received, converted) {
-                            this.chart = window.initSafeChart('leadsTrendChart', {
-                                type: 'line',
-                                data: {
-                                    labels: labels,
-                                    datasets: [
-                                        {
-                                            label: 'Received',
-                                            data: received,
-                                            borderColor: '#2563EB',
-                                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                            fill: true,
-                                            tension: 0.3,
-                                            borderWidth: 2,
-                                            pointRadius: 2,
-                                        },
-                                        {
-                                            label: 'Converted',
-                                            data: converted,
-                                            borderColor: '#10B981',
-                                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                            fill: true,
-                                            tension: 0.3,
-                                            borderWidth: 2,
-                                            pointRadius: 2,
+            </div>
+        </div>
+
+        <!-- 5. LEAD ANALYTICS SECTION -->
+        <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                <div>
+                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Analytics &amp; Breakdown</h2>
+                    <p class="text-[11px] text-muted">Lead volume generation trends and dimension breakdowns.</p>
+                </div>
+
+                <!-- Breakdown Dimension Tabs -->
+                <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
+                    @foreach([
+                            'project' => 'By Project',
+                            'source' => 'By Source',
+                            'executive' => 'By Agent',
+                            'team' => 'By Team',
+                            'organization' => 'By Org',
+                            'overview' => 'By Type',
+                        ] as $tabKey => $tabLabel)
+                            @continue($tabKey === 'source' && !\App\Support\LeadSourceVisibility::allowed())
+                            <button type="button" wire:click="$set('breakdownTab', '{{ $tabKey }}')"
+                                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $breakdownTab === $tabKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                                {{ $tabLabel }}
+                            </button>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- 2-Column Analytics Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Left Chart: Lead Generation Trend -->
+                <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-xs font-bold text-ink">Lead Intake vs Conversion Trend</span>
+                        <span class="text-[10px] text-muted font-medium">Daily Timeline</span>
+                    </div>
+                    <div x-data="{
+                            chart: null,
+                            initChart(labels, received, converted) {
+                                this.chart = window.initSafeChart('leadsTrendChart', {
+                                    type: 'line',
+                                    data: {
+                                        labels: labels,
+                                        datasets: [
+                                            {
+                                                label: 'Received',
+                                                data: received,
+                                                borderColor: '#2563EB',
+                                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                                fill: true,
+                                                tension: 0.3,
+                                                borderWidth: 2,
+                                                pointRadius: 2,
+                                            },
+                                            {
+                                                label: 'Converted',
+                                                data: converted,
+                                                borderColor: '#10B981',
+                                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                                fill: true,
+                                                tension: 0.3,
+                                                borderWidth: 2,
+                                                pointRadius: 2,
+                                            }
+                                        ]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+                                        scales: {
+                                            x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+                                            y: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } }
                                         }
-                                    ]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
-                                    scales: {
-                                        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-                                        y: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } }
                                     }
-                                }
-                            });
-                        }
-                    }"
-                    x-init="$nextTick(function() { initChart(@js($analytics['trendLabels']), @js($analytics['trendReceived']), @js($analytics['trendConverted'])); })"
-                    class="h-56 relative">
-                    <canvas id="leadsTrendChart"></canvas>
+                                });
+                            }
+                        }"
+                        x-init="$nextTick(function() { initChart(@js($analytics['trendLabels']), @js($analytics['trendReceived']), @js($analytics['trendConverted'])); })"
+                        class="h-56 relative">
+                        <canvas id="leadsTrendChart"></canvas>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Right Chart: Active Breakdown Ranking -->
-            <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-xs font-bold text-ink">Volume Breakdown ({{ ucfirst($breakdownTab) }})</span>
-                    <span class="text-[10px] text-muted font-medium">Top Entities</span>
-                </div>
-                <div x-data="{
-                        chart: null,
-                        initBarChart(labels, counts) {
-                            this.chart = window.initSafeChart('leadsBreakdownRankingChart', {
-                                type: 'bar',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Total Leads',
-                                        data: counts,
-                                        backgroundColor: '#0F172A',
-                                        borderRadius: 4,
-                                        barThickness: 14
-                                    }]
-                                },
-                                options: {
-                                    indexAxis: 'y',
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: { legend: { display: false } },
-                                    scales: {
-                                        x: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } },
-                                        y: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } }
+                <!-- Right Chart: Active Breakdown Ranking -->
+                <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-xs font-bold text-ink">Volume Breakdown ({{ ucfirst($breakdownTab) }})</span>
+                        <span class="text-[10px] text-muted font-medium">Top Entities</span>
+                    </div>
+                    <div x-data="{
+                            chart: null,
+                            initBarChart(labels, counts) {
+                                this.chart = window.initSafeChart('leadsBreakdownRankingChart', {
+                                    type: 'bar',
+                                    data: {
+                                        labels: labels,
+                                        datasets: [{
+                                            label: 'Total Leads',
+                                            data: counts,
+                                            backgroundColor: '#0F172A',
+                                            borderRadius: 4,
+                                            barThickness: 14
+                                        }]
+                                    },
+                                    options: {
+                                        indexAxis: 'y',
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        plugins: { legend: { display: false } },
+                                        scales: {
+                                            x: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } },
+                                            y: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } }
+                                        }
                                     }
-                                }
-                            });
-                        }
-                    }"
-                    x-init="$nextTick(function() { initBarChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])); })"
-                    class="h-56 relative">
-                    <canvas id="leadsBreakdownRankingChart"></canvas>
+                                });
+                            }
+                        }"
+                        x-init="$nextTick(function() { initBarChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])); })"
+                        class="h-56 relative">
+                        <canvas id="leadsBreakdownRankingChart"></canvas>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Breakdown Performance Table Component -->
-        <div class="border-t border-border pt-3">
-            @php
-                $breakdownColumns = [
-                    ['key' => 'name', 'label' => 'Entity / Group Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
-                    ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
-                    ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => true, 'priority' => 1],
-                    ['key' => 'avg_sla_time', 'label' => 'Avg Response Time', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 2],
-                ];
-            @endphp
+            <!-- Breakdown Performance Table Component -->
+            <div class="border-t border-border pt-3">
+                @php
+                    $breakdownColumns = [
+                        ['key' => 'name', 'label' => 'Entity / Group Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
+                        ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
+                        ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => true, 'priority' => 1],
+                        ['key' => 'avg_sla_time', 'label' => 'Avg Response Time', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 2],
+                    ];
+                @endphp
 
-            <x-ui.advanced-table 
-                :columns="$breakdownColumns" 
-                :rows="$analytics['paginatedBreakdown']"
-                :showSearch="true" 
-                searchModel="breakdownSearch"
-                searchPlaceholder="Search {{ strtolower($breakdownTab) }} entities..."
-                :sortField="$breakdownSortField"
-                :sortDirection="$breakdownSortDirection"
-                sortAction="sortBreakdownBy"
-                :showFilterDropdown="false" 
-                :showConfigurations="false"
-                tableName="breakdown"
-                emptyTitle="No Breakdown Data" 
-                emptyMessage="No entities match your search or filter criteria.">
-                <x-slot:action>
-                    <span class="text-xs text-muted font-semibold bg-canvas px-2.5 py-1 rounded-lg border border-border">
-                        {{ $analytics['totalBreakdownCount'] }} Total {{ ucfirst($breakdownTab) }}s
-                    </span>
-                </x-slot:action>
-            </x-ui.advanced-table>
-        </div>
-    </div>
-
-    <!-- 6. ASSIGNMENT, SLA, FOLLOW-UP & CREDIT MONITORING WIDGETS -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <!-- 1. Assignment & Distribution Monitoring -->
-        <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-            <div class="flex items-center justify-between pb-2 border-b border-border">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Assignment Status</span>
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {{ $monitoring['assignment']['success_rate'] }}% Success
-                </span>
-            </div>
-            <div class="space-y-1.5 text-xs">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Round Robin Routed</span>
-                    <span class="font-bold text-ink">{{ $monitoring['assignment']['round_robin'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Manual Assignments</span>
-                    <span class="font-bold text-ink">{{ $monitoring['assignment']['manual'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Priority Rule Routed</span>
-                    <span class="font-bold text-ink">{{ $monitoring['assignment']['priority'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Unassigned Pool</span>
-                    <span class="font-bold text-amber-600">{{ $monitoring['assignment']['unassigned'] }}</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. SLA Monitoring -->
-        <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-            <div class="flex items-center justify-between pb-2 border-b border-border">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">SLA Response Times</span>
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    15m Threshold
-                </span>
-            </div>
-            <div class="space-y-1.5 text-xs">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Within SLA Met</span>
-                    <span class="font-bold text-emerald-600">{{ $monitoring['sla']['within'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">SLA Breached (&gt;15m)</span>
-                    <span class="font-bold text-rose-600">{{ $monitoring['sla']['breached'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Pending First Response</span>
-                    <span class="font-bold text-amber-600">{{ $monitoring['sla']['pending'] }}</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Avg Response Speed</span>
-                    <span class="font-mono font-bold text-ink">{{ $monitoring['sla']['avg_response'] }}</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. Upcoming Activities (Follow-ups & Site Visits) -->
-        <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-            <div class="flex items-center justify-between pb-2 border-b border-border">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Tasks</span>
-                <span class="text-[10px] text-muted">Next Due</span>
-            </div>
-            <div class="space-y-2 text-xs">
-                @forelse($monitoring['upcomingFollowups'] as $fu)
-                    <div class="flex items-center justify-between border-b border-border/50 pb-1 cursor-pointer hover:bg-canvas p-1 rounded"
-                         @click="$dispatch('open-lead-detail', { id: {{ $fu->lead_id }} })">
-                        <div class="truncate pr-1">
-                            <span class="font-bold text-ink block truncate">{{ $fu->lead?->name ?: 'Lead #' . $fu->lead_id }}</span>
-                            <span class="text-[10px] text-muted truncate">{{ $fu->note ?: 'Follow-up' }}</span>
-                        </div>
-                        <span class="font-mono text-[10px] text-blue-600 shrink-0 font-semibold">
-                            {{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('d M H:i') : 'Scheduled' }}
+                <x-ui.advanced-table 
+                    :columns="$breakdownColumns" 
+                    :rows="$analytics['paginatedBreakdown']"
+                    :showSearch="true" 
+                    searchModel="breakdownSearch"
+                    searchPlaceholder="Search {{ strtolower($breakdownTab) }} entities..."
+                    :sortField="$breakdownSortField"
+                    :sortDirection="$breakdownSortDirection"
+                    sortAction="sortBreakdownBy"
+                    :showFilterDropdown="false" 
+                    :showConfigurations="false"
+                    tableName="breakdown"
+                    emptyTitle="No Breakdown Data" 
+                    emptyMessage="No entities match your search or filter criteria.">
+                    <x-slot:action>
+                        <span class="text-xs text-muted font-semibold bg-canvas px-2.5 py-1 rounded-lg border border-border">
+                            {{ $analytics['totalBreakdownCount'] }} Total {{ ucfirst($breakdownTab) }}s
                         </span>
-                    </div>
-                @empty
-                    <div class="text-[11px] text-muted text-center py-2">
-                        No pending follow-ups due soon.
-                    </div>
-                @endforelse
+                    </x-slot:action>
+                </x-ui.advanced-table>
             </div>
         </div>
 
-        <!-- 4. Credits & Replacement Position -->
-        <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-            <div class="flex items-center justify-between pb-2 border-b border-border">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Protection</span>
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-canvas border border-border text-ink">
-                    Wallet Engine
-                </span>
+        <!-- 6. ASSIGNMENT, SLA, FOLLOW-UP & CREDIT MONITORING WIDGETS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <!-- 1. Assignment & Distribution Monitoring -->
+            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Assignment Status</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {{ $monitoring['assignment']['success_rate'] }}% Success
+                    </span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Round Robin Routed</span>
+                        <span class="font-bold text-ink">{{ $monitoring['assignment']['round_robin'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Manual Assignments</span>
+                        <span class="font-bold text-ink">{{ $monitoring['assignment']['manual'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Priority Rule Routed</span>
+                        <span class="font-bold text-ink">{{ $monitoring['assignment']['priority'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Unassigned Pool</span>
+                        <span class="font-bold text-amber-600">{{ $monitoring['assignment']['unassigned'] }}</span>
+                    </div>
+                </div>
             </div>
-            <div class="space-y-1.5 text-xs">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Credits Reserved</span>
-                    <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['reserved'], 0) }} Cr</span>
+
+            <!-- 2. SLA Monitoring -->
+            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">SLA Response Times</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        15m Threshold
+                    </span>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Credits Consumed</span>
-                    <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['used'], 0) }} Cr</span>
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Within SLA Met</span>
+                        <span class="font-bold text-emerald-600">{{ $monitoring['sla']['within'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">SLA Breached (&gt;15m)</span>
+                        <span class="font-bold text-rose-600">{{ $monitoring['sla']['breached'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Pending First Response</span>
+                        <span class="font-bold text-amber-600">{{ $monitoring['sla']['pending'] }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Avg Response Speed</span>
+                        <span class="font-mono font-bold text-ink">{{ $monitoring['sla']['avg_response'] }}</span>
+                    </div>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Credits Refunded</span>
-                    <span class="font-mono font-bold text-emerald-600">{{ number_format($monitoring['credit']['refunded'], 0) }} Cr</span>
+            </div>
+
+            <!-- 3. Upcoming Activities (Follow-ups & Site Visits) -->
+            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Tasks</span>
+                    <span class="text-[10px] text-muted">Next Due</span>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-muted">Approved Replacements</span>
-                    <span class="font-bold text-indigo-600">{{ $monitoring['credit']['approved'] }}</span>
+                <div class="space-y-2 text-xs">
+                    @forelse($monitoring['upcomingFollowups'] as $fu)
+                        <div class="flex items-center justify-between border-b border-border/50 pb-1 cursor-pointer hover:bg-canvas p-1 rounded"
+                             @click="$dispatch('open-lead-detail', { id: {{ $fu->lead_id }} })">
+                            <div class="truncate pr-1">
+                                <span class="font-bold text-ink block truncate">{{ $fu->lead?->name ?: 'Lead #' . $fu->lead_id }}</span>
+                                <span class="text-[10px] text-muted truncate">{{ $fu->note ?: 'Follow-up' }}</span>
+                            </div>
+                            <span class="font-mono text-[10px] text-blue-600 shrink-0 font-semibold">
+                                {{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('d M H:i') : 'Scheduled' }}
+                            </span>
+                        </div>
+                    @empty
+                        <div class="text-[11px] text-muted text-center py-2">
+                            No pending follow-ups due soon.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <!-- 4. Credits & Replacement Position -->
+            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-border">
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Protection</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-canvas border border-border text-ink">
+                        Wallet Engine
+                    </span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Credits Reserved</span>
+                        <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['reserved'], 0) }} Cr</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Credits Consumed</span>
+                        <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['used'], 0) }} Cr</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Credits Refunded</span>
+                        <span class="font-mono font-bold text-emerald-600">{{ number_format($monitoring['credit']['refunded'], 0) }} Cr</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <span class="text-muted">Approved Replacements</span>
+                        <span class="font-bold text-indigo-600">{{ $monitoring['credit']['approved'] }}</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
     @endif
 
@@ -918,12 +935,12 @@
                                 </button>
                             @endif
                             @if(!$isBuilder && !$this->isClientContext())
-                            <button type="button" wire:click="autoDistributeUnassignedLeads"
-                                class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                                title="Distribute unassigned leads using the Super Admin configured distribution rule">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                <span>Auto-Assign</span>
-                            </button>
+                                <button type="button" wire:click="autoDistributeUnassignedLeads"
+                                    class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                    title="Distribute unassigned leads using the Super Admin configured distribution rule">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    <span>Auto-Assign</span>
+                                </button>
                             @endif
                         @endif
                         <x-ui.export-button target="exportExcel" class="text-xs" />
@@ -933,7 +950,7 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                 </svg>
-                                <span>Add / Ingest Lead</span>
+                                <span>Add Lead</span>
                             </button>
                         @endif
                     </div>
@@ -1024,7 +1041,7 @@
                                             </div>
 
                                             <div class="flex items-center gap-1">
-                                                @if($lead->first_response_at && (!\App\Models\Lead::usesSalesPanel() || $lead->created_at->diffInMinutes($lead->first_response_at)<=15))
+                                                @if($lead->first_response_at && (!\App\Models\Lead::usesSalesPanel() || $lead->created_at->diffInMinutes($lead->first_response_at) <= 15))
                                                     <span class="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[9px]">SLA Met</span>
                                                 @elseif(\Carbon\Carbon::parse($lead->created_at)->diffInMinutes(now()) > 15)
                                                     <span class="px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 font-bold text-[9px]">SLA Breached</span>
@@ -1033,12 +1050,12 @@
                                                 @endif
 
                                                 @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
-                                                <button type="button"
-                                                    @click.stop="$dispatch('open-lead-journey', { id: {{ $lead->id }} })"
-                                                    class="p-0.5 rounded hover:bg-canvas text-muted hover:text-ink transition cursor-pointer"
-                                                    title="Show Complete Lead Journey Timeline">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                </button>
+                                                    <button type="button"
+                                                        @click.stop="$dispatch('open-lead-journey', { id: {{ $lead->id }} })"
+                                                        class="p-0.5 rounded hover:bg-canvas text-muted hover:text-ink transition cursor-pointer"
+                                                        title="Show Complete Lead Journey Timeline">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    </button>
                                                 @endif
                                             </div>
                                         </div>
@@ -1205,16 +1222,16 @@
 
         <!-- Segmented Mode Control -->
         @if(!$this->isClientContext())
-        <div class="inline-flex p-1 bg-canvas rounded-lg border border-border w-full mb-4">
-            <button type="button" wire:click="$set('pullMode', 'meta')"
-                class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'meta' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                Meta Ads Pull
-            </button>
-            <button type="button" wire:click="$set('pullMode', 'manual')"
-                class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'manual' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                {{ \App\Support\ClientFacingText::label('Single Manual Entry') }}
-            </button>
-        </div>
+            <div class="inline-flex p-1 bg-canvas rounded-lg border border-border w-full mb-4">
+                <button type="button" wire:click="$set('pullMode', 'meta')"
+                    class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'meta' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                    Meta Ads Pull
+                </button>
+                <button type="button" wire:click="$set('pullMode', 'manual')"
+                    class="flex-1 py-1 text-xs font-bold rounded-md transition cursor-pointer {{ $pullMode === 'manual' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                    {{ \App\Support\ClientFacingText::label('Single Manual Entry') }}
+                </button>
+            </div>
         @endif
 
         @if($pullMode === 'meta')
@@ -1390,13 +1407,13 @@
                             class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
                     </div>
                     @if(\App\Support\FinancialVisibility::allowed())
-                    <div>
-                        <label class="font-bold text-ink">Budget</label>
-                        <input type="text" wire:model="manualBudget" placeholder="₹75.0L"
-                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
-                        @error('manualBudget') <span class="text-rose-500 text-[10px]">{{ $message }}</span> @enderror
-                        <p class="text-[10px] text-muted mt-1">Rupees, lakh or crore (e.g. 5000000 or 50 Lakh).</p>
-                    </div>
+                        <div>
+                            <label class="font-bold text-ink">Budget</label>
+                            <input type="text" wire:model="manualBudget" placeholder="₹75.0L"
+                                class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs mt-1">
+                            @error('manualBudget') <span class="text-rose-500 text-[10px]">{{ $message }}</span> @enderror
+                            <p class="text-[10px] text-muted mt-1">Rupees, lakh or crore (e.g. 5000000 or 50 Lakh).</p>
+                        </div>
                     @endif
                     <div>
                         <label class="font-bold text-ink">Property Type</label>
@@ -1445,198 +1462,198 @@
 
     <!-- Lead Manual & Bulk Assignment Modal -->
     @if($showAssignModal)
-    <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-            <div class="flex items-center justify-between pb-3 border-b border-border">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                        </svg>
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+                <div class="flex items-center justify-between pb-3 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-ink">Assign Leads to Team Member</h3>
+                            <p class="text-[11px] text-muted">
+                                Assigning <span class="font-bold text-primary">{{ count($selectedLeadIds) }}</span> lead(s) internally.
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="text-sm font-bold text-ink">Assign Leads to Team Member</h3>
-                        <p class="text-[11px] text-muted">
-                            Assigning <span class="font-bold text-primary">{{ count($selectedLeadIds) }}</span> lead(s) internally.
-                        </p>
-                    </div>
-                </div>
-                <button type="button" wire:click="closeAssignModal" class="text-muted hover:text-ink cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-
-            <div class="space-y-3">
-                @if(isset($assignTeams) && count($assignTeams) > 0)
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">Filter by Team (Optional)</label>
-                        <livewire:shared.searchable-select
-                            wire:model.live="assignTeamId"
-                            class="block w-full"
-                            :options="$assignTeams->pluck('name', 'id')->all()"
-                            placeholder="All Teams / Members"
-                            :key="'assignment-team-select'"
-                        />
-                    </div>
-                @endif
-
-                <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">Select Sales Agent / Member <span class="text-red-500">*</span></label>
-                    <livewire:shared.searchable-select
-                        wire:model.live="assignUserId"
-                        class="block w-full"
-                        :options="$eligibleAssignees->mapWithKeys(fn ($member) => [$member->id => $member->name.' ('.$member->email.')'])->all()"
-                        placeholder="Choose Eligible Team Member"
-                        :key="'assignment-member-select-'.($assignTeamId ?? 'all')"
-                    />
-                    @error('assignUserId') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
+                    <button type="button" wire:click="closeAssignModal" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
 
-                @if(count($selectedLeadIds) === 1)
-                    @php
-                        $singleLead = \App\Models\Lead::find($selectedLeadIds[0]);
-                        $assignHistory = $singleLead ? \App\Models\LeadAssignment::where('lead_id', $singleLead->id)->with(['assignee', 'assigner'])->latest('assigned_at')->take(5)->get() : collect();
-                    @endphp
-                    @if($assignHistory->isNotEmpty())
-                        <div class="p-3 rounded-lg bg-canvas border border-border space-y-1.5 text-xs">
-                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Lead Assignment History</span>
-                            <div class="space-y-1 max-h-28 overflow-y-auto">
-                                @foreach($assignHistory as $ah)
-                                    <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-border/50 last:border-0">
-                                        <span class="font-medium text-ink">{{ $ah->assignee?->name ?? 'User #'.$ah->assigned_to }}</span>
-                                        <span class="text-muted text-[10px] font-mono">{{ \Carbon\Carbon::parse($ah->assigned_at)->format('M d, H:i') }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
+                <div class="space-y-3">
+                    @if(isset($assignTeams) && count($assignTeams) > 0)
+                        <div>
+                            <label class="block text-xs font-semibold text-ink mb-1">Filter by Team (Optional)</label>
+                            <livewire:shared.searchable-select
+                                wire:model.live="assignTeamId"
+                                class="block w-full"
+                                :options="$assignTeams->pluck('name', 'id')->all()"
+                                placeholder="All Teams / Members"
+                                :key="'assignment-team-select'"
+                            />
                         </div>
                     @endif
-                @endif
 
-                <div class="p-3 rounded-lg bg-canvas border border-border text-[11px] text-muted space-y-1">
-                    <div class="flex items-center gap-1.5 font-semibold text-ink">
-                        <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Credit &amp; Assignment Policy:</span>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">Select Sales Agent / Member <span class="text-red-500">*</span></label>
+                        <livewire:shared.searchable-select
+                            wire:model.live="assignUserId"
+                            class="block w-full"
+                            :options="$eligibleAssignees->mapWithKeys(fn($member) => [$member->id => $member->name . ' (' . $member->email . ')'])->all()"
+                            placeholder="Choose Eligible Team Member"
+                            :key="'assignment-member-select-' . ($assignTeamId ?? 'all')"
+                        />
+                        @error('assignUserId') <span class="text-red-500 text-[10px] block mt-1">{{ $message }}</span> @enderror
                     </div>
-                    <p>Internal team assignments do not consume extra client credits. The assignment will be recorded in the audit history and the agent will be notified.</p>
+
+                    @if(count($selectedLeadIds) === 1)
+                        @php
+                            $singleLead = \App\Models\Lead::find($selectedLeadIds[0]);
+                            $assignHistory = $singleLead ? \App\Models\LeadAssignment::where('lead_id', $singleLead->id)->with(['assignee', 'assigner'])->latest('assigned_at')->take(5)->get() : collect();
+                        @endphp
+                        @if($assignHistory->isNotEmpty())
+                            <div class="p-3 rounded-lg bg-canvas border border-border space-y-1.5 text-xs">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Lead Assignment History</span>
+                                <div class="space-y-1 max-h-28 overflow-y-auto">
+                                    @foreach($assignHistory as $ah)
+                                        <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-border/50 last:border-0">
+                                            <span class="font-medium text-ink">{{ $ah->assignee?->name ?? 'User #' . $ah->assigned_to }}</span>
+                                            <span class="text-muted text-[10px] font-mono">{{ \Carbon\Carbon::parse($ah->assigned_at)->format('M d, H:i') }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+
+                    <div class="p-3 rounded-lg bg-canvas border border-border text-[11px] text-muted space-y-1">
+                        <div class="flex items-center gap-1.5 font-semibold text-ink">
+                            <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Credit &amp; Assignment Policy:</span>
+                        </div>
+                        <p>Internal team assignments do not consume extra client credits. The assignment will be recorded in the audit history and the agent will be notified.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                    <button type="button" wire:click="closeAssignModal"
+                        class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="executeAssignment"
+                        class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Confirm Assignment</span>
+                    </button>
                 </div>
             </div>
-
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <button type="button" wire:click="closeAssignModal"
-                    class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
-                    Cancel
-                </button>
-                <button type="button" wire:click="executeAssignment"
-                    class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Confirm Assignment</span>
-                </button>
-            </div>
         </div>
-    </div>
     @endif
 
     <!-- Return Lead to Super Admin (Replacement Request) Modal -->
     @if($showReturnLeadModal && $returnLeadModel)
-    <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-            <div class="flex items-center justify-between pb-3 border-b border-border">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
-                        </svg>
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+                <div class="flex items-center justify-between pb-3 border-b border-border">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-ink">Return Lead to Super Admin</h3>
+                            <p class="text-[11px] text-muted">Submit lead replacement request for review &amp; credit refund</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="text-sm font-bold text-ink">Return Lead to Super Admin</h3>
-                        <p class="text-[11px] text-muted">Submit lead replacement request for review &amp; credit refund</p>
-                    </div>
-                </div>
-                <button type="button" wire:click="closeReturnLeadModal" class="text-muted hover:text-ink cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-
-            @foreach($errors->all() as $error)<p class="text-xs text-red-700" role="alert">{{ $error }}</p>@endforeach
-            @if($isBuilder)<textarea aria-label="Supporting information" wire:model="returnSupportingInfo" class="w-full text-xs rounded-lg border-border" placeholder="Supporting information (optional)"></textarea>@endif
-            <!-- Lead Details Summary -->
-            <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                    <span class="font-mono font-bold text-ink">{{ $returnLeadModel->lead_code }}</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                        {{ ucfirst(str_replace('_', ' ', $returnLeadModel->current_stage)) }}
-                    </span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                        <span class="text-[10px] text-muted block">Contact Name</span>
-                        <span class="font-semibold text-ink">{{ $returnLeadModel->name }}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-muted block">Mobile Number</span>
-                        <span class="font-mono font-semibold text-ink">{{ $returnLeadModel->mobile }}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-muted block">Project</span>
-                        <span class="text-ink">{{ $returnLeadModel->project_name }}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-muted block">Delivered At</span>
-                        <span class="font-mono text-muted text-[11px]">{{ $returnLeadModel->created_at?->format('d M Y, H:i') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Replacement Form -->
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">
-                        Replacement Reason <span class="text-rose-500">*</span>
-                    </label>
-                    <x-ui.themed-select
-                        wire:model="returnReasonId"
-                        :options="$replacementReasons->pluck('label', 'id')->all()"
-                        :searchable="true"
-                        placeholder="-- Select Reason --"
-                        class="w-full"
-                    />
-                    @error('returnReasonId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    <button type="button" wire:click="closeReturnLeadModal" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">
-                        Remarks / Unsuitability Details
-                    </label>
-                    <textarea wire:model="returnRemarks" rows="3"
-                        placeholder="Provide details for Super Admin review (e.g. customer unreachable after 3 attempts, invalid number, duplicate lead)..."
-                        class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition"></textarea>
-                    @error('returnRemarks') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-800 text-[11px] space-y-1">
-                    <div class="font-bold flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Super Admin Review Policy</span>
+                @foreach($errors->all() as $error)<p class="text-xs text-red-700" role="alert">{{ $error }}</p>@endforeach
+                @if($isBuilder)<textarea aria-label="Supporting information" wire:model="returnSupportingInfo" class="w-full text-xs rounded-lg border-border" placeholder="Supporting information (optional)"></textarea>@endif
+                <!-- Lead Details Summary -->
+                <div class="p-3 rounded-xl bg-canvas border border-border space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-mono font-bold text-ink">{{ $returnLeadModel->lead_code }}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            {{ ucfirst(str_replace('_', ' ', $returnLeadModel->current_stage)) }}
+                        </span>
                     </div>
-                    <p class="text-amber-700 leading-relaxed">
-                        Submitting this return request places the claim into the Super Admin Replacement Review Queue. Once reviewed and approved by Super Admin, the lead credit will be refunded to your client wallet and a replacement lead will be generated per policy.
-                    </p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <span class="text-[10px] text-muted block">Contact Name</span>
+                            <span class="font-semibold text-ink">{{ $returnLeadModel->name }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Mobile Number</span>
+                            <span class="font-mono font-semibold text-ink">{{ $returnLeadModel->mobile }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Project</span>
+                            <span class="text-ink">{{ $returnLeadModel->project_name }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Delivered At</span>
+                            <span class="font-mono text-muted text-[11px]">{{ $returnLeadModel->created_at?->format('d M Y, H:i') }}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                <button type="button" wire:click="closeReturnLeadModal"
-                    class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
-                    Cancel
-                </button>
-                <button type="button" wire:click="submitReturnLead"
-                    class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Return Lead to Super Admin</span>
-                </button>
+                <!-- Replacement Form -->
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">
+                            Replacement Reason <span class="text-rose-500">*</span>
+                        </label>
+                        <x-ui.themed-select
+                            wire:model="returnReasonId"
+                            :options="$replacementReasons->pluck('label', 'id')->all()"
+                            :searchable="true"
+                            placeholder="-- Select Reason --"
+                            class="w-full"
+                        />
+                        @error('returnReasonId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">
+                            Remarks / Unsuitability Details
+                        </label>
+                        <textarea wire:model="returnRemarks" rows="3"
+                            placeholder="Provide details for Super Admin review (e.g. customer unreachable after 3 attempts, invalid number, duplicate lead)..."
+                            class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition"></textarea>
+                        @error('returnRemarks') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-800 text-[11px] space-y-1">
+                        <div class="font-bold flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Super Admin Review Policy</span>
+                        </div>
+                        <p class="text-amber-700 leading-relaxed">
+                            Submitting this return request places the claim into the Super Admin Replacement Review Queue. Once reviewed and approved by Super Admin, the lead credit will be refunded to your client wallet and a replacement lead will be generated per policy.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                    <button type="button" wire:click="closeReturnLeadModal"
+                        class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="submitReturnLead"
+                        class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Return Lead to Super Admin</span>
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
     @endif
 
     <!-- CDN Script for SortableJS (Kanban drag-and-drop) -->

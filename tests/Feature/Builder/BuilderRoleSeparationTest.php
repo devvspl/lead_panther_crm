@@ -96,7 +96,7 @@ class BuilderRoleSeparationTest extends TestCase
 
         $component->assertSee('My Leads')
             ->assertSee('Organization Pipeline')
-            ->assertDontSee('Add / Ingest Lead')
+            ->assertDontSee('Add Lead')
             ->assertDontSee('Complete Lead Lifecycle Funnel')
             ->assertDontSee('Lead Analytics & Breakdown');
     }
@@ -111,7 +111,7 @@ class BuilderRoleSeparationTest extends TestCase
         $this->assertFalse($component->get('isBuilder'));
         $component->assertSee('Leads')
             ->assertSee('Live Pipeline')
-            ->assertSee('Add / Ingest Lead')
+            ->assertSee('Add Lead')
             ->assertSee('Complete Lead Lifecycle Funnel')
             ->assertSee('Lead Analytics & Breakdown');
     }

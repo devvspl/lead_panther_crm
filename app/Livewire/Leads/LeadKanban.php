@@ -453,11 +453,17 @@ class LeadKanban extends Component
             'leadType',
             'sla_breached',
         ]);
-        $this->analyticsRange = 'month';
+        $this->statusFilter = 'all';
+        $this->stageFilter = '';
+        $this->project = '';
+        $this->executive = '';
+        $this->analyticsRange = $this->isClientContext() ? 'all' : 'month';
         $this->analyticsCustomFrom = null;
         $this->analyticsCustomTo = null;
         $this->sortField = '';
         $this->sort_by = 'created_desc';
+        $this->selectedRows = [];
+        $this->selectAll = false;
         $this->resetPage();
         $this->dispatch('toast', type: 'info', message: 'All filters reset.');
     }
@@ -811,6 +817,10 @@ class LeadKanban extends Component
         }
 
         // Date Range
+        if (! $start && ! $end && ! empty($this->analyticsRange) && $this->analyticsRange !== 'all') {
+            [$start, $end] = $this->getDateBounds();
+        }
+
         if ($start && $end) {
             $query->whereBetween('created_at', [$start, $end]);
         }
@@ -1570,21 +1580,44 @@ class LeadKanban extends Component
             $portalAccounts = collect();
             $activeFormMappings = collect();
             $allOrganizations = collect();
-            $allCampaigns = Campaign::withoutGlobalScopes()->whereIn('id', Lead::panelQuery()->select('campaign_id'))->get();
-            $allProjects = Project::withoutGlobalScopes()->whereIn('id', $allCampaigns->pluck('project_id')->filter())->get();
+            $allCampaigns = Campaign::withoutGlobalScopes()->whereIn('id', Lead::panelQuery()->whereNotNull('campaign_id')->select('campaign_id'))->get();
+            if ($this->isBuilder) {
+                $builderProjectQuery = Project::withoutGlobalScopes();
+                if ($orgId) {
+                    $campaignProjectIds = $allCampaigns->pluck('project_id')->filter();
+                    $builderProjectQuery->where(function ($q) use ($user, $orgId, $campaignProjectIds) {
+                        $q->where('client_id', $user->id)
+                          ->orWhereIn('client_id', User::where('organization_id', $orgId)->select('id'))
+                          ->orWhereHas('client', fn ($c) => $c->where('organization_id', $orgId));
+                        if ($campaignProjectIds->isNotEmpty()) {
+                            $q->orWhereIn('id', $campaignProjectIds);
+                        }
+                    });
+                } else {
+                    $builderProjectQuery->where('client_id', $user->id);
+                }
+                $allProjects = $builderProjectQuery->orderBy('name')->get();
+            } else {
+                $allProjects = Project::withoutGlobalScopes()->whereIn('id', $allCampaigns->pluck('project_id')->filter())->orderBy('name')->get();
+            }
             $assignTeams = $this->isBuilder && $orgId ? SalesTeam::where('ownable_type', Organization::class)->where('ownable_id', $orgId)->get() : collect();
-            $eligibleAssignees = $this->isBuilder && $orgId ? User::where('organization_id', $orgId)->where('status', 'active')->get()->filter(fn ($member) => NavigationConfig::getRoleKey($member) === 'sales-executive')->filter(fn ($member) => ! $this->assignTeamId || SalesTeamMember::where('sales_team_id', $this->assignTeamId)->where('user_id', $member->id)->where('is_active', true)->exists()) : collect();
+            $eligibleAssignees = $this->isBuilder && $orgId ? User::where('organization_id', $orgId)->where('status', 'active')->get()->filter(fn ($member) => in_array(NavigationConfig::getRoleKey($member), ['sales-executive', 'sales']))->filter(fn ($member) => ! $this->assignTeamId || SalesTeamMember::where('sales_team_id', $this->assignTeamId)->where('user_id', $member->id)->where('is_active', true)->exists()) : collect();
+            $builderTeamMembers = $this->isBuilder && $orgId ? User::where('organization_id', $orgId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'email']) : $eligibleAssignees;
+        } else {
+            $builderTeamMembers = $eligibleAssignees;
         }
 
         if (\App\Support\TeamAccess::isLeader($user)) {
             $assignTeams=\App\Support\TeamAccess::teams($user)->get();
             $eligibleAssignees=\App\Support\TeamAccess::executives($user)->when($this->assignTeamId,fn($q)=>$q->whereIn('id',SalesTeamMember::where('sales_team_id',$this->assignTeamId)->where('is_active',true)->select('user_id')))->get();
+            $builderTeamMembers = $eligibleAssignees;
         }
         return view('livewire.leads.lead-kanban', [
             'canInternalQueue' => $canInternal,
             'isBuilder' => $this->isBuilder,
             'isSalesExecutive' => $this->isSalesExecutive,
             'builderKpis' => $this->builderLeadKpis,
+            'builderTeamMembers' => $builderTeamMembers,
             'stageLeads' => $stageLeads,
             'stageCounts' => $stageCounts,
             'tableLeads' => $tableLeads,

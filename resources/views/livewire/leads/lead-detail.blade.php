@@ -160,11 +160,75 @@
                     @endif
                 </div>
 
-                @if($lead->requirement)
+                @php
+                    $metaSubmission = \App\Support\MetaSubmissionParser::parse($lead);
+                @endphp
+
+                @if($metaSubmission['is_meta'] && ($metaSubmission['has_submission_data'] || !empty($metaSubmission['questions'])))
+                    <div class="pt-3 border-t border-border space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-blue-600 inline" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                </svg>
+                                Meta Lead Submission
+                            </span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                {{ count($metaSubmission['questions']) }} {{ \Illuminate\Support\Str::plural('Response', count($metaSubmission['questions'])) }}
+                            </span>
+                        </div>
+
+                        <!-- Dynamic Questions & Answers List -->
+                        <div class="space-y-2">
+                            @foreach($metaSubmission['questions'] as $qa)
+                                <div class="p-2.5 bg-surface rounded-lg border border-border/80">
+                                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
+                                        {{ $qa['question'] }}
+                                    </span>
+                                    <p class="text-xs font-semibold text-ink leading-relaxed break-words whitespace-pre-line">
+                                        {{ $qa['answer'] }}
+                                    </p>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <!-- Meta Context Section -->
+                        <div class="p-3 bg-blue-50/60 rounded-lg border border-blue-200/70 text-[11px] space-y-2">
+                            <span class="font-bold text-blue-900 block text-[10px] uppercase tracking-wider">
+                                Meta Context Attribution
+                            </span>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-ink">
+                                <div>
+                                    <span class="text-[10px] text-muted block">Campaign</span>
+                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['campaign'] }}">
+                                        {{ $metaSubmission['context']['campaign'] }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-muted block">Ad Set</span>
+                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['adset'] }}">
+                                        {{ $metaSubmission['context']['adset'] }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-muted block">Ad (Creative)</span>
+                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['ad'] }}">
+                                        {{ $metaSubmission['context']['ad'] }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-muted block">Lead Form</span>
+                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['form'] }}">
+                                        {{ $metaSubmission['context']['form'] }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @elseif($lead->requirement)
                     <div class="pt-2 border-t border-border">
-                        <span class="text-[10px] font-bold text-muted uppercase block">Customer Requirement /
-                            Inquiry:</span>
-                        <p class="text-xs text-ink mt-0.5 leading-relaxed bg-surface p-2.5 rounded-lg border border-border">
+                        <span class="text-[10px] font-bold text-muted uppercase block">Customer Requirement / Inquiry:</span>
+                        <p class="text-xs text-ink mt-0.5 leading-relaxed bg-surface p-2.5 rounded-lg border border-border break-words whitespace-pre-line">
                             {{ \App\Support\ClientFacingText::label($lead->requirement) }}
                         </p>
                     </div>
@@ -201,28 +265,18 @@
                     </div>
                 </div>
 
-                @php
-                    $metaCamp = $lead->getMetaAttribute('meta_campaign_name') ?: $lead->campaign?->name;
-                    $metaAdset = $lead->getMetaAttribute('meta_adset_name');
-                    $metaAd = $lead->getMetaAttribute('meta_ad_name');
-                    $metaForm = $lead->getMetaAttribute('meta_form_name');
-                @endphp
-                @if($metaCamp || $metaAdset || $metaAd || $metaForm)
+                @if($metaSubmission['is_meta'])
                     <div class="mt-2 p-2.5 bg-blue-50/70 rounded-lg border border-blue-200 text-[11px] space-y-1">
                         <span class="font-bold text-blue-900 block text-[10px] uppercase">Meta Ads Ingestion Context:</span>
                         <div class="grid grid-cols-2 gap-2 text-ink">
-                            @if($metaCamp)
-                                <div><span class="text-muted text-[10px]">Campaign:</span> <span
-                            class="font-semibold truncate block">{{ $metaCamp }}</span></div> @endif
-                            @if($metaAdset)
-                                <div><span class="text-muted text-[10px]">Ad Set:</span> <span
-                            class="font-semibold truncate block">{{ $metaAdset }}</span></div> @endif
-                            @if($metaAd)
-                                <div><span class="text-muted text-[10px]">Creative:</span> <span
-                            class="font-semibold truncate block">{{ $metaAd }}</span></div> @endif
-                            @if($metaForm)
-                                <div><span class="text-muted text-[10px]">Form:</span> <span
-                            class="font-semibold truncate block">{{ $metaForm }}</span></div> @endif
+                            <div><span class="text-muted text-[10px]">Campaign:</span> <span
+                                class="font-semibold truncate block">{{ $metaSubmission['context']['campaign'] }}</span></div>
+                            <div><span class="text-muted text-[10px]">Ad Set:</span> <span
+                                class="font-semibold truncate block">{{ $metaSubmission['context']['adset'] }}</span></div>
+                            <div><span class="text-muted text-[10px]">Creative:</span> <span
+                                class="font-semibold truncate block">{{ $metaSubmission['context']['ad'] }}</span></div>
+                            <div><span class="text-muted text-[10px]">Form:</span> <span
+                                class="font-semibold truncate block">{{ $metaSubmission['context']['form'] }}</span></div>
                         </div>
                     </div>
                 @endif

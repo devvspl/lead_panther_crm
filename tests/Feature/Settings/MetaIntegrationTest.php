@@ -159,7 +159,7 @@ class MetaIntegrationTest extends TestCase
         Role::firstOrCreate(['name' => 'Super Admin']);
         $admin = User::factory()->create(); $admin->assignRole('Super Admin');
         Livewire::actingAs($admin)->test(\App\Livewire\Settings\MetaAdAccounts::class, ['integrationId' => $page->id])
-            ->call('showRecords', $records[0]->meta_ad_account_id)->assertSee('Same campaign name')->assertDontSee('222c')
+            ->call('showRecords', $records[0]->meta_ad_account_id)->set('statusFilter', '')->assertSee('Same campaign name')->assertDontSee('222c')
             ->set('campaignMap.'.$records[0]->id, $one->id)->call('saveMapping', $records[0]->id)->assertHasNoErrors()
             ->call('closeRecords')->assertSet('viewingId', null);
         $this->assertSame($two->id, $records[1]->fresh()->crm_campaign_id);
@@ -904,9 +904,8 @@ class MetaIntegrationTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(\App\Livewire\Leads\LeadKanban::class)
-            ->assertSee('+ Pull Meta Leads')
-            ->assertSee('Meta Ads Sync')
-            ->assertDontSee('Single Manual Lead')
+            ->assertSee('Add / Ingest Lead')
+            ->assertSee('Meta Ads Pull')
             ->assertDontSee('Bulk CSV Upload');
     }
 

@@ -2,7 +2,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h3 class="font-bold text-ink">Connected Ad Accounts</h3>
-            <p class="text-xs text-muted">Fetch campaigns, ad sets, ads, creatives and insights. Facebook Page lead forms are fetched separately below.</p>
+            <p class="text-xs text-muted">Fetch campaigns, ad sets, ads, creatives and insights. Map campaigns and fetch their associated form leads. Existing Page form routing remains available below.</p>
         </div>
         <button type="button" wire:click="edit" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-primary-hover transition">
             <x-ui.team-icon name="add" /> Add Ad Account
@@ -123,9 +123,11 @@
 
             <!-- Controls & Filters -->
             <div class="flex flex-wrap items-center gap-3">
-                <div class="w-full sm:w-44">
-                    <x-ui.themed-select wire:model.live="kind" :options="['campaign' => 'Campaigns', 'adset' => 'Ad Sets', 'ad' => 'Ads', 'insight' => 'Insights']" />
-                </div>
+                <nav aria-label="Meta record tabs" class="flex flex-wrap gap-1 rounded-lg bg-canvas p-1">
+                    @foreach(['campaign' => 'Campaigns', 'adset' => 'Ad Sets', 'ad' => 'Ads & Forms', 'insight' => 'Insights'] as $tab => $label)
+                        <button type="button" wire:click="$set('kind', '{{ $tab }}')" aria-pressed="{{ $kind === $tab ? 'true' : 'false' }}" class="rounded-md px-3 py-2 text-xs {{ $kind === $tab ? 'bg-surface text-primary font-bold shadow-xs' : 'text-muted' }}">{{ $label }}</button>
+                    @endforeach
+                </nav>
 
                 @if($kind !== 'insight')
                     <div class="w-full sm:w-40">
@@ -161,6 +163,7 @@
                                 <th class="p-2.5">Status</th>
                                 <th class="p-2.5">Budget</th>
                                 <th class="p-2.5">Schedule / Dates</th>
+                                <th class="p-2.5">Destination / Actions</th>
                             @elseif($kind === 'adset')
                                 <th class="p-2.5">Ad Set Name / ID</th>
                                 <th class="p-2.5">Campaign</th>
@@ -225,6 +228,22 @@
                                             <span class="text-muted text-xs block">Synced: {{ $record->synced_at->format('d M Y, H:i') }}</span>
                                         @else
                                             <span class="text-muted text-xs block">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-2.5">
+                                        <p class="font-semibold text-ink">{{ $record->crmCampaign?->project?->client?->name ?: 'Not mapped' }}</p>
+                                        <p class="text-muted text-[11px]">{{ $record->crmCampaign?->project?->name }} @if($record->crmCampaign) · {{ $record->crmCampaign->name }} @endif</p>
+                                        <x-ui.dropdown align="right" width="56">
+                                            <x-slot:trigger><button type="button" class="p-2 text-muted hover:text-primary" aria-label="Campaign actions"><x-ui.team-icon name="more" /></button></x-slot:trigger>
+                                            <x-slot:content>
+                                                <button type="button" wire:click="openCampaignMapping({{ $record->id }})" class="block w-full p-2 text-left hover:bg-canvas">Map Campaign</button>
+                                                <button type="button" wire:click="fetchCampaignLeads({{ $record->id }})" wire:loading.attr="disabled" @disabled(data_get($record->lead_fetch_state, 'status') === 'running') class="block w-full p-2 text-left text-primary hover:bg-canvas disabled:opacity-50">Fetch Leads</button>
+                                            </x-slot:content>
+                                        </x-ui.dropdown>
+                                        @if($fetch = $record->lead_fetch_state)
+                                            <p role="status" class="text-[11px] {{ ($fetch['status'] ?? '') === 'failed' ? 'text-danger' : 'text-muted' }}">{{ ucfirst($fetch['status'] ?? '') }} · {{ $fetch['phase'] ?? '' }} · {{ count($fetch['forms'] ?? []) }} forms · {{ $fetch['created'] ?? 0 }} created · {{ $fetch['duplicates'] ?? 0 }} duplicates · {{ $fetch['skipped'] ?? 0 }} unrelated / unattributed skipped</p>
+                                            @if(!empty($fetch['error']))<p class="text-danger text-[11px] max-w-xs">{{ $fetch['error'] }}</p>@endif
+                                            @if(($fetch['status'] ?? '') === 'completed' && empty($fetch['forms']))<p class="text-muted text-[11px]">No associated lead forms found. Website or messaging campaigns may not use instant forms.</p>@endif
                                         @endif
                                     </td>
                                 @elseif($kind === 'adset')
@@ -348,7 +367,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $kind === 'insight' ? 6 : 5 }}" class="p-6 text-center text-muted">
+                                <td colspan="{{ in_array($kind, ['campaign', 'insight']) ? 6 : 5 }}" class="p-6 text-center text-muted">
                                     No {{ $kind }} records found for the selected criteria.
                                 </td>
                             </tr>
@@ -396,6 +415,26 @@
             </details>
         </div>
     @endif
+
+    <x-ui.modal name="meta-campaign-mapping" maxWidth="xl" centered>
+        <form wire:submit="saveCampaignMapping" class="space-y-4 p-6">
+            <h3 class="font-bold text-ink">Campaign Lead Destination</h3>
+            <p class="text-xs text-muted">Historical and future attributed leads use this destination. Existing Page/form mappings stay unchanged.</p>
+            <label class="block text-xs font-semibold">Client / Organization</label>
+            <x-ui.themed-select wire:model.live="mappingClientId" :options="$mappingClients" :searchable="true" />
+            @error('mappingClientId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
+            <label class="block text-xs font-semibold">CRM Project</label>
+            <x-ui.themed-select wire:model.live="mappingProjectId" :options="$mappingProjects" :searchable="true" wire:key="mapping-project-{{ $mappingClientId }}" />
+            @error('mappingProjectId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
+            <label class="block text-xs font-semibold">CRM Campaign</label>
+            <x-ui.themed-select wire:model="mappingCampaignId" :options="$mappingCampaigns" :searchable="true" wire:key="mapping-campaign-{{ $mappingProjectId }}" />
+            @error('mappingCampaignId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
+            <div class="flex justify-end gap-2">
+                <button type="button" x-on:click="$dispatch('close-modal', 'meta-campaign-mapping')" class="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button>
+                <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">Save Mapping</button>
+            </div>
+        </form>
+    </x-ui.modal>
 
     <x-ui.modal name="meta-ad-account-editor" maxWidth="2xl" centered>
         <form wire:submit="save" class="p-5 space-y-4">

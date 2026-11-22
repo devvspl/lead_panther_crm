@@ -998,24 +998,38 @@ class IntegrationsManager extends Component
                 'label' => 'Campaign Name',
                 'width' => '28%',
                 'priority' => 1,
-                'render' => function ($row) use ($formDetails) {
+                'render' => function ($row) use ($formDetails, $campaignDetails) {
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = is_array($row) ? ($row['name'] ?? null) : $row->name;
                     $mapping = $formDetails->get($fId);
                     $linkedAds = $mapping?->ads()->with('campaignRecord')->get() ?? collect();
                     $matchingAd = $linkedAds->first(fn ($a) => $a->campaignRecord && strtolower($a->campaignRecord->name) === strtolower((string) $fName))
                         ?? $linkedAds->first();
+                    $campaign = $campaignDetails->get($this->formCampaignMap[$fId] ?? null) ?? $mapping?->campaign;
                     $campaignName = $matchingAd?->campaignRecord?->name 
                         ?? data_get($matchingAd?->data, 'campaign_name')
-                        ?? $mapping?->campaign?->name;
+                        ?? $campaign?->name;
+                    $campaignMeta = '';
+                    if ($campaign) {
+                        $campaignMeta = '<div class="mt-1 space-y-0.5 text-[10px] text-muted">'
+                            . ($campaign->project ? '<p>Project: <span class="text-ink">' . e($campaign->project->name) . '</span></p>' : '')
+                            . '<p>Campaign #' . e($campaign->id) . ' · <span class="font-medium">' . e(ucfirst($campaign->status ?? 'Unknown')) . '</span></p>'
+                            . '</div>';
+                    }
+                    $identifiers = '<span id="meta-campaign-desktop-' . e($fId) . '" class="hidden" aria-hidden="true"></span>'
+                        . '<span id="meta-campaign-mobile-' . e($fId) . '" class="hidden" aria-hidden="true"></span>';
                     if ($campaignName) {
                         return '<div class="min-w-0 pr-1">'
                             . '<span class="font-semibold text-ink text-xs block truncate" title="' . e($campaignName) . '">' . e($campaignName) . '</span>'
                             . ($matchingAd ? '<span class="text-muted text-[10px] block mt-0.5 font-mono">Linked Ad: ' . e($matchingAd->name ?: $matchingAd->remote_id) . '</span>' : '')
+                            . $campaignMeta
+                            . $identifiers
                             . '</div>';
                     }
                     return '<div class="text-muted text-[11px]">'
                         . '<span class="italic text-muted">Auto-detected from Meta</span>'
+                        . $campaignMeta
+                        . $identifiers
                         . '</div>';
                 },
             ],

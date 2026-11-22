@@ -10,6 +10,7 @@ class MetaAdRecord extends Model
     protected $guarded = [];
     protected $casts = [
         'data' => 'array',
+        'lead_fetch_state' => 'array',
         'synced_at' => 'datetime',
         'report_date' => 'date',
     ];

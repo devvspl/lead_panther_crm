@@ -407,6 +407,10 @@ class MetaLeadSyncService
                             continue;
                         }
 
+                        // Resolve per-lead campaign routing before duplicate checks. Shared forms can serve multiple clients.
+                        $campaignRoute = app(MetaCampaignLeadService::class)->routing($account, $mapped);
+                        $leadClientId = $campaignRoute?->project?->client_id ?: ($mapping?->client_id ?: ($defaultConfiguredClientId ?: $clientId));
+                        $projectId = $campaignRoute?->project_id ?: $project?->id;
                         $mobile = $mapped['mobile'] ?: '';
                         $email = $mapped['email'] ?: '';
                         $metaLeadId = $rawLead['id'] ?? 'unknown';
@@ -447,7 +451,7 @@ class MetaLeadSyncService
 
                         // Auto-create or map Campaign from Meta campaign_name
                         $remoteCampaign = app(MetaAdAccountService::class)->campaignRecord($account, $mapped);
-                        $targetCampaignId = $overrideCampaignId;
+                        $targetCampaignId = $campaignRoute?->id ?? $overrideCampaignId;
 
                         // Only fallback to legacy scoped campaign if the form is NOT explicitly mapped to a client
                         if (!$targetCampaignId && empty($mapping?->client_id)) {

@@ -31,6 +31,48 @@ class MetaAdAccounts extends Component
     public string $statusFilter = '';
     public array $campaignMap = [];
     public string $message = '';
+    #[Locked] public ?int $mappingRecordId = null;
+    public string $mappingClientId = '';
+    public string $mappingProjectId = '';
+    public string $mappingCampaignId = '';
+
+    private function campaignRecord(int $id): MetaAdRecord
+    {
+        abort_unless($this->viewingId, 404);
+        return $this->account($this->viewingId)->records()->where('kind', 'campaign')->findOrFail($id);
+    }
+
+    public function openCampaignMapping(int $recordId): void
+    {
+        $record = $this->campaignRecord($recordId);
+        $this->resetValidation();
+        $this->mappingRecordId = $record->id;
+        $this->mappingCampaignId = (string) ($record->crm_campaign_id ?? '');
+        $this->mappingProjectId = (string) ($record->crmCampaign?->project_id ?? '');
+        $this->mappingClientId = (string) ($record->crmCampaign?->project?->client_id ?? '');
+        $this->dispatch('open-modal', 'meta-campaign-mapping');
+    }
+
+    public function updatedMappingClientId(): void { $this->reset('mappingProjectId', 'mappingCampaignId'); }
+    public function updatedMappingProjectId(): void { $this->reset('mappingCampaignId'); }
+
+    public function saveCampaignMapping(): void
+    {
+        $this->validate(['mappingClientId' => 'required|integer|exists:users,id', 'mappingProjectId' => 'required|integer|exists:projects,id', 'mappingCampaignId' => 'required|integer|exists:campaigns,id']);
+        app(\App\Services\MetaCampaignLeadService::class)->saveMapping($this->campaignRecord($this->mappingRecordId), (int) $this->mappingClientId, (int) $this->mappingProjectId, (int) $this->mappingCampaignId);
+        $this->dispatch('close-modal', 'meta-campaign-mapping');
+        $this->message = 'Campaign destination saved. Existing form mappings are preserved; attributed future leads use this destination.';
+    }
+
+    public function fetchCampaignLeads(int $recordId): void
+    {
+        $record = $this->campaignRecord($recordId);
+        if (!$record->crm_campaign_id) { $this->openCampaignMapping($recordId); return; }
+        try {
+            app(\App\Services\MetaCampaignLeadService::class)->start($record);
+            $this->message = 'Lead fetch queued. Only forms resolved from this campaign’s ads will be read. Progress appears below the campaign.';
+        } catch (\RuntimeException $e) { $this->message = $e->getMessage(); }
+    }
 
     public function boot(): void
     {
@@ -132,6 +174,7 @@ class MetaAdAccounts extends Component
         $account = $this->account($id);
         $this->viewingId = $id;
         $this->reset('search', 'kind', 'campaignMap', 'statusFilter', 'insightLevel', 'insightDatePreset');
+        $this->statusFilter = 'ACTIVE';
         $this->campaignMap = $account->records()->where('kind', 'campaign')->pluck('crm_campaign_id', 'id')->all();
         $this->resetPage('metaRecordsPage');
     }
@@ -145,6 +188,7 @@ class MetaAdAccounts extends Component
     public function updatedKind(): void
     {
         abort_unless(in_array($this->kind, ['campaign', 'adset', 'ad', 'insight']), 422);
+        $this->statusFilter = $this->kind === 'campaign' ? 'ACTIVE' : '';
         $this->resetPage('metaRecordsPage');
     }
 
@@ -164,9 +208,10 @@ class MetaAdAccounts extends Component
     {
         $record = $this->account($this->viewingId)->records()->where('kind', 'campaign')->findOrFail($recordId);
         $value = $this->campaignMap[$recordId] ?? null;
-        if ($value) Campaign::findOrFail($value);
-        $record->update(['crm_campaign_id' => $value ?: null]);
-        app(MetaAdAccountService::class)->audit($record->account, 'campaign_mapped', ['remote_campaign_id' => $record->remote_id, 'crm_campaign_id' => $value]);
+        if ($value) {
+            $campaign = Campaign::with('project')->findOrFail($value);
+            app(\App\Services\MetaCampaignLeadService::class)->saveMapping($record, (int) $campaign->project->client_id, (int) $campaign->project_id, $campaign->id);
+        }
         $this->message = 'Campaign mapping saved. Existing form routing is unchanged.';
     }
 
@@ -202,13 +247,19 @@ class MetaAdAccounts extends Component
             }
         }
 
-        $records = $query?->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
+        $records = $query?->with('crmCampaign.project.client')->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
 
         return view('livewire.settings.meta-ad-accounts', [
             'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages'])->orderBy('name')->get(),
             'selected' => $account,
             'records' => $records ?: collect(),
             'campaignOptions' => ['' => 'No CRM mapping'] + Campaign::orderBy('name')->pluck('name', 'id')->all(),
+            'mappingClients' => ['' => 'Select client / organization'] + \App\Models\User::where('status', 'active')->where(function ($q) {
+                $q->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['Builder/Developer', 'Client/Organization Admin', 'Organization Admin', 'Client Admin', 'Super Admin', 'super-admin']))
+                    ->orWhereIn('id', \App\Models\Project::select('client_id'));
+            })->orderBy('name')->pluck('name', 'id')->all(),
+            'mappingProjects' => ['' => 'Select CRM project'] + ($this->mappingClientId ? \App\Models\Project::where('client_id', $this->mappingClientId)->orderBy('name')->pluck('name', 'id')->all() : []),
+            'mappingCampaigns' => ['' => 'Select CRM campaign'] + ($this->mappingProjectId ? Campaign::where('project_id', $this->mappingProjectId)->whereHas('project', fn ($q) => $q->where('client_id', $this->mappingClientId))->orderBy('name')->pluck('name', 'id')->all() : []),
             'logs' => $account ? AuditLog::where('subject_type', MetaAdAccount::class)->where('subject_id', $account->id)->latest('created_at')->limit(10)->get() : collect(),
         ]);
     }

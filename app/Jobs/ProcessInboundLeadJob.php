@@ -25,6 +25,10 @@ class ProcessInboundLeadJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public WebhookLog $webhookLog;
+    public int $tries = 8;
+    public int $timeout = 60;
+
+    public function backoff(): array { return [60, 300, 900, 1800]; }
 
     public function __construct(WebhookLog $webhookLog)
     {
@@ -54,22 +58,20 @@ class ProcessInboundLeadJob implements ShouldQueue
                     $account = $page;
                 }
                 $leadgenId = $raw['entry'][0]['changes'][0]['value']['leadgen_id'] ?? $raw['leadgen_id'] ?? null;
-                $hasFieldData = !empty($raw['field_data']) || !empty($raw['entry'][0]['changes'][0]['value']['field_data']);
+                $value = $raw['entry'][0]['changes'][0]['value'] ?? $raw;
+                $hasFieldData = !empty($raw['field_data']) || !empty($value['field_data'])
+                    || (!empty($value['full_name']) && (!empty($value['phone_number']) || !empty($value['email'])));
 
                 if ($leadgenId && !$hasFieldData && $account) {
                     $token = $account->getCredential('access_token');
+                    if (!$token) throw new \RuntimeException('Page access token is required to retrieve this lead.');
                     if ($token) {
-                        try {
-                            $fbRes = \Illuminate\Support\Facades\Http::timeout(15)->get("https://graph.facebook.com/v19.0/{$leadgenId}", [
-                                'access_token' => $token,
-                                'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
-                            ]);
-                            if ($fbRes->successful() && is_array($fbRes->json())) {
-                                $raw = array_merge($raw, $fbRes->json());
-                            }
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::warning("ProcessInboundLeadJob: Failed fetching leadgen {$leadgenId} from Graph API: " . $e->getMessage());
-                        }
+                        $fbRes = app(\App\Services\MetaAdAccountService::class)->get((string) $leadgenId, $token, [
+                            'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
+                        ]);
+                        if (empty($fbRes['field_data'])) throw new \RuntimeException('Meta lead details are unavailable; retry after restoring lead retrieval access.');
+                        $raw = array_merge($raw, $fbRes);
+
                     }
                 }
             }
@@ -91,193 +93,202 @@ class ProcessInboundLeadJob implements ShouldQueue
                 $this->webhookLog->update(['processed' => true, 'error_message' => 'Meta lead already imported.']);
                 return;
             }
-            $formId = $mapped['form'] ?? null;
-            $mapping = null;
-            if ($account && $formId) {
-                $mapping = \App\Models\LeadFormMapping::where('portal_account_id', $account->id)
-                    ->where('form_id', $formId)
-                    ->first();
-            }
-
-            // Determine Client & LeadSource (Form mapping with client takes top priority)
-            $client = Client::first();
-            $defaultClientId = $client?->id ?: (\App\Models\User::first()?->id ?: 1);
-            if ($account) {
-                $accDefault = $account->getCredential('default_client_id');
-                if ($accDefault) $defaultClientId = (int) $accDefault;
-            }
-
-            $targetClientId = (!empty($mapping?->client_id))
-                ? (int) $mapping->client_id
-                : ($mapping?->campaign?->project?->client_id ?: $defaultClientId);
-
-            $clientId = $targetClientId;
-
-            // Inherit project context belonging to the target client
-            $projectId = null;
-            if (!empty($mapping?->project_id)) {
-                $p = Project::find($mapping->project_id);
-                if ($p && (int) $p->client_id === (int) $clientId) {
-                    $projectId = $p->id;
+            \Illuminate\Support\Facades\DB::transaction(function () use ($account, $type, $raw, $mapped) {
+                $formId = $mapped['form'] ?? null;
+                $mapping = null;
+                if ($account && $formId) {
+                    $mapping = \App\Models\LeadFormMapping::where('portal_account_id', $account->id)
+                        ->where('form_id', $formId)
+                        ->first();
                 }
-            }
-            if (!$projectId && !empty($mapping?->campaign?->project_id)) {
-                $p = Project::find($mapping->campaign->project_id);
-                if ($p && (int) $p->client_id === (int) $clientId) {
-                    $projectId = $p->id;
+
+                // Determine Client & LeadSource (Form mapping with client takes top priority)
+                $client = Client::first();
+                $defaultClientId = $client?->id ?: (\App\Models\User::first()?->id ?: 1);
+                if ($account) {
+                    $accDefault = $account->getCredential('default_client_id');
+                    if ($accDefault) $defaultClientId = (int) $accDefault;
                 }
-            }
-            if (!$projectId) {
-                $projectId = Project::where('client_id', $clientId)->value('id') ?: Project::value('id');
-            }
 
-            $campaignId = $mapping?->campaign_id;
-            $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
-            $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
+                $targetClientId = (!empty($mapping?->client_id))
+                    ? (int) $mapping->client_id
+                    : ($mapping?->campaign?->project?->client_id ?: $defaultClientId);
 
-            // Only fallback to legacy scoped campaign if form has NO explicit client mapping
-            if (!$campaignId && $type === 'meta' && $account && empty($mapping?->client_id)) {
-                $scoped = app(\App\Services\MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id);
-                if ($scoped) {
-                    $campaignId = $scoped->id;
-                    $projectId = $scoped->project_id;
-                    $clientId = $scoped->project?->client_id ?: $clientId;
-                }
-            }
+                $campaignRoute = $type === 'meta' && $account
+                    ? app(\App\Services\MetaCampaignLeadService::class)->routing($account, $mapped) : null;
+                if ($campaignRoute) $targetClientId = $campaignRoute->project->client_id;
+                $clientId = $targetClientId;
 
-            // Auto-create or map Campaign from Meta campaign name under the client's project
-            if (!empty($mapped['campaign']) && !$campaignId) {
-                $campaign = \App\Models\Campaign::firstOrCreate(
-                    [
-                        'project_id' => $projectId,
-                        'name' => $mapped['campaign'],
-                    ],
-                    [
-                        'lead_source_id' => $leadSource->id,
-                        'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
-                        'status' => 'active',
-                    ]
-                );
-                $campaignId = $campaign->id;
-            }
-
-            $mobile = $mapped['mobile'] ?? '';
-            $email = $mapped['email'] ?? 'unknown@example.com';
-
-            // 2. 90-Day Duplicate Check
-            $existingLead = Lead::where('client_id', $clientId)
-                ->where('created_at', '>=', now()->subDays(90))
-                ->where(function ($q) use ($mobile, $email) {
-                    $q->where('mobile', $mobile);
-                    if ($email && $email !== 'unknown@example.com') {
-                        $q->orWhere('email', $email);
+                // Inherit project context belonging to the target client
+                $projectId = null;
+                if (!empty($mapping?->project_id)) {
+                    $p = Project::find($mapping->project_id);
+                    if ($p && (int) $p->client_id === (int) $clientId) {
+                        $projectId = $p->id;
                     }
-                })
-                ->first();
+                }
+                if (!$projectId && !empty($mapping?->campaign?->project_id)) {
+                    $p = Project::find($mapping->campaign->project_id);
+                    if ($p && (int) $p->client_id === (int) $clientId) {
+                        $projectId = $p->id;
+                    }
+                }
+                if (!$projectId) {
+                    $projectId = Project::where('client_id', $clientId)->value('id') ?: Project::value('id');
+                }
 
-            if ($existingLead) {
-                // Insert duplicate metadata for audit traceability without creating duplicate Lead or consuming credits
+                if ($campaignRoute) $projectId = $campaignRoute->project_id;
+                $campaignId = $campaignRoute?->id ?? $mapping?->campaign_id;
+                $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
+                $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
+
+                // Only fallback to legacy scoped campaign if form has NO explicit client mapping
+                if (!$campaignId && $type === 'meta' && $account && empty($mapping?->client_id)) {
+                    $scoped = app(\App\Services\MetaAdAccountService::class)->campaignForLead($account, $mapped, $projectId, $leadSource->id);
+                    if ($scoped) {
+                        $campaignId = $scoped->id;
+                        $projectId = $scoped->project_id;
+                        $clientId = $scoped->project?->client_id ?: $clientId;
+                    }
+                }
+
+                // Auto-create or map Campaign from Meta campaign name under the client's project
+                if (!empty($mapped['campaign']) && !$campaignId) {
+                    $campaign = \App\Models\Campaign::firstOrCreate(
+                        [
+                            'project_id' => $projectId,
+                            'name' => $mapped['campaign'],
+                        ],
+                        [
+                            'lead_source_id' => $leadSource->id,
+                            'utm_campaign' => \Illuminate\Support\Str::slug($mapped['campaign']),
+                            'status' => 'active',
+                        ]
+                    );
+                    $campaignId = $campaign->id;
+                }
+
+                $mobile = $mapped['mobile'] ?? '';
+                $email = $mapped['email'] ?? 'unknown@example.com';
+
+                // 2. 90-Day Duplicate Check
+                $existingLead = Lead::where('client_id', $clientId)
+                    ->where('created_at', '>=', now()->subDays(90))
+                    ->where(function ($q) use ($mobile, $email) {
+                        $q->where('mobile', $mobile);
+                        if ($email && $email !== 'unknown@example.com') {
+                            $q->orWhere('email', $email);
+                        }
+                    })
+                    ->first();
+
+                if ($existingLead) {
+                    if ($type === 'meta' && !empty($mapped['leadgen_id'])) {
+                        LeadMetadata::firstOrCreate(['lead_id' => $existingLead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $mapped['leadgen_id']]);
+                    }
+                    // Insert duplicate metadata for audit traceability without creating duplicate Lead or consuming credits
+                    LeadMetadata::create([
+                        'lead_id' => $existingLead->id,
+                        'key' => 'duplicate_utm_source',
+                        'value' => $mapped['raw_utm']['utm_source'] ?? $type,
+                    ]);
+
+                    LeadMetadata::create([
+                        'lead_id' => $existingLead->id,
+                        'key' => 'duplicate_raw_json',
+                        'value' => json_encode($raw),
+                    ]);
+
+                    $this->webhookLog->update([
+                        'processed' => true,
+                        'error_message' => 'Duplicate lead detected (same mobile/email within 90 days). Logged metadata.',
+                    ]);
+                    return;
+                }
+
+                // Parse budget to valid decimal format
+                $rawBudget = $mapped['budget'] ?? null;
+                $cleanBudget = null;
+                if (is_numeric($rawBudget)) {
+                    $cleanBudget = (float) $rawBudget;
+                } elseif (is_string($rawBudget)) {
+                    preg_match('/[0-9]+(\.[0-9]+)?/', str_replace(',', '', $rawBudget), $matches);
+                    if (!empty($matches[0])) {
+                        $num = (float) $matches[0];
+                        if (str_contains(strtolower($rawBudget), 'cr')) {
+                            $cleanBudget = $num * 10000000;
+                        } elseif (str_contains(strtolower($rawBudget), 'l')) {
+                            $cleanBudget = $num * 100000;
+                        } else {
+                            $cleanBudget = $num;
+                        }
+                    }
+                }
+                $budget = $cleanBudget ?: 7500000.00;
+
+                // 3. Create New Lead Master Record (project_id removed; inherited via campaign)
+                $lead = Lead::create([
+                    'lead_code' => Lead::generateUniqueLeadCode(),
+                    'client_id' => $clientId,
+                    'campaign_id' => $campaignId,
+                    'lead_source_id' => $leadSource->id,
+                    'name' => $mapped['name'] ?? 'Inbound Lead',
+                    'mobile' => $mobile,
+                    'email' => $email,
+                    'city' => $mapped['city'] ?? 'Mumbai',
+                    'location' => $mapped['location'] ?? null,
+                    'budget' => $budget,
+                    'property_type' => $mapped['property_type'] ?? '2 BHK',
+                    'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
+                    'status' => 'new',
+                    'current_stage' => 'new',
+                    'assigned_to' => null,
+                ]);
+
+                // Save raw UTM / Attribution metadata
                 LeadMetadata::create([
-                    'lead_id' => $existingLead->id,
-                    'key' => 'duplicate_utm_source',
+                    'lead_id' => $lead->id,
+                    'key' => 'utm_source',
                     'value' => $mapped['raw_utm']['utm_source'] ?? $type,
                 ]);
 
+                if (!empty($mapped['leadgen_id'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $mapped['leadgen_id']]);
+                }
+                if (!empty($mapped['form'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_id', 'value' => (string) $mapped['form']]);
+                }
+                if (!empty($mapped['campaign'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_name', 'value' => $mapped['campaign']]);
+                }
+                if (!empty($mapped['campaign_id'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_id', 'value' => (string) $mapped['campaign_id']]);
+                }
+                if ($remoteCampaign) LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_account_id', 'value' => $remoteCampaign->ad_account_id]);
+                if (!empty($mapped['ad_set'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
+                }
+                if (!empty($mapped['ad'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_name', 'value' => $mapped['ad']]);
+                }
+                if (!empty($mapped['custom_fields'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);
+                }
+
                 LeadMetadata::create([
-                    'lead_id' => $existingLead->id,
-                    'key' => 'duplicate_raw_json',
+                    'lead_id' => $lead->id,
+                    'key' => 'raw_json',
                     'value' => json_encode($raw),
                 ]);
 
                 $this->webhookLog->update([
                     'processed' => true,
-                    'error_message' => 'Duplicate lead detected (same mobile/email within 90 days). Logged metadata.',
+                    'error_message' => null,
                 ]);
-                return;
-            }
 
-            // Parse budget to valid decimal format
-            $rawBudget = $mapped['budget'] ?? null;
-            $cleanBudget = null;
-            if (is_numeric($rawBudget)) {
-                $cleanBudget = (float) $rawBudget;
-            } elseif (is_string($rawBudget)) {
-                preg_match('/[0-9]+(\.[0-9]+)?/', str_replace(',', '', $rawBudget), $matches);
-                if (!empty($matches[0])) {
-                    $num = (float) $matches[0];
-                    if (str_contains(strtolower($rawBudget), 'cr')) {
-                        $cleanBudget = $num * 10000000;
-                    } elseif (str_contains(strtolower($rawBudget), 'l')) {
-                        $cleanBudget = $num * 100000;
-                    } else {
-                        $cleanBudget = $num;
-                    }
-                }
-            }
-            $budget = $cleanBudget ?: 7500000.00;
-
-            // 3. Create New Lead Master Record (project_id removed; inherited via campaign)
-            $lead = Lead::create([
-                'lead_code' => Lead::generateUniqueLeadCode(),
-                'client_id' => $clientId,
-                'campaign_id' => $campaignId,
-                'lead_source_id' => $leadSource->id,
-                'name' => $mapped['name'] ?? 'Inbound Lead',
-                'mobile' => $mobile,
-                'email' => $email,
-                'city' => $mapped['city'] ?? 'Mumbai',
-                'location' => $mapped['location'] ?? null,
-                'budget' => $budget,
-                'property_type' => $mapped['property_type'] ?? '2 BHK',
-                'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
-                'status' => 'new',
-                'current_stage' => 'new',
-                'assigned_to' => null,
-            ]);
-
-            // Save raw UTM / Attribution metadata
-            LeadMetadata::create([
-                'lead_id' => $lead->id,
-                'key' => 'utm_source',
-                'value' => $mapped['raw_utm']['utm_source'] ?? $type,
-            ]);
-
-            if (!empty($mapped['leadgen_id'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $mapped['leadgen_id']]);
-            }
-            if (!empty($mapped['form'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_id', 'value' => (string) $mapped['form']]);
-            }
-            if (!empty($mapped['campaign'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_name', 'value' => $mapped['campaign']]);
-            }
-            if (!empty($mapped['campaign_id'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_id', 'value' => (string) $mapped['campaign_id']]);
-            }
-            if ($remoteCampaign) LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_account_id', 'value' => $remoteCampaign->ad_account_id]);
-            if (!empty($mapped['ad_set'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
-            }
-            if (!empty($mapped['ad'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_name', 'value' => $mapped['ad']]);
-            }
-            if (!empty($mapped['custom_fields'])) {
-                LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);
-            }
-
-            LeadMetadata::create([
-                'lead_id' => $lead->id,
-                'key' => 'raw_json',
-                'value' => json_encode($raw),
-            ]);
-
-            $this->webhookLog->update([
-                'processed' => true,
-                'error_message' => null,
-            ]);
-
-            // Dispatch LeadCreated event to trigger Credit Reservation
-            event(new LeadCreated($lead));
+                // Dispatch LeadCreated event to trigger Credit Reservation
+                event(new LeadCreated($lead));
+            });
         } catch (Throwable $e) {
             $this->webhookLog->update([
                 'error_message' => 'Processing exception: ' . $e->getMessage(),

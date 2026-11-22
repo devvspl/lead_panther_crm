@@ -112,6 +112,7 @@ class InboundLeadPipelineTest extends TestCase
         Project::create(['client_id' => $client->id, 'name' => 'Test Project Retries']);
 
         $account = PortalAccount::create(['name' => 'Owned Account', 'type' => 'owned']);
+        $account->setCredential('default_client_id', $client->id);
         $log = WebhookLog::create([
             'portal_account_id' => $account->id,
             'payload' => file_get_contents(base_path('tests/Fixtures/webhooks/owned.json')),

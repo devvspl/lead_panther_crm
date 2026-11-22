@@ -36,6 +36,7 @@
     $activeColumns = array_values(array_filter($columns, fn($c) => in_array($c['key'], $visibleCols)));
     $hasFilterConfig = isset($this) && method_exists($this, 'filterConfig') && !empty($this->filterConfig());
     $hasToolbar = $showSearch || ($showFilterDropdown && (isset($filters) || $hasFilterConfig)) || ($showConfigurations && !empty($columns)) || isset($action);
+    $effectiveLoadingTarget = $loadingTarget ?: ($searchModel . ', ' . $sortAction . ', setStatusFilter, resetTableFilters, gotoPage, previousPage, nextPage, setPerPage');
 @endphp
 
 <div class="lp-data-view min-w-0 max-w-full space-y-4" x-data="{
@@ -314,8 +315,7 @@
                 </thead>
 
                 @if(!$loading)
-                    <tbody class="divide-y divide-border" @if($showSkeleton) wire:loading.remove @if($loadingTarget)
-                    wire:target="{{ $loadingTarget }}" @endif @endif>
+                    <tbody class="divide-y divide-border" @if($showSkeleton) wire:loading.remove wire:target="{{ $effectiveLoadingTarget }}" @endif>
                         @if(!empty($rows) && count($rows) > 0)
                             @foreach($rows as $row)
                                 @php
@@ -482,57 +482,9 @@
                                             @elseif($type === 'lead_actions')
                                                 @php
                                                     $actionLeadId = is_object($row) ? $row->id : $row['id'];
-                                                    $actionUser = auth()->user();
-                                                    $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                                 @endphp
-                                                <div class="flex items-center justify-end gap-1.5">
-                                                    <button type="button"
-                                                        @click="$dispatch('open-lead-detail', { id: {{ $actionLeadId }} })"
-                                                        class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
-                                                        title="View Lead Details">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
-                                                    @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
-                                                        <button type="button"
-                                                            @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadId }} })"
-                                                            class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
-                                                            title="Show Full Lead Journey Timeline">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        </button>
-                                                    @endif
-                                                    @if(!$isSalesUser)
-                                                        @if(!\App\Models\Lead::usesSalesPanel() || (!$row->isTerminalStage() && \App\Models\Lead::normalizeStage($row->current_stage) !== 'pending_credit'))
-                                                            <button type="button"
-                                                                @click.stop="$dispatch('open-lead-assign', { id: {{ $actionLeadId }} })"
-                                                                class="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
-                                                                title="Assign Lead to Team Member">
-                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                                                </svg>
-                                                            </button>
-                                                        @endif
-                                                        @if(!\App\Support\TeamAccess::isLeader($actionUser) && (!\App\Models\Lead::usesSalesPanel() || (!in_array(\App\Models\Lead::normalizeStage($row->current_stage), ['closed_won', 'booking', 'payment_received', 'replaced', 'pending_credit']) && !in_array($row->replacement_status, ['pending', 'approved']))))
-                                                            <button type="button"
-                                                                @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadId }} })"
-                                                                class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                                                                title="Return Lead to Super Admin (Replacement Request)">
-                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                        d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
-                                                                </svg>
-                                                            </button>
-                                                        @endif
-                                                    @endif
-                                                    <x-ui.lead-archive-menu :id="$actionLeadId" />
+                                                <div class="flex items-center justify-end">
+                                                    <x-ui.lead-archive-menu :id="$actionLeadId" :lead="$row" />
                                                 </div>
                                             @elseif($type === 'user_name')
                                                 @php
@@ -805,7 +757,7 @@
                 @if($loading || $showSkeleton)
                     {{-- Toggle visibility without overriding tbody's native table-row-group display. --}}
                     <tbody class="divide-y divide-border {{ !$loading ? 'hidden' : '' }}" @if(!$loading)
-                        wire:loading.class.remove="hidden" @if($loadingTarget) wire:target="{{ $loadingTarget }}" @endif
+                        wire:loading.class.remove="hidden" wire:target="{{ $effectiveLoadingTarget }}"
                     @endif>
                         @for($i = 0; $i < (int) $skeletonRows; $i++)
                             @php
@@ -874,8 +826,7 @@
     <!-- 4. MOBILE RESPONSIVE CARD STACK (Reflow on < md) -->
     @if(!$loading)
         <div class="block md:hidden">
-            <div class="space-y-3" @if($showSkeleton) wire:loading.remove @if($loadingTarget)
-            wire:target="{{ $loadingTarget }}" @endif @endif>
+            <div class="space-y-3" @if($showSkeleton) wire:loading.remove wire:target="{{ $effectiveLoadingTarget }}" @endif>
                 @if(!empty($rows) && count($rows) > 0)
                     @foreach($rows as $row)
                         @php
@@ -1020,41 +971,8 @@
                                                     $actionUserMob = auth()->user();
                                                     $isSalesUserMob = $actionUserMob && (\App\Support\NavigationConfig::getRoleKey($actionUserMob) === 'sales-executive' || $actionUserMob->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
                                                 @endphp
-                                                <div class="flex items-center justify-end gap-1.5">
-                                                    <button type="button"
-                                                        @click="$dispatch('open-lead-detail', { id: {{ $actionLeadIdMob }} })"
-                                                        class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer"
-                                                        title="View Lead Details">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
-                                                    @if(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
-                                                        <button type="button"
-                                                            @click.stop="$dispatch('open-lead-journey', { id: {{ $actionLeadIdMob }} })"
-                                                            class="p-1.5 rounded-lg text-primary hover:text-primary-dark hover:bg-primary/10 transition cursor-pointer"
-                                                            title="Show Full Lead Journey Timeline">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        </button>
-                                                    @endif
-                                                    @if(!$isSalesUserMob)
-                                                        <button type="button"
-                                                            @click.stop="$dispatch('open-return-lead', { id: {{ $actionLeadIdMob }} })"
-                                                            class="p-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                                                            title="Return Lead to Super Admin">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                    d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1" />
-                                                            </svg>
-                                                        </button>
-                                                    @endif
-                                                    <x-ui.lead-archive-menu :id="$actionLeadIdMob" />
+                                                <div class="flex items-center justify-end">
+                                                    <x-ui.lead-archive-menu :id="$actionLeadIdMob" :lead="$row" />
                                                 </div>
                                             @elseif($type === 'user_name')
                                                 @php
@@ -1310,8 +1228,7 @@
     @if($loading || $showSkeleton)
         {{-- Keep responsive visibility outside Livewire's inline display changes. --}}
         <div class="block md:hidden">
-            <div class="space-y-3" @if(!$loading) wire:loading.block @if($loadingTarget) wire:target="{{ $loadingTarget }}"
-            @endif @endif>
+            <div class="space-y-3" @if(!$loading) wire:loading.block wire:target="{{ $effectiveLoadingTarget }}" @endif>
                 @for($i = 0; $i < (int) min($skeletonRows, 4); $i++)
                     <div class="bg-surface rounded-card border border-border p-4 shadow-sm space-y-3 animate-pulse">
                         <div

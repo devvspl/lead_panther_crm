@@ -1615,6 +1615,25 @@ class LeadKanban extends Component
             ->toArray();
     }
 
+    public function pushLeadToClient(int $id): void
+    {
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->find($id);
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
+            return;
+        }
+
+        $clientOrgId = $lead->client?->organization_id ?: ($lead->organization?->id ?: null);
+        if (!$clientOrgId) {
+            $this->dispatch('toast', type: 'error', message: 'This lead has no associated client organization to push to.');
+
+            return;
+        }
+
+        $this->dispatch('client-push-selected', organizationId: $clientOrgId, leadIds: [$id], sendNow: true)->to(\App\Livewire\Leads\ClientDeliveryCenter::class);
+    }
+
     #[On('open-lead-assign')]
     public function openAssignModalForSingleLead(int $id): void
     {

@@ -92,6 +92,10 @@ Route::get('/leads/download-errors/{batch}', function (\App\Models\UploadBatch $
     }, $filename, ['Content-Type' => 'text/csv']);
 })->middleware(['auth'])->name('leads.download-errors');
 
+Route::get('/leads/upload-batches/{batch}/download', \App\Http\Controllers\UploadBatchDownloadController::class)
+    ->middleware(['auth'])
+    ->name('leads.upload-batches.download');
+
 Route::get('/leads/upload-history', UploadHistory::class)->middleware(['auth'])->name('leads.upload-history');
 
 // Client Credit Wallet Route

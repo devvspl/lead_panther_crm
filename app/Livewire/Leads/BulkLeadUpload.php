@@ -297,15 +297,25 @@ class BulkLeadUpload extends Component
                 }
             }
 
-            // Audit Batch Record Creation
-            $filename = $this->file ? $this->file->getClientOriginalName() : 'batch_import.csv';
+            // Audit Batch Record Creation & Permanent File Storage
+            $originalFilename = $this->file ? $this->file->getClientOriginalName() : 'batch_import.csv';
+            $storedPath = null;
+            if ($this->file) {
+                try {
+                    $storedPath = $this->file->store('imports/batches/' . date('Y/m'), 'local');
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to store bulk upload original file: ' . $e->getMessage());
+                }
+            }
 
             $this->completedBatch = UploadBatch::create([
                 'uploaded_by' => auth()->id(),
                 'project_id' => $this->projectId,
                 'campaign_id' => $this->campaignId,
                 'lead_source_id' => $this->leadSourceId,
-                'filename' => $filename,
+                'filename' => $originalFilename,
+                'original_filename' => $originalFilename,
+                'file_path' => $storedPath,
                 'total_rows' => $totalRows,
                 'imported_count' => $importedCount,
                 'skipped_count' => $skippedCount,

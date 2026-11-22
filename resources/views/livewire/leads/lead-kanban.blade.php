@@ -307,15 +307,16 @@
 
         <!-- Active Filters Bar -->
         @php
-            $hasActiveFilters = $filterOrganizationId || $project || $campaign || $team || $source || $executive || $leadType || ($statusFilter !== 'all') || $stageFilter || $sla_breached || ($analyticsRange !== 'month');
+            $defaultRange = $this->isClientContext() ? 'all' : 'month';
+            $hasActiveFilters = $filterOrganizationId || $project || $campaign || $team || $source || $executive || $leadType || ($statusFilter !== 'all') || $stageFilter || $sla_breached || ($analyticsRange !== $defaultRange) || ($this->isClientContext() && !empty($deliveryFilter));
         @endphp
         @if($hasActiveFilters)
             <div class="flex items-center gap-1.5 flex-wrap pt-2 border-t border-border/70 text-xs">
                 <span class="font-semibold text-muted text-[11px]">Active:</span>
-                @if($analyticsRange !== 'month')
+                @if($analyticsRange !== $defaultRange)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
                         Range: {{ ucfirst(str_replace('_', ' ', $analyticsRange)) }}
-                        <button type="button" wire:click="$set('analyticsRange', 'month')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                        <button type="button" wire:click="$set('analyticsRange', '{{ $defaultRange }}')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($filterOrganizationId)
@@ -330,10 +331,22 @@
                         <button type="button" wire:click="$set('project', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
+                @if($campaign)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                        Campaign: #{{ $campaign }}
+                        <button type="button" wire:click="$set('campaign', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                    </span>
+                @endif
                 @if(\App\Support\LeadSourceVisibility::allowed() && $source)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
                         Source: #{{ $source }}
                         <button type="button" wire:click="$set('source', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                    </span>
+                @endif
+                @if($executive)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                        Executive: #{{ $executive }}
+                        <button type="button" wire:click="$set('executive', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($statusFilter !== 'all')
@@ -346,6 +359,12 @@
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
                         Stage: {{ $mainStages[$stageFilter] ?? ucfirst(str_replace('_', ' ', $stageFilter)) }}
                         <button type="button" wire:click="$set('stageFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                    </span>
+                @endif
+                @if($this->isClientContext() && !empty($deliveryFilter))
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                        Delivery: {{ ucfirst($deliveryFilter) }}
+                        <button type="button" wire:click="$set('deliveryFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
                     </span>
                 @endif
                 @if($sla_breached)
@@ -843,6 +862,7 @@
                     <span class="text-xs text-muted font-medium">Sort By:</span>
                     <x-ui.themed-select class="max-w-full" searchable  wire:model.live="sort_by" trigger-class="h-8 text-xs font-semibold rounded-lg border border-border bg-canvas text-ink px-2.5 py-0 focus:outline-none">
                         <option value="created_desc">Latest Created</option>
+                        <option value="created_asc">Oldest Created</option>
                         <option value="score_desc">Priority Score: High to Low</option>
                         <option value="score_asc">Priority Score: Low to High</option>
                     </x-ui.themed-select>

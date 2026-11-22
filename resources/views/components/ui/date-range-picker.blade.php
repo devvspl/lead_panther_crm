@@ -328,6 +328,26 @@
 
         <button
             type="button"
+            @click="selectPreset('yesterday')"
+            class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
+            :class="range === 'yesterday' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
+        >
+            <span>Yesterday</span>
+            <span x-show="range === 'yesterday'" class="text-ink font-bold text-xs">✓</span>
+        </button>
+
+        <button
+            type="button"
+            @click="selectPreset('last7')"
+            class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
+            :class="range === 'last7' ? 'bg-canvas text-ink font-bold' : 'text-ink'"
+        >
+            <span>Last 7 Days</span>
+            <span x-show="range === 'last7'" class="text-ink font-bold text-xs">✓</span>
+        </button>
+
+        <button
+            type="button"
             @click="selectPreset('week')"
             class="w-full text-left px-3 py-1.5 rounded-md hover:bg-canvas transition flex items-center justify-between"
             :class="range === 'week' ? 'bg-canvas text-ink font-bold' : 'text-ink'"

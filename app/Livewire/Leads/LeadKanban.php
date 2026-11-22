@@ -87,9 +87,6 @@ class LeadKanban extends Component
     public string $leadType = '';
 
     #[Url]
-    public string $date_range = 'month';
-
-    #[Url]
     public bool $sla_breached = false;
 
     #[Url]
@@ -98,6 +95,7 @@ class LeadKanban extends Component
     // View & Analytics State
     public string $viewMode = 'kanban'; // 'kanban' | 'table'
 
+    #[Url(as: 'date_range')]
     public string $analyticsRange = 'month';
 
     public ?string $analyticsCustomFrom = null;
@@ -246,16 +244,22 @@ class LeadKanban extends Component
 
         if (auth()->check()) {
             $this->viewMode = GeneralSetting::getValue(auth()->id(), 'leads_view_mode', 'kanban') ?: 'kanban';
-            $savedRange = GeneralSetting::getValue(auth()->id(), 'leads_analytics_range', 'month') ?: 'month';
-            if (str_starts_with($savedRange, '{')) {
-                $decoded = json_decode($savedRange, true);
-                if (is_array($decoded)) {
-                    $this->analyticsRange = $decoded['range'] ?? 'custom';
-                    $this->analyticsCustomFrom = $decoded['from'] ?? null;
-                    $this->analyticsCustomTo = $decoded['to'] ?? null;
-                }
+            if (request()->has('date_range')) {
+                $this->analyticsRange = (string) request('date_range');
+            } elseif (request()->has('analyticsRange')) {
+                $this->analyticsRange = (string) request('analyticsRange');
             } else {
-                $this->analyticsRange = $savedRange;
+                $savedRange = GeneralSetting::getValue(auth()->id(), 'leads_analytics_range', 'month') ?: 'month';
+                if (str_starts_with($savedRange, '{')) {
+                    $decoded = json_decode($savedRange, true);
+                    if (is_array($decoded)) {
+                        $this->analyticsRange = $decoded['range'] ?? 'custom';
+                        $this->analyticsCustomFrom = $decoded['from'] ?? null;
+                        $this->analyticsCustomTo = $decoded['to'] ?? null;
+                    }
+                } else {
+                    $this->analyticsRange = $savedRange;
+                }
             }
 
             // Sync legacy partner param if passed
@@ -285,6 +289,7 @@ class LeadKanban extends Component
 
     public function updatedAnalyticsRange(string $range): void
     {
+        $this->resetPage();
         if (auth()->check()) {
             if ($range === 'custom') {
                 $this->persistCustomAnalyticsRange();
@@ -296,11 +301,13 @@ class LeadKanban extends Component
 
     public function updatedAnalyticsCustomFrom(): void
     {
+        $this->resetPage();
         $this->persistCustomAnalyticsRange();
     }
 
     public function updatedAnalyticsCustomTo(): void
     {
+        $this->resetPage();
         $this->persistCustomAnalyticsRange();
     }
 
@@ -316,6 +323,7 @@ class LeadKanban extends Component
             $this->analyticsCustomFrom = $from;
             $this->analyticsCustomTo = $to;
         }
+        $this->resetPage();
         $this->persistCustomAnalyticsRange();
     }
 
@@ -340,11 +348,14 @@ class LeadKanban extends Component
                 return;
             }
         }
+        $this->selectedRows = [];
+        $this->selectAll = false;
         $this->resetPage();
     }
 
     public function updatedProject(): void
     {
+        $this->campaign = '';
         $this->resetPage();
     }
 
@@ -395,6 +406,7 @@ class LeadKanban extends Component
 
     public function updatedSortBy(): void
     {
+        $this->sortField = '';
         $this->resetPage();
     }
 
@@ -444,6 +456,7 @@ class LeadKanban extends Component
         $this->analyticsRange = 'month';
         $this->analyticsCustomFrom = null;
         $this->analyticsCustomTo = null;
+        $this->sortField = '';
         $this->sort_by = 'created_desc';
         $this->resetPage();
         $this->dispatch('toast', type: 'info', message: 'All filters reset.');
@@ -627,9 +640,20 @@ class LeadKanban extends Component
             $prevStart = Carbon::now()->subDays(13)->startOfDay();
             $prevEnd = Carbon::now()->subDays(7)->endOfDay();
             $periodLabel = 'vs prior 7 days';
+        } elseif (in_array($range, ['lastmonth', 'last_month'])) {
+            $start = Carbon::now()->subMonth()->startOfMonth();
+            $end = Carbon::now()->subMonth()->endOfMonth();
+            $prevStart = Carbon::now()->subMonths(2)->startOfMonth();
+            $prevEnd = Carbon::now()->subMonths(2)->endOfMonth();
+            $periodLabel = 'vs 2 months ago';
         } elseif ($range === 'custom' && $this->analyticsCustomFrom && $this->analyticsCustomTo) {
             $start = Carbon::parse($this->analyticsCustomFrom)->startOfDay();
             $end = Carbon::parse($this->analyticsCustomTo)->endOfDay();
+            if ($start->gt($end)) {
+                $tmp = $start;
+                $start = $end->copy()->startOfDay();
+                $end = $tmp->copy()->endOfDay();
+            }
             $days = max(1, (int) $start->diffInDays($end) + 1);
             $prevEnd = (clone $start)->subSecond();
             $prevStart = (clone $start)->subDays($days)->startOfDay();
@@ -646,6 +670,12 @@ class LeadKanban extends Component
             $prevStart = Carbon::now()->subYear()->startOfYear();
             $prevEnd = Carbon::now()->subYear()->endOfYear();
             $periodLabel = 'vs prior year';
+        } elseif ($range === 'all') {
+            $start = Carbon::createFromTimestamp(0);
+            $end = Carbon::now()->addCentury();
+            $prevStart = Carbon::createFromTimestamp(0);
+            $prevEnd = Carbon::createFromTimestamp(0);
+            $periodLabel = 'all time';
         } else {
             // Default: current month
             $start = Carbon::now()->startOfMonth();
@@ -689,12 +719,22 @@ class LeadKanban extends Component
 
     public function getBuilderLeadKpisProperty(): array
     {
-        $query = $this->getScopedQuery();
+        $status = $this->statusFilter;
+        $stage = $this->stageFilter;
+        $this->statusFilter = 'all';
+        $this->stageFilter = '';
+        try {
+            $query = $this->getScopedQuery();
+        } finally {
+            $this->statusFilter = $status;
+            $this->stageFilter = $stage;
+        }
+
         $total = (clone $query)->count();
-        $new = (clone $query)->whereIn('current_stage', ['new', 'lead_received'])->count();
+        $new = (clone $query)->whereIn('current_stage', Lead::stageValues('new'))->count();
         $assigned = (clone $query)->whereNotNull('assigned_to')->count();
         $unassigned = (clone $query)->whereNull('assigned_to')->count();
-        $inProgress = (clone $query)->whereIn('current_stage', ['contacted', 'connected', 'interested', 'qualified', 'site_visit', 'negotiation'])->count();
+        $inProgress = (clone $query)->whereIn('current_stage', ['contacted', 'connected', 'interested', 'qualified', 'follow_up', 'follow-up', 'meeting_scheduled', 'site_visit', 'negotiation', 'booking', 'payment_received'])->count();
 
         $allOrgLeadIds = (clone $query)->pluck('id')->toArray();
         $followupsDue = Followup::whereIn('lead_id', $allOrgLeadIds)
@@ -702,8 +742,8 @@ class LeadKanban extends Component
             ->where('status', '!=', 'completed')
             ->count();
 
-        $closedWon = (clone $query)->whereIn('current_stage', ['closed_won', 'booking'])->count();
-        $lost = (clone $query)->whereIn('current_stage', ['closed_lost', 'lost', 'wrong_number'])->count();
+        $closedWon = (clone $query)->whereIn('current_stage', Lead::stageValues('closed_won'))->count();
+        $lost = (clone $query)->whereIn('current_stage', Lead::stageValues('lost'))->count();
 
         return [
             'total_leads' => ['label' => 'Total Leads', 'value' => $total, 'icon' => 'users', 'color' => 'blue', 'filter' => 'all'],
@@ -777,12 +817,16 @@ class LeadKanban extends Component
 
         // Search
         if (!empty($this->search)) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('lead_code', 'like', '%' . $this->search . '%')
-                  ->orWhere('mobile', 'like', '%' . $this->search . '%')
-                  ->orWhere('email', 'like', '%' . $this->search . '%')
-                  ->orWhere('city', 'like', '%' . $this->search . '%');
+            $search = trim($this->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('lead_code', 'like', '%' . $search . '%')
+                  ->orWhere('mobile', 'like', '%' . $search . '%')
+                  ->orWhere('email', 'like', '%' . $search . '%')
+                  ->orWhere('city', 'like', '%' . $search . '%');
+                if (is_numeric($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
             });
         }
 
@@ -837,18 +881,22 @@ class LeadKanban extends Component
 
         // Stage Filter
         if (!empty($this->stageFilter)) {
-            $query->whereIn('current_stage', Lead::usesSalesPanel() ? Lead::stageValues(Lead::normalizeStage($this->stageFilter)) : [$this->stageFilter]);
+            $query->whereIn('current_stage', Lead::stageValues(Lead::normalizeStage($this->stageFilter)));
         }
 
         // Status Filter
         if (!empty($this->statusFilter) && $this->statusFilter !== 'all') {
             $sf = strtolower($this->statusFilter);
             if ($sf === 'new') {
-                $query->where(fn($q) => $q->where('status', 'new')->orWhere('current_stage', 'new'));
+                $query->where(fn($q) => $q->whereIn('status', Lead::stageValues('new'))->orWhereIn('current_stage', Lead::stageValues('new')));
             } elseif ($sf === 'assigned') {
                 $query->whereNotNull('assigned_to');
             } elseif ($sf === 'unassigned') {
                 $query->whereNull('assigned_to');
+            } elseif ($sf === 'in_progress') {
+                $query->whereIn('current_stage', ['contacted', 'connected', 'interested', 'qualified', 'follow_up', 'follow-up', 'meeting_scheduled', 'site_visit', 'negotiation', 'booking', 'payment_received']);
+            } elseif (in_array($sf, ['followups', 'follow-ups', 'follow_up'])) {
+                $query->whereHas('followups', fn ($q) => $q->where('status', 'pending')->where('due_at', '<=', now()->endOfDay()));
             } elseif ($sf === 'contacted') {
                 $query->whereIn('current_stage', ['contacted', 'connected']);
             } elseif ($sf === 'interested') {
@@ -862,9 +910,9 @@ class LeadKanban extends Component
             } elseif ($sf === 'booking') {
                 $query->whereIn('current_stage', ['booking', 'payment']);
             } elseif ($sf === 'closed_won') {
-                $query->where(fn($q) => $q->where('current_stage', 'closed_won')->orWhere('status', 'closed_won'));
-            } elseif ($sf === 'closed_lost') {
-                $query->where(fn($q) => $q->whereIn('current_stage', ['closed_lost', 'lost'])->orWhereIn('status', ['closed_lost', 'lost']));
+                $query->where(fn($q) => $q->whereIn('current_stage', Lead::stageValues('closed_won'))->orWhereIn('status', Lead::stageValues('closed_won')));
+            } elseif (in_array($sf, ['lost', 'closed_lost'])) {
+                $query->where(fn($q) => $q->whereIn('current_stage', Lead::stageValues('lost'))->orWhereIn('status', Lead::stageValues('lost')));
             } elseif ($sf === 'duplicate') {
                 $query->where(fn($q) => $q->where('status', 'duplicate')->orWhere('current_stage', 'duplicate'));
             } elseif ($sf === 'pending_credit') {
@@ -1435,6 +1483,8 @@ class LeadKanban extends Component
             $tableQuery = (clone $baseQuery);
             if (!empty($this->sortField)) {
                 $tableQuery->orderBy($this->sortField, $this->sortDirection);
+            } elseif ($this->sort_by === 'created_asc') {
+                $tableQuery->oldest('id');
             } elseif ($this->sort_by === 'score_desc') {
                 $tableQuery->orderByDesc('lead_score')->latest('id');
             } elseif ($this->sort_by === 'score_asc') {
@@ -1452,7 +1502,9 @@ class LeadKanban extends Component
                 $stageCounts[$stageKey] = $stageQuery->count();
                 $limit = $this->stageLimits[$stageKey] ?? 20;
 
-                if ($this->sort_by === 'score_desc') {
+                if ($this->sort_by === 'created_asc') {
+                    $stageQuery->oldest('id');
+                } elseif ($this->sort_by === 'score_desc') {
                     $stageQuery->orderByDesc('lead_score')->latest('id');
                 } elseif ($this->sort_by === 'score_asc') {
                     $stageQuery->orderBy('lead_score')->latest('id');

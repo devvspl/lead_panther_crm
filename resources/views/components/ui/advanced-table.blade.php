@@ -582,16 +582,45 @@
                                                 </button>
                                             </div>
                                         @elseif($type === 'upload_actions')
-                                            <div class="flex items-center justify-end">
-                                                @if((is_object($row) ? $row->failed_count : $row['failed_count']) > 0)
-                                                    <a href="{{ route('leads.download-errors', is_object($row) ? $row->id : $row['id']) }}"
-                                                        download="upload_errors_batch_{{ is_object($row) ? $row->id : $row['id'] }}.csv"
+                                            @php
+                                                $batchId = is_object($row) ? $row->id : $row['id'];
+                                                $failedCount = is_object($row) ? ($row->failed_count ?? 0) : ($row['failed_count'] ?? 0);
+                                                $batchFilePath = is_object($row) ? ($row->file_path ?? null) : ($row['file_path'] ?? null);
+                                                $hasOriginalFile = !empty($batchFilePath) && !str_contains($batchFilePath, '..') && \Illuminate\Support\Facades\Storage::disk('local')->exists($batchFilePath);
+                                                $origName = is_object($row) ? ($row->original_filename ?? $row->filename) : ($row['original_filename'] ?? ($row['filename'] ?? ''));
+                                            @endphp
+                                            <div class="flex items-center justify-end gap-2 flex-wrap">
+                                                @if($failedCount > 0)
+                                                    <a href="{{ route('leads.download-errors', $batchId) }}"
+                                                        download="upload_errors_batch_{{ $batchId }}.csv"
                                                         data-navigate-skip wire:navigate.skip target="_blank" rel="noopener noreferrer"
-                                                        class="px-2.5 py-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
-                                                        Error CSV
+                                                        class="px-2.5 py-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                                        title="Download error CSV">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        <span>Error CSV</span>
                                                     </a>
                                                 @else
                                                     <span class="text-[11px] text-muted font-semibold">Clean Import</span>
+                                                @endif
+
+                                                @if($hasOriginalFile)
+                                                    <a href="{{ route('leads.upload-batches.download', $batchId) }}"
+                                                        data-navigate-skip wire:navigate.skip
+                                                        class="px-2.5 py-1 bg-surface border border-border hover:bg-canvas hover:border-neutral-300 text-ink font-semibold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                                        title="Download original file: {{ $origName }}">
+                                                        <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                        </svg>
+                                                        <span>Download</span>
+                                                    </a>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 font-medium text-[11px] rounded-lg cursor-not-allowed select-none"
+                                                        title="Original file unavailable for this batch">
+                                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                        <span>Original file unavailable</span>
+                                                    </span>
                                                 @endif
                                             </div>
                                         @elseif($type === 'audit_id')
@@ -1003,16 +1032,45 @@
                                             </button>
                                         </div>
                                     @elseif($type === 'upload_actions')
-                                        <div class="flex items-center justify-end">
-                                            @if((is_object($row) ? $row->failed_count : $row['failed_count']) > 0)
-                                                <a href="{{ route('leads.download-errors', is_object($row) ? $row->id : $row['id']) }}"
-                                                    download="upload_errors_batch_{{ is_object($row) ? $row->id : $row['id'] }}.csv"
+                                        @php
+                                            $batchId = is_object($row) ? $row->id : $row['id'];
+                                            $failedCount = is_object($row) ? ($row->failed_count ?? 0) : ($row['failed_count'] ?? 0);
+                                            $batchFilePath = is_object($row) ? ($row->file_path ?? null) : ($row['file_path'] ?? null);
+                                            $hasOriginalFile = !empty($batchFilePath) && !str_contains($batchFilePath, '..') && \Illuminate\Support\Facades\Storage::disk('local')->exists($batchFilePath);
+                                            $origName = is_object($row) ? ($row->original_filename ?? $row->filename) : ($row['original_filename'] ?? ($row['filename'] ?? ''));
+                                        @endphp
+                                        <div class="flex items-center justify-end gap-2 flex-wrap">
+                                            @if($failedCount > 0)
+                                                <a href="{{ route('leads.download-errors', $batchId) }}"
+                                                    download="upload_errors_batch_{{ $batchId }}.csv"
                                                     data-navigate-skip wire:navigate.skip target="_blank" rel="noopener noreferrer"
-                                                    class="px-2.5 py-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
-                                                    Error CSV
+                                                    class="px-2.5 py-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                                    title="Download error CSV">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    <span>Error CSV</span>
                                                 </a>
                                             @else
                                                 <span class="text-[11px] text-muted font-semibold">Clean Import</span>
+                                            @endif
+
+                                            @if($hasOriginalFile)
+                                                <a href="{{ route('leads.upload-batches.download', $batchId) }}"
+                                                    data-navigate-skip wire:navigate.skip
+                                                    class="px-2.5 py-1 bg-surface border border-border hover:bg-canvas hover:border-neutral-300 text-ink font-semibold text-[11px] rounded-lg transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                                    title="Download original file: {{ $origName }}">
+                                                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                    </svg>
+                                                    <span>Download</span>
+                                                </a>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 font-medium text-[11px] rounded-lg cursor-not-allowed select-none"
+                                                    title="Original file unavailable for this batch">
+                                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                    </svg>
+                                                    <span>Original file unavailable</span>
+                                                </span>
                                             @endif
                                         </div>
                                     @elseif($type === 'audit_id')

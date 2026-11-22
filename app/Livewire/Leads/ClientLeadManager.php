@@ -15,6 +15,7 @@ class ClientLeadManager extends LeadKanban
     public int $clientOrganizationId;
     public bool $showClientImport = false;
     public string $bulkStage = '';
+    #[\Livewire\Attributes\Url]
     public string $deliveryFilter = '';
 
     public function boot(): void
@@ -29,7 +30,9 @@ class ClientLeadManager extends LeadKanban
         $this->otherStages += ['pending_credit' => 'Pending Credit', 'lost' => 'Lost', 'invalid' => 'Invalid', 'duplicate' => 'Duplicate', 'unreachable' => 'Unreachable'];
         $this->queue = 'client';
         $this->viewMode = 'table';
-        $this->analyticsRange = 'all';
+        if (!request()->has('date_range') && !request()->has('analyticsRange')) {
+            $this->analyticsRange = 'all';
+        }
     }
 
     public function isClientContext(): bool { return true; }
@@ -83,9 +86,24 @@ class ClientLeadManager extends LeadKanban
         return $query;
     }
 
+    public function updatedDeliveryFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function getBuilderLeadKpisProperty(): array
     {
-        $query = $this->getScopedQuery();
+        $status = $this->statusFilter;
+        $stage = $this->stageFilter;
+        $this->statusFilter = 'all';
+        $this->stageFilter = '';
+        try {
+            $query = $this->getScopedQuery();
+        } finally {
+            $this->statusFilter = $status;
+            $this->stageFilter = $stage;
+        }
+
         $metrics = [
             'all' => ['Total Leads', (clone $query)->count()],
             'new' => ['New', (clone $query)->whereIn('current_stage', Lead::stageValues('new'))->count()],
@@ -128,6 +146,8 @@ class ClientLeadManager extends LeadKanban
         parent::resetFilters();
         $this->analyticsRange = 'all';
         $this->deliveryFilter = '';
+        $this->sortField = '';
+        $this->sort_by = 'created_desc';
         $this->selectedRows = [];
         $this->selectAll = false;
     }

@@ -65,9 +65,43 @@ class UploadHistory extends Component
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    public function downloadOriginalFile(int $batchId)
+    {
+        $batch = UploadBatch::findOrFail($batchId);
+        $user = auth()->user();
+
+        $isSuperAdmin = $user && $user->hasAnyRole(['Super Admin', 'super-admin']);
+        $isUploader = $user && $batch->uploaded_by === $user->id;
+        $isOrgMember = false;
+
+        if ($user && $user->organization_id) {
+            $isOrgMember = $batch->project && $batch->project->client && $batch->project->client->organization_id === $user->organization_id;
+        }
+
+        if (!$isSuperAdmin && !$isUploader && !$isOrgMember) {
+            abort(403, 'Unauthorized access to this upload batch.');
+        }
+
+        if (!$batch->hasOriginalFile()) {
+            $this->dispatch('toast', type: 'error', message: 'Original file is unavailable for this batch.');
+            return null;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($batch->file_path, $batch->getDownloadFilename());
+    }
+
     protected function getFilteredQuery()
     {
         $query = UploadBatch::with(['uploader', 'project', 'campaign', 'leadSource']);
+
+        $user = auth()->user();
+        if ($user && !$user->hasAnyRole(['Super Admin', 'super-admin'])) {
+            if ($user->organization_id) {
+                $query->whereHas('project.client', fn($cq) => $cq->where('organization_id', $user->organization_id));
+            } else {
+                $query->where('uploaded_by', $user->id);
+            }
+        }
 
         if (!empty($this->search)) {
             $query->where(function ($q) {

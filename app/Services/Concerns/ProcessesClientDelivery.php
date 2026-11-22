@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 trait ProcessesClientDelivery
 {
-    public const DELIVERY_FREQUENCIES = ['immediate', '15_minutes', '30_minutes', 'random_1_30', 'hourly', 'daily', 'weekly', 'manual'];
+    public const DELIVERY_FREQUENCIES = ['immediate', 'custom_minutes', '15_minutes', '30_minutes', 'random_1_30', 'hourly', 'daily', 'weekly', 'manual'];
 
     protected function deliveryAdmin(User $actor): void
     {
@@ -53,6 +53,7 @@ trait ProcessesClientDelivery
             'project_id' => 'required|integer|exists:projects,id',
             'campaign_id' => 'nullable|integer|exists:campaigns,id',
             'frequency' => ['required', Rule::in(self::DELIVERY_FREQUENCIES)],
+            'interval_minutes' => 'required_if:frequency,custom_minutes|nullable|integer|min:1|max:1440',
             'quantity_mode' => ['required', Rule::in(['fixed', 'all'])],
             'quantity' => 'required_if:quantity_mode,fixed|nullable|integer|min:1|max:1000000',
             'max_cycle' => 'nullable|integer|min:1|max:1000000',
@@ -71,12 +72,14 @@ trait ProcessesClientDelivery
             'confirmed_send_all' => 'accepted_if:quantity_mode,all',
             'confirmed_unlimited' => 'accepted_if:daily_enabled,false',
         ], [
+            'interval_minutes.required_if' => 'Enter the delivery interval in minutes.',
             'quantity.required_if' => 'Enter how many leads to send.',
             'daily_limit.required_if' => 'Enter a daily limit, or turn the daily limit off.',
         ], [
             'client_id' => 'client',
             'project_id' => 'project',
             'campaign_id' => 'campaign',
+            'interval_minutes' => 'delivery interval in minutes',
             'quantity' => 'lead quantity',
             'daily_limit' => 'daily limit',
             'window_start' => 'start time',
@@ -104,6 +107,13 @@ trait ProcessesClientDelivery
                 $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
                 if (!$plan->exists) $plan->state = 'active';
                 $after = now()->addMinutes($randomMinutes);
+                $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, $after) : null;
+            } elseif ($data['frequency'] === 'custom_minutes') {
+                $interval = max(1, (int) ($data['interval_minutes'] ?? 20));
+                $data['interval_minutes'] = $interval;
+                $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
+                if (!$plan->exists) $plan->state = 'active';
+                $after = now()->addMinutes($interval);
                 $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, $after) : null;
             } else {
                 $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
@@ -391,6 +401,7 @@ trait ProcessesClientDelivery
     {
         $s = $plan->settings;
         $minutes = match ($s['frequency']) {
+            'custom_minutes' => max(1, (int) ($s['interval_minutes'] ?? 20)),
             '15_minutes' => 15,
             '30_minutes' => 30,
             'random_1_30' => random_int(1, 30),
@@ -533,6 +544,9 @@ trait ProcessesClientDelivery
                 $s['random_interval_minutes'] = $randomMinutes;
                 $plan->settings = $s;
                 $resumeAfter = now()->addMinutes($randomMinutes);
+            } elseif ($action === 'resume' && ($s['frequency'] ?? '') === 'custom_minutes') {
+                $interval = max(1, (int) ($s['interval_minutes'] ?? 20));
+                $resumeAfter = now()->addMinutes($interval);
             }
             $plan->update([
                 'settings' => $s,

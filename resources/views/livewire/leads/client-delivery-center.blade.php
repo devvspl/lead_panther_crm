@@ -51,13 +51,29 @@
                 <div wire:key="delivery-campaign-{{ $settings['project_id'] }}"><label class="font-semibold">Campaign (Optional)</label><x-ui.themed-select wire:model.live="settings.campaign_id" :options="['' => 'Use project default'] + $campaigns->pluck('name','id')->all()" placeholder="Use project default" :searchable="true" /></div>
             </div>
             <div class="grid sm:grid-cols-2 gap-3">
-                <div><label>Delivery Frequency</label><x-ui.themed-select wire:model.live="settings.frequency" :options="['immediate'=>'Immediately','15_minutes'=>'Every 15 minutes','30_minutes'=>'Every 30 minutes','random_1_30'=>'Random (1–30 Minutes)','hourly'=>'Hourly','daily'=>'Daily','weekly'=>'Weekly','manual'=>'Manual Only']" :searchable="true" /></div>
+                <div><label>Delivery Frequency</label><x-ui.themed-select wire:model.live="settings.frequency" :options="['immediate'=>'Immediately','15_minutes'=>'Every 15 minutes','30_minutes'=>'Every 30 minutes','custom_minutes'=>'Every ' . ($settings['interval_minutes'] ?? 20) . ' minutes (Custom)','random_1_30'=>'Random (1–30 Minutes)','hourly'=>'Hourly','daily'=>'Daily','weekly'=>'Weekly','manual'=>'Manual Only']" :searchable="true" /></div>
                 <div><label>Lead Quantity</label><x-ui.themed-select wire:model.live="settings.quantity_mode" :options="['fixed'=>'Fixed Batch Quantity','all'=>'Send All Available Leads']" /></div>
+                @if($settings['frequency'] === 'custom_minutes')
+                    <div><label class="font-semibold">Delivery Interval (Minutes) *</label><x-text-input variant="compact" type="number" min="1" max="1440" wire:model.live="settings.interval_minutes" placeholder="e.g. 20" /></div>
+                @endif
                 @if($settings['quantity_mode'] === 'fixed')<div><label>Leads to Send *</label><x-text-input variant="compact" type="number" min="1" wire:model="settings.quantity" /></div>@endif
                 <div class="space-y-2"><label class="flex items-center gap-2 h-8"><input type="checkbox" wire:model.live="settings.daily_enabled">Set a daily limit</label>@if($settings['daily_enabled'])<x-text-input variant="compact" type="number" min="1" wire:model="settings.daily_limit" placeholder="Maximum leads per day" />@endif</div>
                 @if(in_array($settings['frequency'], ['daily','weekly']))<div><label>Scheduled Time</label><x-text-input variant="compact" type="time" wire:model="settings.daily_time" /></div>@endif
                 @if($settings['frequency'] === 'weekly')<div><label>Weekly Day</label><x-ui.themed-select wire:model="settings.weekly_day" :options="[0=>'Sunday',1=>'Monday',2=>'Tuesday',3=>'Wednesday',4=>'Thursday',5=>'Friday',6=>'Saturday']" /></div>@endif
-                @if($settings['frequency'] === 'random_1_30')
+                @if($settings['frequency'] === 'custom_minutes')
+                    <div class="col-span-full p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-blue-900 text-xs space-y-1">
+                        <div class="font-bold flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>Custom Delivery Frequency (Every {{ $settings['interval_minutes'] ?: 20 }} Minutes)</span>
+                        </div>
+                        <p class="text-[11px] text-blue-800 leading-relaxed">
+                            Delivers leads automatically every {{ $settings['interval_minutes'] ?: 20 }} minutes according to the configured interval.
+                            @if($plan && ($plan->settings['frequency'] ?? '') === 'custom_minutes' && $plan->next_run_at)
+                                <span class="font-semibold block mt-1">Next scheduled delivery: {{ $plan->next_run_at->format('d M Y H:i T') }} ({{ $plan->next_run_at->isPast() ? 'due now' : 'in ' . $plan->next_run_at->diffForHumans(null, true) }} · interval: {{ $plan->settings['interval_minutes'] ?? 20 }}m).</span>
+                            @endif
+                        </p>
+                    </div>
+                @elseif($settings['frequency'] === 'random_1_30')
                     <div class="col-span-full p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-blue-900 text-xs space-y-1">
                         <div class="font-bold flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

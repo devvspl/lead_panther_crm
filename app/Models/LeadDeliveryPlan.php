@@ -15,6 +15,7 @@ class LeadDeliveryPlan extends Model
         $freq = $this->settings['frequency'] ?? '';
         return match ($freq) {
             'random_1_30' => 'Random (1–30 Minutes)',
+            'custom_minutes' => 'Every ' . ($this->settings['interval_minutes'] ?? 20) . ' minutes',
             '15_minutes' => 'Every 15 minutes',
             '30_minutes' => 'Every 30 minutes',
             'immediate' => 'Immediately',

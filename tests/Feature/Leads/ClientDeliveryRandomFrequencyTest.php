@@ -181,4 +181,82 @@ class ClientDeliveryRandomFrequencyTest extends TestCase
         $this->assertNotNull($plan->next_run_at);
         $this->assertSame('Random (1–30 Minutes)', $plan->frequency_label);
     }
+
+    public function test_saving_plan_with_custom_minutes_frequency_sets_interval_and_next_run_at(): void
+    {
+        $plan = $this->service()->saveClientDeliveryPlan($this->sourceOrg, $this->settings([
+            'frequency' => 'custom_minutes',
+            'interval_minutes' => 20,
+        ]), $this->admin);
+
+        $this->assertSame('custom_minutes', $plan->settings['frequency']);
+        $this->assertSame(20, $plan->settings['interval_minutes']);
+        $this->assertNotNull($plan->next_run_at);
+        $expectedNextRun = now()->addMinutes(20);
+        $this->assertEquals($expectedNextRun->timestamp, $plan->next_run_at->timestamp);
+        $this->assertSame('Every 20 minutes', $plan->frequency_label);
+    }
+
+    public function test_advancing_client_delivery_respects_custom_minutes_interval(): void
+    {
+        $lead = $this->createLead();
+        $plan = $this->service()->saveClientDeliveryPlan($this->sourceOrg, $this->settings([
+            'frequency' => 'custom_minutes',
+            'interval_minutes' => 20,
+        ]), $this->admin);
+        $this->service()->enqueueClientLeads($plan, [$lead->id], true, $this->admin);
+
+        $run = $this->service()->startClientDeliveryCycle($plan->id, true);
+        $this->assertNotNull($run);
+
+        $this->service()->processClientDeliveryRun($run->id);
+
+        $plan->refresh();
+        $this->assertNotNull($plan->next_run_at);
+        $this->assertEquals(now()->addMinutes(20)->timestamp, $plan->next_run_at->timestamp);
+        $this->assertSame(20, $plan->settings['interval_minutes']);
+    }
+
+    public function test_scheduler_respects_next_run_at_for_custom_minutes_cycle(): void
+    {
+        $lead = $this->createLead();
+        $plan = $this->service()->saveClientDeliveryPlan($this->sourceOrg, $this->settings([
+            'frequency' => 'custom_minutes',
+            'interval_minutes' => 20,
+        ]), $this->admin);
+        $this->service()->enqueueClientLeads($plan, [$lead->id], true, $this->admin);
+
+        // Before next_run_at, automatic cycle should NOT start
+        $this->assertNull($this->service()->startClientDeliveryCycle($plan->id, false));
+
+        // Fast forward to next_run_at
+        Carbon::setTestNow($plan->next_run_at->copy()->addSecond());
+
+        // Now automatic cycle should start
+        $run = $this->service()->startClientDeliveryCycle($plan->id, false);
+        $this->assertNotNull($run);
+        $this->assertSame('queued', $run->status);
+    }
+
+    public function test_livewire_ui_renders_custom_minutes_option_and_saves_successfully(): void
+    {
+        Queue::fake();
+        $lead = $this->createLead();
+
+        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->sourceOrg->id])
+            ->call('openPush', $this->sourceOrg->id, [$lead->id])
+            ->set('settings.client_id', $this->destClient->id)
+            ->set('settings.project_id', $this->project->id)
+            ->set('settings.campaign_id', $this->campaign->id)
+            ->set('settings.frequency', 'custom_minutes')
+            ->set('settings.interval_minutes', 20)
+            ->call('pushLeads')
+            ->assertHasNoErrors();
+
+        $plan = LeadDeliveryPlan::where('organization_id', $this->sourceOrg->id)->firstOrFail();
+        $this->assertSame('custom_minutes', $plan->settings['frequency']);
+        $this->assertSame(20, $plan->settings['interval_minutes']);
+        $this->assertNotNull($plan->next_run_at);
+        $this->assertSame('Every 20 minutes', $plan->frequency_label);
+    }
 }

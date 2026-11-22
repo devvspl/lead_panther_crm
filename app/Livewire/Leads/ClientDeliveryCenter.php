@@ -32,10 +32,13 @@ class ClientDeliveryCenter extends Component
         $this->organizationId = $organization->id;
         $plan = $this->plan();
         $this->settings = $plan ? array_merge($plan->settings, $plan->only('client_id', 'project_id', 'campaign_id')) : [
-            'client_id' => null, 'project_id' => null, 'campaign_id' => null, 'frequency' => 'immediate', 'quantity_mode' => 'fixed', 'quantity' => 1,
+            'client_id' => null, 'project_id' => null, 'campaign_id' => null, 'frequency' => 'immediate', 'interval_minutes' => 20, 'quantity_mode' => 'fixed', 'quantity' => 1,
             'max_cycle' => null, 'daily_enabled' => false, 'daily_limit' => null, 'automatic' => true, 'timezone' => $organization->delivery_timezone ?: config('app.timezone'),
             'start_date' => null, 'end_date' => null, 'window_start' => '00:00', 'window_end' => '23:59', 'daily_time' => '09:00', 'weekly_day' => 1, 'working_days' => [0, 1, 2, 3, 4, 5, 6],
         ];
+        if (!isset($this->settings['interval_minutes'])) {
+            $this->settings['interval_minutes'] = $plan?->settings['interval_minutes'] ?? 20;
+        }
         if (!$plan) {
             $this->settings['client_id'] = app(LeadDistributionService::class)->clientDeliveryRecipients()->where('organization_id', $this->organizationId)->orderBy('id')->value('id');
             $this->chooseSingleDestination();
@@ -51,7 +54,13 @@ class ClientDeliveryCenter extends Component
     }
     public function updatedSettingsClientId(): void { $this->settings['project_id'] = $this->settings['campaign_id'] = null; $this->chooseSingleDestination(); }
     public function updatedSettingsProjectId(): void { $this->settings['campaign_id'] = null; $this->chooseSingleDestination(); }
-    public function updatedSettingsFrequency(): void { $this->settings['automatic'] = $this->settings['frequency'] !== 'manual'; }
+    public function updatedSettingsFrequency(): void
+    {
+        $this->settings['automatic'] = $this->settings['frequency'] !== 'manual';
+        if ($this->settings['frequency'] === 'custom_minutes' && empty($this->settings['interval_minutes'])) {
+            $this->settings['interval_minutes'] = 20;
+        }
+    }
     public function updated($property): void { if (str_starts_with($property, 'history')) $this->resetPage('deliveryPage'); }
 
     #[On('client-push-selected')]
@@ -61,10 +70,14 @@ class ClientDeliveryCenter extends Component
         $this->selectedLeadIds = array_values(array_unique(array_map('intval', $leadIds)));
         if ($sendNow && ($plan = $this->plan())) {
             $this->settings = array_merge($plan->settings, $plan->only('client_id','project_id','campaign_id'));
+            if (!isset($this->settings['interval_minutes'])) $this->settings['interval_minutes'] = $plan->settings['interval_minutes'] ?? 20;
             $this->pushLeads();
             return;
         }
-        if (!$this->plan()) $this->settings['quantity'] = max(1, count($this->selectedLeadIds));
+        if (!$this->plan()) {
+            $this->settings['quantity'] = max(1, count($this->selectedLeadIds));
+            if (!isset($this->settings['interval_minutes'])) $this->settings['interval_minutes'] = 20;
+        }
         $this->consentConfirmed = false;
         $this->showConfiguration = true;
         $this->dispatch('open-offcanvas', name: 'client-delivery-configuration');

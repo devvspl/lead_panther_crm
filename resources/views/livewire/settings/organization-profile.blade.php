@@ -141,75 +141,42 @@
         </form>
     </div>
     <!-- Lead Assignment Mode Configuration Card -->
-    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-5">
-        <div class="flex items-start justify-between gap-4">
-            <div class="space-y-1">
-                <div class="flex items-center space-x-2">
-                    <div class="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                    </div>
-                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">
-                        Lead Assignment Mode
-                    </h2>
+    <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
                 </div>
-                <p class="text-xs text-muted pl-9">
-                    Choose how incoming leads received from Lead Panther campaigns and manual client pushes are routed.
-                </p>
+                <h2 class="text-xs font-bold text-ink uppercase tracking-wider">
+                    Lead Assignment Mode
+                </h2>
             </div>
             <span class="inline-flex items-center px-2.5 py-1 rounded-pill text-[11px] font-semibold {{ $leadAssignmentMode === 'automatic' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200' }}">
                 <span class="w-1.5 h-1.5 rounded-full {{ $leadAssignmentMode === 'automatic' ? 'bg-emerald-500' : 'bg-blue-500' }} mr-1.5"></span>
-                <span>{{ $leadAssignmentMode === 'automatic' ? 'Automatic Assignment' : 'Manual Assignment (Builder)' }}</span>
+                <span>{{ $leadAssignmentMode === 'automatic' ? 'Automatic' : 'Manual' }}</span>
             </span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <!-- Option 1: Automatic Assignment -->
             <button type="button"
                 wire:click="setLeadAssignmentMode('automatic')"
                 wire:loading.attr="disabled"
-                class="relative text-left p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between {{ $leadAssignmentMode === 'automatic' ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30' : 'border-border bg-surface hover:bg-canvas/50 text-muted' }}">
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full {{ $leadAssignmentMode === 'automatic' ? 'bg-primary' : 'bg-neutral-300' }}"></span>
-                            <span class="text-xs font-bold {{ $leadAssignmentMode === 'automatic' ? 'text-ink' : 'text-muted' }}">
-                                1. Automatic Assignment
-                            </span>
-                        </div>
-                        @if($leadAssignmentMode === 'automatic')
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary text-white">Active</span>
-                        @endif
-                    </div>
-                    <p class="text-xs text-muted leading-relaxed">
-                        Leads received from Lead Panther are <strong>automatically assigned</strong> to the organization's Sales Executives using existing round-robin distribution rules and notification logic.
-                    </p>
-                </div>
+                class="p-3.5 rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-2 {{ $leadAssignmentMode === 'automatic' ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs' : 'border-border bg-surface text-muted hover:border-border-hover' }}">
+                <span class="w-2.5 h-2.5 rounded-full {{ $leadAssignmentMode === 'automatic' ? 'bg-primary' : 'bg-neutral-300' }}"></span>
+                <span class="text-xs">Automatic Assignment</span>
             </button>
 
             <!-- Option 2: Manual Assignment (Builder / Developer) -->
             <button type="button"
                 wire:click="setLeadAssignmentMode('manual')"
                 wire:loading.attr="disabled"
-                class="relative text-left p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between {{ $leadAssignmentMode === 'manual' ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30' : 'border-border bg-surface hover:bg-canvas/50 text-muted' }}">
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full {{ $leadAssignmentMode === 'manual' ? 'bg-primary' : 'bg-neutral-300' }}"></span>
-                            <span class="text-xs font-bold {{ $leadAssignmentMode === 'manual' ? 'text-ink' : 'text-muted' }}">
-                                2. Manual Assignment (Builder / Developer)
-                            </span>
-                        </div>
-                        @if($leadAssignmentMode === 'manual')
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary text-white">Active</span>
-                        @endif
-                    </div>
-                    <p class="text-xs text-muted leading-relaxed">
-                        All incoming leads are sent <strong>directly to the Builder / Developer account</strong>. Leads are held unassigned so the Builder / Developer can manually review and assign them to executives.
-                    </p>
-                </div>
+                class="p-3.5 rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-2 {{ $leadAssignmentMode === 'manual' ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs' : 'border-border bg-surface text-muted hover:border-border-hover' }}">
+                <span class="w-2.5 h-2.5 rounded-full {{ $leadAssignmentMode === 'manual' ? 'bg-primary' : 'bg-neutral-300' }}"></span>
+                <span class="text-xs">Manual Assignment</span>
             </button>
         </div>
     </div>

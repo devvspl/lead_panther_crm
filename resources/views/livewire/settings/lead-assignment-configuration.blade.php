@@ -27,42 +27,23 @@
             <!-- Two-Option Switch Cards -->
             <div class="grid sm:grid-cols-2 gap-3 pt-1">
                 <!-- Option 1: Automatic Assignment -->
-                <div wire:click="setAssignmentMode('automatic')" class="relative flex flex-col p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'automatic' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-2.5">
-                            <input type="radio" wire:model.live="settings.assignment_mode" value="automatic" class="text-primary focus:ring-primary h-4 w-4">
-                            <span class="text-xs font-bold text-ink">1. Automatic Assignment</span>
-                        </div>
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Auto</span>
+                <div wire:click="setAssignmentMode('automatic')" class="relative flex items-center justify-between p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'automatic' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
+                    <div class="flex items-center gap-2.5">
+                        <input type="radio" wire:model.live="settings.assignment_mode" value="automatic" class="text-primary focus:ring-primary h-4 w-4">
+                        <span class="text-xs font-bold text-ink">Automatic Assignment</span>
                     </div>
-                    <p class="text-[11px] text-muted mt-2 leading-relaxed pl-6">
-                        Leads received from Lead Panther are automatically assigned to Sales Executives using round-robin and capacity rules.
-                    </p>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Auto</span>
                 </div>
 
                 <!-- Option 2: Manual Assignment (Builder / Developer) -->
-                <div wire:click="setAssignmentMode('manual')" class="relative flex flex-col p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'manual' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-2.5">
-                            <input type="radio" wire:model.live="settings.assignment_mode" value="manual" class="text-primary focus:ring-primary h-4 w-4">
-                            <span class="text-xs font-bold text-ink">2. Manual Assignment (Builder / Developer)</span>
-                        </div>
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">Manual</span>
+                <div wire:click="setAssignmentMode('manual')" class="relative flex items-center justify-between p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'manual' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
+                    <div class="flex items-center gap-2.5">
+                        <input type="radio" wire:model.live="settings.assignment_mode" value="manual" class="text-primary focus:ring-primary h-4 w-4">
+                        <span class="text-xs font-bold text-ink">Manual Assignment (Builder)</span>
                     </div>
-                    <p class="text-[11px] text-muted mt-2 leading-relaxed pl-6">
-                        All incoming leads are sent directly to the Builder / Developer account. Executives will only see leads when manually assigned.
-                    </p>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">Manual</span>
                 </div>
             </div>
-
-            @if(($settings['assignment_mode'] ?? 'automatic') === 'manual')
-                <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
-                    <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span><strong>Manual Assignment Mode Active:</strong> Leads are delivered directly to the Builder / Developer account. Automatic distribution to executives is paused. The Builder / Developer can manually assign or reassign leads to executives at any time.</span>
-                </div>
-            @endif
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             @unless($isTeamLeader)<div><label class="block mb-1">Assignment team</label><x-ui.themed-select wire:model="settings.team_id" :options="$teams" placeholder="All organization teams" :searchable="true" class="w-full" /></div>@endunless

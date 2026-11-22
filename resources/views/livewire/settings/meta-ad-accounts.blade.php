@@ -74,20 +74,30 @@
                         </td>
                         <td class="p-3 whitespace-nowrap text-muted">{{ $account->last_synced_at?->format('d M Y H:i') ?: 'Never' }}</td>
                         <td class="p-3">
-                            <x-ui.dropdown align="right" width="56">
-                                <x-slot:trigger>
-                                    <button type="button" :aria-expanded="open" aria-haspopup="menu" title="Ad Account actions" aria-label="Ad Account actions" class="p-2 text-muted hover:text-primary transition">
-                                        <x-ui.team-icon name="more" />
-                                    </button>
-                                </x-slot:trigger>
-                                <x-slot:content>
-                                    <button type="button" wire:click="edit({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Edit / Reconnect</button>
-                                    <button type="button" wire:click="testConnection({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Test Connection</button>
-                                    <button type="button" wire:click="sync({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Sync Now</button>
-                                    <button type="button" wire:click="showRecords({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas font-semibold text-primary">Campaigns &amp; Reporting</button>
-                                    <button type="button" wire:click="disconnect({{ $account->id }})" wire:confirm="Disconnect this Ad Account? Existing Page integrations and records will be retained." class="block w-full text-left p-2 text-danger hover:bg-canvas">Disconnect</button>
-                                </x-slot:content>
-                            </x-ui.dropdown>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" wire:click="sync({{ $account->id }})" wire:loading.attr="disabled" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface text-ink text-xs font-semibold shadow-2xs transition">
+                                    <svg wire:loading.remove wire:target="sync({{ $account->id }})" class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    <svg wire:loading wire:target="sync({{ $account->id }})" class="animate-spin w-3 h-3 text-ink" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    <span>Sync Now</span>
+                                </button>
+                                <button type="button" wire:click="showRecords({{ $account->id }})" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold transition">
+                                    <span>Campaigns &amp; Reporting</span>
+                                </button>
+                                <x-ui.dropdown align="right" width="56">
+                                    <x-slot:trigger>
+                                        <button type="button" :aria-expanded="open" aria-haspopup="menu" title="Ad Account actions" aria-label="Ad Account actions" class="p-1.5 text-muted hover:text-primary transition rounded-lg hover:bg-canvas">
+                                            <x-ui.team-icon name="more" />
+                                        </button>
+                                    </x-slot:trigger>
+                                    <x-slot:content>
+                                        <button type="button" wire:click="edit({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Edit / Reconnect</button>
+                                        <button type="button" wire:click="testConnection({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Test Connection</button>
+                                        <button type="button" wire:click="sync({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas">Sync Now</button>
+                                        <button type="button" wire:click="showRecords({{ $account->id }})" class="block w-full text-left p-2 hover:bg-canvas font-semibold text-primary">Campaigns &amp; Reporting</button>
+                                        <button type="button" wire:click="disconnect({{ $account->id }})" wire:confirm="Disconnect this Ad Account? Existing Page integrations and records will be retained." class="block w-full text-left p-2 text-danger hover:bg-canvas">Disconnect</button>
+                                    </x-slot:content>
+                                </x-ui.dropdown>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -124,7 +134,7 @@
             <!-- Controls & Filters -->
             <div class="flex flex-wrap items-center gap-3">
                 <nav aria-label="Meta record tabs" class="flex flex-wrap gap-1 rounded-lg bg-canvas p-1">
-                    @foreach(['campaign' => 'Campaigns', 'adset' => 'Ad Sets', 'ad' => 'Ads & Forms', 'insight' => 'Insights'] as $tab => $label)
+                    @foreach(['campaign' => 'Campaign Lead Management', 'adset' => 'Ad Sets', 'ad' => 'Ads & Forms', 'insight' => 'Insights'] as $tab => $label)
                         <button type="button" wire:click="$set('kind', '{{ $tab }}')" aria-pressed="{{ $kind === $tab ? 'true' : 'false' }}" class="rounded-md px-3 py-2 text-xs {{ $kind === $tab ? 'bg-surface text-primary font-bold shadow-xs' : 'text-muted' }}">{{ $label }}</button>
                     @endforeach
                 </nav>
@@ -151,6 +161,16 @@
                     <input wire:model.live.debounce.300ms="search" aria-label="Search imported records" placeholder="Search by name, ID, or form ID..." class="w-full rounded-lg border border-border bg-canvas text-ink px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ink" />
                 </div>
             </div>
+
+            @if($kind === 'campaign')
+                <div class="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs space-y-1">
+                    <p class="font-bold text-ink flex items-center gap-2">
+                        <span class="inline-block w-2 h-2 rounded-full bg-primary"></span>
+                        <span>Campaign Lead Management &amp; Client Routing</span>
+                    </p>
+                    <p class="text-muted">Map campaigns directly to Clients and CRM Projects. Use <strong>Fetch Leads</strong> to ingest historical leads from all associated lead forms, and let Meta webhooks route future leads automatically.</p>
+                </div>
+            @endif
 
             <!-- Records Table -->
             <div class="overflow-x-auto rounded-lg border border-border">
@@ -231,20 +251,43 @@
                                         @endif
                                     </td>
                                     <td class="p-2.5">
-                                        <p class="font-semibold text-ink">{{ $record->crmCampaign?->project?->client?->name ?: 'Not mapped' }}</p>
-                                        <p class="text-muted text-[11px]">{{ $record->crmCampaign?->project?->name }} @if($record->crmCampaign) · {{ $record->crmCampaign->name }} @endif</p>
-                                        <x-ui.dropdown align="right" width="56">
-                                            <x-slot:trigger><button type="button" class="p-2 text-muted hover:text-primary" aria-label="Campaign actions"><x-ui.team-icon name="more" /></button></x-slot:trigger>
-                                            <x-slot:content>
-                                                <button type="button" wire:click="openCampaignMapping({{ $record->id }})" class="block w-full p-2 text-left hover:bg-canvas">Map Campaign</button>
-                                                <button type="button" wire:click="fetchCampaignLeads({{ $record->id }})" wire:loading.attr="disabled" @disabled(data_get($record->lead_fetch_state, 'status') === 'running') class="block w-full p-2 text-left text-primary hover:bg-canvas disabled:opacity-50">Fetch Leads</button>
-                                            </x-slot:content>
-                                        </x-ui.dropdown>
-                                        @if($fetch = $record->lead_fetch_state)
-                                            <p role="status" class="text-[11px] {{ ($fetch['status'] ?? '') === 'failed' ? 'text-danger' : 'text-muted' }}">{{ ucfirst($fetch['status'] ?? '') }} · {{ $fetch['phase'] ?? '' }} · {{ count($fetch['forms'] ?? []) }} forms · {{ $fetch['created'] ?? 0 }} created · {{ $fetch['duplicates'] ?? 0 }} duplicates · {{ $fetch['skipped'] ?? 0 }} unrelated / unattributed skipped</p>
-                                            @if(!empty($fetch['error']))<p class="text-danger text-[11px] max-w-xs">{{ $fetch['error'] }}</p>@endif
-                                            @if(($fetch['status'] ?? '') === 'completed' && empty($fetch['forms']))<p class="text-muted text-[11px]">No associated lead forms found. Website or messaging campaigns may not use instant forms.</p>@endif
-                                        @endif
+                                        <div class="space-y-1.5">
+                                            @if($record->crmCampaign?->project?->client)
+                                                <div class="flex items-center gap-1.5 text-xs">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                                    <span class="font-semibold text-ink">{{ $record->crmCampaign->project->client->name }}</span>
+                                                </div>
+                                                <p class="text-muted text-[11px] pl-3">
+                                                    {{ $record->crmCampaign->project->name }} · {{ $record->crmCampaign->name }}
+                                                </p>
+                                            @else
+                                                <div class="flex items-center gap-1.5 text-xs">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                                                    <span class="font-medium text-amber-700">Not mapped</span>
+                                                </div>
+                                                <p class="text-muted text-[11px] pl-3">Assign client to route leads</p>
+                                            @endif
+                                            <div class="flex items-center gap-1.5 pt-0.5">
+                                                <button type="button" wire:click="openCampaignMapping({{ $record->id }})" class="px-2 py-1 rounded bg-canvas border border-border text-[11px] font-semibold text-ink hover:bg-surface hover:border-primary transition">
+                                                    {{ $record->crm_campaign_id ? 'Edit Mapping' : 'Map Campaign' }}
+                                                </button>
+                                                <button type="button" wire:click="fetchCampaignLeads({{ $record->id }})" wire:loading.attr="disabled" @disabled(data_get($record->lead_fetch_state, 'status') === 'running') class="px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary hover:bg-primary/20 transition disabled:opacity-50">
+                                                    Fetch Leads
+                                                </button>
+                                                <x-ui.dropdown align="right" width="56">
+                                                    <x-slot:trigger><button type="button" class="p-1 text-muted hover:text-primary" aria-label="Campaign actions"><x-ui.team-icon name="more" /></button></x-slot:trigger>
+                                                    <x-slot:content>
+                                                        <button type="button" wire:click="openCampaignMapping({{ $record->id }})" class="block w-full p-2 text-left hover:bg-canvas">Map Campaign</button>
+                                                        <button type="button" wire:click="fetchCampaignLeads({{ $record->id }})" wire:loading.attr="disabled" @disabled(data_get($record->lead_fetch_state, 'status') === 'running') class="block w-full p-2 text-left text-primary hover:bg-canvas disabled:opacity-50">Fetch Leads</button>
+                                                    </x-slot:content>
+                                                </x-ui.dropdown>
+                                            </div>
+                                            @if($fetch = $record->lead_fetch_state)
+                                                <p role="status" class="text-[11px] {{ ($fetch['status'] ?? '') === 'failed' ? 'text-danger' : 'text-muted' }}">{{ ucfirst($fetch['status'] ?? '') }} · {{ $fetch['phase'] ?? '' }} · {{ count($fetch['forms'] ?? []) }} forms · {{ $fetch['created'] ?? 0 }} created · {{ $fetch['duplicates'] ?? 0 }} duplicates · {{ $fetch['skipped'] ?? 0 }} unrelated / unattributed skipped</p>
+                                                @if(!empty($fetch['error']))<p class="text-danger text-[11px] max-w-xs">{{ $fetch['error'] }}</p>@endif
+                                                @if(($fetch['status'] ?? '') === 'completed' && empty($fetch['forms']))<p class="text-muted text-[11px]">No associated lead forms found. Website or messaging campaigns may not use instant forms.</p>@endif
+                                            @endif
+                                        </div>
                                     </td>
                                 @elseif($kind === 'adset')
                                     <td class="p-2.5">
@@ -387,34 +430,96 @@
                 @endforelse
             </div>
 
-            <details class="text-xs">
-                <summary class="cursor-pointer font-bold text-ink">Recent Sync &amp; Connection History</summary>
-                <div class="space-y-2 mt-2">
+        </div>
+    @endif
+
+    <!-- Sync History & Diagnostics Section -->
+    <details class="text-xs rounded-xl border border-border p-4 bg-surface shadow-2xs">
+        <summary class="cursor-pointer font-bold text-ink flex items-center justify-between">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Recent Sync &amp; Diagnostics History</span>
+            </span>
+            <span class="text-[11px] text-muted font-normal">Campaigns, Ad Sets, Ads &amp; Lead Forms</span>
+        </summary>
+        <div class="space-y-4 mt-3 pt-3 border-t border-border">
+            <!-- Ad Account Sync History -->
+            <div>
+                <h5 class="font-bold text-ink uppercase tracking-wider text-[11px] mb-2">Campaigns &amp; Ads Synchronization History</h5>
+                <div class="space-y-2">
                     @forelse($logs as $log)
                         @php($details = json_decode($log->to_value ?? '{}', true) ?: [])
-                        <div class="rounded-lg border border-border p-2 bg-canvas">
-                            <p class="font-semibold text-ink">{{ $log->created_at?->format('d M Y H:i:s') ?? $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>
+                        <div class="rounded-lg border border-border p-2.5 bg-canvas">
+                            <div class="flex items-center justify-between">
+                                <p class="font-semibold text-ink">{{ $log->created_at?->format('d M Y H:i:s') ?? $log->created_at }} · {{ str_replace('meta.ad_account.', '', $log->action) }}</p>
+                                @if($details['stage'] ?? null)<span class="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted border border-border">Stage: {{ $details['stage'] }}</span>@endif
+                            </div>
                             @if(isset($details['kind']))
-                                <p class="text-muted">{{ ucfirst($details['kind']) }}: {{ $details['fetched'] ?? 0 }} fetched · {{ $details['new'] ?? 0 }} new · {{ $details['updated'] ?? 0 }} updated · {{ !empty($details['has_more']) ? 'More pages pending' : 'Edge complete' }}</p>
+                                <p class="text-muted mt-0.5">{{ ucfirst($details['kind']) }}: {{ $details['fetched'] ?? 0 }} fetched · {{ $details['new'] ?? 0 }} new · {{ $details['updated'] ?? 0 }} updated · {{ !empty($details['has_more']) ? 'More pages pending' : 'Edge complete' }}</p>
                             @endif
                             @if(isset($details['counts']))
-                                <p class="text-muted">@foreach($details['counts'] as $k => $c){{ ucfirst($k) }}: {{ $c }} @endforeach</p>
+                                <p class="text-muted mt-0.5">@foreach($details['counts'] as $k => $c){{ ucfirst($k) }}: {{ $c }} @endforeach</p>
                             @endif
                             @if(isset($details['message']))
-                                <p class="text-ink">{{ $details['message'] }}</p>
+                                <p class="text-ink mt-0.5">{{ $details['message'] }}</p>
                             @endif
-                            @if($details['stage'] ?? null)<p>Stage: {{ $details['stage'] }}</p>@endif
                             @if($details['http_status'] ?? null)
-                                <p class="text-muted text-[11px]">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>
+                                <p class="text-muted text-[10px] mt-0.5">HTTP {{ $details['http_status'] }} · Meta code {{ $details['meta_code'] ?? '—' }}</p>
                             @endif
                         </div>
                     @empty
-                        <p class="text-muted">No recent sync history.</p>
+                        <p class="text-muted text-xs p-2">No recent ad account synchronization logs.</p>
                     @endforelse
                 </div>
-            </details>
+            </div>
+
+            <!-- Form Fetch History & Diagnostics -->
+            <div>
+                <h5 class="font-bold text-ink uppercase tracking-wider text-[11px] mb-2">Lead Form Fetch History &amp; Diagnostics</h5>
+                <div class="overflow-x-auto rounded-lg border border-border">
+                    <table class="w-full text-left text-xs bg-canvas">
+                        <thead class="bg-surface text-muted">
+                            <tr>
+                                <th class="p-2">Time / Page</th>
+                                <th class="p-2">Result</th>
+                                <th class="p-2">Fetched / New / Saved</th>
+                                <th class="p-2">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            @forelse($formSyncHistory as $entry)
+                                <tr>
+                                    <td class="p-2 whitespace-nowrap">
+                                        {{ $entry['at']->format('d M Y H:i:s') }}
+                                        <span class="block text-muted text-[11px]">Page {{ $entry['page_id'] ?? '—' }} · {{ $entry['origin'] ?? '—' }}</span>
+                                    </td>
+                                    <td class="p-2">
+                                        <span @class([
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                            'bg-emerald-50 text-emerald-700 border border-emerald-200' => ($entry['status'] ?? '') === 'completed',
+                                            'bg-rose-50 text-rose-700 border border-rose-200' => ($entry['status'] ?? '') === 'failed',
+                                            'bg-neutral-100 text-neutral-600 border border-neutral-200' => !in_array($entry['status'] ?? '', ['completed', 'failed']),
+                                        ])>
+                                            {{ ucfirst($entry['status'] ?? 'unknown') }}
+                                        </span>
+                                    </td>
+                                    <td class="p-2 font-mono">{{ $entry['fetched'] ?? 0 }} / {{ $entry['new'] ?? 0 }} / {{ $entry['saved'] ?? 0 }}</td>
+                                    <td class="p-2 min-w-64">
+                                        {{ $entry['message'] ?? '' }}
+                                        @if($entry['http_status'] ?? null)
+                                            <span class="block text-muted text-[11px]">HTTP {{ $entry['http_status'] }} · Meta code {{ $entry['meta_code'] ?? '—' }}</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="p-3 text-muted text-center">No lead form fetch attempts recorded yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-    @endif
+    </details>
 
     <x-ui.modal name="meta-campaign-mapping" maxWidth="xl" centered>
         <form wire:submit="saveCampaignMapping" class="space-y-4 p-6">

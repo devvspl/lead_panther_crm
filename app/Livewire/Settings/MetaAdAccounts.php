@@ -260,7 +260,14 @@ class MetaAdAccounts extends Component
             })->orderBy('name')->pluck('name', 'id')->all(),
             'mappingProjects' => ['' => 'Select CRM project'] + ($this->mappingClientId ? \App\Models\Project::where('client_id', $this->mappingClientId)->orderBy('name')->pluck('name', 'id')->all() : []),
             'mappingCampaigns' => ['' => 'Select CRM campaign'] + ($this->mappingProjectId ? Campaign::where('project_id', $this->mappingProjectId)->whereHas('project', fn ($q) => $q->where('client_id', $this->mappingClientId))->orderBy('name')->pluck('name', 'id')->all() : []),
-            'logs' => $account ? AuditLog::where('subject_type', MetaAdAccount::class)->where('subject_id', $account->id)->latest('created_at')->limit(10)->get() : collect(),
+            'logs' => $account ? AuditLog::where('subject_type', MetaAdAccount::class)->where('subject_id', $account->id)->latest('created_at')->limit(15)->get() : AuditLog::where('subject_type', MetaAdAccount::class)->latest('created_at')->limit(10)->get(),
+            'formSyncHistory' => AuditLog::where('subject_type', PortalAccount::class)
+                ->where('subject_id', $this->integrationId)
+                ->where('action', 'like', 'meta.forms.%')->latest('id')->limit(15)->get()->map(function ($log) {
+                    $details = json_decode($log->to_value ?? '{}', true) ?: [];
+                    return ['id' => $log->id, 'at' => $log->created_at] + \Illuminate\Support\Arr::only($details,
+                        ['page_id', 'origin', 'status', 'pages', 'fetched', 'new', 'updated', 'saved', 'message', 'http_status', 'meta_code']);
+                }),
         ]);
     }
 }

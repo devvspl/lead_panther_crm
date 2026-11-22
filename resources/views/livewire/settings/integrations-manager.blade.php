@@ -385,11 +385,6 @@
                         </button>
                     </div>
 
-                    <div class="rounded-xl border border-border bg-canvas p-3 space-y-2 text-xs">
-                        <p>Fetching forms loads the selected Facebook Page's published lead forms. Campaigns and ad sets (including a new ad using an existing form) appear separately in <strong>Connected Ad Accounts → Campaigns &amp; Reporting</strong>.</p>
-                        <p class="text-muted">For a missing item, check the Ad Account, the Page used by the ad, and whether the ad and Instant Form are published.</p>
-                        <x-ui.button type="button" variant="secondary" wire:click="syncLinkedAdAccounts" wire:loading.attr="disabled">Sync Campaigns &amp; Ad Sets</x-ui.button>
-                    </div>
                     @if($formFetchSummary)
                         <div role="status" class="rounded-xl border border-border bg-canvas p-3 space-y-1 text-xs">
                             <p class="font-semibold">Form fetch: {{ ucfirst($formFetchSummary['status']) }} · Page {{ $formFetchSummary['page_id'] ?: 'not configured' }}</p>
@@ -397,14 +392,6 @@
                             <p>{{ $formFetchSummary['message'] }}</p>
                         </div>
                     @endif
-                    <details class="rounded-xl border border-border p-3 text-xs" wire:key="meta-form-history-{{ $selectedMappingAccountId ?: $selectedAccountId }}">
-                        <summary class="cursor-pointer font-semibold">Form Fetch History &amp; Diagnostics</summary>
-                        <div class="overflow-x-auto mt-3"><table class="w-full text-left"><thead class="bg-canvas text-muted"><tr><th class="p-2">Time / Page</th><th class="p-2">Result</th><th class="p-2">Fetched / New / Saved</th><th class="p-2">Details</th></tr></thead><tbody class="divide-y divide-border">
-                            @forelse($formSyncHistory as $entry)
-                                <tr><td class="p-2 whitespace-nowrap">{{ $entry['at']->format('d M Y H:i:s') }}<span class="block text-muted">Page {{ $entry['page_id'] ?? '—' }} · {{ $entry['origin'] ?? '—' }}</span></td><td class="p-2">{{ ucfirst($entry['status'] ?? 'unknown') }}</td><td class="p-2">{{ $entry['fetched'] ?? 0 }} / {{ $entry['new'] ?? 0 }} / {{ $entry['saved'] ?? 0 }}</td><td class="p-2 min-w-64">{{ $entry['message'] ?? '' }} @if($entry['http_status'] ?? null)<span class="block text-muted">HTTP {{ $entry['http_status'] }} · Meta code {{ $entry['meta_code'] ?? '—' }}</span>@endif</td></tr>
-                            @empty<tr><td colspan="4" class="p-3 text-muted">No fetch attempts recorded yet.</td></tr>@endforelse
-                        </tbody></table></div>
-                    </details>
                     @if(count($metaPageOptions) > 1)
                         <div class="max-w-md"><label class="block text-xs font-semibold mb-1">Facebook Page</label><x-ui.themed-select wire:model.live="selectedMappingAccountId" :options="$metaPageOptions" /></div>
                     @endif

@@ -7,6 +7,7 @@ use Livewire\WithFileUploads;
 use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\Client;
 use App\Models\CreditWallet;
 use App\Models\CreditTransaction;
 use App\Models\AuditLog;
@@ -30,6 +31,7 @@ class OrganizationManager extends Component
 
     public string $name = '';
     public string $status = 'active';
+    public string $billingEmail = '';
 
     public ?int $editingOrganizationId = null;
 
@@ -193,6 +195,8 @@ class OrganizationManager extends Component
 
     public function openRegisterOrgModal(string $tab = 'create'): void
     {
+        $this->reset(['name', 'status', 'billingEmail']);
+        $this->status = 'active';
         $this->orgModalTab = in_array($tab, ['create', 'import']) ? $tab : 'create';
         $this->resetImportState();
         $this->showCreateOrgModal = true;
@@ -202,6 +206,7 @@ class OrganizationManager extends Component
     public function closeRegisterOrgModal(): void
     {
         $this->showCreateOrgModal = false;
+        $this->reset(['name', 'status', 'billingEmail']);
         $this->resetImportState();
         $this->dispatch('close-modal', 'register-organization-modal');
     }
@@ -216,17 +221,31 @@ class OrganizationManager extends Component
         $this->validate([
             'name' => 'required|string|max:255',
             'status' => 'nullable|in:active,suspended',
+            'billingEmail' => 'nullable|email|max:255',
         ]);
 
-        Organization::create([
+        $org = Organization::create([
             'name' => $this->name,
             'status' => $this->status ?: 'active',
         ]);
 
-        $this->reset(['name', 'status']);
+        // Automatically create organization main user (primary billing owner / client)
+        $client = Client::create([
+            'organization_id' => $org->id,
+            'name' => $this->name,
+            'email' => !empty($this->billingEmail) ? $this->billingEmail : null,
+            'status' => $org->status ?: 'active',
+        ]);
+
+        CreditWallet::firstOrCreate(
+            ['client_id' => $client->id],
+            ['balance' => 0]
+        );
+
+        $this->reset(['name', 'status', 'billingEmail']);
         $this->showCreateOrgModal = false;
         $this->dispatch('close-modal', 'register-organization-modal');
-        $this->dispatch('toast', type: 'success', message: 'Organization created successfully.');
+        $this->dispatch('toast', type: 'success', message: 'Organization created successfully with primary client.');
     }
 
     public function updatedImportFile(): void

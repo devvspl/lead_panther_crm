@@ -845,13 +845,41 @@
     <!-- TAB 3: PROJECT MAPPINGS -->
     @if($activeTab === 'clients')
         <div class="space-y-6">
+            @if($clients->isEmpty())
+                <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2.5">
+                        <svg class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <span class="font-bold">No Billing Owner Registered Yet</span>
+                            <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">Saving a project mapping will automatically provision a main user for {{ $organization->name }}, or you can set one up now.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" wire:click="autoCreateMainUser" wire:loading.attr="disabled" class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs cursor-pointer transition shadow-2xs">
+                            Auto-Create Main User
+                        </button>
+                        <button type="button" wire:click="openCreateClientModal" class="px-3.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-surface/50 hover:bg-surface text-amber-900 dark:text-amber-200 font-semibold text-xs cursor-pointer transition">
+                            + Custom Client Details
+                        </button>
+                    </div>
+                </div>
+            @endif
+
             <div class="p-5 rounded-2xl bg-surface border border-border space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="min-w-0">
                         <h3 class="text-sm font-bold text-ink">Project Mapping ({{ $totalProjectsCount }})</h3>
                         <p class="text-xs text-muted mt-1">Projects are automatically assigned to {{ $organization->name }}'s billing owner.</p>
                     </div>
-                    <x-ui.export-button target="exportTabExcel('clients')" label="Export Project Mappings" class="justify-center" />
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="openCreateClientModal" class="px-3 py-1.5 border border-border bg-surface hover:bg-canvas rounded-lg text-xs font-semibold text-ink flex items-center gap-1.5 cursor-pointer transition">
+                            <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            <span>+ Add Client / Billing Owner</span>
+                        </button>
+                        <x-ui.export-button target="exportTabExcel('clients')" label="Export Project Mappings" class="justify-center" />
+                    </div>
                 </div>
                 <form wire:submit="saveProjectMapping" class="flex flex-col sm:flex-row sm:items-end gap-3">
                     <div class="flex-1 min-w-0"><label for="mapping-project-name" class="block text-xs mb-2">Project name</label><input id="mapping-project-name" wire:model="mappingProjectName" class="w-full h-9 rounded-lg border border-border bg-canvas px-3 text-xs" required /></div>

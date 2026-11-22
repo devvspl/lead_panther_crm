@@ -67,6 +67,36 @@ class OrganizationManagerTest extends TestCase
             'name' => 'Sobha Developers Ltd',
             'status' => 'active',
         ]);
+
+        $org = Organization::where('name', 'Sobha Developers Ltd')->firstOrFail();
+        $client = Client::where('organization_id', $org->id)->firstOrFail();
+        $this->assertEquals('Sobha Developers Ltd', $client->name);
+        $this->assertTrue($client->hasRole('Builder/Developer'));
+        $this->assertDatabaseHas('client_wallets', [
+            'client_id' => $client->id,
+            'balance' => 0,
+        ]);
+    }
+
+    public function test_create_organization_with_custom_billing_email(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+
+        Livewire::actingAs($admin)
+            ->test(OrganizationManager::class)
+            ->call('openRegisterOrgModal', 'create')
+            ->set('name', 'Godrej Properties Ltd')
+            ->set('billingEmail', 'accounts@godrej.test')
+            ->set('status', 'active')
+            ->call('createOrganization')
+            ->assertSet('showCreateOrgModal', false)
+            ->assertDispatched('toast');
+
+        $org = Organization::where('name', 'Godrej Properties Ltd')->firstOrFail();
+        $client = Client::where('organization_id', $org->id)->firstOrFail();
+        $this->assertEquals('accounts@godrej.test', $client->email);
+        $this->assertTrue($client->hasRole('Builder/Developer'));
     }
 
     public function test_download_import_template_excel_and_csv(): void

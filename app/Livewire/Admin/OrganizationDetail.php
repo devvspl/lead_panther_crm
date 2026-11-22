@@ -81,20 +81,74 @@ class OrganizationDetail extends Component
                 ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client', 'Broker', 'broker', 'Channel Partner', 'channel-partner']))->select('id'));
     }
 
+    public function ensureBillingOwner(): Client
+    {
+        $owners = User::where('organization_id', $this->organization->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin']))->select('id');
+
+        $client = $this->billingClients()->whereIn('id', $owners)->orderBy('id')->first()
+            ?? $this->billingClients()->orderBy('id')->first();
+
+        if ($client) {
+            return $client;
+        }
+
+        // 1. Check if any user in this organization already has a builder/developer/client role
+        $existingBuilder = User::where('organization_id', $this->organization->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client']))
+            ->orderBy('id')
+            ->first();
+
+        if ($existingBuilder) {
+            $client = Client::find($existingBuilder->id);
+            if ($client) {
+                CreditWallet::firstOrCreate(['client_id' => $client->id], ['balance' => 0]);
+                $this->organization->load('clients.projects', 'clients.wallet');
+                return $client;
+            }
+        }
+
+        // 2. Otherwise create a default primary billing owner client for this organization
+        $slug = Str::slug($this->organization->name ?: 'client');
+        $email = $slug . '_' . $this->organization->id . '@client.local';
+        if (User::where('email', $email)->exists()) {
+            $email = $slug . '_' . $this->organization->id . '_' . uniqid() . '@client.local';
+        }
+
+        $client = Client::create([
+            'organization_id' => $this->organization->id,
+            'name' => $this->organization->name,
+            'email' => $email,
+            'status' => 'active',
+        ]);
+
+        CreditWallet::firstOrCreate(
+            ['client_id' => $client->id],
+            ['balance' => 0]
+        );
+
+        $this->organization->load('clients.projects', 'clients.wallet');
+
+        return $client;
+    }
+
+    public function autoCreateMainUser(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $client = $this->ensureBillingOwner();
+        $this->dispatch('toast', type: 'success', message: "Primary billing owner '{$client->name}' is ready.");
+    }
+
     public function saveProjectMapping(): void
     {
         abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
         $this->mappingProjectName = trim($this->mappingProjectName);
         $this->validate(['mappingProjectName' => 'required|string|max:255']);
-        $owners = User::where('organization_id', $this->organization->id)
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin']))->select('id');
-        $client = $this->billingClients()->whereIn('id', $owners)->orderBy('id')->first()
-            ?? $this->billingClients()->orderBy('id')->first();
-        if (! $client) {
-            $this->addError('mappingProjectName', 'This organization needs a billing owner before a project can be mapped.');
-            return;
-        }
+
+        $client = $this->ensureBillingOwner();
+
         Project::withoutGlobalScopes()->firstOrCreate(['client_id' => $client->id, 'name' => trim($this->mappingProjectName)], ['status' => 'active']);
+        $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
         $this->reset('mappingProjectName');
         $this->dispatch('toast', type: 'success', message: 'Project mapping saved.');
     }
@@ -540,6 +594,7 @@ class OrganizationDetail extends Component
     public function openCreateClientModal(): void
     {
         $this->reset(['newClientName', 'newClientBillingEmail', 'newClientStatus']);
+        $this->newClientName = $this->organization->name;
         $this->newClientStatus = 'active';
         $this->showCreateClientModal = true;
         $this->dispatch('open-modal', 'create-org-client-modal');

@@ -97,6 +97,15 @@
                         </div>
 
                         <div>
+                            <label class="font-bold text-ink">Main User / Billing Email <span class="text-muted font-normal">(Optional)</span></label>
+                            <input type="email" wire:model="billingEmail" placeholder="e.g. billing@prestige.com (auto-generated if blank)"
+                                class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                            @error('billingEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
+                            @enderror
+                            <p class="text-[11px] text-muted mt-1">A primary billing owner client will automatically be provisioned for this organization.</p>
+                        </div>
+
+                        <div>
                             <label class="font-bold text-ink">Initial Status</label>
                             <x-ui.themed-select wire:model="status" :options="['active' => 'Active', 'suspended' => 'Suspended']" placeholder="Initial Status" class="w-full mt-1" />
                             @error('status') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>

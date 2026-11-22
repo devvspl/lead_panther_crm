@@ -24,12 +24,19 @@ class LeadSeeder extends Seeder
         $adminUser = User::role('super-admin')->first();
 
         for ($i = 0; $i < 300; $i++) {
-            $client = $clients->random();
-            $clientProjects = $projects->where('client_id', $client->id);
-            $project = $clientProjects->count() > 0 ? $clientProjects->random() : $projects->random();
-
-            $projectCampaigns = $campaigns->where('project_id', $project->id);
-            $campaign = $projectCampaigns->count() > 0 ? $projectCampaigns->random() : $campaigns->random();
+            if ($campaigns->isNotEmpty()) {
+                $campaign = $campaigns->random();
+                $project = $projects->firstWhere('id', $campaign->project_id) ?? $projects->random();
+                $client = $clients->firstWhere('id', $project->client_id) ?? $clients->first();
+            } elseif ($projects->isNotEmpty()) {
+                $project = $projects->random();
+                $client = $clients->firstWhere('id', $project->client_id) ?? $clients->first();
+                $campaign = null;
+            } else {
+                $client = $clients->random();
+                $project = null;
+                $campaign = null;
+            }
 
             $assignedAgent = $salesExecs->random();
 

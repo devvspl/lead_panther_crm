@@ -13,6 +13,12 @@ class OrganizationProjectSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+    }
+
     public function test_projects_and_wallets_exclude_team_members_and_project_rates_save(): void
     {
         $this->seed(DeltekSeeder::class);
@@ -41,5 +47,61 @@ class OrganizationProjectSettingsTest extends TestCase
         $outside = Project::create(['client_id' => $other->id, 'name' => 'Outside Project']);
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
         $component->call('saveProjectRate', $outside->id);
+    }
+
+    public function test_project_mapping_automatically_provisions_billing_owner_client_when_none_exists(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        // Organization with NO pre-existing billing owner (e.g. only executive / team leader)
+        $org = Organization::create(['name' => 'H&S By Investors Clinic', 'status' => 'active']);
+        $executive = User::factory()->create(['organization_id' => $org->id, 'name' => 'H&S Executive 01']);
+        $executive->assignRole('Executive');
+        $teamLeader = User::factory()->create(['organization_id' => $org->id, 'name' => 'H&S Team Leader']);
+        $teamLeader->assignRole('Team Leader');
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->assertSee('No Billing Owner Registered Yet')
+            ->assertSee('Auto-Create Main User')
+            ->assertSee('+ Add Client / Billing Owner')
+            ->set('mappingProjectName', 'Boulevard walk by H&S')
+            ->call('saveProjectMapping')
+            ->assertHasNoErrors()
+            ->assertDispatched('toast', type: 'success', message: 'Project mapping saved.');
+
+        $project = Project::withoutGlobalScopes()->where('name', 'Boulevard walk by H&S')->firstOrFail();
+        $this->assertNotNull($project->client_id);
+
+        $client = \App\Models\Client::withoutGlobalScopes()->findOrFail($project->client_id);
+        $this->assertEquals($org->id, $client->organization_id);
+        $this->assertEquals('H&S By Investors Clinic', $client->name);
+        $this->assertTrue($client->hasRole('Builder/Developer'));
+
+        // Verify credit wallet was automatically created with 0 balance
+        $wallet = \App\Models\CreditWallet::where('client_id', $client->id)->firstOrFail();
+        $this->assertEquals(0, $wallet->balance);
+    }
+
+    public function test_auto_create_main_user_button_provisions_billing_owner(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Prestige Heights', 'status' => 'active']);
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->assertSee('Auto-Create Main User')
+            ->call('autoCreateMainUser')
+            ->assertDispatched('toast', type: 'success');
+
+        $client = \App\Models\Client::withoutGlobalScopes()->where('organization_id', $org->id)->firstOrFail();
+        $this->assertEquals('Prestige Heights', $client->name);
+        $this->assertTrue($client->hasRole('Builder/Developer'));
+        $this->assertDatabaseHas('client_wallets', ['client_id' => $client->id, 'balance' => 0]);
     }
 }

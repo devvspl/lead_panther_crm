@@ -11,6 +11,11 @@ class Client extends User
 {
     protected $table = 'users';
 
+    public function getMorphClass(): string
+    {
+        return User::class;
+    }
+
     protected static function booted(): void
     {
         parent::booted();
@@ -29,10 +34,11 @@ class Client extends User
         });
 
         static::created(function ($client) {
-            if ($client->roles()->count() === 0) {
+            $user = User::find($client->id);
+            if ($user && $user->roles()->count() === 0) {
                 try {
                     $role = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Builder/Developer', 'guard_name' => 'web']);
-                    $client->assignRole($role);
+                    $user->assignRole($role);
                 } catch (\Throwable $e) {}
             }
         });

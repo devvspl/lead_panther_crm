@@ -1056,7 +1056,6 @@
                                                     @endif
                                                     <x-ui.lead-archive-menu :id="$actionLeadIdMob" />
                                                 </div>
-                                                </div>
                                             @elseif($type === 'user_name')
                                                 @php
                                                     $userRowIdMobile = is_object($row) ? $row->id : $row['id'];

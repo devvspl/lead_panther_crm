@@ -2040,10 +2040,14 @@ class LeadKanban extends Component
     public function tableColumns(): array
     {
         $columns = $this->clientTableColumns();
-        if (Lead::usesSalesPanel()) array_splice($columns, max(0, count($columns) - 1), 0, [
-            ['key' => 'internal_verification', 'label' => 'Lead Panther Verification', 'type' => 'text', 'priority' => 2],
-            ['key' => 'internal_handover', 'label' => 'Client Handover', 'type' => 'text', 'priority' => 2],
-        ]);
+        $isSuperAdmin = auth()->user()?->hasAnyRole(['Super Admin', 'super-admin'])
+            || \App\Support\NavigationConfig::getRoleKey(auth()->user()) === 'super-admin';
+        if ($isSuperAdmin) {
+            array_splice($columns, max(0, count($columns) - 1), 0, [
+                ['key' => 'internal_verification', 'label' => 'Lead Panther Verification', 'type' => 'text', 'priority' => 2],
+                ['key' => 'internal_handover', 'label' => 'Client Handover', 'type' => 'text', 'priority' => 2],
+            ]);
+        }
         return $columns;
     }
 

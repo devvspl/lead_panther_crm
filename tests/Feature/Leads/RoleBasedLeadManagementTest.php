@@ -229,10 +229,33 @@ class RoleBasedLeadManagementTest extends TestCase
             'current_stage',
             'status',
             'next_followup',
-            'internal_verification',
-            'internal_handover',
             'actions',
         ], $colKeys);
+        $this->assertNotContains('internal_verification', $colKeys);
+        $this->assertNotContains('internal_handover', $colKeys);
+    }
+
+    public function test_internal_verification_and_handover_columns_visible_to_super_admin_only(): void
+    {
+        // 1. Sales Executive does not see internal verification columns
+        $this->actingAs($this->exec1);
+        $execCols = array_column(Livewire::test(LeadKanban::class)->instance()->tableColumns(), 'key');
+        $this->assertNotContains('internal_verification', $execCols);
+        $this->assertNotContains('internal_handover', $execCols);
+
+        // 2. Builder does not see internal verification columns
+        $this->actingAs($this->builderUser);
+        $builderCols = array_column(Livewire::test(LeadKanban::class)->instance()->tableColumns(), 'key');
+        $this->assertNotContains('internal_verification', $builderCols);
+        $this->assertNotContains('internal_handover', $builderCols);
+
+        // 3. Super Admin sees both internal verification and handover columns
+        $admin = User::factory()->create();
+        $admin->assignRole('Super Admin');
+        $this->actingAs($admin);
+        $adminCols = array_column(Livewire::test(LeadKanban::class)->instance()->tableColumns(), 'key');
+        $this->assertContains('internal_verification', $adminCols);
+        $this->assertContains('internal_handover', $adminCols);
     }
 
     public function test_sales_executive_cannot_assign_or_auto_distribute_leads(): void

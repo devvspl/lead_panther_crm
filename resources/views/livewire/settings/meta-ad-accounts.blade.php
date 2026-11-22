@@ -252,24 +252,28 @@
                                     </td>
                                     <td class="p-2.5">
                                         <div class="space-y-1.5">
-                                            @if($record->crmCampaign?->project?->client)
+                                            @php
+                                                $destClient = $record->client ?: $record->crmCampaign?->project?->client;
+                                                $destProject = $record->project ?: $record->crmCampaign?->project;
+                                            @endphp
+                                            @if($destProject)
                                                 <div class="flex items-center gap-1.5 text-xs">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                                    <span class="font-semibold text-ink">{{ $record->crmCampaign->project->client->name }}</span>
+                                                    <span class="font-semibold text-ink">{{ $destClient?->name ?: $destProject->client?->name ?: 'Mapped Client' }}</span>
                                                 </div>
                                                 <p class="text-muted text-[11px] pl-3">
-                                                    {{ $record->crmCampaign->project->name }} · {{ $record->crmCampaign->name }}
+                                                    Project: <span class="font-medium text-ink">{{ $destProject->name }}</span>
                                                 </p>
                                             @else
                                                 <div class="flex items-center gap-1.5 text-xs">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
                                                     <span class="font-medium text-amber-700">Not mapped</span>
                                                 </div>
-                                                <p class="text-muted text-[11px] pl-3">Assign client to route leads</p>
+                                                <p class="text-muted text-[11px] pl-3">Assign client &amp; project to route leads</p>
                                             @endif
                                             <div class="flex items-center gap-1.5 pt-0.5">
                                                 <button type="button" wire:click="openCampaignMapping({{ $record->id }})" class="px-2 py-1 rounded bg-canvas border border-border text-[11px] font-semibold text-ink hover:bg-surface hover:border-primary transition">
-                                                    {{ $record->crm_campaign_id ? 'Edit Mapping' : 'Map Campaign' }}
+                                                    {{ ($record->project_id || $record->crm_campaign_id) ? 'Edit Mapping' : 'Map Campaign' }}
                                                 </button>
                                                 <button type="button" wire:click="fetchCampaignLeads({{ $record->id }})" wire:loading.attr="disabled" @disabled(data_get($record->lead_fetch_state, 'status') === 'running') class="px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary hover:bg-primary/20 transition disabled:opacity-50">
                                                     Fetch Leads
@@ -525,16 +529,31 @@
         <form wire:submit="saveCampaignMapping" class="space-y-4 p-6">
             <h3 class="font-bold text-ink">Campaign Lead Destination</h3>
             <p class="text-xs text-muted">Historical and future attributed leads use this destination. Existing Page/form mappings stay unchanged.</p>
-            <label class="block text-xs font-semibold">Client / Organization</label>
-            <x-ui.themed-select wire:model.live="mappingClientId" :options="$mappingClients" :searchable="true" />
-            @error('mappingClientId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
-            <label class="block text-xs font-semibold">CRM Project</label>
-            <x-ui.themed-select wire:model.live="mappingProjectId" :options="$mappingProjects" :searchable="true" wire:key="mapping-project-{{ $mappingClientId }}" />
-            @error('mappingProjectId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
-            <label class="block text-xs font-semibold">CRM Campaign</label>
-            <x-ui.themed-select wire:model="mappingCampaignId" :options="$mappingCampaigns" :searchable="true" wire:key="mapping-campaign-{{ $mappingProjectId }}" />
-            @error('mappingCampaignId')<p class="text-danger text-xs">{{ $message }}</p>@enderror
-            <div class="flex justify-end gap-2">
+            
+            <div>
+                <label class="block text-xs font-semibold mb-1">Client / Organization <span class="text-danger">*</span></label>
+                <x-ui.themed-select wire:model.live="mappingClientId" :options="$mappingClients" :searchable="true" />
+                @error('mappingClientId')<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold mb-1">CRM Project <span class="text-danger">*</span></label>
+                @if($mappingClientId && empty($projectsList))
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 mb-2">
+                        No projects available for this organization.
+                    </div>
+                @endif
+                <x-ui.themed-select
+                    wire:model.live="mappingProjectId"
+                    :options="$mappingProjects"
+                    :searchable="true"
+                    wire:key="mapping-project-{{ $mappingClientId }}"
+                    placeholder="{{ empty($mappingClientId) ? 'Select client / organization first' : (empty($projectsList) ? 'No projects available for this organization.' : 'Select CRM project') }}"
+                />
+                @error('mappingProjectId')<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
                 <button type="button" x-on:click="$dispatch('close-modal', 'meta-campaign-mapping')" class="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button>
                 <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">Save Mapping</button>
             </div>

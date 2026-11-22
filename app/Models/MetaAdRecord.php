@@ -20,6 +20,16 @@ class MetaAdRecord extends Model
         return $this->belongsTo(MetaAdAccount::class, 'meta_ad_account_id');
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'client_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'project_id');
+    }
+
     public function crmCampaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class, 'crm_campaign_id');

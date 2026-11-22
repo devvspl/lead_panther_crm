@@ -47,9 +47,8 @@ class MetaAdAccounts extends Component
         $record = $this->campaignRecord($recordId);
         $this->resetValidation();
         $this->mappingRecordId = $record->id;
-        $this->mappingCampaignId = (string) ($record->crm_campaign_id ?? '');
-        $this->mappingProjectId = (string) ($record->crmCampaign?->project_id ?? '');
-        $this->mappingClientId = (string) ($record->crmCampaign?->project?->client_id ?? '');
+        $this->mappingProjectId = (string) ($record->project_id ?? $record->crmCampaign?->project_id ?? '');
+        $this->mappingClientId = (string) ($record->client_id ?? $record->project?->client_id ?? $record->crmCampaign?->project?->client_id ?? '');
         $this->dispatch('open-modal', 'meta-campaign-mapping');
     }
 
@@ -58,16 +57,27 @@ class MetaAdAccounts extends Component
 
     public function saveCampaignMapping(): void
     {
-        $this->validate(['mappingClientId' => 'required|integer|exists:users,id', 'mappingProjectId' => 'required|integer|exists:projects,id', 'mappingCampaignId' => 'required|integer|exists:campaigns,id']);
-        app(\App\Services\MetaCampaignLeadService::class)->saveMapping($this->campaignRecord($this->mappingRecordId), (int) $this->mappingClientId, (int) $this->mappingProjectId, (int) $this->mappingCampaignId);
+        $this->validate([
+            'mappingClientId' => 'required|integer|exists:users,id',
+            'mappingProjectId' => 'required|integer|exists:projects,id',
+        ], [
+            'mappingClientId.required' => 'Please select a Client / Organization.',
+            'mappingProjectId.required' => 'CRM Project is required.',
+            'mappingProjectId.exists' => 'The selected project does not exist.',
+        ]);
+        app(\App\Services\MetaCampaignLeadService::class)->saveMapping(
+            $this->campaignRecord($this->mappingRecordId),
+            (int) $this->mappingClientId,
+            (int) $this->mappingProjectId
+        );
         $this->dispatch('close-modal', 'meta-campaign-mapping');
-        $this->message = 'Campaign destination saved. Existing form mappings are preserved; attributed future leads use this destination.';
+        $this->message = 'Campaign destination saved. Attributed leads will route to the selected Client / Organization and CRM Project.';
     }
 
     public function fetchCampaignLeads(int $recordId): void
     {
         $record = $this->campaignRecord($recordId);
-        if (!$record->crm_campaign_id) { $this->openCampaignMapping($recordId); return; }
+        if (!$record->project_id && !$record->crm_campaign_id) { $this->openCampaignMapping($recordId); return; }
         try {
             app(\App\Services\MetaCampaignLeadService::class)->start($record);
             $this->message = 'Lead fetch queued. Only forms resolved from this campaign’s ads will be read. Progress appears below the campaign.';
@@ -247,19 +257,36 @@ class MetaAdAccounts extends Component
             }
         }
 
-        $records = $query?->with('crmCampaign.project.client')->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
+        $records = $query?->with(['client.organization', 'project.client', 'crmCampaign.project.client'])->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
+
+        $user = $this->mappingClientId ? \App\Models\User::with('organization')->find($this->mappingClientId) : null;
+        $projectsList = [];
+        if ($user) {
+            $clientIds = [$user->id];
+            if ($user->organization_id) {
+                $orgUserIds = \App\Models\User::where('organization_id', $user->organization_id)->pluck('id')->all();
+                $clientIds = array_unique(array_merge($clientIds, $orgUserIds));
+            }
+            $projectsList = \App\Models\Project::whereIn('client_id', $clientIds)->orderBy('name')->pluck('name', 'id')->all();
+        }
+
+        $mappingProjects = empty($this->mappingClientId)
+            ? ['' => 'Select client / organization first']
+            : (empty($projectsList)
+                ? ['' => 'No projects available for this organization.']
+                : (['' => 'Select CRM project'] + $projectsList));
 
         return view('livewire.settings.meta-ad-accounts', [
             'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages'])->orderBy('name')->get(),
             'selected' => $account,
             'records' => $records ?: collect(),
+            'projectsList' => $projectsList,
             'campaignOptions' => ['' => 'No CRM mapping'] + Campaign::orderBy('name')->pluck('name', 'id')->all(),
             'mappingClients' => ['' => 'Select client / organization'] + \App\Models\User::where('status', 'active')->where(function ($q) {
                 $q->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['Builder/Developer', 'Client/Organization Admin', 'Organization Admin', 'Client Admin', 'Super Admin', 'super-admin']))
                     ->orWhereIn('id', \App\Models\Project::select('client_id'));
             })->orderBy('name')->pluck('name', 'id')->all(),
-            'mappingProjects' => ['' => 'Select CRM project'] + ($this->mappingClientId ? \App\Models\Project::where('client_id', $this->mappingClientId)->orderBy('name')->pluck('name', 'id')->all() : []),
-            'mappingCampaigns' => ['' => 'Select CRM campaign'] + ($this->mappingProjectId ? Campaign::where('project_id', $this->mappingProjectId)->whereHas('project', fn ($q) => $q->where('client_id', $this->mappingClientId))->orderBy('name')->pluck('name', 'id')->all() : []),
+            'mappingProjects' => $mappingProjects,
             'logs' => $account ? AuditLog::where('subject_type', MetaAdAccount::class)->where('subject_id', $account->id)->latest('created_at')->limit(15)->get() : AuditLog::where('subject_type', MetaAdAccount::class)->latest('created_at')->limit(10)->get(),
             'formSyncHistory' => AuditLog::where('subject_type', PortalAccount::class)
                 ->where('subject_id', $this->integrationId)

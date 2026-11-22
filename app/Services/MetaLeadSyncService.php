@@ -409,8 +409,12 @@ class MetaLeadSyncService
 
                         // Resolve per-lead campaign routing before duplicate checks. Shared forms can serve multiple clients.
                         $campaignRoute = app(MetaCampaignLeadService::class)->routing($account, $mapped);
-                        $leadClientId = $campaignRoute?->project?->client_id ?: ($mapping?->client_id ?: ($defaultConfiguredClientId ?: $clientId));
-                        $projectId = $campaignRoute?->project_id ?: $project?->id;
+                        $leadClientId = $campaignRoute instanceof \App\Models\Project
+                            ? $campaignRoute->client_id
+                            : ($campaignRoute?->project?->client_id ?: ($mapping?->client_id ?: ($defaultConfiguredClientId ?: $clientId)));
+                        $projectId = $campaignRoute instanceof \App\Models\Project
+                            ? $campaignRoute->id
+                            : ($campaignRoute?->project_id ?: $project?->id);
                         $mobile = $mapped['mobile'] ?: '';
                         $email = $mapped['email'] ?: '';
                         $metaLeadId = $rawLead['id'] ?? 'unknown';

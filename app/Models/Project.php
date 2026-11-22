@@ -24,4 +24,14 @@ class Project extends Model
     {
         return $this->belongsTo(User::class, 'client_id');
     }
+
+    public function getProjectIdAttribute(): int
+    {
+        return (int) $this->id;
+    }
+
+    public function getProjectAttribute(): self
+    {
+        return $this;
+    }
 }

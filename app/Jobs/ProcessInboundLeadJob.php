@@ -116,7 +116,11 @@ class ProcessInboundLeadJob implements ShouldQueue
 
                 $campaignRoute = $type === 'meta' && $account
                     ? app(\App\Services\MetaCampaignLeadService::class)->routing($account, $mapped) : null;
-                if ($campaignRoute) $targetClientId = $campaignRoute->project->client_id;
+                if ($campaignRoute) {
+                    $targetClientId = $campaignRoute instanceof \App\Models\Project
+                        ? (int) $campaignRoute->client_id
+                        : (int) ($campaignRoute->project?->client_id ?: $campaignRoute->client_id);
+                }
                 $clientId = $targetClientId;
 
                 // Inherit project context belonging to the target client
@@ -137,8 +141,10 @@ class ProcessInboundLeadJob implements ShouldQueue
                     $projectId = Project::where('client_id', $clientId)->value('id') ?: Project::value('id');
                 }
 
-                if ($campaignRoute) $projectId = $campaignRoute->project_id;
-                $campaignId = $campaignRoute?->id ?? $mapping?->campaign_id;
+                $campaignId = $campaignRoute instanceof \App\Models\Campaign ? $campaignRoute->id : ($mapping?->campaign_id ?? null);
+                if ($campaignRoute) {
+                    $projectId = (int) ($campaignRoute instanceof \App\Models\Project ? $campaignRoute->id : $campaignRoute->project_id);
+                }
                 $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
                 $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
 

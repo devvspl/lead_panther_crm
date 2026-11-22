@@ -10,21 +10,49 @@ use Illuminate\Validation\ValidationException;
 /** Campaign imports never enumerate a Page's unrelated forms. */
 class MetaCampaignLeadService
 {
-    public function saveMapping(MetaAdRecord $record, int $clientId, int $projectId, int $campaignId): void
+    public function saveMapping(MetaAdRecord $record, int $clientId, int $projectId, ?int $campaignId = null): void
     {
-        $campaign = Campaign::with('project')->findOrFail($campaignId);
-        if ($record->kind !== 'campaign' || (int) $campaign->project_id !== $projectId
-            || (int) $campaign->project?->client_id !== $clientId) {
-            throw ValidationException::withMessages(['mappingCampaignId' => 'Choose a campaign belonging to the selected client and project.']);
+        if ($record->kind !== 'campaign') {
+            throw ValidationException::withMessages(['mappingProjectId' => 'Only campaigns can be mapped.']);
         }
-        DB::transaction(function () use ($record, $campaignId) {
+
+        $client = \App\Models\User::with('organization')->findOrFail($clientId);
+        $project = \App\Models\Project::with('client.organization')->findOrFail($projectId);
+
+        $belongsToClient = (int) $project->client_id === (int) $client->id;
+        $belongsToOrg = false;
+        if (!$belongsToClient && $client->organization_id && $project->client?->organization_id) {
+            $belongsToOrg = (int) $project->client->organization_id === (int) $client->organization_id;
+        }
+
+        if (!$belongsToClient && !$belongsToOrg) {
+            throw ValidationException::withMessages(['mappingProjectId' => 'The selected project does not belong to the selected organization.']);
+        }
+
+        if ($campaignId) {
+            $campaign = Campaign::find($campaignId);
+            if (!$campaign || (int) $campaign->project_id !== (int) $project->id) {
+                $campaignId = null;
+            }
+        }
+
+        DB::transaction(function () use ($record, $clientId, $projectId, $campaignId) {
             $locked = MetaAdRecord::lockForUpdate()->findOrFail($record->id);
             if (data_get($locked->lead_fetch_state, 'status') === 'running') {
-                throw ValidationException::withMessages(['mappingCampaignId' => 'Wait for the current lead fetch to finish before changing its mapping.']);
+                throw ValidationException::withMessages(['mappingProjectId' => 'Wait for the current lead fetch to finish before changing its mapping.']);
             }
-            $locked->update(['crm_campaign_id' => $campaignId]);
+            $locked->update([
+                'client_id' => $clientId,
+                'project_id' => $projectId,
+                'crm_campaign_id' => $campaignId,
+            ]);
         });
-        app(MetaAdAccountService::class)->audit($record->account, 'campaign_mapped', ['remote_campaign_id' => $record->remote_id, 'crm_campaign_id' => $campaignId]);
+        app(MetaAdAccountService::class)->audit($record->account, 'campaign_mapped', [
+            'remote_campaign_id' => $record->remote_id,
+            'client_id' => $clientId,
+            'project_id' => $projectId,
+            'crm_campaign_id' => $campaignId,
+        ]);
     }
 
     public function start(MetaAdRecord $record): void
@@ -34,10 +62,12 @@ class MetaCampaignLeadService
             $record = MetaAdRecord::lockForUpdate()->findOrFail($record->id);
             $state = $record->lead_fetch_state;
             if (($state['status'] ?? null) === 'running') return false;
+            $mappingKey = ($record->client_id ?? 0) . ':' . ($record->project_id ?? 0) . ':' . ($record->crm_campaign_id ?? 0);
             // Resume a failed cursor only while its destination is unchanged.
-            if (($state['status'] ?? null) !== 'failed' || ($state['crm_campaign_id'] ?? null) !== $record->crm_campaign_id) {
+            if (($state['status'] ?? null) !== 'failed' || ($state['mapping_key'] ?? null) !== $mappingKey) {
                 $state = ['phase' => 'adsets', 'after' => null, 'adsets' => [], 'set_index' => 0, 'forms' => [], 'form_index' => 0,
-                    'fetched' => 0, 'created' => 0, 'duplicates' => 0, 'skipped' => 0, 'crm_campaign_id' => $record->crm_campaign_id];
+                    'fetched' => 0, 'created' => 0, 'duplicates' => 0, 'skipped' => 0, 'mapping_key' => $mappingKey,
+                    'client_id' => $record->client_id, 'project_id' => $record->project_id, 'crm_campaign_id' => $record->crm_campaign_id];
             }
             $state['run_id'] ??= (string) \Illuminate\Support\Str::uuid();
             $record->update(['lead_fetch_state' => array_replace($state, ['status' => 'running', 'error' => null, 'requested_at' => now()->toIso8601String()])]);
@@ -49,13 +79,17 @@ class MetaCampaignLeadService
         }
     }
 
-    private function validateMapping(MetaAdRecord $record): Campaign
+    public function validateMapping(MetaAdRecord $record): mixed
     {
-        $campaign = $record->crmCampaign()->with('project.client')->first();
-        if ($record->kind !== 'campaign' || !$campaign?->project?->client || $campaign->project->client->status !== 'active') {
-            throw new \RuntimeException('Map this campaign to an active client, project and CRM campaign first.');
+        $project = $record->project ?: ($record->crm_campaign_id ? $record->crmCampaign?->project : null);
+        $client = $record->client ?: $project?->client;
+        if ($record->kind !== 'campaign' || !$project || !$client || $client->status !== 'active') {
+            throw new \RuntimeException('Map this campaign to an active client and CRM project first.');
         }
-        return $campaign;
+        if ($record->crm_campaign_id && $record->crmCampaign) {
+            return $record->crmCampaign;
+        }
+        return $project;
     }
 
     /** One bounded API page per queue job. Returns whether a continuation is needed. */
@@ -68,7 +102,10 @@ class MetaCampaignLeadService
         try {
             if (!in_array($state['status'] ?? '', ['running', 'failed'])) return false;
             $this->validateMapping($record);
-            if ((int) ($state['crm_campaign_id'] ?? 0) !== (int) $record->crm_campaign_id) throw new \RuntimeException('Campaign mapping changed. Start a new fetch.');
+            $mappingKey = ($record->client_id ?? 0) . ':' . ($record->project_id ?? 0) . ':' . ($record->crm_campaign_id ?? 0);
+            if (!empty($state['mapping_key']) && $state['mapping_key'] !== $mappingKey) {
+                throw new \RuntimeException('Campaign mapping changed. Start a new fetch.');
+            }
             $account = $record->account;
             if (!$account->access_token || in_array($account->status, ['disconnected', 'expired']) || $account->token_expires_at?->isPast()) {
                 throw new \RuntimeException('Reconnect the Ad Account before fetching leads.');
@@ -219,13 +256,16 @@ class MetaCampaignLeadService
     }
 
     /** Used by history imports and future webhooks before legacy form/default routing. */
-    public function routing(PortalAccount $page, array $mapped): ?Campaign
+    public function routing(PortalAccount $page, array $mapped): mixed
     {
         $accounts = MetaAdAccount::where(function ($q) use ($page) {
             $q->whereHas('pages', fn ($pages) => $pages->where('portal_accounts.id', $page->id))
                 ->orWhere('portal_account_id', $page->id);
         })->pluck('id');
-        $query = MetaAdRecord::whereIn('meta_ad_account_id', $accounts)->where('kind', 'campaign')->whereNotNull('crm_campaign_id');
+        $query = MetaAdRecord::whereIn('meta_ad_account_id', $accounts)->where('kind', 'campaign')
+            ->where(function ($q) {
+                $q->whereNotNull('project_id')->orWhereNotNull('crm_campaign_id');
+            });
         if (!empty($mapped['campaign_id'])) $query->where('remote_id', (string) $mapped['campaign_id']);
         elseif (!empty($mapped['ad_id'])) {
             $campaignIds = MetaAdRecord::whereIn('meta_ad_account_id', $accounts)->where('kind', 'ad')->where('remote_id', (string) $mapped['ad_id'])->pluck('campaign_id');
@@ -239,8 +279,8 @@ class MetaCampaignLeadService
         }
         $record = $query->first();
         if (!$record) return null;
-        $campaign = $this->validateMapping($record);
+        $target = $this->validateMapping($record);
         // A campaign-specific mapping takes precedence; shared form mappings stay untouched.
-        return $campaign;
+        return $target;
     }
 }

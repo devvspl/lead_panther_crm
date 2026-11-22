@@ -19,7 +19,7 @@
     $isSuperAdmin = $actionUser && $actionUser->hasAnyRole(['Super Admin', 'super-admin']);
     $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
     $canArchive = $isSuperAdmin;
-    $canConfigDisplay = $actionUser && ($actionUser->hasAnyRole(['Super Admin', 'super-admin', 'Client', 'client', 'Builder', 'builder', 'Builder/Developer', 'Admin', 'admin']) || $actionUser->organization_id);
+    $canConfigDisplay = $isSuperAdmin;
     $canJourney = $isSuperAdmin;
 
     // Assign check
@@ -48,7 +48,7 @@
     <button x-ref="trigger" type="button" @click.stop="open ? close() : show()" @keydown.arrow-down.prevent="show()" :aria-expanded="open" :aria-controls="$id('lead-actions')" aria-haspopup="menu" title="Lead options" aria-label="Lead options" class="p-1.5 text-muted hover:text-ink hover:bg-canvas rounded-lg transition focus-visible:outline-2 focus-visible:outline-primary cursor-pointer"><x-ui.team-icon name="more" /></button>
     <template x-teleport="body">
         <div x-show="open" x-cloak :id="$id('lead-actions')" @click.outside="open=false" @keydown.escape.stop.prevent="close()" @keydown.tab="open=false" :style="{left:left+'px',top:top+'px'}" role="menu" aria-label="Lead options" class="fixed z-[70] w-56 max-h-[85vh] overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl space-y-0.5 text-ink">
-            <!-- 1. View & Edit -->
+            <!-- 1. View Details -->
             <button x-ref="firstAction" type="button" role="menuitem"
                 @click.stop="open=false; $dispatch('open-lead-detail', { id: {{ $leadId }} })"
                 class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-canvas hover:text-primary transition cursor-pointer">
@@ -57,15 +57,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 <span>View Details</span>
-            </button>
-
-            <button type="button" role="menuitem"
-                @click.stop="open=false; $dispatch('open-lead-detail', { id: {{ $leadId }}, tab: 'stage_details' })"
-                class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-canvas hover:text-primary transition cursor-pointer">
-                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                <span>Edit Lead</span>
             </button>
 
             <button type="button" role="menuitem"

@@ -252,7 +252,8 @@ class LeadDisplayConfigurationTest extends TestCase
 
     public function test_advanced_table_renders_configure_display_button_in_lead_actions_for_authorized_users(): void
     {
-        $this->actingAs($this->clientAdminA);
+        // 1. Super Admin sees Configure Display, sees View Details, and does not see separate duplicate Edit Lead
+        $this->actingAs($this->superAdmin);
 
         $columns = [
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions'],
@@ -262,13 +263,27 @@ class LeadDisplayConfigurationTest extends TestCase
             (object) ['id' => 42],
         ];
 
-        $html = \Illuminate\Support\Facades\Blade::render(
+        $superAdminHtml = \Illuminate\Support\Facades\Blade::render(
             '<x-ui.advanced-table :columns="$columns" :rows="$rows" />',
             ['columns' => $columns, 'rows' => $rows]
         );
 
-        $this->assertStringContainsString('Configure Display', $html);
-        $this->assertStringContainsString('open-display-config', $html);
-        $this->assertStringContainsString('leadId: 42', $html);
+        $this->assertStringContainsString('Configure Display', $superAdminHtml);
+        $this->assertStringContainsString('View Details', $superAdminHtml);
+        $this->assertStringNotContainsString('Edit Lead', $superAdminHtml);
+        $this->assertStringContainsString('open-display-config', $superAdminHtml);
+        $this->assertStringContainsString('leadId: 42', $superAdminHtml);
+
+        // 2. Client Admin / other non-super-admin does NOT see Configure Display
+        $this->actingAs($this->clientAdminA);
+
+        $clientAdminHtml = \Illuminate\Support\Facades\Blade::render(
+            '<x-ui.advanced-table :columns="$columns" :rows="$rows" />',
+            ['columns' => $columns, 'rows' => $rows]
+        );
+
+        $this->assertStringNotContainsString('Configure Display', $clientAdminHtml);
+        $this->assertStringContainsString('View Details', $clientAdminHtml);
+        $this->assertStringNotContainsString('Edit Lead', $clientAdminHtml);
     }
 }

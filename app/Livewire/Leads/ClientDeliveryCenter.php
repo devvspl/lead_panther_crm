@@ -217,7 +217,7 @@ class ClientDeliveryCenter extends Component
             'Awaiting internal approval' => $deliveryHealth['awaiting'] ?? 0,
             'Sent this cycle' => $attempts ? (clone $attempts)->where('status', 'sent')->count() : 0,
             'Daily capacity' => $plan ? (app(LeadDistributionService::class)->remainingClientDeliveryCapacity($plan) ?? 'Unlimited') : 'Not configured',
-            'Next delivery' => $plan?->next_run_at?->format('d M Y H:i T') ?? 'Not scheduled',
+            'Next delivery' => $plan?->next_run_at ? $plan->next_run_at->format('d M Y H:i T') . ($plan->next_run_at->isPast() ? ' (Due now)' : ' (in ' . $plan->next_run_at->diffForHumans(null, true) . ')') : 'Not scheduled',
             'Last successful' => (clone $items)->max('sent_at') ?? 'None recorded',
         ];
         $processed = $attempts ? (clone $attempts)->count() : 0;

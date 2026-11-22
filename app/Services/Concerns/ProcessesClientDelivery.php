@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 trait ProcessesClientDelivery
 {
-    public const DELIVERY_FREQUENCIES = ['immediate', '15_minutes', '30_minutes', 'hourly', 'daily', 'weekly', 'manual'];
+    public const DELIVERY_FREQUENCIES = ['immediate', '15_minutes', '30_minutes', 'random_1_30', 'hourly', 'daily', 'weekly', 'manual'];
 
     protected function deliveryAdmin(User $actor): void
     {
@@ -98,9 +98,18 @@ trait ProcessesClientDelivery
             Organization::whereKey($source->id)->lockForUpdate()->firstOrFail();
             $plan = LeadDeliveryPlan::firstOrNew(['organization_id' => $source->id]);
             $before = $plan->exists ? $plan->getAttributes() : [];
-            $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
-            if (!$plan->exists) $plan->state = 'active';
-            $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, now()) : null;
+            if ($data['frequency'] === 'random_1_30') {
+                $randomMinutes = random_int(1, 30);
+                $data['random_interval_minutes'] = $randomMinutes;
+                $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
+                if (!$plan->exists) $plan->state = 'active';
+                $after = now()->addMinutes($randomMinutes);
+                $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, $after) : null;
+            } else {
+                $plan->fill(['client_id' => $input['client_id'], 'project_id' => $input['project_id'], 'campaign_id' => $input['campaign_id'], 'settings' => $data, 'created_by' => $plan->created_by ?: $actor->id]);
+                if (!$plan->exists) $plan->state = 'active';
+                $plan->next_run_at = $data['automatic'] && $plan->state === 'active' ? $this->nextClientDeliveryAt($plan, now()) : null;
+            }
             $plan->save();
             $this->deliveryAudit('delivery.plan_configured', $plan, $before, $plan->getAttributes(), $actor->id);
             return $plan;
@@ -384,12 +393,19 @@ trait ProcessesClientDelivery
         $minutes = match ($s['frequency']) {
             '15_minutes' => 15,
             '30_minutes' => 30,
+            'random_1_30' => random_int(1, 30),
             'hourly' => 60,
             default => 1
         };
+        if ($s['frequency'] === 'random_1_30') {
+            $s['random_interval_minutes'] = $minutes;
+        }
         $after = now()->addMinutes($minutes);
         if ($dailyExhausted) $after = now()->setTimezone($s['timezone'])->addDay()->startOfDay()->setTimezone(config('app.timezone'));
-        $plan->update(['next_run_at' => $s['automatic'] ? $this->nextClientDeliveryAt($plan, $after) : null]);
+        $plan->update([
+            'settings' => $s,
+            'next_run_at' => $s['automatic'] ? $this->nextClientDeliveryAt($plan, $after) : null
+        ]);
     }
 
     /** Called in the existing release transaction, under the plan lock held by processClientDeliveryRun. */
@@ -510,7 +526,18 @@ trait ProcessesClientDelivery
                 }]);
                 if ($action === 'resume') \App\Jobs\ProcessClientDeliveryRun::dispatch($run->id)->afterCommit();
             }
-            $plan->update(['next_run_at' => $action === 'resume' && $plan->settings['automatic'] ? $this->nextClientDeliveryAt($plan, now()) : null]);
+            $resumeAfter = now();
+            $s = $plan->settings;
+            if ($action === 'resume' && ($s['frequency'] ?? '') === 'random_1_30') {
+                $randomMinutes = random_int(1, 30);
+                $s['random_interval_minutes'] = $randomMinutes;
+                $plan->settings = $s;
+                $resumeAfter = now()->addMinutes($randomMinutes);
+            }
+            $plan->update([
+                'settings' => $s,
+                'next_run_at' => $action === 'resume' && ($s['automatic'] ?? false) ? $this->nextClientDeliveryAt($plan, $resumeAfter) : null
+            ]);
             $this->deliveryAudit('delivery.' . $action, $plan, ['state' => $before], ['state' => $plan->state], $actor->id);
         }, 3);
     }

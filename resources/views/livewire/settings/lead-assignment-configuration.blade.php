@@ -6,7 +6,64 @@
     <p class="text-xs text-muted">{{ $effective['enabled'] && $effective['method'] !== 'manual' ? 'Automatic' : \App\Support\ClientFacingText::label('Manual') }} · {{ \App\Support\ClientFacingText::label(ucwords(str_replace('_',' ',$effective['method']))) }} · Daily limit: {{ $effective['daily_limit'] ?: 'Unlimited' }} · {{ $effective['batch_size'] }} per batch · {{ $effective['start_time'] }}–{{ $effective['end_time'] }} {{ $effective['timezone'] }}</p>
     @if($canConfigure)
     <form wire:submit="save" class="space-y-4">
-        <x-ui.team-switch wire:model="settings.enabled" label="Automatic assignment" />
+        <!-- Lead Assignment Mode Selection -->
+        <div class="p-4 rounded-xl border border-border bg-canvas space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        <span>Lead Assignment Mode</span>
+                    </h3>
+                    <p class="text-[11px] text-muted mt-0.5">Control how newly received and pushed leads are assigned within this organization.</p>
+                </div>
+                
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold {{ ($settings['assignment_mode'] ?? 'automatic') === 'automatic' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200' }}">
+                    {{ ($settings['assignment_mode'] ?? 'automatic') === 'automatic' ? 'Automatic Assignment Active' : 'Manual Assignment (Builder) Active' }}
+                </span>
+            </div>
+
+            <!-- Two-Option Switch Cards -->
+            <div class="grid sm:grid-cols-2 gap-3 pt-1">
+                <!-- Option 1: Automatic Assignment -->
+                <div wire:click="setAssignmentMode('automatic')" class="relative flex flex-col p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'automatic' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <input type="radio" wire:model.live="settings.assignment_mode" value="automatic" class="text-primary focus:ring-primary h-4 w-4">
+                            <span class="text-xs font-bold text-ink">1. Automatic Assignment</span>
+                        </div>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Auto</span>
+                    </div>
+                    <p class="text-[11px] text-muted mt-2 leading-relaxed pl-6">
+                        Leads received from Lead Panther are automatically assigned to Sales Executives using round-robin and capacity rules.
+                    </p>
+                </div>
+
+                <!-- Option 2: Manual Assignment (Builder / Developer) -->
+                <div wire:click="setAssignmentMode('manual')" class="relative flex flex-col p-3.5 rounded-xl border-2 transition cursor-pointer {{ ($settings['assignment_mode'] ?? 'automatic') === 'manual' ? 'border-primary bg-primary/5 shadow-2xs' : 'border-border bg-surface hover:border-border-hover' }}">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <input type="radio" wire:model.live="settings.assignment_mode" value="manual" class="text-primary focus:ring-primary h-4 w-4">
+                            <span class="text-xs font-bold text-ink">2. Manual Assignment (Builder / Developer)</span>
+                        </div>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">Manual</span>
+                    </div>
+                    <p class="text-[11px] text-muted mt-2 leading-relaxed pl-6">
+                        All incoming leads are sent directly to the Builder / Developer account. Executives will only see leads when manually assigned.
+                    </p>
+                </div>
+            </div>
+
+            @if(($settings['assignment_mode'] ?? 'automatic') === 'manual')
+                <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
+                    <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span><strong>Manual Assignment Mode Active:</strong> Leads are delivered directly to the Builder / Developer account. Automatic distribution to executives is paused. The Builder / Developer can manually assign or reassign leads to executives at any time.</span>
+                </div>
+            @endif
+        </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             @unless($isTeamLeader)<div><label class="block mb-1">Assignment team</label><x-ui.themed-select wire:model="settings.team_id" :options="$teams" placeholder="All organization teams" :searchable="true" class="w-full" /></div>@endunless
             <div><label class="block mb-1">Assignment method</label><x-ui.themed-select wire:model="settings.method" :options="$isTeamLeader ? array_merge(['round_robin'=>'Round Robin','manual'=>\App\Support\ClientFacingText::label('Manual')], in_array($settings['method'] ?? '', ['equal_distribution','priority']) ? [$settings['method']=>ucwords(str_replace('_',' ',$settings['method']))] : []) : ['round_robin'=>'Round Robin','equal_distribution'=>'Equal Distribution','priority'=>'Priority Based','manual'=>\App\Support\ClientFacingText::label('Manual Assignment')]" class="w-full" /></div>

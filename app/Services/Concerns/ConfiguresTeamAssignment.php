@@ -10,10 +10,24 @@ trait ConfiguresTeamAssignment
     public function assignmentDefaults(Organization $org): array
     {
         $teams = $this->assignmentTeams($org->id)->pluck('id');
+        $mode = $org->getLeadAssignmentMode();
+        $isAuto = ($mode === Organization::ASSIGNMENT_MODE_AUTOMATIC);
         $method = in_array($org->distribution_method,['round_robin','priority','manual']) ? $org->distribution_method : ($org->distribution_method === 'capacity' ? 'equal_distribution' : 'round_robin');
-        return array_replace(['enabled' => (bool)($org->auto_assign_enabled ?? true), 'method' => $method, 'daily_limit' => 0, 'batch_size' => 1, 'team_id' => $teams->count() === 1 ? $teams->first() : null,
-            'timezone' => $org->delivery_timezone ?: config('app.timezone'), 'working_days' => [0,1,2,3,4,5,6],
-            'start_time' => '00:00', 'end_time' => '23:59', 'project_ids' => [], 'campaign_ids' => [], 'members' => []], $org->assignment_config ?? []);
+        return array_replace([
+            'enabled' => $isAuto,
+            'assignment_mode' => $mode,
+            'method' => $method,
+            'daily_limit' => 0,
+            'batch_size' => 1,
+            'team_id' => $teams->count() === 1 ? $teams->first() : null,
+            'timezone' => $org->delivery_timezone ?: config('app.timezone'),
+            'working_days' => [0,1,2,3,4,5,6],
+            'start_time' => '00:00',
+            'end_time' => '23:59',
+            'project_ids' => [],
+            'campaign_ids' => [],
+            'members' => [],
+        ], $org->assignment_config ?? []);
     }
 
     public function assignmentExecutives(int $orgId)
@@ -32,22 +46,43 @@ trait ConfiguresTeamAssignment
     public function saveAssignmentConfiguration(Organization $org, array $input, User $actor): void
     {
         $leader = \App\Support\TeamAccess::isLeader($actor);
+        $isSuperAdmin = $actor->hasRole('Super Admin') || $actor->hasRole('super-admin');
         $current = $this->assignmentDefaults($org);
         $leaderIds = [];
-        if ($leader) {
+        if ($leader && !$isSuperAdmin) {
             abort_unless($actor->is_active && $actor->organization_id === $org->id && $actor->can('assign-team-leads')
                 && $current['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($current['team_id'])->exists(), 403);
             $leaderIds = \App\Support\TeamAccess::executives($actor, false)->whereIn('id', SalesTeamMember::where('sales_team_id', $current['team_id'])->select('user_id'))->pluck('id')->all();
             if (array_diff(array_keys($input['members'] ?? []), $leaderIds)) throw ValidationException::withMessages(['settings.members'=>'Only your assignment team members can be configured.']);
-            $allowed = array_intersect_key($input, array_flip(['enabled','method','daily_limit','batch_size','working_days','start_time','end_time']));
+            $allowed = array_intersect_key($input, array_flip(['enabled','assignment_mode','method','daily_limit','batch_size','working_days','start_time','end_time']));
             foreach ($input['members'] ?? [] as $id=>$member) $current['members'][$id]['available'] = $member['available'] ?? true;
             $input = array_replace($current, $allowed);
             foreach ($input['members'] as &$member) $member['priority'] ??= 1;
             unset($member);
             if (!in_array($input['method'], ['round_robin','equal_distribution','manual']) && !($input['method'] === 'priority' && $current['method'] === 'priority')) throw ValidationException::withMessages(['settings.method'=>'Choose Round Robin, Equal Distribution or Manual Assignment.']);
-        } else abort_unless($actor->is_active && $actor->hasRole('Super Admin'), 403);
+        } else {
+            abort_unless($actor->is_active && $isSuperAdmin, 403);
+        }
+
+        // Determine effective assignment mode
+        $mode = $input['assignment_mode'] ?? null;
+        $enabled = isset($input['enabled']) ? (bool) $input['enabled'] : null;
+
+        if ($mode === Organization::ASSIGNMENT_MODE_MANUAL && $enabled !== true) {
+            $input['assignment_mode'] = Organization::ASSIGNMENT_MODE_MANUAL;
+            $input['enabled'] = false;
+        } elseif ($enabled === false) {
+            $input['assignment_mode'] = Organization::ASSIGNMENT_MODE_MANUAL;
+            $input['enabled'] = false;
+        } else {
+            $input['assignment_mode'] = Organization::ASSIGNMENT_MODE_AUTOMATIC;
+            $input['enabled'] = true;
+        }
+
         $data = validator($input, [
-            'enabled'=>'required|boolean', 'method'=>'required|in:round_robin,equal_distribution,priority,manual',
+            'enabled'=>'required|boolean',
+            'assignment_mode'=>'required|in:automatic,manual',
+            'method'=>'required|in:round_robin,equal_distribution,priority,manual',
             'team_id'=>'nullable|integer',
             'daily_limit'=>'required|integer|min:0', 'batch_size'=>'required|integer|min:1|max:1000', 'timezone'=>'required|timezone',
             'working_days'=>'required|array|min:1', 'working_days.*'=>'integer|between:0,6',
@@ -61,9 +96,9 @@ trait ConfiguresTeamAssignment
             || array_diff(array_keys($data['members']), $this->assignmentExecutives($org->id)->pluck('id')->all())) {
             throw ValidationException::withMessages(['assignment' => 'Select projects, campaigns and executives belonging to this organization.']);
         }
-        DB::transaction(function () use ($org, $data, $actor, $leader, $leaderIds) {
+        DB::transaction(function () use ($org, $data, $actor, $leader, $leaderIds, $isSuperAdmin) {
             $org = Organization::whereKey($org->id)->lockForUpdate()->firstOrFail();
-            if ($leader) {
+            if ($leader && !$isSuperAdmin) {
                 $latest = $this->assignmentDefaults($org);
                 abort_unless($latest['team_id'] === $data['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($data['team_id'])->exists(),403);
                 foreach (['timezone','project_ids','campaign_ids'] as $key) $data[$key] = $latest[$key];
@@ -74,7 +109,12 @@ trait ConfiguresTeamAssignment
                 $data['members'] = $members;
             }
             $before = $org->assignment_config;
-            $org->update(['assignment_config'=>$data, 'auto_assign_enabled'=>$data['enabled'], 'distribution_method'=>$data['method']]);
+            $org->update([
+                'lead_assignment_mode' => $data['assignment_mode'],
+                'assignment_config' => $data,
+                'auto_assign_enabled' => $data['enabled'],
+                'distribution_method' => $data['method'],
+            ]);
             AuditLog::create(['organization_id'=>$org->id, 'user_id'=>$actor->id, 'action'=>'assignment.configuration_updated',
                 'subject_type'=>Organization::class, 'subject_id'=>$org->id, 'from_value'=>$before, 'to_value'=>$data, 'created_at'=>now()]);
         });
@@ -124,8 +164,27 @@ trait ConfiguresTeamAssignment
                 if ($user && $user->organization_id === $orgId) $this->assignLeadToUser($lead,$user,'existing');
                 return array_replace($result,['assigned_user'=>$user,'status'=>'assigned','message'=>'Already assigned.']);
             }
+            $isManual = ($s['assignment_mode'] ?? 'automatic') === Organization::ASSIGNMENT_MODE_MANUAL
+                || $org->isManualAssignment()
+                || !$s['enabled']
+                || $s['method'] === 'manual'
+                || !$org->auto_assign_enabled;
+
+            if ($isManual) {
+                if (!$lead->client_id) {
+                    $builderUser = $org->clients()->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client']))->first();
+                    if ($builderUser) {
+                        $lead->update(['client_id' => $builderUser->id]);
+                    }
+                }
+                return array_replace($result, [
+                    'status' => 'held_for_builder_manual_assignment',
+                    'message' => 'Lead routed directly to Builder / Developer account for manual assignment.',
+                ]);
+            }
+
             $local = now()->setTimezone($s['timezone']);
-            if (!$org->is_active || !$s['enabled'] || $s['method']==='manual' || !$org->auto_assign_enabled
+            if (!$org->is_active
                 || !$lead->delivered_at || $lead->delivery_pending || $lead->internal_processing_pending
                 || !in_array($local->dayOfWeek,$s['working_days']) || $local->format('H:i') < $s['start_time'] || $local->format('H:i') > $s['end_time']
                 || in_array($lead->status,['duplicate','invalid','rejected','lost','closed_won','replaced'])) return $result;
@@ -155,7 +214,7 @@ trait ConfiguresTeamAssignment
     {
         $org = Organization::findOrFail($orgId);
         $settings = $this->assignmentDefaults($org);
-        if (!$settings['enabled'] || $settings['method']==='manual') return 0;
+        if (!$settings['enabled'] || ($settings['assignment_mode'] ?? 'automatic') === Organization::ASSIGNMENT_MODE_MANUAL || $settings['method']==='manual') return 0;
         $count = 0;
         foreach ($this->assignmentPendingLeads($orgId)->orderBy('id')->limit($settings['batch_size'])->get() as $lead) {
             if ($this->distribute($lead)['status']==='assigned') $count++;

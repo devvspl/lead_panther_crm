@@ -243,13 +243,19 @@ class LeadDistributionService
         $targetOrgId = $this->resolveLeadOrganizationId($lead);
         $targetOrg = $targetOrgId ? Organization::find($targetOrgId) : null;
 
-        // 2. Check if Auto-Assignment is Disabled for Organization
-        if ($targetOrg && !$targetOrg->auto_assign_enabled && empty($forceMethod)) {
+        // 2. Check if Auto-Assignment is Disabled for Organization or Manual Assignment Mode Active
+        if ($targetOrg && ($targetOrg->isManualAssignment() || !$targetOrg->auto_assign_enabled) && empty($forceMethod)) {
+            if (!$lead->client_id) {
+                $builderClient = $targetOrg->clients()->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder', 'builder-admin', 'Client', 'client']))->first();
+                if ($builderClient) {
+                    $lead->update(['client_id' => $builderClient->id]);
+                }
+            }
             return [
                 'assigned_user' => null,
                 'method' => self::METHOD_MANUAL,
-                'status' => 'held_for_manual_assignment',
-                'message' => "Automatic assignment disabled for {$targetOrg->name}. Lead placed in unassigned queue.",
+                'status' => 'held_for_builder_manual_assignment',
+                'message' => "Manual assignment mode active for {$targetOrg->name}. Lead placed in Builder / Developer account for manual assignment.",
             ];
         }
 

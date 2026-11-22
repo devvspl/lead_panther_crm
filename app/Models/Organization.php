@@ -10,6 +10,10 @@ class Organization extends Model
 {
     use \App\Traits\HasLeadCreditCost;
     protected $guarded = [];
+
+    public const ASSIGNMENT_MODE_AUTOMATIC = 'automatic';
+    public const ASSIGNMENT_MODE_MANUAL = 'manual';
+
     protected $casts = [
         'min_credit_threshold' => 'integer',
         'show_builder_credit_balance' => 'boolean',
@@ -17,8 +21,41 @@ class Organization extends Model
         'internal_processing_config' => 'array',
         'assignment_config' => 'array',
         'auto_assign_enabled' => 'boolean',
+        'lead_assignment_mode' => 'string',
         'lead_display_config' => 'array',
     ];
+
+    /**
+     * Get effective lead assignment mode: 'automatic' or 'manual'.
+     */
+    public function getLeadAssignmentMode(): string
+    {
+        $explicit = $this->lead_assignment_mode;
+        if ($explicit && in_array($explicit, [self::ASSIGNMENT_MODE_AUTOMATIC, self::ASSIGNMENT_MODE_MANUAL])) {
+            return $explicit;
+        }
+
+        $configMode = $this->assignment_config['assignment_mode'] ?? null;
+        if ($configMode && in_array($configMode, [self::ASSIGNMENT_MODE_AUTOMATIC, self::ASSIGNMENT_MODE_MANUAL])) {
+            return $configMode;
+        }
+
+        if ($this->auto_assign_enabled === false || ($this->distribution_method === 'manual')) {
+            return self::ASSIGNMENT_MODE_MANUAL;
+        }
+
+        return self::ASSIGNMENT_MODE_AUTOMATIC;
+    }
+
+    public function isAutomaticAssignment(): bool
+    {
+        return $this->getLeadAssignmentMode() === self::ASSIGNMENT_MODE_AUTOMATIC;
+    }
+
+    public function isManualAssignment(): bool
+    {
+        return $this->getLeadAssignmentMode() === self::ASSIGNMENT_MODE_MANUAL;
+    }
 
     /**
      * Default lead details drawer display preferences.

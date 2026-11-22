@@ -21,21 +21,44 @@ class LeadAssignmentConfiguration extends Component
     {
         $this->organizationId = $organizationId;
         $org = $this->organization();
+        $this->settings = app(LeadDistributionService::class)->assignmentDefaults($org);
+        $this->settings['assignment_mode'] = $org->getLeadAssignmentMode();
+        $this->settings['enabled'] = ($this->settings['assignment_mode'] === Organization::ASSIGNMENT_MODE_AUTOMATIC);
+
         // Read-only team viewers must not receive other teams' member settings in Livewire's snapshot.
         if (!auth()->user()->hasRole('Super Admin')) {
             if (TeamAccess::isLeader(auth()->user())) {
-                $all = app(LeadDistributionService::class)->assignmentDefaults($org);
-                $this->settings = array_intersect_key($all, array_flip(['enabled','method','daily_limit','batch_size','working_days','start_time','end_time']));
+                $all = $this->settings;
+                $this->settings = array_intersect_key($all, array_flip(['enabled','assignment_mode','method','daily_limit','batch_size','working_days','start_time','end_time']));
                 $this->settings['members'] = [];
                 foreach (TeamAccess::executives(auth()->user(), false)->whereIn('id', \App\Models\SalesTeamMember::where('sales_team_id', $all['team_id'])->select('user_id'))->get() as $member) {
                     $this->settings['members'][$member->id] = ['available'=>$all['members'][$member->id]['available'] ?? true];
                 }
+            } else {
+                $this->settings = [];
             }
             return;
         }
-        $this->settings = app(LeadDistributionService::class)->assignmentDefaults($org);
         foreach (app(LeadDistributionService::class)->assignmentExecutives($organizationId)->get() as $member) {
             $this->settings['members'][$member->id] ??= ['available'=>true,'priority'=>1];
+        }
+    }
+
+    public function updatedSettingsAssignmentMode(string $value): void
+    {
+        $this->settings['enabled'] = ($value === Organization::ASSIGNMENT_MODE_AUTOMATIC);
+    }
+
+    public function updatedSettingsEnabled(bool $value): void
+    {
+        $this->settings['assignment_mode'] = $value ? Organization::ASSIGNMENT_MODE_AUTOMATIC : Organization::ASSIGNMENT_MODE_MANUAL;
+    }
+
+    public function setAssignmentMode(string $mode): void
+    {
+        if (in_array($mode, [Organization::ASSIGNMENT_MODE_AUTOMATIC, Organization::ASSIGNMENT_MODE_MANUAL])) {
+            $this->settings['assignment_mode'] = $mode;
+            $this->settings['enabled'] = ($mode === Organization::ASSIGNMENT_MODE_AUTOMATIC);
         }
     }
     public function save(): void
@@ -70,8 +93,13 @@ class LeadAssignmentConfiguration extends Component
         $ids = $ids === null ? $activeIds : array_values(array_intersect($ids, $activeIds));
         $ownsPendingPool = !$leader || (!empty($effective['team_id']) && TeamAccess::teams(auth()->user())->whereKey($effective['team_id'])->exists());
         if ($leader && $ownsPendingPool) $ids = array_values(array_intersect($ids, \App\Models\SalesTeamMember::where('sales_team_id', $effective['team_id'])->pluck('user_id')->all()));
+        $user = auth()->user();
+        $isBuilder = $user && $user->organization_id === $this->organizationId
+            && $user->hasAnyRole(['Builder/Developer','Builder','builder','builder-admin']);
+
         return view('livewire.settings.lead-assignment-configuration',[
-            'canConfigure'=>auth()->user()->hasRole('Super Admin') || ($leader && $ownsPendingPool && auth()->user()->can('assign-team-leads')),
+            'canConfigure'=>auth()->user()->hasRole('Super Admin') || $isBuilder || ($leader && $ownsPendingPool && auth()->user()->can('assign-team-leads')),
+            'isBuilder'=>$isBuilder,
             'isTeamLeader'=>$leader,
             'teams'=>$activeTeams->pluck('name','id')->all(),
             'statistics'=>collect($service->assignmentStatistics($org,$ids))->map(function ($row) use ($activeMemberships) {

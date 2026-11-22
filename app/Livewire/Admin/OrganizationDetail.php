@@ -61,6 +61,21 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: $visible ? 'Credit balance is visible on the builder dashboard.' : 'Credit balance is hidden on the builder dashboard.');
     }
 
+    public function setLeadAssignmentMode(string $mode): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        abort_unless(in_array($mode, [Organization::ASSIGNMENT_MODE_AUTOMATIC, Organization::ASSIGNMENT_MODE_MANUAL]), 422);
+
+        $service = app(\App\Services\LeadDistributionService::class);
+        $defaults = $service->assignmentDefaults($this->organization);
+        $defaults['assignment_mode'] = $mode;
+        $defaults['enabled'] = ($mode === Organization::ASSIGNMENT_MODE_AUTOMATIC);
+
+        $service->saveAssignmentConfiguration($this->organization, $defaults, auth()->user());
+        $this->organization->refresh();
+        $this->dispatch('toast', type: 'success', message: 'Lead Assignment Mode set to ' . ($mode === Organization::ASSIGNMENT_MODE_AUTOMATIC ? 'Automatic Assignment' : 'Manual Assignment (Builder / Developer)') . '.');
+    }
+
     public function auditTableColumns(): array
     {
         return [

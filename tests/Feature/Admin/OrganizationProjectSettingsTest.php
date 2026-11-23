@@ -235,4 +235,53 @@ class OrganizationProjectSettingsTest extends TestCase
 
         $this->assertDatabaseHas('projects', ['id' => $project->id]);
     }
+
+    public function test_can_edit_project_by_clicking_project_name(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Edit Project Org', 'status' => 'active']);
+        $client = User::factory()->create(['organization_id' => $org->id, 'name' => 'Edit Project Owner']);
+        $client->assignRole('Builder/Developer');
+
+        $project = Project::create([
+            'client_id' => $client->id,
+            'name' => 'Original Project Name',
+            'status' => 'active',
+            'lead_cost' => 5,
+        ]);
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->assertSee('Original Project Name')
+            ->assertSee('Edit')
+            // Click the project name / edit button
+            ->call('openEditProjectModal', $project->id)
+            ->assertSet('showEditProjectModal', true)
+            ->assertSet('editingProjectId', $project->id)
+            ->assertSet('editingProjectName', 'Original Project Name')
+            ->assertSet('editingProjectStatus', 'active')
+            ->assertSet('editingProjectLeadCost', 5)
+            // Edit project name and status
+            ->set('editingProjectName', 'Updated Boulevard Walk')
+            ->set('editingProjectStatus', 'inactive')
+            ->set('editingProjectLeadCost', 8)
+            ->call('updateProject')
+            ->assertHasNoErrors()
+            ->assertSet('showEditProjectModal', false)
+            ->assertDispatched('toast', type: 'success');
+
+        $fresh = $project->fresh();
+        $this->assertEquals('Updated Boulevard Walk', $fresh->name);
+        $this->assertEquals('inactive', $fresh->status);
+        $this->assertEquals(8, $fresh->lead_cost);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $org->id,
+            'action' => 'project.updated',
+            'subject_id' => $project->id,
+        ]);
+    }
 }

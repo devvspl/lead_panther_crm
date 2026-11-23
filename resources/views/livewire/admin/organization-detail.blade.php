@@ -892,21 +892,34 @@
                     @forelse($projects as $project)
                         <tr>
                             <td class="p-4 font-bold">
-                                <span>{{ $project->name }}</span>
-                                @if(isset($project->leads_count) && $project->leads_count > 0)
-                                    <span class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
-                                        {{ $project->leads_count }} {{ Str::plural('lead', $project->leads_count) }}
-                                    </span>
-                                @endif
+                                <div class="flex items-center gap-2">
+                                    <button type="button" wire:click="openEditProjectModal({{ $project->id }})" class="font-bold text-ink hover:text-primary transition-colors cursor-pointer text-left inline-flex items-center gap-1.5 group" title="Click to edit project">
+                                        <span class="group-hover:underline underline-offset-2">{{ $project->name }}</span>
+                                        <svg class="w-3.5 h-3.5 text-muted group-hover:text-primary transition-colors opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                    </button>
+                                    @if(isset($project->leads_count) && $project->leads_count > 0)
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+                                            {{ $project->leads_count }} {{ Str::plural('lead', $project->leads_count) }}
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="p-4">{{ $project->client_name }}</td>
                             <td class="p-4">{{ ucfirst($project->status) }}</td>
                             <td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</td>
                             <td class="p-4 text-right">
-                                <button type="button" wire:click="openRemoveProjectModal({{ $project->id }})" title="Remove Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer text-xs font-semibold">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    <span>Remove</span>
-                                </button>
+                                <div class="inline-flex items-center gap-2 justify-end">
+                                    <button type="button" wire:click="openEditProjectModal({{ $project->id }})" title="Edit Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer text-xs font-semibold">
+                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                        <span>Edit</span>
+                                    </button>
+                                    <button type="button" wire:click="openRemoveProjectModal({{ $project->id }})" title="Remove Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer text-xs font-semibold">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        <span>Remove</span>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -1529,6 +1542,85 @@
                     <button type="submit"
                         class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer flex items-center gap-1.5">
                         <span>Apply Credit Adjustment</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-modal>
+
+    <!-- MODAL 4b: EDIT PROJECT -->
+    <x-modal name="edit-org-project-modal" :show="$showEditProjectModal" maxWidth="md">
+        <div class="p-5 sm:p-6 space-y-5">
+            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-primary/10 text-primary">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Edit Project</h3>
+                        <p class="text-xs text-muted">Update project details under <strong class="text-ink">{{ $organization->name }}</strong></p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeEditProjectModal"
+                    class="text-muted hover:text-ink cursor-pointer p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form wire:submit.prevent="updateProject" class="space-y-4 text-xs">
+                <div>
+                    <label class="font-bold text-ink">Project Name <span class="text-red-500">*</span></label>
+                    <input type="text" wire:model="editingProjectName" placeholder="e.g. Boulevard walk by H&S"
+                        class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                    @error('editingProjectName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="font-bold text-ink">Mapped Client / Billing Owner <span class="text-red-500">*</span></label>
+                    <select wire:model="editingProjectClientId"
+                        class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                        @foreach($clients as $c)
+                            <option value="{{ $c->id }}">{{ $c->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('editingProjectClientId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="font-bold text-ink">Status</label>
+                        <select wire:model="editingProjectStatus"
+                            class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                        @error('editingProjectStatus') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Lead Cost (Credits)</label>
+                        <input type="number" min="1" step="1" wire:model="editingProjectLeadCost" placeholder="Inherit ({{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }})"
+                            class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                        @error('editingProjectLeadCost') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                    <button type="button" wire:click="closeEditProjectModal"
+                        class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" wire:loading.attr="disabled"
+                        class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer flex items-center gap-1.5">
+                        <span wire:loading.remove wire:target="updateProject">Save Changes</span>
+                        <span wire:loading wire:target="updateProject">Saving...</span>
                     </button>
                 </div>
             </form>

@@ -179,6 +179,111 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: 'Project pricing saved.');
     }
 
+    public function openEditProjectModal(int $projectId): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
+        if (empty($clientIds)) {
+            $clientIds = User::where('organization_id', $this->organization->id)->pluck('id')->toArray();
+        }
+
+        $project = Project::withoutGlobalScopes()->whereIn('client_id', $clientIds)->findOrFail($projectId);
+
+        $this->editingProjectId = $project->id;
+        $this->editingProjectName = $project->name;
+        $this->editingProjectStatus = $project->status ?: 'active';
+        $this->editingProjectClientId = $project->client_id;
+        $this->editingProjectLeadCost = $project->lead_cost;
+        $this->resetErrorBag();
+        $this->showEditProjectModal = true;
+    }
+
+    public function closeEditProjectModal(): void
+    {
+        $this->showEditProjectModal = false;
+        $this->editingProjectId = null;
+        $this->editingProjectName = '';
+        $this->editingProjectStatus = 'active';
+        $this->editingProjectClientId = null;
+        $this->editingProjectLeadCost = null;
+        $this->resetErrorBag();
+    }
+
+    public function updateProject(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        if (!$this->editingProjectId) {
+            return;
+        }
+
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
+        if (empty($clientIds)) {
+            $clientIds = User::where('organization_id', $this->organization->id)->pluck('id')->toArray();
+        }
+
+        $project = Project::withoutGlobalScopes()->whereIn('client_id', $clientIds)->findOrFail($this->editingProjectId);
+
+        $this->editingProjectName = trim($this->editingProjectName);
+        $this->validate([
+            'editingProjectName' => 'required|string|max:255',
+            'editingProjectStatus' => 'required|in:active,inactive,suspended',
+            'editingProjectClientId' => ['required', 'integer', Rule::in($clientIds)],
+            'editingProjectLeadCost' => 'nullable|integer|min:1|max:999999',
+        ], [
+            'editingProjectName.required' => 'Project name is required.',
+            'editingProjectClientId.required' => 'Please select a mapped client.',
+        ]);
+
+        $oldName = $project->name;
+        $newName = $this->editingProjectName;
+
+        DB::transaction(function () use ($project, $oldName, $newName) {
+            $leadCost = ($this->editingProjectLeadCost === '' || $this->editingProjectLeadCost === null) ? null : (int) $this->editingProjectLeadCost;
+
+            $project->update([
+                'name' => $newName,
+                'status' => $this->editingProjectStatus,
+                'client_id' => $this->editingProjectClientId,
+                'lead_cost' => $leadCost,
+            ]);
+
+            if ($oldName !== $newName) {
+                Campaign::withoutGlobalScopes()
+                    ->where('project_id', $project->id)
+                    ->where('name', $oldName)
+                    ->update(['name' => $newName]);
+            }
+
+            AuditLog::create([
+                'organization_id' => $this->organization->id,
+                'user_id' => auth()->id(),
+                'action' => 'project.updated',
+                'subject_type' => Project::class,
+                'subject_id' => $project->id,
+                'from_value' => json_encode([
+                    'name' => $oldName,
+                    'status' => $project->getOriginal('status'),
+                    'client_id' => $project->getOriginal('client_id'),
+                    'lead_cost' => $project->getOriginal('lead_cost'),
+                ]),
+                'to_value' => json_encode([
+                    'name' => $newName,
+                    'status' => $this->editingProjectStatus,
+                    'client_id' => $this->editingProjectClientId,
+                    'lead_cost' => $leadCost,
+                ]),
+                'created_at' => now(),
+            ]);
+        });
+
+        $this->organization->load('clients.projects', 'clients.wallet');
+        $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
+
+        $this->dispatch('toast', type: 'success', message: "Project '{$newName}' updated successfully.");
+        $this->closeEditProjectModal();
+    }
+
     public function getProjectLeadsCount(int $projectId): int
     {
         $hasProjectCol = Schema::hasColumn('leads', 'project_id');
@@ -493,6 +598,14 @@ class OrganizationDetail extends Component
     public ?string $projectToRemoveName = null;
     public int $projectAssignedLeadsCount = 0;
     public ?int $destinationProjectId = null;
+
+    // Project Edit
+    public bool $showEditProjectModal = false;
+    public ?int $editingProjectId = null;
+    public string $editingProjectName = '';
+    public string $editingProjectStatus = 'active';
+    public ?int $editingProjectClientId = null;
+    public $editingProjectLeadCost = null;
 
     // Directly Assigned Leads Management (Retained for background compatibility)
     public string $leadSearch = '';

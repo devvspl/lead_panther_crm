@@ -260,6 +260,7 @@ class OrganizationProjectSettingsTest extends TestCase
             // Click the project name / edit button
             ->call('openEditProjectModal', $project->id)
             ->assertSet('showEditProjectModal', true)
+            ->assertDispatched('open-modal', 'edit-org-project-modal')
             ->assertSet('editingProjectId', $project->id)
             ->assertSet('editingProjectName', 'Original Project Name')
             ->assertSet('editingProjectStatus', 'active')
@@ -271,6 +272,7 @@ class OrganizationProjectSettingsTest extends TestCase
             ->call('updateProject')
             ->assertHasNoErrors()
             ->assertSet('showEditProjectModal', false)
+            ->assertDispatched('close-modal', 'edit-org-project-modal')
             ->assertDispatched('toast', type: 'success');
 
         $fresh = $project->fresh();

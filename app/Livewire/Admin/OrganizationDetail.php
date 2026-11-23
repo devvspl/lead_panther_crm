@@ -196,6 +196,7 @@ class OrganizationDetail extends Component
         $this->editingProjectLeadCost = $project->lead_cost;
         $this->resetErrorBag();
         $this->showEditProjectModal = true;
+        $this->dispatch('open-modal', 'edit-org-project-modal');
     }
 
     public function closeEditProjectModal(): void
@@ -207,6 +208,7 @@ class OrganizationDetail extends Component
         $this->editingProjectClientId = null;
         $this->editingProjectLeadCost = null;
         $this->resetErrorBag();
+        $this->dispatch('close-modal', 'edit-org-project-modal');
     }
 
     public function updateProject(): void
@@ -318,6 +320,7 @@ class OrganizationDetail extends Component
         $this->destinationProjectId = null;
         $this->resetErrorBag();
         $this->showRemoveProjectModal = true;
+        $this->dispatch('open-modal', 'remove-org-project-modal');
     }
 
     public function closeRemoveProjectModal(): void
@@ -328,6 +331,7 @@ class OrganizationDetail extends Component
         $this->projectAssignedLeadsCount = 0;
         $this->destinationProjectId = null;
         $this->resetErrorBag();
+        $this->dispatch('close-modal', 'remove-org-project-modal');
     }
 
     public function getOtherProjectsProperty()

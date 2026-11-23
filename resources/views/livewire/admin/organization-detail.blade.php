@@ -1549,7 +1549,7 @@
     </x-modal>
 
     <!-- MODAL 4b: EDIT PROJECT -->
-    <x-modal name="edit-org-project-modal" :show="$showEditProjectModal" maxWidth="md">
+    <x-modal name="edit-org-project-modal" wire:model="showEditProjectModal" :show="$showEditProjectModal" maxWidth="md">
         <div class="p-5 sm:p-6 space-y-5">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
                 <div class="flex items-center gap-3">
@@ -1585,9 +1585,11 @@
                     <label class="font-bold text-ink">Mapped Client / Billing Owner <span class="text-red-500">*</span></label>
                     <select wire:model="editingProjectClientId"
                         class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
-                        @foreach($clients as $c)
+                        @forelse($clients as $c)
                             <option value="{{ $c->id }}">{{ $c->name }}</option>
-                        @endforeach
+                        @empty
+                            <option value="">No billing clients available</option>
+                        @endforelse
                     </select>
                     @error('editingProjectClientId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
@@ -1628,7 +1630,7 @@
     </x-modal>
 
     <!-- MODAL 5: REMOVE PROJECT & REASSIGN LEADS -->
-    <x-modal name="remove-org-project-modal" :show="$showRemoveProjectModal" maxWidth="md">
+    <x-modal name="remove-org-project-modal" wire:model="showRemoveProjectModal" :show="$showRemoveProjectModal" maxWidth="md">
         <div class="p-5 sm:p-6 space-y-5">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
                 <div class="flex items-center gap-3">

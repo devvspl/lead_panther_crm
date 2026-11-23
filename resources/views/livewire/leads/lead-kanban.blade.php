@@ -1194,6 +1194,9 @@
     <!-- Lead Details Display Configuration Modal -->
     <livewire:leads.lead-display-config-modal />
 
+    <!-- Super Admin Lead Master Editor & Inspector Modal -->
+    <livewire:leads.super-admin-lead-modal />
+
     <!-- Confirmation Modal for Terminal / Exception Stage Transition -->
     @if($showConfirmModal)
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">

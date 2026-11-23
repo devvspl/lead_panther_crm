@@ -307,6 +307,12 @@
         <x-ui.confirmation-modal />
         <x-ui.browser-push-prompt />
 
+        @auth
+            @if(auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
+                <livewire:leads.super-admin-lead-modal />
+            @endif
+        @endauth
+
         @livewireScripts
     </body>
 </html>

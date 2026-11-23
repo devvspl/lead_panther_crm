@@ -216,6 +216,22 @@ class SuperAdminLeadModalTest extends TestCase
         ]);
     }
 
+    public function test_modal_renders_theme_selects_and_responsive_mobile_layout(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(SuperAdminLeadModal::class)
+            ->dispatch('open-super-admin-lead-modal', id: $this->lead->id)
+            ->assertSee('lp-select-trigger')
+            ->assertSee('h-[100dvh]')
+            ->assertSee('sm:max-h-[92vh]')
+            ->assertSee('flex-col-reverse')
+            ->set('project_id', $this->project->id)
+            ->set('campaign_id', $this->campaign->id)
+            ->assertSet('project_id', $this->project->id)
+            ->assertSet('campaign_id', $this->campaign->id);
+    }
+
     public function test_non_super_admin_is_denied_access(): void
     {
         $this->actingAs($this->salesExecutive);

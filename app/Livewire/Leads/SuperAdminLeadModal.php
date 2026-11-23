@@ -150,8 +150,20 @@ class SuperAdminLeadModal extends Component
         $this->isOpen = true;
     }
 
-    public function updatedProjectId(?int $newProjectId): void
+    public function updated(string $property, mixed $value): void
     {
+        if (in_array($property, ['client_id', 'project_id', 'campaign_id', 'lead_source_id', 'assigned_to'])) {
+            if ($value === '' || $value === '0' || $value === 0 || $value === 'null') {
+                $this->{$property} = null;
+            } elseif (is_numeric($value)) {
+                $this->{$property} = (int) $value;
+            }
+        }
+    }
+
+    public function updatedProjectId(mixed $newProjectId): void
+    {
+        $newProjectId = $newProjectId ? (int) $newProjectId : null;
         if ($newProjectId) {
             // If current campaign does not belong to new project, clear or re-link
             if ($this->campaign_id) {
@@ -167,8 +179,9 @@ class SuperAdminLeadModal extends Component
         }
     }
 
-    public function updatedCampaignId(?int $newCampaignId): void
+    public function updatedCampaignId(mixed $newCampaignId): void
     {
+        $newCampaignId = $newCampaignId ? (int) $newCampaignId : null;
         if ($newCampaignId) {
             $camp = Campaign::withoutGlobalScopes()->find($newCampaignId);
             if ($camp && $camp->project_id) {
@@ -216,6 +229,13 @@ class SuperAdminLeadModal extends Component
     public function saveLead(): void
     {
         $this->authorizeSuperAdmin();
+
+        $this->client_id = $this->client_id ? (int) $this->client_id : null;
+        $this->project_id = $this->project_id ? (int) $this->project_id : null;
+        $this->campaign_id = $this->campaign_id ? (int) $this->campaign_id : null;
+        $this->lead_source_id = $this->lead_source_id ? (int) $this->lead_source_id : null;
+        $this->assigned_to = $this->assigned_to ? (int) $this->assigned_to : null;
+
         $this->validate();
 
         $lead = Lead::withoutGlobalScopes()->with(['client', 'metadata'])->findOrFail($this->leadId);

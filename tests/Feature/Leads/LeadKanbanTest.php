@@ -215,4 +215,152 @@ class LeadKanbanTest extends TestCase
         $this->assertEquals('Dholera Mega Campaign', $lead->campaign_name);
         $this->assertEquals('DHOLERA EMI_01 (v2)', $lead->form_name);
     }
+
+    public function test_super_admin_can_unassign_executive_when_no_action_taken(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super-admin');
+
+        $org = Organization::create(['name' => 'Agency Alpha', 'status' => 'active']);
+        $executive = User::factory()->create(['organization_id' => $org->id, 'name' => 'Agent Rahul']);
+        $executive->assignRole('sales-executive');
+
+        $source = LeadSource::create(['name' => 'Meta Ads']);
+        $lead = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Aarav Sharma',
+            'mobile' => '9876543210',
+            'client_id' => $superAdmin->id,
+            'assigned_to' => $executive->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'assigned',
+            'status' => 'assigned',
+            'first_response_at' => null,
+            'executive_first_response_at' => null,
+            'executive_assigned_at' => now()->subHours(2),
+        ]);
+
+        $assignment = \App\Models\LeadAssignment::create([
+            'lead_id' => $lead->id,
+            'assigned_to' => $executive->id,
+            'assigned_by' => $superAdmin->id,
+            'assigned_at' => now()->subHours(2),
+        ]);
+
+        Livewire::actingAs($superAdmin)
+            ->test(LeadKanban::class)
+            ->call('openUnassignModal', $lead->id)
+            ->assertSet('showUnassignModal', true)
+            ->assertSet('unassignLeadId', $lead->id)
+            ->call('executeUnassignment')
+            ->assertSet('showUnassignModal', false)
+            ->assertDispatched('lead-updated')
+            ->assertDispatched('toast', type: 'success');
+
+        $this->assertNull($lead->fresh()->assigned_to);
+        $this->assertEquals('new', $lead->fresh()->current_stage);
+        $this->assertNotNull($assignment->fresh()->unassigned_at);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'lead.unassigned',
+            'subject_id' => $lead->id,
+        ]);
+    }
+
+    public function test_sales_executive_cannot_unassign_leads(): void
+    {
+        $org = Organization::create(['name' => 'Agency Beta', 'status' => 'active']);
+        $executive = User::factory()->create(['organization_id' => $org->id, 'name' => 'Agent Priya']);
+        $executive->assignRole('sales-executive');
+
+        $source = LeadSource::create(['name' => 'Google Ads']);
+        $lead = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Rohan Verma',
+            'mobile' => '9812345678',
+            'assigned_to' => $executive->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'assigned',
+            'status' => 'assigned',
+        ]);
+
+        Livewire::actingAs($executive)
+            ->test(LeadKanban::class)
+            ->call('unassignLead', $lead->id)
+            ->assertDispatched('toast', type: 'error');
+
+        $this->assertEquals($executive->id, $lead->fresh()->assigned_to);
+    }
+
+    public function test_bulk_unassign_selected_leads(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super-admin');
+
+        $org = Organization::create(['name' => 'Agency Gamma', 'status' => 'active']);
+        $executive = User::factory()->create(['organization_id' => $org->id, 'name' => 'Agent Amit']);
+        $executive->assignRole('sales-executive');
+
+        $source = LeadSource::create(['name' => 'Direct Lead']);
+        $lead1 = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Customer 1',
+            'mobile' => '9800000001',
+            'client_id' => $superAdmin->id,
+            'assigned_to' => $executive->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'assigned',
+            'status' => 'assigned',
+        ]);
+        $lead2 = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Customer 2',
+            'mobile' => '9800000002',
+            'client_id' => $superAdmin->id,
+            'assigned_to' => $executive->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'assigned',
+            'status' => 'assigned',
+        ]);
+
+        Livewire::actingAs($superAdmin)
+            ->test(LeadKanban::class)
+            ->set('selectedRows', [(string)$lead1->id, (string)$lead2->id])
+            ->call('unassignSelectedLeads')
+            ->assertDispatched('toast', type: 'success');
+
+        $this->assertNull($lead1->fresh()->assigned_to);
+        $this->assertNull($lead2->fresh()->assigned_to);
+    }
+
+    public function test_lead_detail_can_unassign_executive(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super-admin');
+
+        $org = Organization::create(['name' => 'Agency Delta', 'status' => 'active']);
+        $executive = User::factory()->create(['organization_id' => $org->id, 'name' => 'Agent Sunita']);
+        $executive->assignRole('sales-executive');
+
+        $source = LeadSource::create(['name' => 'Meta Source']);
+        $lead = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Kavita Roy',
+            'mobile' => '9811122233',
+            'client_id' => $superAdmin->id,
+            'assigned_to' => $executive->id,
+            'lead_source_id' => $source->id,
+            'current_stage' => 'assigned',
+            'status' => 'assigned',
+        ]);
+
+        Livewire::actingAs($superAdmin)
+            ->test(\App\Livewire\Leads\LeadDetail::class)
+            ->call('openLead', $lead->id)
+            ->assertSet('isOpen', true)
+            ->assertSee('No Action Taken')
+            ->call('unassignExecutive')
+            ->assertDispatched('toast', type: 'success');
+
+        $this->assertNull($lead->fresh()->assigned_to);
+    }
 }

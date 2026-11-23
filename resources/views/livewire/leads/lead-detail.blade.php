@@ -325,15 +325,55 @@
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">3 &bull; Assignment
                         &amp; Ownership</span>
                     @if($lead->assignedTo)
-                        <span
-                            class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            Assigned
-                        </span>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span
+                                class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                Assigned
+                            </span>
+                            @if(!$lead->executive_first_response_at && !$lead->first_response_at)
+                                <span
+                                    class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200"
+                                    title="Sales executive has not logged any response or stage progress yet">
+                                    No Action Taken
+                                </span>
+                            @endif
+                            @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']) || $isBuilder)
+                                <button type="button"
+                                    wire:click="unassignExecutive"
+                                    wire:confirm="Remove executive assignment from this lead? The lead will become unassigned."
+                                    class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                                    </svg>
+                                    <span>Unassign</span>
+                                </button>
+                                <button type="button"
+                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })"
+                                    class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface text-ink hover:bg-canvas border border-border transition cursor-pointer flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                    </svg>
+                                    <span>Reassign</span>
+                                </button>
+                            @endif
+                        </div>
                     @else
-                        <span
-                            class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            Unassigned
-                        </span>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span
+                                class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Unassigned
+                            </span>
+                            @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']) || $isBuilder)
+                                <button type="button"
+                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })"
+                                    class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                    </svg>
+                                    <span>Assign</span>
+                                </button>
+                            @endif
+                        </div>
                     @endif
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">

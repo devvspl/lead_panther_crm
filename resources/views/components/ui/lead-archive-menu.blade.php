@@ -18,6 +18,8 @@
 
     $isSuperAdmin = $actionUser && $actionUser->hasAnyRole(['Super Admin', 'super-admin']);
     $isSalesUser = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'sales-executive' || $actionUser->hasRole(['sales-executive', 'Sales Executive', 'Executive', 'sales']));
+    $isBuilder = $actionUser && (\App\Support\NavigationConfig::getRoleKey($actionUser) === 'builder' || $actionUser->hasRole(['Builder', 'builder']));
+    $isAdmin = $actionUser && $actionUser->hasRole(['Admin', 'admin', 'Account Manager', 'account-manager', 'super-admin']);
     $canArchive = $isSuperAdmin;
     $canConfigDisplay = $isSuperAdmin;
     $canJourney = $isSuperAdmin;
@@ -26,6 +28,11 @@
     $currentStage = $actionLead?->current_stage ?? '';
     $normalizedStage = \App\Models\Lead::normalizeStage($currentStage);
     $canAssign = !$isSalesUser && (!\App\Models\Lead::usesSalesPanel() || ($normalizedStage !== 'pending_credit' && !in_array($normalizedStage, ['closed_won', 'lost', 'invalid', 'unreachable', 'replaced'])));
+
+    // Unassign check (Super Admin, Admin, Builder when lead is currently assigned)
+    $isAssigned = !empty($actionLead?->assigned_to);
+    $hasExecutiveAction = !empty($actionLead?->executive_first_response_at) || !empty($actionLead?->first_response_at);
+    $canUnassign = $isAssigned && ($isSuperAdmin || $isAdmin || $isBuilder);
 
     // Replacement check
     $canReplace = !$isSalesUser && !\App\Support\TeamAccess::isLeader($actionUser) && (!\App\Models\Lead::usesSalesPanel() || (!in_array($normalizedStage, ['closed_won', 'booking', 'payment_received', 'replaced', 'pending_credit']) && !in_array($actionLead?->replacement_status ?? '', ['pending', 'approved'])));
@@ -71,11 +78,30 @@
             @if($canAssign)
             <button type="button" role="menuitem"
                 @click.stop="open=false; $dispatch('open-lead-assign', { id: {{ $leadId }} })"
-                class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-canvas hover:text-emerald-600 transition cursor-pointer">
+                class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-canvas hover:text-emerald-600 transition cursor-pointer"
+                title="{{ $isAssigned ? 'Reassign Lead' : 'Assign Lead' }}">
                 <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
-                <span>Assign Lead</span>
+                <span>{{ $isAssigned ? 'Reassign Lead' : 'Assign Lead' }}</span>
+                <span class="sr-only">Assign Lead</span>
+            </button>
+            @endif
+
+            @if($canUnassign)
+            <button type="button" role="menuitem"
+                @click.stop="open=false; $dispatch('open-unassign-lead', { id: {{ $leadId }} })"
+                class="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer"
+                title="{{ !$hasExecutiveAction ? 'Executive has not taken action. Click to remove assignment.' : 'Remove executive assignment from this lead' }}">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                    </svg>
+                    <span class="truncate">Unassign Executive</span>
+                </div>
+                @if(!$hasExecutiveAction)
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 shrink-0">No Action</span>
+                @endif
             </button>
             @endif
 

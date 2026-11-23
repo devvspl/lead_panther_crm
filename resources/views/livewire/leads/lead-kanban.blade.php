@@ -933,6 +933,13 @@
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                                     <span>Assign Selected ({{ count($selectedRows) }})</span>
                                 </button>
+                                <button type="button" wire:click="unassignSelectedLeads"
+                                    wire:confirm="Remove executive assignments from all selected leads? They will be returned to the unassigned pool."
+                                    class="px-3 h-8 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                    title="Unassign executive from selected leads (especially when no action was taken)">
+                                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" /></svg>
+                                    <span>Unassign Selected ({{ count($selectedRows) }})</span>
+                                </button>
                             @endif
                             @if(!$isBuilder && !$this->isClientContext())
                                 <button type="button" wire:click="autoDistributeUnassignedLeads"
@@ -1547,6 +1554,95 @@
                         class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         <span>Confirm Assignment</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Unassign Sales Executive Modal -->
+    @if($showUnassignModal && $unassignLeadModel)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+                <div class="flex items-center justify-between pb-3 border-b border-border">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-ink">Remove Executive Assignment</h3>
+                            <p class="text-[11px] text-muted">Unassign sales executive and return lead to unassigned pool</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeUnassignModal" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Lead & Assignment Details Summary -->
+                <div class="p-3 rounded-xl bg-canvas border border-border space-y-2.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-mono font-bold text-ink">{{ $unassignLeadModel->lead_code }}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            {{ ucfirst(str_replace('_', ' ', $unassignLeadModel->current_stage)) }}
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <span class="text-[10px] text-muted block">Contact Name</span>
+                            <span class="font-semibold text-ink">{{ $unassignLeadModel->name }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Mobile Number</span>
+                            <span class="font-mono font-semibold text-ink">{{ $unassignLeadModel->mobile }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Assigned Executive</span>
+                            <span class="font-semibold text-ink">{{ $unassignLeadModel->assignedTo?->name ?? 'User #' . $unassignLeadModel->assigned_to }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-muted block">Executive Action Status</span>
+                            @if($unassignLeadModel->executive_first_response_at || $unassignLeadModel->first_response_at)
+                                <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Action Taken</span>
+                            @else
+                                <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">No Action Taken</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if(!$unassignLeadModel->executive_first_response_at && !$unassignLeadModel->first_response_at)
+                    <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                        <div class="font-bold flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <span>Executive Inactive / No Action</span>
+                        </div>
+                        <p class="text-amber-800 leading-relaxed">
+                            The assigned sales executive has not responded or taken any action on this lead. Removing this assignment will reset the lead back to unassigned status so it can be manually reassigned or auto-distributed.
+                        </p>
+                    </div>
+                @endif
+
+                <div>
+                    <label class="block text-xs font-semibold text-ink mb-1">
+                        Reason / Remarks
+                    </label>
+                    <input type="text" wire:model="unassignReason"
+                        placeholder="e.g. Sales executive inactive / no action taken, reassignment requested"
+                        class="w-full px-3 py-2 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-1 focus:ring-primary focus:border-primary transition" />
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                    <button type="button" wire:click="closeUnassignModal"
+                        class="px-3.5 py-1.5 rounded-lg border border-border bg-canvas text-ink text-xs font-semibold hover:bg-surface transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="executeUnassignment"
+                        class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Confirm Unassign</span>
                     </button>
                 </div>
             </div>

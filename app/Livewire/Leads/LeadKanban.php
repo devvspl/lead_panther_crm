@@ -162,6 +162,15 @@ class LeadKanban extends Component
 
     public ?int $assignUserId = null;
 
+    // Unassign Lead Executive State
+    public bool $showUnassignModal = false;
+
+    public ?int $unassignLeadId = null;
+
+    public ?Lead $unassignLeadModel = null;
+
+    public string $unassignReason = '';
+
     // Return Lead to Super Admin (Replacement Request) State
     public bool $showReturnLeadModal = false;
 
@@ -1707,6 +1716,198 @@ class LeadKanban extends Component
         $this->assignTeamId = null;
         $this->assignUserId = null;
         $this->showAssignModal = true;
+    }
+
+    #[On('open-unassign-lead')]
+    public function openUnassignModal(int $id): void
+    {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot unassign leads.');
+
+            return;
+        }
+
+        $user = auth()->user();
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())
+            ->with(['assignedTo', 'client.organization'])
+            ->find($id);
+
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
+            return;
+        }
+
+        if (!$lead->assigned_to) {
+            $this->dispatch('toast', type: 'warning', message: 'This lead is not currently assigned to any executive.');
+
+            return;
+        }
+
+        if ($this->isBuilder && $user?->organization_id) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+
+                return;
+            }
+        }
+
+        $this->unassignLeadId = $id;
+        $this->unassignLeadModel = $lead;
+        $hasAction = !empty($lead->first_response_at) || !empty($lead->executive_first_response_at);
+        $this->unassignReason = $hasAction ? 'Reassigning / unassigning executive' : 'Sales executive has not taken action';
+        $this->showUnassignModal = true;
+    }
+
+    public function closeUnassignModal(): void
+    {
+        $this->showUnassignModal = false;
+        $this->unassignLeadId = null;
+        $this->unassignLeadModel = null;
+        $this->unassignReason = '';
+    }
+
+    public function executeUnassignment(): void
+    {
+        if (!$this->unassignLeadId) {
+            return;
+        }
+
+        $leadId = $this->unassignLeadId;
+        $reason = $this->unassignReason;
+        $this->closeUnassignModal();
+        $this->unassignLead($leadId, $reason);
+    }
+
+    #[On('unassign-lead-executive')]
+    public function unassignLead(int $id, ?string $reason = null): void
+    {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot unassign leads.');
+
+            return;
+        }
+
+        $user = auth()->user();
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())
+            ->with(['assignedTo', 'client'])
+            ->find($id);
+
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
+            return;
+        }
+
+        if (!$lead->assigned_to) {
+            $this->dispatch('toast', type: 'info', message: 'This lead is already unassigned.');
+
+            return;
+        }
+
+        if ($this->isBuilder && $user?->organization_id) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+
+                return;
+            }
+        }
+
+        $previousAssignee = $lead->assignedTo;
+        $previousAssigneeId = $lead->assigned_to;
+        $previousAssigneeName = $previousAssignee?->name ?? "User #{$previousAssigneeId}";
+        $hasActionTaken = !empty($lead->first_response_at) || !empty($lead->executive_first_response_at);
+
+        DB::transaction(function () use ($lead, $user, $previousAssigneeId, $previousAssigneeName, $reason, $hasActionTaken) {
+            LeadAssignment::where('lead_id', $lead->id)
+                ->whereNull('unassigned_at')
+                ->update(['unassigned_at' => now()]);
+
+            $oldStage = $lead->current_stage;
+            $newStage = in_array(Lead::normalizeStage($oldStage), ['assigned']) ? 'new' : $oldStage;
+            $newStatus = in_array($lead->status, ['assigned']) ? 'new' : $lead->status;
+
+            $lead->update([
+                'assigned_to' => null,
+                'current_stage' => $newStage,
+                'status' => $newStatus,
+                'executive_assigned_at' => null,
+                'executive_response_due_at' => null,
+                'executive_first_response_at' => null,
+            ]);
+
+            if ($oldStage !== $newStage) {
+                LeadStatusHistory::create([
+                    'lead_id' => $lead->id,
+                    'from_status' => $oldStage,
+                    'to_status' => $newStage,
+                    'changed_by' => $user->id,
+                    'changed_at' => now(),
+                ]);
+            }
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'action' => 'lead.unassigned',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'from_value' => json_encode([
+                    'assigned_to' => $previousAssigneeId,
+                    'assignee_name' => $previousAssigneeName,
+                    'action_taken' => $hasActionTaken,
+                ]),
+                'to_value' => json_encode([
+                    'assigned_to' => null,
+                    'reason' => $reason ?: ($hasActionTaken ? 'Executive assignment removed by admin' : 'Executive has not taken action (unassigned by admin)'),
+                ]),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+                'created_at' => now(),
+            ]);
+        });
+
+        $this->dispatch('lead-updated');
+        $this->dispatch('toast', type: 'success', message: "Assignment removed for {$previousAssigneeName}. Lead is now unassigned.");
+    }
+
+    public function unassignSelectedLeads(): void
+    {
+        if ($this->isSalesExecutive) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: Sales Executives cannot unassign leads.');
+
+            return;
+        }
+
+        if (empty($this->selectedRows)) {
+            $this->dispatch('toast', type: 'warning', message: 'Please select at least one lead from the table.');
+
+            return;
+        }
+
+        $count = 0;
+        foreach ($this->selectedRows as $leadId) {
+            $lead = Lead::find((int) $leadId);
+            if ($lead && $lead->assigned_to) {
+                $this->unassignLead((int) $leadId, 'Bulk unassigned by admin (no action taken / reassignment)');
+                $count++;
+            }
+        }
+
+        $this->selectedRows = [];
+        $this->selectAll = false;
+        $this->dispatch('toast', type: 'success', message: "Successfully removed executive assignment from {$count} lead(s).");
     }
 
     #[On('open-return-lead')]

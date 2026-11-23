@@ -119,7 +119,7 @@ class LeadDetail extends Component
     }
 
     #[On('open-lead-detail')]
-    public function openLead(int $id): void
+    public function openLead(int $id, ?string $tab = null): void
     {
         $user = auth()->user();
         $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'project' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'campaign' => fn ($q) => Lead::usesSalesPanel() ? $q->withoutGlobalScopes() : $q, 'leadSource', 'assignedTo', 'siteVisits', 'followups', 'meetings', 'bookings.payments'])->find($id);
@@ -139,7 +139,7 @@ class LeadDetail extends Component
 
         $this->leadId = $id;
         $this->isOpen = true;
-        $this->activeTab = 'stage_details';
+        $this->activeTab = ($tab && in_array($tab, ['stage_details', 'timeline', 'communications'])) ? $tab : 'stage_details';
 
         // Prepopulate default form dates and fields
         $this->followupDueAt = now()->addDays(1)->format('Y-m-d\TH:i');
@@ -985,6 +985,120 @@ class LeadDetail extends Component
         if ($this->leadId) {
             $this->dispatch('show-lead-journey', id: $this->leadId);
         }
+    }
+
+    public function pushLeadToClient(int $id): void
+    {
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'organization'])->find($id);
+        if (!$lead) {
+            $this->dispatch('toast', type: 'error', message: 'Lead not found.');
+
+            return;
+        }
+
+        $clientOrgId = $lead->client?->organization_id ?: ($lead->organization?->id ?: null);
+        if (!$clientOrgId) {
+            $this->dispatch('toast', type: 'error', message: 'This lead has no associated client organization to push to.');
+
+            return;
+        }
+
+        $this->dispatch('client-push-selected', organizationId: $clientOrgId, leadIds: [$id], sendNow: true)->to(\App\Livewire\Leads\ClientDeliveryCenter::class);
+    }
+
+    public function unassignExecutive(?string $reason = null): void
+    {
+        $user = auth()->user();
+        $isSuperAdmin = $user && $user->hasAnyRole(['Super Admin', 'super-admin']);
+        $isBuilder = $user && (\App\Support\NavigationConfig::getRoleKey($user) === 'builder' || $user->hasRole(['Builder', 'builder']));
+        $isAdmin = $user && $user->hasRole(['Admin', 'admin', 'Account Manager', 'account-manager', 'super-admin']);
+
+        if (!$isSuperAdmin && !$isAdmin && !$isBuilder) {
+            $this->dispatch('toast', type: 'error', message: 'Unauthorized: You do not have permission to remove executive assignment.');
+
+            return;
+        }
+
+        if (!$this->leadId) {
+            return;
+        }
+
+        $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['assignedTo', 'client'])->find($this->leadId);
+        if (!$lead || !$lead->assigned_to) {
+            $this->dispatch('toast', type: 'warning', message: 'Lead is not assigned to any executive.');
+
+            return;
+        }
+
+        if ($isBuilder && $user?->organization_id) {
+            $orgId = $user->organization_id;
+            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
+                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
+                || ($lead->client_id === $user->id)
+                || ($lead->assigned_to === $user->id);
+
+            if (!$hasOrgAccess) {
+                $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
+
+                return;
+            }
+        }
+
+        $previousAssignee = $lead->assignedTo;
+        $previousAssigneeId = $lead->assigned_to;
+        $previousAssigneeName = $previousAssignee?->name ?? "User #{$previousAssigneeId}";
+        $hasActionTaken = !empty($lead->first_response_at) || !empty($lead->executive_first_response_at);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($lead, $user, $previousAssigneeId, $previousAssigneeName, $reason, $hasActionTaken) {
+            LeadAssignment::where('lead_id', $lead->id)
+                ->whereNull('unassigned_at')
+                ->update(['unassigned_at' => now()]);
+
+            $oldStage = $lead->current_stage;
+            $newStage = in_array(Lead::normalizeStage($oldStage), ['assigned']) ? 'new' : $oldStage;
+            $newStatus = in_array($lead->status, ['assigned']) ? 'new' : $lead->status;
+
+            $lead->update([
+                'assigned_to' => null,
+                'current_stage' => $newStage,
+                'status' => $newStatus,
+                'executive_assigned_at' => null,
+                'executive_response_due_at' => null,
+                'executive_first_response_at' => null,
+            ]);
+
+            if ($oldStage !== $newStage) {
+                \App\Models\LeadStatusHistory::create([
+                    'lead_id' => $lead->id,
+                    'from_status' => $oldStage,
+                    'to_status' => $newStage,
+                    'changed_by' => $user->id,
+                    'changed_at' => now(),
+                ]);
+            }
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'action' => 'lead.unassigned',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'from_value' => json_encode([
+                    'assigned_to' => $previousAssigneeId,
+                    'assignee_name' => $previousAssigneeName,
+                    'action_taken' => $hasActionTaken,
+                ]),
+                'to_value' => json_encode([
+                    'assigned_to' => null,
+                    'reason' => $reason ?: ($hasActionTaken ? 'Executive assignment removed by admin' : 'Executive has not taken action (unassigned by admin)'),
+                ]),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+                'created_at' => now(),
+            ]);
+        });
+
+        $this->dispatch('lead-updated');
+        $this->dispatch('toast', type: 'success', message: "Assignment removed for {$previousAssigneeName}. Lead is now unassigned.");
     }
 
     public function render(LeadJourneyService $journeyService)

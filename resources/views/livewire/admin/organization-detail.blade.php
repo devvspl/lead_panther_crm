@@ -1,19 +1,18 @@
-<div class="space-y-6">
+<div class="space-y-4 sm:space-y-6">
     <!-- Top Breadcrumbs & Back Bar -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-            <div class="flex items-center space-x-2 text-xs text-muted mb-1.5">
-                <a href="{{ route('admin.dashboard') }}" class="hover:text-ink transition" wire:navigate>System
-                    Administration</a>
+            <div class="flex items-center space-x-1.5 sm:space-x-2 text-[11px] sm:text-xs text-muted mb-1 truncate">
+                <a href="{{ route('admin.dashboard') }}" class="hover:text-ink transition shrink-0" wire:navigate>Admin</a>
                 <span>/</span>
-                <a href="{{ route('admin.organizations') }}" class="hover:text-ink transition" wire:navigate>Clients</a>
+                <a href="{{ route('admin.organizations') }}" class="hover:text-ink transition shrink-0" wire:navigate>Clients</a>
                 <span>/</span>
                 <span class="text-ink font-semibold truncate">{{ $organization->name }}</span>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5 sm:gap-3">
                 <a href="{{ route('admin.organizations') }}" wire:navigate
-                    class="p-2 rounded-xl bg-surface border border-border hover:bg-canvas text-muted hover:text-ink transition shadow-2xs inline-flex items-center justify-center shrink-0"
+                    class="p-1.5 sm:p-2 rounded-xl bg-surface border border-border hover:bg-canvas text-muted hover:text-ink transition shadow-2xs inline-flex items-center justify-center shrink-0"
                     title="Back to Clients Directory">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -21,24 +20,24 @@
                     </svg>
                 </a>
 
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-2.5">
-                        <span>{{ $organization->name }}</span>
+                <div class="min-w-0">
+                    <h1 class="text-lg sm:text-2xl font-bold tracking-tight text-ink flex flex-wrap items-center gap-2">
+                        <span class="truncate">{{ $organization->name }}</span>
                         @if($organization->status === 'active')
                             <span
-                                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
-                                <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
+                                <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-600 animate-pulse"></span>
                                 Active
                             </span>
                         @else
                             <span
-                                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-950 border border-red-300">
-                                <span class="w-2 h-2 rounded-full bg-red-600"></span>
+                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-red-100 text-red-950 border border-red-300">
+                                <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-600"></span>
                                 Suspended
                             </span>
                         @endif
                     </h1>
-                    <div class="flex items-center gap-2 text-xs text-muted mt-0.5">
+                    <div class="flex items-center gap-2 text-[11px] sm:text-xs text-muted mt-0.5">
                         <span
                             class="font-mono text-[11px] font-bold text-ink">#ORG-{{ str_pad($organization->id, 4, '0', STR_PAD_LEFT) }}</span>
                         <span>•</span>
@@ -50,12 +49,12 @@
         </div>
 
         <!-- Header Actions -->
-        <div class="flex flex-wrap items-center gap-2.5 min-w-0 max-w-full">
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0 max-w-full">
             <!-- Full Workbook Excel Export Button -->
             <button type="button" wire:click="exportFullExcel"
-                class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
                 title="Export All Clients Tabs into Multi-Sheet Excel">
-                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -65,7 +64,7 @@
             <!-- Suspend / Activate -->
             <button type="button" wire:click="toggleOrganizationStatus"
                 wire:confirm="Are you sure you want to change this organization's status?"
-                class="px-3 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                 @if($organization->status === 'active')
                     <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -85,7 +84,7 @@
 
             @if(!$isEditing)
                 <button type="button" wire:click="startEditing"
-                    class="px-3 py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                    class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                     <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -95,7 +94,7 @@
             @endif
 
             <button type="button" wire:click="openAddMemberModal"
-                class="px-3.5 py-2 rounded-xl bg-ink text-white hover:bg-neutral-800 text-xs font-semibold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+                class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-ink text-white hover:bg-neutral-800 text-xs font-semibold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -107,7 +106,7 @@
 
     <!-- Quick Edit Form (when isEditing is true) -->
     @if($isEditing)
-        <div class="p-5 rounded-2xl bg-surface border border-primary/30 shadow-sm space-y-4 transition-all">
+        <div class="p-4 sm:p-5 rounded-2xl bg-surface border border-primary/30 shadow-sm space-y-4 transition-all">
             <div class="flex items-center justify-between pb-3 border-b border-border">
                 <div class="flex items-center gap-2">
                     <span class="p-1.5 rounded-lg bg-primary/10 text-primary">
@@ -166,20 +165,22 @@
             ['label' => 'Available Lead Credits', 'value' => $totalWalletBalance, 'description' => 'Remaining credits', 'icon' => 'wallet', 'balance' => true],
         ];
     @endphp
-    <div data-organization-kpis class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-stretch">
+    <div data-organization-kpis class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3.5 items-stretch">
         @foreach($overviewMetrics as $metric)
             @php $isBalance = $metric['balance'] ?? false; @endphp
-            <div class="min-w-0 p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col gap-2">
-                <div class="flex items-center justify-between gap-2 text-muted text-[11px] font-semibold uppercase tracking-wider">
-                    <span>{{ $metric['label'] }}</span>
-                    <x-ui.team-icon :name="$metric['icon']" class="text-primary" />
+            <div class="min-w-0 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-1.5 sm:gap-2 {{ $isBalance ? 'col-span-2 sm:col-span-2 lg:col-span-1' : '' }}">
+                <div class="flex items-center justify-between gap-1.5 text-muted text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">
+                    <span class="truncate">{{ $metric['label'] }}</span>
+                    <x-ui.team-icon :name="$metric['icon']" class="text-primary w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 </div>
-                <div class="text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
-                <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted">
-                    <span>{{ $metric['description'] }}</span>
+                <div class="text-xl sm:text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
+                <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[9px] sm:text-[10px] text-muted">
+                    <span class="truncate">{{ $metric['description'] }}</span>
                     @if($isBalance)
-                        <span class="w-full">Total: {{ number_format($totalLeadCredits) }} / Used: {{ number_format($usedLeadCredits) }} / Remaining: {{ number_format($totalWalletBalance) }} Credits</span>
-                        <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}</span>
+                        <div class="w-full flex items-center justify-between gap-1 flex-wrap pt-1 mt-0.5 border-t border-border/50 text-[9px] sm:text-[10px]">
+                            <span class="truncate">Total: {{ number_format($totalLeadCredits) }} / Used: {{ number_format($usedLeadCredits) }} / Remaining: {{ number_format($totalWalletBalance) }} Credits</span>
+                            <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold shrink-0 {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}</span>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -187,12 +188,12 @@
     </div>
 
     <!-- Tabbed Navigation Bar -->
-    <div class="border-b border-border">
-        <nav class="flex space-x-2 sm:space-x-5 -mb-px overflow-x-auto text-xs font-semibold">
+    <div class="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0">
+        <nav class="flex space-x-1 sm:space-x-4 -mb-px overflow-x-auto text-xs font-semibold no-scrollbar">
             <!-- Tab 1: Overview -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'overview']) }}"
                 wire:click.prevent="setTab('overview')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'overview' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'overview' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -203,14 +204,14 @@
             <!-- Tab 2: Team Members -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'team']) }}"
                 wire:click.prevent="setTab('team')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'team' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'team' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
                 <span>Team Members</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'team' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
+                    class="px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'team' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ $totalUsersCount }}
                 </span>
             </a>
@@ -218,45 +219,63 @@
             <!-- Tab 3: Projects -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'clients']) }}"
                 wire:click.prevent="setTab('clients')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'clients' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'clients' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 <span>Projects</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
+                    class="px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'clients' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ $totalProjectsCount }}
                 </span>
             </a>
 
+            <!-- Tab 4: Leads -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'leads']) }}"
                 wire:click.prevent="setTab('leads')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 whitespace-nowrap {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink' }}">Leads</a>
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'leads' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Leads</span>
+                <span
+                    class="px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'leads' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
+                    {{ $totalLeadsCount }}
+                </span>
+            </a>
 
-            <!-- Tab 4: Lead Credits -->
+            <!-- Tab 5: Lead Credits -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'credits']) }}"
                 wire:click.prevent="setTab('credits')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'credits' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'credits' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
                 <span>Lead Credits</span>
                 <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
+                    class="px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $activeTab === 'credits' ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-canvas text-muted border border-border' }}">
                     {{ number_format($totalWalletBalance) }}
                 </span>
             </a>
 
-
+            <!-- Tab 6: Campaign Details & Delivery -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'campaigns']) }}"
                 wire:click.prevent="setTab('campaigns')"
-                class="py-3 px-2 border-b-2 whitespace-nowrap {{ $activeTab === 'campaigns' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted' }}">Campaign Details & Delivery</a>
-            <!-- Tab 6: Activity Log -->
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'campaigns' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+                <span>Campaign Details & Delivery</span>
+            </a>
+
+            <!-- Tab 7: Activity Log -->
             <a href="{{ route('admin.organizations.show', ['organization' => $organization->id, 'tab' => 'activity']) }}"
                 wire:click.prevent="setTab('activity')"
-                class="py-3 px-2 border-b-2 transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $activeTab === 'activity' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
+                class="py-2.5 sm:py-3 px-2 sm:px-2.5 border-b-2 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap shrink-0 {{ $activeTab === 'activity' ? 'border-primary text-primary font-bold' : 'border-transparent text-muted hover:text-ink hover:border-border' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -876,7 +895,7 @@
                     <div class="flex items-center gap-2">
                         <button type="button" wire:click="openCreateClientModal" class="px-3 py-1.5 border border-border bg-surface hover:bg-canvas rounded-lg text-xs font-semibold text-ink flex items-center gap-1.5 cursor-pointer transition">
                             <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                            <span>Add Client</span>
+                            <span>+ Add Client / Billing Owner</span>
                         </button>
                         <x-ui.export-button target="exportTabExcel('clients')" label="Export Project" class="justify-center" />
                     </div>

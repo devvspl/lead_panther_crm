@@ -118,6 +118,12 @@ class LeadDetail extends Component
         // Re-renders the lead details drawer with the updated organization display preferences
     }
 
+    #[On('lead-updated')]
+    public function refreshLead(): void
+    {
+        // Re-renders the lead details drawer with updated lead data
+    }
+
     #[On('open-lead-detail')]
     public function openLead(int $id, ?string $tab = null): void
     {
@@ -987,6 +993,7 @@ class LeadDetail extends Component
         }
     }
 
+    #[On('push-lead-to-client')]
     public function pushLeadToClient(int $id): void
     {
         $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->with(['client', 'organization'])->find($id);

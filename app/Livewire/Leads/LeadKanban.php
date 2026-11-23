@@ -1657,6 +1657,7 @@ class LeadKanban extends Component
             ->toArray();
     }
 
+    #[On('push-lead-to-client')]
     public function pushLeadToClient(int $id): void
     {
         $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->find($id);
@@ -1700,10 +1701,12 @@ class LeadKanban extends Component
 
         if ($this->isBuilder && $user?->organization_id) {
             $orgId = $user->organization_id;
-            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
-                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
-                || ($lead->client_id === $user->id)
-                || ($lead->assigned_to === $user->id);
+            $hasOrgAccess = ($lead->organization_id && (int) $lead->organization_id === (int) $orgId)
+                || ($lead->organization && (int) $lead->organization->id === (int) $orgId)
+                || ($lead->client && (int) $lead->client->organization_id === (int) $orgId)
+                || ($lead->assignedTo && (int) $lead->assignedTo->organization_id === (int) $orgId)
+                || ((int) $lead->client_id === (int) $user->id)
+                || ((int) $lead->assigned_to === (int) $user->id);
 
             if (!$hasOrgAccess) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
@@ -1746,10 +1749,12 @@ class LeadKanban extends Component
 
         if ($this->isBuilder && $user?->organization_id) {
             $orgId = $user->organization_id;
-            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
-                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
-                || ($lead->client_id === $user->id)
-                || ($lead->assigned_to === $user->id);
+            $hasOrgAccess = ($lead->organization_id && (int) $lead->organization_id === (int) $orgId)
+                || ($lead->organization && (int) $lead->organization->id === (int) $orgId)
+                || ($lead->client && (int) $lead->client->organization_id === (int) $orgId)
+                || ($lead->assignedTo && (int) $lead->assignedTo->organization_id === (int) $orgId)
+                || ((int) $lead->client_id === (int) $user->id)
+                || ((int) $lead->assigned_to === (int) $user->id);
 
             if (!$hasOrgAccess) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
@@ -1813,10 +1818,12 @@ class LeadKanban extends Component
 
         if ($this->isBuilder && $user?->organization_id) {
             $orgId = $user->organization_id;
-            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
-                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
-                || ($lead->client_id === $user->id)
-                || ($lead->assigned_to === $user->id);
+            $hasOrgAccess = ($lead->organization_id && (int) $lead->organization_id === (int) $orgId)
+                || ($lead->organization && (int) $lead->organization->id === (int) $orgId)
+                || ($lead->client && (int) $lead->client->organization_id === (int) $orgId)
+                || ($lead->assignedTo && (int) $lead->assignedTo->organization_id === (int) $orgId)
+                || ((int) $lead->client_id === (int) $user->id)
+                || ((int) $lead->assigned_to === (int) $user->id);
 
             if (!$hasOrgAccess) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
@@ -1935,10 +1942,12 @@ class LeadKanban extends Component
         // Validate organization ownership for non-super admins
         if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
             $orgId = $user->organization_id;
-            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
-                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
-                || ($lead->client_id === $user->id)
-                || ($lead->assigned_to === $user->id);
+            $hasOrgAccess = ($lead->organization_id && (int) $lead->organization_id === (int) $orgId)
+                || ($lead->organization && (int) $lead->organization->id === (int) $orgId)
+                || ($lead->client && (int) $lead->client->organization_id === (int) $orgId)
+                || ($lead->assignedTo && (int) $lead->assignedTo->organization_id === (int) $orgId)
+                || ((int) $lead->client_id === (int) $user->id)
+                || ((int) $lead->assigned_to === (int) $user->id);
 
             if (!$hasOrgAccess && $orgId) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized: Lead does not belong to your organization.');
@@ -2007,10 +2016,12 @@ class LeadKanban extends Component
         // Validate organization ownership for non-super admins
         if ($user && !$user->hasRole('Super Admin') && !$user->hasRole('super-admin')) {
             $orgId = $user->organization_id;
-            $hasOrgAccess = ($lead->client && $lead->client->organization_id === $orgId)
-                || ($lead->assignedTo && $lead->assignedTo->organization_id === $orgId)
-                || ($lead->client_id === $user->id)
-                || ($lead->assigned_to === $user->id);
+            $hasOrgAccess = ($lead->organization_id && (int) $lead->organization_id === (int) $orgId)
+                || ($lead->organization && (int) $lead->organization->id === (int) $orgId)
+                || ($lead->client && (int) $lead->client->organization_id === (int) $orgId)
+                || ($lead->assignedTo && (int) $lead->assignedTo->organization_id === (int) $orgId)
+                || ((int) $lead->client_id === (int) $user->id)
+                || ((int) $lead->assigned_to === (int) $user->id);
 
             if (!$hasOrgAccess && $orgId) {
                 $this->dispatch('toast', type: 'error', message: 'Unauthorized action on this lead.');

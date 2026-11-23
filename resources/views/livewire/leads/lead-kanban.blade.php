@@ -1469,7 +1469,7 @@
 
     <!-- Lead Manual & Bulk Assignment Modal -->
     @if($showAssignModal)
-        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-[80] overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-2">
@@ -1562,7 +1562,7 @@
 
     <!-- Unassign Sales Executive Modal -->
     @if($showUnassignModal && $unassignLeadModel)
-        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-[80] overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-2.5">
@@ -1651,7 +1651,7 @@
 
     <!-- Return Lead to Super Admin (Replacement Request) Modal -->
     @if($showReturnLeadModal && $returnLeadModel)
-        <div class="fixed inset-0 z-50 overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-[80] overflow-y-auto bg-ink/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div class="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between pb-3 border-b border-border">
                     <div class="flex items-center gap-2.5">

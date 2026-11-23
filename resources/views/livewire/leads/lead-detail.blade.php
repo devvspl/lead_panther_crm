@@ -348,7 +348,7 @@
                                     <span>Unassign</span>
                                 </button>
                                 <button type="button"
-                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })"
+                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} }); if (window.Livewire) Livewire.dispatch('open-lead-assign', { id: {{ $lead->id }} });"
                                     class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface text-ink hover:bg-canvas border border-border transition cursor-pointer flex items-center gap-1">
                                     <svg class="w-3 h-3 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -365,7 +365,7 @@
                             </span>
                             @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']) || $isBuilder)
                                 <button type="button"
-                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })"
+                                    @click="$dispatch('open-lead-assign', { id: {{ $lead->id }} }); if (window.Livewire) Livewire.dispatch('open-lead-assign', { id: {{ $lead->id }} });"
                                     class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer flex items-center gap-1">
                                     <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -481,7 +481,7 @@
                                     <p>Payment: {{ $payment->amount }} · {{ $payment->paid_at }} · {{ $payment->transaction_id }}</p>
                         @endforeach @endif
                         @if(!in_array($normalizedStage, ['closed_won', 'lost', 'invalid', 'unreachable', 'replaced', 'pending_credit']))<x-ui.button
-                            x-on:click="$dispatch('open-lead-assign', { id: {{ $lead->id }} })"
+                            x-on:click="$dispatch('open-lead-assign', { id: {{ $lead->id }} }); if (window.Livewire) Livewire.dispatch('open-lead-assign', { id: {{ $lead->id }} });"
                         variant="secondary">{{ $lead->assigned_to ? 'Reassign Lead' : 'Assign Lead' }}</x-ui.button>@endif
                     </div>
                 @else

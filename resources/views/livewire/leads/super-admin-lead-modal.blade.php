@@ -183,45 +183,45 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Assigned Client / Builder</label>
-                                    <x-ui.theme-select wire:model="client_id" placeholder="-- No Client Assigned --" searchable class="w-full">
+                                    <x-ui.themed-select wire:model="client_id" placeholder="-- No Client Assigned --" searchable class="w-full">
                                         <option value="">-- No Client Assigned --</option>
                                         @foreach($clients as $c)
                                             <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->email }})</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('client_id') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">CRM Project</label>
-                                    <x-ui.theme-select wire:model.live="project_id" placeholder="-- No Project Selected --" searchable class="w-full">
+                                    <x-ui.themed-select wire:model.live="project_id" placeholder="-- No Project Selected --" searchable class="w-full">
                                         <option value="">-- No Project Selected --</option>
                                         @foreach($projects as $p)
                                             <option value="{{ $p->id }}">{{ $p->name }}</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('project_id') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Marketing Campaign</label>
-                                    <x-ui.theme-select wire:model.live="campaign_id" placeholder="-- Select Campaign --" searchable class="w-full">
+                                    <x-ui.themed-select wire:model.live="campaign_id" placeholder="-- Select Campaign --" searchable class="w-full">
                                         <option value="">-- Select or Auto-create Campaign --</option>
                                         @foreach($campaigns as $camp)
                                             <option value="{{ $camp->id }}">{{ $camp->name }}</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('campaign_id') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Lead Ingestion Source</label>
-                                    <x-ui.theme-select wire:model="lead_source_id" placeholder="-- Select Source --" searchable class="w-full">
+                                    <x-ui.themed-select wire:model="lead_source_id" placeholder="-- Select Source --" searchable class="w-full">
                                         <option value="">-- Select Source --</option>
                                         @foreach($leadSources as $src)
                                             <option value="{{ $src->id }}">{{ $src->name }}</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('lead_source_id') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
@@ -234,12 +234,12 @@
                                             </button>
                                         @endif
                                     </div>
-                                    <x-ui.theme-select wire:model="assigned_to" placeholder="-- Unassigned --" searchable class="w-full">
+                                    <x-ui.themed-select wire:model="assigned_to" placeholder="-- Unassigned --" searchable class="w-full">
                                         <option value="">-- Unassigned (Not Assigned to Any Executive) --</option>
                                         @foreach($executives as $ex)
                                             <option value="{{ $ex->id }}">{{ $ex->name }} ({{ $ex->email }})</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('assigned_to') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
                             </div>
@@ -257,21 +257,21 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Current Stage <span class="text-rose-500">*</span></label>
-                                    <x-ui.theme-select wire:model="current_stage" placeholder="Select Stage" class="w-full">
+                                    <x-ui.themed-select wire:model="current_stage" placeholder="Select Stage" class="w-full">
                                         @foreach($stages as $key => $lbl)
                                             <option value="{{ $key }}">{{ $lbl }}</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('current_stage') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Lead Status <span class="text-rose-500">*</span></label>
-                                    <x-ui.theme-select wire:model="status" placeholder="Select Status" class="w-full">
+                                    <x-ui.themed-select wire:model="status" placeholder="Select Status" class="w-full">
                                         @foreach($statuses as $stKey => $stLbl)
                                             <option value="{{ $stKey }}">{{ $stLbl }}</option>
                                         @endforeach
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                     @error('status') <p class="text-[11px] text-rose-500 mt-1">{{ $message }}</p> @enderror
                                 </div>
 
@@ -289,22 +289,22 @@
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Booking Status</label>
-                                    <x-ui.theme-select wire:model="booking_status" placeholder="Select Booking Status" class="w-full">
+                                    <x-ui.themed-select wire:model="booking_status" placeholder="Select Booking Status" class="w-full">
                                         <option value="">-- Not Booked / None --</option>
                                         <option value="pending">Pending</option>
                                         <option value="confirmed">Confirmed</option>
                                         <option value="cancelled">Cancelled</option>
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-semibold text-ink mb-1 sm:mb-1.5">Replacement Status</label>
-                                    <x-ui.theme-select wire:model="replacement_status" placeholder="Select Replacement Status" class="w-full">
+                                    <x-ui.themed-select wire:model="replacement_status" placeholder="Select Replacement Status" class="w-full">
                                         <option value="">-- None --</option>
                                         <option value="pending">Pending</option>
                                         <option value="approved">Approved</option>
                                         <option value="rejected">Rejected</option>
-                                    </x-ui.theme-select>
+                                    </x-ui.themed-select>
                                 </div>
                             </div>
                         </div>

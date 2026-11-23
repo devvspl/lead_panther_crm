@@ -1,14 +1,42 @@
 <div class="space-y-6">
-    @if($canInternalQueue)
-        <div class="flex gap-2 text-xs"><button wire:click="$set('queue', 'client')"
-                class="rounded-lg border border-border px-4 py-2 {{ $queue !== 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Client
-                Leads</button><button wire:click="$set('queue', 'internal')"
-                class="rounded-lg border border-border px-4 py-2 {{ $queue === 'internal' ? 'bg-ink text-white' : 'bg-surface text-ink' }}">Internal
-                Processing Queue</button></div>
-    @endif
     @if($queue === 'internal' && $canInternalQueue)
         <livewire:leads.internal-processing-queue />
     @else
+    <!-- 0. MAIN TABS HEADER: LEADS & ANALYTICS -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
+        <div class="flex items-center gap-1.5 sm:gap-2">
+            <button type="button" wire:click="setMainTab('leads')"
+                class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer {{ $activeMainTab === 'leads' ? 'bg-ink text-white shadow-2xs' : 'bg-surface hover:bg-canvas text-muted hover:text-ink border border-border' }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                <span>Leads</span>
+                <span class="sr-only">Total Leads</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold {{ $activeMainTab === 'leads' ? 'bg-white/20 text-white' : 'bg-canvas border border-border text-muted' }}">
+                    {{ number_format($totalLeadCount ?? 0) }}
+                </span>
+            </button>
+
+            <button type="button" wire:click="setMainTab('analytics')"
+                class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors cursor-pointer {{ $activeMainTab === 'analytics' ? 'bg-ink text-white shadow-2xs' : 'bg-surface hover:bg-canvas text-muted hover:text-ink border border-border' }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span>Analytics</span>
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                {{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Pipeline' : ($isSalesExecutive ? 'My Assigned Pipeline' : ($isBuilder ? 'Organization Pipeline' : 'Live Pipeline')) }}
+            </span>
+            @if($canInternalQueue)
+                <span class="sr-only">Internal Processing Queue</span>
+            @endif
+            <span class="sr-only">Conversion Rate</span>
+        </div>
+    </div>
+    @if($activeMainTab === 'leads')
     <!-- 1. COMPACT PAGE HEADER -->
     <div
         class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
@@ -49,27 +77,44 @@
     @if($this->isClientContext())
         @include('livewire.leads.client-lead-controls')
     @else
-    <!-- 2. COMPACT GLOBAL FILTERS -->
-    <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    <!-- 2. COLLAPSIBLE FILTERS PANEL -->
+    <div x-data="{ open: @entangle('filtersOpen') }" class="bg-surface rounded-card border border-border shadow-2xs overflow-hidden transition-all">
+        <!-- Filter Header Toggle Bar -->
+        <div class="p-3.5 flex flex-wrap items-center justify-between gap-3 bg-surface hover:bg-canvas/50 transition">
+            <button type="button" @click="open = !open" wire:click="$toggle('filtersOpen')"
+                class="flex items-center gap-2.5 text-xs font-bold text-ink uppercase tracking-wider cursor-pointer select-none">
+                <div class="p-1 rounded-md bg-canvas border border-border text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                </div>
+                <span>Filters</span>
+                @if($activeFilterCount > 0)
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        {{ $activeFilterCount }} Active
+                    </span>
+                @endif
+                <svg class="w-3.5 h-3.5 text-muted transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Filters</span>
-            </div>
+            </button>
+
             <div class="flex items-center gap-2">
-                <button type="button" wire:click="$refresh"
+                <button type="button" x-show="open" wire:click="$refresh"
                     class="inline-flex items-center gap-1 px-3 py-1 bg-ink text-white rounded-lg text-xs font-semibold hover:bg-neutral-800 transition cursor-pointer">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     <span>Apply</span>
                 </button>
-                <button type="button" wire:click="resetFilters"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 bg-surface hover:bg-canvas border border-border text-muted hover:text-ink rounded-lg text-xs font-semibold transition cursor-pointer">
-                    <span>Reset</span>
-                </button>
+                @if($activeFilterCount > 0)
+                    <button type="button" wire:click="resetFilters"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-surface hover:bg-canvas border border-border text-muted hover:text-ink rounded-lg text-xs font-semibold transition cursor-pointer">
+                        <span>Clear All</span>
+                    </button>
+                @endif
             </div>
         </div>
+
+        <div x-show="open" x-cloak class="p-4 pt-2 border-t border-border/70 space-y-3 bg-canvas/30">
 
         @php
             $statusOptions = [
@@ -308,544 +353,85 @@
                 </label>
             </div>
         </div>
-
         @endif
-
-        <!-- Active Filters Bar -->
-        @php
-            $defaultRange = $this->isClientContext() ? 'all' : 'month';
-            $hasActiveFilters = $filterOrganizationId || $project || $campaign || $team || $source || $executive || $leadType || ($statusFilter !== 'all') || $stageFilter || $sla_breached || ($analyticsRange !== $defaultRange) || ($this->isClientContext() && !empty($deliveryFilter));
-        @endphp
-        @if($hasActiveFilters)
-            <div class="flex items-center gap-1.5 flex-wrap pt-2 border-t border-border/70 text-xs">
-                <span class="font-semibold text-muted text-[11px]">Active:</span>
-                @if($analyticsRange !== $defaultRange)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Range: {{ ucfirst(str_replace('_', ' ', $analyticsRange)) }}
-                        <button type="button" wire:click="$set('analyticsRange', '{{ $defaultRange }}')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($filterOrganizationId)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Org: #{{ $filterOrganizationId }}
-                        <button type="button" wire:click="$set('filterOrganizationId', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($project)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Project: {{ $allProjects->firstWhere('id', $project)?->name ?? '#'.$project }}
-                        <button type="button" wire:click="$set('project', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($campaign)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Campaign: {{ $allCampaigns->firstWhere('id', $campaign)?->name ?? '#'.$campaign }}
-                        <button type="button" wire:click="$set('campaign', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if(\App\Support\LeadSourceVisibility::allowed() && $source)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Source: #{{ $source }}
-                        <button type="button" wire:click="$set('source', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($executive)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Team Member: {{ ($builderTeamMembers ?? $eligibleAssignees)->firstWhere('id', $executive)?->name ?? '#'.$executive }}
-                        <button type="button" wire:click="$set('executive', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($statusFilter !== 'all')
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Status: {{ $statusOptions[$statusFilter] ?? ucfirst(str_replace('_', ' ', $statusFilter)) }}
-                        <button type="button" wire:click="$set('statusFilter', 'all')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($stageFilter)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Stage: {{ $stageOptions[$stageFilter] ?? ($mainStages[$stageFilter] ?? ucfirst(str_replace('_', ' ', $stageFilter))) }}
-                        <button type="button" wire:click="$set('stageFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($this->isClientContext() && !empty($deliveryFilter))
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
-                        Delivery: {{ ucfirst($deliveryFilter) }}
-                        <button type="button" wire:click="$set('deliveryFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                @if($sla_breached)
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-[11px] font-medium text-red-700">
-                        SLA Breached
-                        <button type="button" wire:click="$set('sla_breached', false)" class="text-red-500 hover:text-red-800 cursor-pointer">&times;</button>
-                    </span>
-                @endif
-                <button type="button" wire:click="resetFilters" class="text-[11px] text-blue-600 hover:underline font-semibold ml-1 cursor-pointer">
-                    Clear All
-                </button>
-            </div>
-        @endif
+        </div>
     </div>
 
+    <!-- Active Filters Bar -->
+    @php
+        $defaultRange = $this->isClientContext() ? 'all' : 'month';
+        $hasActiveFilters = $filterOrganizationId || $project || $campaign || $team || $source || $executive || $leadType || ($statusFilter !== 'all') || $stageFilter || $sla_breached || ($analyticsRange !== $defaultRange) || ($this->isClientContext() && !empty($deliveryFilter));
+    @endphp
+    @if($hasActiveFilters)
+        <div class="flex items-center gap-1.5 flex-wrap px-1 text-xs">
+            <span class="font-semibold text-muted text-[11px]">Active:</span>
+            @if($analyticsRange !== $defaultRange)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Range: {{ ucfirst(str_replace('_', ' ', $analyticsRange)) }}
+                    <button type="button" wire:click="$set('analyticsRange', '{{ $defaultRange }}')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($filterOrganizationId)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Org: #{{ $filterOrganizationId }}
+                    <button type="button" wire:click="$set('filterOrganizationId', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($project)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Project: {{ $allProjects->firstWhere('id', $project)?->name ?? '#'.$project }}
+                    <button type="button" wire:click="$set('project', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($campaign)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Campaign: {{ $allCampaigns->firstWhere('id', $campaign)?->name ?? '#'.$campaign }}
+                    <button type="button" wire:click="$set('campaign', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if(\App\Support\LeadSourceVisibility::allowed() && $source)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Source: #{{ $source }}
+                    <button type="button" wire:click="$set('source', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($executive)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Team Member: {{ ($builderTeamMembers ?? $eligibleAssignees)->firstWhere('id', $executive)?->name ?? '#'.$executive }}
+                    <button type="button" wire:click="$set('executive', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($statusFilter !== 'all')
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Status: {{ $statusOptions[$statusFilter] ?? ucfirst(str_replace('_', ' ', $statusFilter)) }}
+                    <button type="button" wire:click="$set('statusFilter', 'all')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($stageFilter)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Stage: {{ $stageOptions[$stageFilter] ?? ($mainStages[$stageFilter] ?? ucfirst(str_replace('_', ' ', $stageFilter))) }}
+                    <button type="button" wire:click="$set('stageFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($this->isClientContext() && !empty($deliveryFilter))
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas border border-border text-[11px] font-medium text-ink">
+                    Delivery: {{ ucfirst($deliveryFilter) }}
+                    <button type="button" wire:click="$set('deliveryFilter', '')" class="text-muted hover:text-ink cursor-pointer">&times;</button>
+                </span>
+            @endif
+            @if($sla_breached)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-[11px] font-medium text-red-700">
+                    SLA Breached
+                    <button type="button" wire:click="$set('sla_breached', false)" class="text-red-500 hover:text-red-800 cursor-pointer">&times;</button>
+                </span>
+            @endif
+            <button type="button" wire:click="resetFilters" class="text-[11px] text-blue-600 hover:underline font-semibold ml-1 cursor-pointer">
+                Clear All
+            </button>
+        </div>
+    @endif
     @endif
     @if($isSalesExecutive)<div class="flex gap-2 text-xs items-center"><label for="lead-followup-filter">Follow-ups</label><x-ui.themed-select class="max-w-full" searchable  id="lead-followup-filter" wire:model.live="followupFilter" trigger-class="rounded-lg border-border"><option value="">All</option><option value="today">Today</option><option value="overdue">Overdue</option><option value="upcoming">Upcoming</option></x-ui.themed-select></div>@endif
-    @if($isBuilder || $this->isClientContext())
-        <!-- 3. BUILDER COMPACT 8 OPERATIONAL KPI CARDS -->
-        <div class="space-y-2">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Overview Metrics</h2>
-                <span class="text-[11px] text-muted">Click any metric card to filter leads</span>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-                @foreach($builderKpis as $kpiKey => $kpi)
-                    <button type="button" wire:click="$set('statusFilter', '{{ $kpi['filter'] }}')"
-                        class="bg-surface hover:bg-canvas border {{ $statusFilter === $kpi['filter'] ? 'border-primary ring-1 ring-primary' : 'border-border' }} rounded-xl p-3 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between">
-                        <div class="flex items-center justify-between gap-1 text-[10px] font-bold text-muted uppercase tracking-wider">
-                            <span class="truncate">{{ $kpi['label'] }}</span>
-                            <span class="w-2 h-2 rounded-full {{ $statusFilter === $kpi['filter'] ? 'bg-primary' : 'bg-neutral-300' }}"></span>
-                        </div>
-                        <div class="text-xl font-bold font-mono text-ink mt-1.5">
-                            {{ number_format($kpi['value']) }}
-                        </div>
-                    </button>
-                @endforeach
-            </div>
-        </div>
-    @elseif(!$isSalesExecutive)
-        <!-- 3. LEAD OVERVIEW KPI CARDS -->
-        <div class="space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                    <h2 class="text-xs font-bold text-muted uppercase tracking-wider">Lead Overview</h2>
-                    <p class="text-[11px] text-muted">Click any metric card to filter leads directory below.</p>
-                </div>
-
-                <!-- Group Filter Tabs -->
-                <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
-                    @foreach([
-                            'all' => 'All Metrics',
-                            'intake' => 'Intake',
-                            'assignment' => 'Assignment',
-                            'progress' => 'Progress',
-                            'conversion' => 'Conversion',
-                            'quality' => 'Quality'
-                        ] as $grpKey => $grpLabel)
-                            <button type="button" wire:click="$set('activeKpiGroup', '{{ $grpKey }}')"
-                                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $activeKpiGroup === $grpKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                                {{ $grpLabel }}
-                            </button>
-                    @endforeach
-                </div>
-            </div>
-
-            @php
-                $displayCards = [];
-                if ($activeKpiGroup === 'all') {
-                    // Show selected highlights from each group
-                    $displayCards = array_merge(
-                        $kpis['intake'],
-                        $kpis['assignment'],
-                        $kpis['progress'],
-                        $kpis['conversion'],
-                        $kpis['quality']
-                    );
-                } else {
-                    $displayCards = $kpis[$activeKpiGroup] ?? [];
-                }
-            @endphp
-
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                @foreach($displayCards as $kpi)
-                    <div wire:click="applyKpiFilter('{{ $kpi['status'] }}', '{{ $kpi['stage'] ?? '' }}')"
-                        class="bg-surface hover:bg-canvas border border-border hover:border-ink/30 rounded-xl p-3 transition flex flex-col justify-between cursor-pointer shadow-2xs group">
-                        <div class="flex items-center justify-between gap-1.5">
-                            <span class="text-[11px] font-semibold text-muted truncate" title="{{ $kpi['title'] }}">{{ $kpi['title'] }}</span>
-                            <div class="p-1 rounded-md bg-canvas border border-border text-muted group-hover:text-ink transition shrink-0">
-                                @if($kpi['icon'] === 'users')
-                                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                @elseif($kpi['icon'] === 'sparkles')
-                                    <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-                                @elseif($kpi['icon'] === 'user-check')
-                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                @elseif($kpi['icon'] === 'user-x')
-                                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM18 10l5 5m0-5l-5 5"/></svg>
-                                @elseif($kpi['icon'] === 'trophy')
-                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-                                @elseif($kpi['icon'] === 'alert-triangle')
-                                    <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                @else
-                                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="mt-2">
-                            <div class="text-xl font-extrabold text-ink tracking-tight">
-                                {{ $kpi['value'] }}
-                            </div>
-                            <div class="flex items-center gap-1 mt-1 text-[10px]">
-                                @if($kpi['isPositive'] === true)
-                                    <span class="font-bold text-emerald-600 inline-flex items-center">
-                                        ↑ {{ $kpi['delta'] }}
-                                    </span>
-                                @elseif($kpi['isPositive'] === false)
-                                    <span class="font-bold text-rose-600 inline-flex items-center">
-                                        ↓ {{ $kpi['delta'] }}
-                                    </span>
-                                @else
-                                    <span class="text-muted font-mono">0%</span>
-                                @endif
-                                <span class="text-muted truncate font-normal">{{ $kpi['period'] }}</span>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-
-    @endif
-
-    @if(!$isBuilder && !$isSalesExecutive && !$this->isClientContext())
-        <!-- 4. COMPLETE 13-STAGE LEAD LIFECYCLE FUNNEL -->
-        <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-                <div>
-                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Complete Lead Lifecycle Funnel</h2>
-                    <p class="text-[11px] text-muted">13-stage journey: Intake → Duplicate → Credit → Assignment → Engagement → Conversion. Click any stage to filter records.</p>
-                </div>
-                <div class="text-[11px] font-semibold text-muted">
-                    Horizontal pipeline scroll ⇄
-                </div>
-            </div>
-
-            <!-- Horizontally Scrollable Stage Cards -->
-            <div class="overflow-x-auto pb-2 -mx-1 px-1">
-                <div class="flex items-center gap-2 min-w-max">
-                    @foreach($funnel as $stg)
-                        <div wire:click="filterByLifecycleStage('{{ $stg['stage_key'] }}')"
-                            class="w-48 bg-canvas hover:bg-surface border {{ $stg['is_alert'] ? 'border-amber-300 ring-1 ring-amber-300' : 'border-border' }} hover:border-ink/40 rounded-xl p-3 transition cursor-pointer flex flex-col justify-between shadow-2xs group relative">
-
-                            <!-- Top Row: Step & SLA Time -->
-                            <div class="flex items-center justify-between text-[10px] text-muted font-mono">
-                                <span class="font-bold text-ink bg-surface border border-border px-1.5 py-0.2 rounded">
-                                    {{ sprintf('%02d', $stg['step']) }}
-                                </span>
-                                <span class="text-[10px] text-muted font-medium">⏱ {{ $stg['avg_time'] }}</span>
-                            </div>
-
-                            <!-- Stage Title -->
-                            <div class="mt-2">
-                                <h4 class="text-xs font-bold text-ink group-hover:text-primary transition truncate">
-                                    {{ $stg['name'] }}
-                                </h4>
-                                <div class="text-lg font-black text-ink mt-0.5">
-                                    {{ number_format($stg['count']) }}
-                                </div>
-                            </div>
-
-                            <!-- Bottom Stats: Conv % & Drop-off -->
-                            <div class="mt-2.5 pt-2 border-t border-border flex items-center justify-between text-[10px]">
-                                <span class="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                    {{ $stg['conversion_rate'] }}%
-                                </span>
-
-                                @if($stg['drop_off'] > 0)
-                                    <span class="font-bold text-rose-600" title="{{ $stg['drop_off'] }} drop-offs from previous step">
-                                        -{{ number_format($stg['drop_off']) }} drop
-                                    </span>
-                                @else
-                                    <span class="text-muted font-mono">0 drop</span>
-                                @endif
-                            </div>
-
-                            @if($stg['is_alert'])
-                                <div class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center text-[8px] text-white font-bold" title="High drop-off rate alert">
-                                    !
-                                </div>
-                            @endif
-                        </div>
-
-                        @if($stg['step'] < 13)
-                            <div class="text-muted/40 font-bold select-none shrink-0">
-                                →
-                            </div>
-                        @endif
-                    @endforeach
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. LEAD ANALYTICS SECTION -->
-        <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
-                <div>
-                    <h2 class="text-xs font-bold text-ink uppercase tracking-wider">Lead Analytics &amp; Breakdown</h2>
-                    <p class="text-[11px] text-muted">Lead volume generation trends and dimension breakdowns.</p>
-                </div>
-
-                <!-- Breakdown Dimension Tabs -->
-                <div class="inline-flex p-1 bg-canvas rounded-lg border border-border flex-wrap gap-1">
-                    @foreach([
-                            'project' => 'By Project',
-                            'source' => 'By Source',
-                            'executive' => 'By Agent',
-                            'team' => 'By Team',
-                            'organization' => 'By Org',
-                            'overview' => 'By Type',
-                        ] as $tabKey => $tabLabel)
-                            @continue($tabKey === 'source' && !\App\Support\LeadSourceVisibility::allowed())
-                            <button type="button" wire:click="$set('breakdownTab', '{{ $tabKey }}')"
-                                class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer {{ $breakdownTab === $tabKey ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
-                                {{ $tabLabel }}
-                            </button>
-                    @endforeach
-                </div>
-            </div>
-
-            <!-- 2-Column Analytics Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Left Chart: Lead Generation Trend -->
-                <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-xs font-bold text-ink">Lead Intake vs Conversion Trend</span>
-                        <span class="text-[10px] text-muted font-medium">Daily Timeline</span>
-                    </div>
-                    <div x-data="{
-                            chart: null,
-                            initChart(labels, received, converted) {
-                                this.chart = window.initSafeChart('leadsTrendChart', {
-                                    type: 'line',
-                                    data: {
-                                        labels: labels,
-                                        datasets: [
-                                            {
-                                                label: 'Received',
-                                                data: received,
-                                                borderColor: '#2563EB',
-                                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                                fill: true,
-                                                tension: 0.3,
-                                                borderWidth: 2,
-                                                pointRadius: 2,
-                                            },
-                                            {
-                                                label: 'Converted',
-                                                data: converted,
-                                                borderColor: '#10B981',
-                                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                                fill: true,
-                                                tension: 0.3,
-                                                borderWidth: 2,
-                                                pointRadius: 2,
-                                            }
-                                        ]
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
-                                        scales: {
-                                            x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-                                            y: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } }
-                                        }
-                                    }
-                                });
-                            }
-                        }"
-                        x-init="$nextTick(function() { initChart(@js($analytics['trendLabels']), @js($analytics['trendReceived']), @js($analytics['trendConverted'])); })"
-                        class="h-56 relative">
-                        <canvas id="leadsTrendChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Right Chart: Active Breakdown Ranking -->
-                <div class="p-3 bg-canvas/60 rounded-xl border border-border space-y-2">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-xs font-bold text-ink">Volume Breakdown ({{ ucfirst($breakdownTab) }})</span>
-                        <span class="text-[10px] text-muted font-medium">Top Entities</span>
-                    </div>
-                    <div x-data="{
-                            chart: null,
-                            initBarChart(labels, counts) {
-                                this.chart = window.initSafeChart('leadsBreakdownRankingChart', {
-                                    type: 'bar',
-                                    data: {
-                                        labels: labels,
-                                        datasets: [{
-                                            label: 'Total Leads',
-                                            data: counts,
-                                            backgroundColor: '#0F172A',
-                                            borderRadius: 4,
-                                            barThickness: 14
-                                        }]
-                                    },
-                                    options: {
-                                        indexAxis: 'y',
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: { legend: { display: false } },
-                                        scales: {
-                                            x: { grid: { color: '#E2E8F0' }, ticks: { font: { size: 9 } } },
-                                            y: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } }
-                                        }
-                                    }
-                                });
-                            }
-                        }"
-                        x-init="$nextTick(function() { initBarChart(@js($analytics['chartLabels']), @js($analytics['chartCounts'])); })"
-                        class="h-56 relative">
-                        <canvas id="leadsBreakdownRankingChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Breakdown Performance Table Component -->
-            <div class="border-t border-border pt-3">
-                @php
-                    $breakdownColumns = [
-                        ['key' => 'name', 'label' => 'Entity / Group Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
-                        ['key' => 'total_leads', 'label' => 'Total Leads', 'class' => 'font-mono font-bold', 'formatter' => fn($v) => number_format((float) $v), 'sortable' => true, 'priority' => 1],
-                        ['key' => 'conversion_rate', 'label' => 'Conversion Rate', 'suffix' => '%', 'class' => 'font-mono font-bold text-emerald-600', 'sortable' => true, 'priority' => 1],
-                        ['key' => 'avg_sla_time', 'label' => 'Avg Response Time', 'class' => 'font-mono text-muted', 'sortable' => true, 'priority' => 2],
-                    ];
-                @endphp
-
-                <x-ui.advanced-table 
-                    :columns="$breakdownColumns" 
-                    :rows="$analytics['paginatedBreakdown']"
-                    :showSearch="true" 
-                    searchModel="breakdownSearch"
-                    searchPlaceholder="Search {{ strtolower($breakdownTab) }} entities..."
-                    :sortField="$breakdownSortField"
-                    :sortDirection="$breakdownSortDirection"
-                    sortAction="sortBreakdownBy"
-                    :showFilterDropdown="false" 
-                    :showConfigurations="false"
-                    tableName="breakdown"
-                    emptyTitle="No Breakdown Data" 
-                    emptyMessage="No entities match your search or filter criteria.">
-                    <x-slot:action>
-                        <span class="text-xs text-muted font-semibold bg-canvas px-2.5 py-1 rounded-lg border border-border">
-                            {{ $analytics['totalBreakdownCount'] }} Total {{ ucfirst($breakdownTab) }}s
-                        </span>
-                    </x-slot:action>
-                </x-ui.advanced-table>
-            </div>
-        </div>
-
-        <!-- 6. ASSIGNMENT, SLA, FOLLOW-UP & CREDIT MONITORING WIDGETS -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <!-- 1. Assignment & Distribution Monitoring -->
-            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
-                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Assignment Status</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {{ $monitoring['assignment']['success_rate'] }}% Success
-                    </span>
-                </div>
-                <div class="space-y-1.5 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Round Robin Routed</span>
-                        <span class="font-bold text-ink">{{ $monitoring['assignment']['round_robin'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Manual Assignments</span>
-                        <span class="font-bold text-ink">{{ $monitoring['assignment']['manual'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Priority Rule Routed</span>
-                        <span class="font-bold text-ink">{{ $monitoring['assignment']['priority'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Unassigned Pool</span>
-                        <span class="font-bold text-amber-600">{{ $monitoring['assignment']['unassigned'] }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. SLA Monitoring -->
-            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
-                    <span class="text-xs font-bold text-ink uppercase tracking-wider">SLA Response Times</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                        15m Threshold
-                    </span>
-                </div>
-                <div class="space-y-1.5 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Within SLA Met</span>
-                        <span class="font-bold text-emerald-600">{{ $monitoring['sla']['within'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">SLA Breached (&gt;15m)</span>
-                        <span class="font-bold text-rose-600">{{ $monitoring['sla']['breached'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Pending First Response</span>
-                        <span class="font-bold text-amber-600">{{ $monitoring['sla']['pending'] }}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Avg Response Speed</span>
-                        <span class="font-mono font-bold text-ink">{{ $monitoring['sla']['avg_response'] }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. Upcoming Activities (Follow-ups & Site Visits) -->
-            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
-                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Upcoming Tasks</span>
-                    <span class="text-[10px] text-muted">Next Due</span>
-                </div>
-                <div class="space-y-2 text-xs">
-                    @forelse($monitoring['upcomingFollowups'] as $fu)
-                        <div class="flex items-center justify-between border-b border-border/50 pb-1 cursor-pointer hover:bg-canvas p-1 rounded"
-                             @click="$dispatch('open-lead-detail', { id: {{ $fu->lead_id }} })">
-                            <div class="truncate pr-1">
-                                <span class="font-bold text-ink block truncate">{{ $fu->lead?->name ?: 'Lead #' . $fu->lead_id }}</span>
-                                <span class="text-[10px] text-muted truncate">{{ $fu->note ?: 'Follow-up' }}</span>
-                            </div>
-                            <span class="font-mono text-[10px] text-blue-600 shrink-0 font-semibold">
-                                {{ $fu->due_at ? \Carbon\Carbon::parse($fu->due_at)->format('d M H:i') : 'Scheduled' }}
-                            </span>
-                        </div>
-                    @empty
-                        <div class="text-[11px] text-muted text-center py-2">
-                            No pending follow-ups due soon.
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-            <!-- 4. Credits & Replacement Position -->
-            <div class="bg-surface rounded-card border border-border p-3.5 shadow-2xs space-y-2.5">
-                <div class="flex items-center justify-between pb-2 border-b border-border">
-                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Credit Protection</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-canvas border border-border text-ink">
-                        Wallet Engine
-                    </span>
-                </div>
-                <div class="space-y-1.5 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Credits Reserved</span>
-                        <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['reserved'], 0) }} Cr</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Credits Consumed</span>
-                        <span class="font-mono font-bold text-ink">{{ number_format($monitoring['credit']['used'], 0) }} Cr</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Credits Refunded</span>
-                        <span class="font-mono font-bold text-emerald-600">{{ number_format($monitoring['credit']['refunded'], 0) }} Cr</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <span class="text-muted">Approved Replacements</span>
-                        <span class="font-bold text-indigo-600">{{ $monitoring['credit']['approved'] }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    @endif
 
     <!-- 7. LEAD DIRECTORY (TOOLBAR + KANBAN / ADVANCED TABLE) -->
     <div class="space-y-3">
@@ -1184,7 +770,457 @@
         @endif
     </div>
 
-    <!-- 8. MODALS & SLIDE-OVERS -->
+        @elseif($activeMainTab === 'analytics')
+    <!-- ANALYTICS DASHBOARD -->
+    <div class="space-y-6">
+        <!-- 1. ANALYTICS HEADER & ACTIONS -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface rounded-card border border-border p-4 shadow-2xs">
+            <div>
+                <h1 class="text-base sm:text-lg font-bold text-ink">Lead Analytics & Performance</h1>
+                <p class="text-xs text-muted mt-0.5">Real-time reporting, stage progression, conversion insights, and team productivity.</p>
+            </div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <!-- Date Range Selector -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs text-muted font-medium">Period:</span>
+                    <x-ui.themed-select class="w-36 text-xs" searchable wire:model.live="analyticsRange" trigger-class="h-8 rounded-lg border-border">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="this_week">This Week</option>
+                        <option value="last_week">Last Week</option>
+                        <option value="month">This Month</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="quarter">This Quarter</option>
+                        <option value="year">This Year</option>
+                        <option value="all">All Time</option>
+                    </x-ui.themed-select>
+                </div>
+
+                <!-- Export Report Button -->
+                <button type="button" wire:click="exportAnalyticsReport"
+                    class="inline-flex items-center gap-1.5 px-3.5 h-8 text-xs font-semibold rounded-lg bg-surface hover:bg-canvas border border-border text-ink transition shadow-2xs cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Export Report</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. SIX KPI CARDS -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <!-- Total Leads -->
+            <button type="button" wire:click="filterFromAnalytics('status', 'all')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-ink/30 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>Total Leads</span>
+                    <span class="p-1 rounded bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-ink tracking-tight">
+                        {{ number_format($analyticsData['kpis']['total']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>All registered</span>
+                        <span class="text-blue-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+
+            <!-- New Leads -->
+            <button type="button" wire:click="filterFromAnalytics('status', 'new')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-blue-400 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>New Leads</span>
+                    <span class="p-1 rounded bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-blue-600 tracking-tight">
+                        {{ number_format($analyticsData['kpis']['new']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>Awaiting action</span>
+                        <span class="text-blue-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+
+            <!-- In Progress -->
+            <button type="button" wire:click="filterFromAnalytics('status', 'in_progress')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-amber-400 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>In Progress</span>
+                    <span class="p-1 rounded bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-amber-600 tracking-tight">
+                        {{ number_format($analyticsData['kpis']['in_progress']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>Active followups</span>
+                        <span class="text-amber-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Follow-ups Due -->
+            <button type="button" wire:click="filterFromAnalytics('followup', 'overdue')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-purple-400 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>Follow-ups Due</span>
+                    <span class="p-1 rounded bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-purple-600 tracking-tight">
+                        {{ number_format($analyticsData['kpis']['followups_due']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>Pending / Overdue</span>
+                        <span class="text-purple-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Closed Won -->
+            <button type="button" wire:click="filterFromAnalytics('status', 'closed_won')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-emerald-400 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>Closed Won</span>
+                    <span class="p-1 rounded bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-emerald-600 tracking-tight">
+                        {{ number_format($analyticsData['kpis']['closed_won']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>Won conversions</span>
+                        <span class="text-emerald-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Lost Leads -->
+            <button type="button" wire:click="filterFromAnalytics('status', 'lost')"
+                class="bg-surface hover:bg-canvas border border-border hover:border-rose-400 rounded-xl p-3.5 text-left transition shadow-2xs cursor-pointer flex flex-col justify-between group">
+                <div class="flex items-center justify-between gap-1 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    <span>Lost Leads</span>
+                    <span class="p-1 rounded bg-rose-50 text-rose-600 group-hover:bg-rose-100 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl font-bold font-mono text-rose-600 tracking-tight">
+                        {{ number_format($analyticsData['kpis']['lost']) }}
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5 flex items-center justify-between">
+                        <span>Lost / Disqualified</span>
+                        <span class="text-rose-600 group-hover:underline font-medium">View &rarr;</span>
+                    </div>
+                </div>
+            </button>
+        </div>
+
+        <!-- 3. CHARTS ROW: LEAD TREND (LINE) & LEADS BY STAGE (DONUT) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Lead Trend Line Chart (2 cols on lg) -->
+            <div class="lg:col-span-2 bg-surface rounded-card border border-border p-4 shadow-2xs flex flex-col justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                            <span>Lead Trend</span>
+                            <span class="text-[11px] font-normal text-muted lowercase">({{ $trendGranularity }})</span>
+                        </h2>
+                        <p class="text-[11px] text-muted">Inflow volume across selected timeframe</p>
+                    </div>
+
+                    <!-- Granularity switchers: Daily / Weekly / Monthly -->
+                    <div class="inline-flex items-center p-0.5 rounded-lg bg-canvas border border-border text-xs">
+                        <button type="button" wire:click="$set('trendGranularity', 'daily')"
+                            class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer {{ $trendGranularity === 'daily' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                            Daily
+                        </button>
+                        <button type="button" wire:click="$set('trendGranularity', 'weekly')"
+                            class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer {{ $trendGranularity === 'weekly' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                            Weekly
+                        </button>
+                        <button type="button" wire:click="$set('trendGranularity', 'monthly')"
+                            class="px-2.5 py-1 rounded-md font-medium transition cursor-pointer {{ $trendGranularity === 'monthly' ? 'bg-ink text-white shadow-2xs' : 'text-muted hover:text-ink' }}">
+                            Monthly
+                        </button>
+                    </div>
+                </div>
+
+                <div x-data="{
+                    initTrend() {
+                        const canvas = this.$refs.trendCanvas;
+                        if (!canvas) return;
+                        window.initSafeChart(canvas, {
+                            type: 'line',
+                            data: {
+                                labels: @js($analyticsData['trend']['labels']),
+                                datasets: [{
+                                    label: 'Leads Inflow',
+                                    data: @js($analyticsData['trend']['counts']),
+                                    borderColor: '#2563eb',
+                                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                                    fill: true,
+                                    tension: 0.35,
+                                    borderWidth: 2.5,
+                                    pointRadius: 3.5,
+                                    pointHoverRadius: 6,
+                                    pointBackgroundColor: '#2563eb',
+                                    pointBorderColor: '#ffffff',
+                                    pointBorderWidth: 1.5,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        backgroundColor: '#111827',
+                                        titleFont: { size: 12, weight: '600' },
+                                        bodyFont: { size: 12 },
+                                        padding: 8,
+                                        cornerRadius: 6,
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: { font: { size: 11 }, maxRotation: 45 }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(229, 231, 235, 0.5)' },
+                                        ticks: { precision: 0, font: { size: 11 } }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }" x-init="initTrend()" wire:key="trend-chart-{{ $trendGranularity }}-{{ md5(json_encode($analyticsData['trend'])) }}" class="h-64 sm:h-72 w-full relative">
+                    <canvas x-ref="trendCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Leads by Stage Donut (1 col on lg) -->
+            <div class="bg-surface rounded-card border border-border p-4 shadow-2xs flex flex-col justify-between">
+                <div class="mb-2">
+                    <h2 class="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">Leads by Stage</h2>
+                    <p class="text-[11px] text-muted">Current stage distribution</p>
+                </div>
+
+                <div x-data="{
+                    initDonut() {
+                        const canvas = this.$refs.stageCanvas;
+                        if (!canvas) return;
+                        window.initSafeChart(canvas, {
+                            type: 'doughnut',
+                            data: {
+                                labels: @js($analyticsData['stages']['labels']),
+                                datasets: [{
+                                    data: @js($analyticsData['stages']['counts']),
+                                    backgroundColor: @js($analyticsData['stages']['colors']),
+                                    borderWidth: 2,
+                                    borderColor: '#ffffff',
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                cutout: '65%',
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(ctx) {
+                                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                                const val = ctx.parsed;
+                                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                                return ` ${ctx.label}: ${val} (${pct}%)`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }" x-init="initDonut()" wire:key="donut-stage-{{ md5(json_encode($analyticsData['stages'])) }}" class="h-44 w-full relative my-auto">
+                    <canvas x-ref="stageCanvas"></canvas>
+                </div>
+
+                <!-- Stage Breakdown List -->
+                <div class="mt-3 max-h-40 overflow-y-auto divide-y divide-border/60 text-xs pr-1">
+                    @foreach($analyticsData['stages']['breakdown'] as $stg)
+                        <button type="button" wire:click="filterFromAnalytics('stage', '{{ $stg['key'] }}')"
+                            class="w-full flex items-center justify-between py-1.5 px-1 hover:bg-canvas rounded transition cursor-pointer group text-left">
+                            <div class="flex items-center gap-2 truncate">
+                                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {{ $stg['color'] }};"></span>
+                                <span class="font-medium text-ink group-hover:text-blue-600 truncate">{{ $stg['label'] }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                                <span class="font-bold text-ink">{{ number_format($stg['count']) }}</span>
+                                <span class="text-muted w-10 text-right">{{ $stg['percentage'] }}%</span>
+                            </div>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. MIDDLE ROW: LEAD STATUS DISTRIBUTION & LEAD SOURCE -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Lead Status Distribution -->
+            <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-4">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">Lead Status Distribution</h2>
+                    <p class="text-[11px] text-muted">Click any status to filter leads</p>
+                </div>
+
+                <div class="space-y-2.5">
+                    @foreach($analyticsData['status_distribution'] as $st)
+                        <button type="button" wire:click="filterFromAnalytics('status', '{{ $st['key'] }}')"
+                            class="w-full text-left group p-1.5 hover:bg-canvas rounded-lg transition cursor-pointer">
+                            <div class="flex items-center justify-between text-xs mb-1">
+                                <span class="font-semibold text-ink group-hover:text-blue-600 flex items-center gap-1.5">
+                                    {{ $st['label'] }}
+                                </span>
+                                <span class="font-mono text-[11px] text-muted">
+                                    <strong class="text-ink font-bold">{{ number_format($st['count']) }}</strong> ({{ $st['percentage'] }}%)
+                                </span>
+                            </div>
+                            <div class="w-full bg-neutral-100 rounded-full h-2 overflow-hidden">
+                                <div class="h-2 rounded-full transition-all duration-300 {{ $st['key'] === 'closed_won' ? 'bg-emerald-500' : ($st['key'] === 'lost' ? 'bg-rose-500' : ($st['key'] === 'in_progress' ? 'bg-amber-500' : ($st['key'] === 'new' ? 'bg-blue-500' : 'bg-neutral-400'))) }}"
+                                    style="width: {{ max($st['percentage'], $st['count'] > 0 ? 3 : 0) }}%"></div>
+                            </div>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- Lead Source Breakdown -->
+            <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-4">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">Lead Source Breakdown</h2>
+                    <p class="text-[11px] text-muted">Acquisition channels performance</p>
+                </div>
+
+                <div class="space-y-3">
+                    @foreach($analyticsData['sources'] as $src)
+                        <button type="button" wire:click="filterFromAnalytics('source', '{{ $src['key'] }}')"
+                            class="w-full text-left group p-2 hover:bg-canvas rounded-lg border border-border/60 transition cursor-pointer">
+                            <div class="flex items-center justify-between text-xs mb-1.5">
+                                <div class="flex items-center gap-2">
+                                    @if(str_contains(strtolower($src['label']), 'meta') || str_contains(strtolower($src['label']), 'facebook') || str_contains(strtolower($src['label']), 'instagram'))
+                                        <span class="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]">M</span>
+                                    @elseif(str_contains(strtolower($src['label']), 'google'))
+                                        <span class="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-[10px]">G</span>
+                                    @elseif(str_contains(strtolower($src['label']), 'website'))
+                                        <span class="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-[10px]">W</span>
+                                    @elseif(str_contains(strtolower($src['label']), 'manual') || str_contains(strtolower($src['label']), 'upload'))
+                                        <span class="w-6 h-6 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-[10px]">U</span>
+                                    @else
+                                        <span class="w-6 h-6 rounded-md bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-[10px]">O</span>
+                                    @endif
+                                    <span class="font-semibold text-ink group-hover:text-blue-600">{{ $src['label'] }}</span>
+                                </div>
+                                <div class="font-mono text-xs">
+                                    <strong class="text-ink font-bold">{{ number_format($src['count']) }}</strong>
+                                    <span class="text-muted text-[11px]">({{ $src['percentage'] }}%)</span>
+                                </div>
+                            </div>
+                            <div class="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
+                                <div class="h-1.5 rounded-full bg-ink transition-all duration-300"
+                                    style="width: {{ max($src['percentage'], $src['count'] > 0 ? 3 : 0) }}%"></div>
+                            </div>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. TEAM PERFORMANCE LEADERBOARD TABLE -->
+        <div class="bg-surface rounded-card border border-border p-4 shadow-2xs space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">Team Performance & Conversion</h2>
+                    <p class="text-[11px] text-muted">Assigned volume, responsiveness, and conversion rate by team member</p>
+                </div>
+                <span class="text-[11px] text-muted">{{ count($analyticsData['team_performance']) }} Members Tracked</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-border text-[11px] font-bold text-muted uppercase tracking-wider bg-canvas">
+                            <th class="py-2.5 px-3">Team Member</th>
+                            <th class="py-2.5 px-3 text-right">Assigned Leads</th>
+                            <th class="py-2.5 px-3 text-right">Contacted Leads</th>
+                            <th class="py-2.5 px-3 text-right">Converted Won</th>
+                            <th class="py-2.5 px-3 text-right">Conversion Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border/60">
+                        @forelse($analyticsData['team_performance'] as $tp)
+                            <tr class="hover:bg-canvas transition cursor-pointer group" wire:click="filterFromAnalytics('executive', '{{ $tp['id'] }}')">
+                                <td class="py-2.5 px-3">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-7 h-7 rounded-full bg-neutral-200 text-ink font-bold flex items-center justify-center text-xs shrink-0">
+                                            {{ strtoupper(substr($tp['name'], 0, 1)) }}
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-ink group-hover:text-blue-600">{{ $tp['name'] }}</div>
+                                            <div class="text-[10px] text-muted">{{ $tp['email'] }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-2.5 px-3 text-right font-mono font-bold text-ink">
+                                    {{ number_format($tp['assigned']) }}
+                                </td>
+                                <td class="py-2.5 px-3 text-right font-mono text-amber-600 font-semibold">
+                                    {{ number_format($tp['contacted']) }}
+                                </td>
+                                <td class="py-2.5 px-3 text-right font-mono text-emerald-600 font-bold">
+                                    {{ number_format($tp['converted']) }}
+                                </td>
+                                <td class="py-2.5 px-3 text-right">
+                                    <div class="inline-flex items-center gap-2 justify-end">
+                                        <div class="w-16 bg-neutral-100 rounded-full h-1.5 overflow-hidden hidden sm:block">
+                                            <div class="h-1.5 rounded-full {{ $tp['conversion_rate'] >= 20 ? 'bg-emerald-500' : ($tp['conversion_rate'] >= 10 ? 'bg-blue-500' : 'bg-neutral-400') }}"
+                                                style="width: {{ min($tp['conversion_rate'], 100) }}%"></div>
+                                        </div>
+                                        <span class="font-mono font-bold {{ $tp['conversion_rate'] >= 20 ? 'text-emerald-600' : ($tp['conversion_rate'] >= 10 ? 'text-blue-600' : 'text-ink') }}">
+                                            {{ $tp['conversion_rate'] }}%
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-muted">
+                                    No active sales executives or assigned leads found for this scope.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @endif
+<!-- 8. MODALS & SLIDE-OVERS -->
     <!-- Slide-over Detail Component -->
     <livewire:leads.lead-detail />
 

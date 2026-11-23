@@ -389,11 +389,6 @@ class Lead extends Model
         return $this->leadSource?->name ?: 'Direct';
     }
 
-    public function getWhatsappAttribute(): ?string
-    {
-        return $this->mobile;
-    }
-
     public function getActualPropertyTypeAttribute(): ?string
     {
         return \App\Support\LeadPropertyAndBudgetExtractor::resolvePropertyType($this);

@@ -95,13 +95,6 @@ class LeadKanban extends Component
     // View & Analytics State
     public string $viewMode = 'kanban'; // 'kanban' | 'table'
 
-    #[Url(as: 'tab')]
-    public string $activeMainTab = 'leads'; // 'leads' | 'analytics'
-
-    public bool $filtersOpen = false;
-
-    public string $trendGranularity = 'daily'; // 'daily' | 'weekly' | 'monthly'
-
     #[Url(as: 'date_range')]
     public string $analyticsRange = 'month';
 
@@ -301,347 +294,6 @@ class LeadKanban extends Component
                 GeneralSetting::setValue(auth()->id(), 'leads_view_mode', $mode);
             }
         }
-    }
-
-    public function setMainTab(string $tab): void
-    {
-        if (in_array($tab, ['leads', 'analytics'])) {
-            $this->activeMainTab = $tab;
-        }
-    }
-
-    public function toggleFilters(): void
-    {
-        $this->filtersOpen = ! $this->filtersOpen;
-    }
-
-    public function filterFromAnalytics(string $type, string $value): void
-    {
-        if ($type === 'status') {
-            $this->statusFilter = $value;
-            $this->stageFilter = '';
-        } elseif ($type === 'stage') {
-            $this->stageFilter = $value;
-            $this->statusFilter = 'all';
-        } elseif ($type === 'source') {
-            $this->source = $value;
-        } elseif ($type === 'executive') {
-            $this->executive = $value;
-        } elseif ($type === 'followup') {
-            $this->followupFilter = $value;
-        }
-        $this->activeMainTab = 'leads';
-        $this->resetPage();
-    }
-
-    public function getActiveFilterCountProperty(): int
-    {
-        $count = 0;
-        $defaultRange = $this->isClientContext() ? 'all' : 'month';
-        if ($this->analyticsRange !== $defaultRange && !empty($this->analyticsRange)) $count++;
-        if (!empty($this->filterOrganizationId)) $count++;
-        if (!empty($this->project)) $count++;
-        if (!empty($this->campaign)) $count++;
-        if (!empty($this->source) && \App\Support\LeadSourceVisibility::allowed()) $count++;
-        if (!empty($this->team)) $count++;
-        if (!empty($this->executive)) $count++;
-        if ($this->statusFilter !== 'all' && !empty($this->statusFilter)) $count++;
-        if (!empty($this->stageFilter)) $count++;
-        if (!empty($this->leadType)) $count++;
-        if ($this->sla_breached) $count++;
-        if (!empty($this->search)) $count++;
-        if (!empty($this->followupFilter)) $count++;
-        return $count;
-    }
-
-    public function getAnalyticsDataProperty(): array
-    {
-        $query = $this->getScopedQuery();
-        $totalLeads = (clone $query)->count();
-
-        // 1. KPI Cards
-        $newLeads = (clone $query)->where(function ($q) {
-            $q->where('status', 'new')->orWhere('current_stage', 'new');
-        })->count();
-
-        $inProgressLeads = (clone $query)->where(function ($q) {
-            $q->where('status', 'in_progress')
-              ->orWhereIn('current_stage', ['contacted', 'connected', 'interested', 'follow_up', 'follow-up', 'meeting_scheduled', 'meeting', 'site_visit', 'negotiation', 'booking']);
-        })->count();
-
-        $scopedLeadIds = (clone $query)->select('leads.id');
-        $followupsDue = Followup::whereIn('lead_id', $scopedLeadIds)
-            ->where('status', 'pending')
-            ->where(function ($q) {
-                $q->whereNull('due_at')->orWhere('due_at', '<=', now());
-            })->count();
-
-        $closedWonLeads = (clone $query)->where(function ($q) {
-            $q->whereIn('status', ['converted', 'closed_won'])
-              ->orWhere('current_stage', 'closed_won');
-        })->count();
-
-        $lostLeads = (clone $query)->where(function ($q) {
-            $q->whereIn('status', ['lost', 'closed_lost'])
-              ->orWhereIn('current_stage', ['lost', 'closed_lost', 'wrong_number', 'invalid', 'unreachable', 'replaced']);
-        })->count();
-
-        // 2. Trend Line Chart
-        $trendLabels = [];
-        $trendCounts = [];
-        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
-
-        if ($this->trendGranularity === 'monthly') {
-            $expr = $isSqlite ? "strftime('%Y-%m', leads.created_at)" : "DATE_FORMAT(leads.created_at, '%Y-%m')";
-            $trendData = (clone $query)
-                ->select(DB::raw("{$expr} as period"), DB::raw('COUNT(leads.id) as count'))
-                ->groupBy('period')
-                ->orderBy('period')
-                ->get();
-            foreach ($trendData as $row) {
-                if ($row->period) {
-                    $trendLabels[] = Carbon::parse($row->period . '-01')->format('M Y');
-                    $trendCounts[] = (int) $row->count;
-                }
-            }
-        } elseif ($this->trendGranularity === 'weekly') {
-            $expr = $isSqlite ? "strftime('%Y-%W', leads.created_at)" : "DATE_FORMAT(DATE_SUB(leads.created_at, INTERVAL WEEKDAY(leads.created_at) DAY), '%Y-%m-%d')";
-            $trendData = (clone $query)
-                ->select(DB::raw("{$expr} as period"), DB::raw('COUNT(leads.id) as count'))
-                ->groupBy('period')
-                ->orderBy('period')
-                ->get();
-            foreach ($trendData as $row) {
-                if ($row->period) {
-                    $label = $isSqlite ? 'Wk ' . substr((string)$row->period, -2) : Carbon::parse($row->period)->format('d M');
-                    $trendLabels[] = $label;
-                    $trendCounts[] = (int) $row->count;
-                }
-            }
-        } else { // daily
-            $expr = $isSqlite ? "DATE(leads.created_at)" : "DATE(leads.created_at)";
-            $trendData = (clone $query)
-                ->select(DB::raw("{$expr} as period"), DB::raw('COUNT(leads.id) as count'))
-                ->groupBy('period')
-                ->orderBy('period')
-                ->get();
-            foreach ($trendData as $row) {
-                if ($row->period) {
-                    $trendLabels[] = Carbon::parse($row->period)->format('d M');
-                    $trendCounts[] = (int) $row->count;
-                }
-            }
-        }
-
-        if (empty($trendLabels)) {
-            $trendLabels = [now()->format('d M')];
-            $trendCounts = [0];
-        }
-
-        // 3. Leads by Stage (Donut Chart)
-        $stageRaw = (clone $query)
-            ->select('current_stage', DB::raw('COUNT(*) as count'))
-            ->groupBy('current_stage')
-            ->orderByDesc('count')
-            ->get();
-
-        $stageLabels = [];
-        $stageCounts = [];
-        $stageColors = [];
-        $stageBreakdown = [];
-
-        $stageColorPalette = [
-            'new' => '#3B82F6',
-            'assigned' => '#6366F1',
-            'contacted' => '#F59E0B',
-            'connected' => '#F59E0B',
-            'interested' => '#EC4899',
-            'follow_up' => '#8B5CF6',
-            'follow-up' => '#8B5CF6',
-            'meeting_scheduled' => '#06B6D4',
-            'meeting' => '#06B6D4',
-            'site_visit' => '#14B8A6',
-            'negotiation' => '#F97316',
-            'booking' => '#10B981',
-            'closed_won' => '#22C55E',
-            'closed_lost' => '#EF4444',
-            'lost' => '#EF4444',
-            'duplicate' => '#94A3B8',
-            'pending_credit' => '#A855F7',
-        ];
-
-        $allStagesList = array_merge($this->mainStages, $this->otherStages);
-
-        foreach ($stageRaw as $row) {
-            $key = (string) $row->current_stage;
-            $label = $allStagesList[$key] ?? ucfirst(str_replace('_', ' ', $key));
-            $count = (int) $row->count;
-            $pct = $totalLeads > 0 ? round(($count / $totalLeads) * 100, 1) : 0;
-            $color = $stageColorPalette[$key] ?? '#64748B';
-
-            $stageLabels[] = $label;
-            $stageCounts[] = $count;
-            $stageColors[] = $color;
-            $stageBreakdown[] = [
-                'key' => $key,
-                'label' => $label,
-                'count' => $count,
-                'percentage' => $pct,
-                'color' => $color,
-            ];
-        }
-
-        // 4. Lead Status Distribution
-        $statusDist = [
-            'new' => [
-                'label' => 'New',
-                'count' => (clone $query)->where(fn($q) => $q->where('status', 'new')->orWhere('current_stage', 'new'))->count(),
-                'color' => 'bg-blue-500',
-            ],
-            'assigned' => [
-                'label' => 'Assigned',
-                'count' => (clone $query)->whereNotNull('assigned_to')->count(),
-                'color' => 'bg-indigo-500',
-            ],
-            'unassigned' => [
-                'label' => 'Unassigned',
-                'count' => (clone $query)->whereNull('assigned_to')->count(),
-                'color' => 'bg-slate-400',
-            ],
-            'contacted' => [
-                'label' => 'Contacted',
-                'count' => (clone $query)->where(fn($q) => $q->where('status', 'contacted')->orWhereIn('current_stage', ['contacted', 'connected']))->count(),
-                'color' => 'bg-amber-500',
-            ],
-            'interested' => [
-                'label' => 'Interested',
-                'count' => (clone $query)->where('current_stage', 'interested')->count(),
-                'color' => 'bg-pink-500',
-            ],
-            'in_progress' => [
-                'label' => 'In Progress',
-                'count' => (clone $query)->where(fn($q) => $q->whereIn('current_stage', ['follow_up', 'follow-up', 'meeting_scheduled', 'meeting', 'site_visit', 'negotiation', 'booking'])->orWhere('status', 'in_progress'))->count(),
-                'color' => 'bg-purple-500',
-            ],
-            'closed_won' => [
-                'label' => 'Closed Won',
-                'count' => (clone $query)->where(fn($q) => $q->whereIn('status', ['converted', 'closed_won'])->orWhere('current_stage', 'closed_won'))->count(),
-                'color' => 'bg-emerald-500',
-            ],
-            'lost' => [
-                'label' => 'Lost',
-                'count' => (clone $query)->where(fn($q) => $q->whereIn('status', ['lost', 'closed_lost'])->orWhereIn('current_stage', ['lost', 'closed_lost', 'wrong_number', 'invalid', 'unreachable', 'replaced']))->count(),
-                'color' => 'bg-rose-500',
-            ],
-        ];
-
-        foreach ($statusDist as $k => &$item) {
-            $item['key'] = $k;
-            $item['percentage'] = $totalLeads > 0 ? round(($item['count'] / $totalLeads) * 100, 1) : 0;
-        }
-        unset($item);
-
-        // 5. Lead Source Breakdown
-        $sourceCategories = [
-            'meta' => ['label' => 'Meta Ads (Facebook / Instagram)', 'count' => 0, 'icon' => 'meta', 'color' => 'bg-blue-600'],
-            'google' => ['label' => 'Google Ads', 'count' => 0, 'icon' => 'google', 'color' => 'bg-amber-500'],
-            'website' => ['label' => 'Website', 'count' => 0, 'icon' => 'globe', 'color' => 'bg-emerald-600'],
-            'manual' => ['label' => 'Manual / Upload', 'count' => 0, 'icon' => 'upload', 'color' => 'bg-indigo-600'],
-            'other' => ['label' => 'Other Sources', 'count' => 0, 'icon' => 'dots', 'color' => 'bg-slate-500'],
-        ];
-
-        if (\App\Support\LeadSourceVisibility::allowed()) {
-            $sourceRows = (clone $query)
-                ->whereNotNull('leads.lead_source_id')
-                ->select('leads.lead_source_id', DB::raw('COUNT(leads.id) as src_count'))
-                ->groupBy('leads.lead_source_id')
-                ->get();
-
-            $allSourcesMap = LeadSource::pluck('name', 'id');
-            $knownCount = 0;
-            foreach ($sourceRows as $sRow) {
-                $name = strtolower(trim((string) ($allSourcesMap[$sRow->lead_source_id] ?? '')));
-                $c = (int) $sRow->src_count;
-                $knownCount += $c;
-                if (str_contains($name, 'meta') || str_contains($name, 'facebook') || str_contains($name, 'instagram')) {
-                    $sourceCategories['meta']['count'] += $c;
-                } elseif (str_contains($name, 'google')) {
-                    $sourceCategories['google']['count'] += $c;
-                } elseif (str_contains($name, 'web') || str_contains($name, 'direct') || str_contains($name, 'portal')) {
-                    $sourceCategories['website']['count'] += $c;
-                } elseif (str_contains($name, 'manual') || str_contains($name, 'csv') || str_contains($name, 'upload') || str_contains($name, 'excel')) {
-                    $sourceCategories['manual']['count'] += $c;
-                } else {
-                    $sourceCategories['other']['count'] += $c;
-                }
-            }
-            $sourceCategories['other']['count'] += max(0, $totalLeads - $knownCount);
-        } else {
-            $sourceCategories['other']['count'] = $totalLeads;
-        }
-
-        foreach ($sourceCategories as $sk => &$sc) {
-            $sc['key'] = $sk;
-            $sc['percentage'] = $totalLeads > 0 ? round(($sc['count'] / $totalLeads) * 100, 1) : 0;
-        }
-        unset($sc);
-
-        // 6. Team Performance Table
-        $teamPerformance = DB::table('leads')
-            ->join('users', 'leads.assigned_to', '=', 'users.id')
-            ->whereIn('leads.id', (clone $query)->select('leads.id'))
-            ->select(
-                'users.id as user_id',
-                'users.name as user_name',
-                'users.email as user_email',
-                DB::raw('COUNT(leads.id) as assigned_leads'),
-                DB::raw("COUNT(CASE WHEN leads.executive_first_response_at IS NOT NULL OR leads.first_response_at IS NOT NULL OR leads.status = 'contacted' OR leads.current_stage IN ('contacted', 'connected') THEN 1 END) as contacted_leads"),
-                DB::raw("COUNT(CASE WHEN leads.status IN ('converted', 'closed_won') OR leads.current_stage = 'closed_won' THEN 1 END) as converted_leads")
-            )
-            ->groupBy('users.id', 'users.name', 'users.email')
-            ->orderByDesc('assigned_leads')
-            ->limit(20)
-            ->get()
-            ->map(function ($row) {
-                $assigned = (int) $row->assigned_leads;
-                $converted = (int) $row->converted_leads;
-                $rate = $assigned > 0 ? round(($converted / $assigned) * 100, 1) : 0;
-                return [
-                    'id' => $row->user_id,
-                    'user_id' => $row->user_id,
-                    'name' => $row->user_name,
-                    'email' => $row->user_email,
-                    'assigned' => $assigned,
-                    'contacted' => (int) $row->contacted_leads,
-                    'converted' => $converted,
-                    'conversion_rate' => $rate,
-                ];
-            });
-
-        return [
-            'kpis' => [
-                'total' => $totalLeads,
-                'new' => $newLeads,
-                'in_progress' => $inProgressLeads,
-                'followups_due' => $followupsDue,
-                'closed_won' => $closedWonLeads,
-                'lost' => $lostLeads,
-            ],
-            'trend' => [
-                'labels' => $trendLabels,
-                'counts' => $trendCounts,
-                'granularity' => $this->trendGranularity,
-            ],
-            'stages' => [
-                'labels' => $stageLabels,
-                'counts' => $stageCounts,
-                'colors' => $stageColors,
-                'breakdown' => $stageBreakdown,
-            ],
-            'status_distribution' => $statusDist,
-            'sources' => $sourceCategories,
-            'team_performance' => $teamPerformance,
-        ];
     }
 
     public function updatedAnalyticsRange(string $range): void
@@ -1179,7 +831,7 @@ class LeadKanban extends Component
         }
 
         if ($start && $end) {
-            $query->whereBetween('leads.created_at', [$start, $end]);
+            $query->whereBetween('created_at', [$start, $end]);
         }
 
         // Search
@@ -1970,10 +1622,6 @@ class LeadKanban extends Component
             $builderTeamMembers = $eligibleAssignees;
         }
         return view('livewire.leads.lead-kanban', [
-            'activeMainTab' => $this->activeMainTab,
-            'analyticsData' => $this->analyticsData,
-            'activeFilterCount' => $this->activeFilterCount,
-            'totalLeadCount' => $baseQuery->count(),
             'canInternalQueue' => $canInternal,
             'isBuilder' => $this->isBuilder,
             'isSalesExecutive' => $this->isSalesExecutive,
@@ -2733,28 +2381,15 @@ class LeadKanban extends Component
 
         return [
             ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
-            ['key' => 'name', 'label' => 'Contact Details', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'mobile', 'label' => 'Phone Number', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
-            ['key' => 'whatsapp', 'label' => 'WhatsApp', 'type' => 'whatsapp', 'priority' => 1],
+            ['key' => 'name', 'label' => 'Contact Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
+            ['key' => 'mobile', 'label' => 'Mobile', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
             ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
+            ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2]] : []),
             ['key' => 'campaign_name', 'label' => 'Campaign', 'type' => 'text', 'priority' => 2, 'class' => 'text-muted text-xs'],
             ['key' => 'organization_name', 'label' => 'Organization', 'type' => 'text', 'priority' => 2, 'class' => 'text-ink text-xs'],
             ['key' => 'team_name', 'label' => 'Team', 'type' => 'text', 'priority' => 3, 'class' => 'text-muted text-xs'],
-            ['key' => 'assigned_to_user', 'label' => 'Assigned Executive', 'type' => 'avatar-stack', 'priority' => 1],
-            ['key' => 'status', 'label' => 'Lead Status', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
-                'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
-                'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-                'assigned' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-                'unassigned' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
-                'contacted' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'interested' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'in_progress' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'converted' => 'bg-green-100 text-green-800 border border-green-300',
-                'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
-                'lost' => 'bg-red-50 text-red-700 border border-red-200',
-                'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
-            ]],
-            ['key' => 'current_stage', 'label' => 'Lead Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+            ['key' => 'assigned_to_user', 'label' => 'Assigned Agent', 'type' => 'avatar-stack', 'priority' => 1],
+            ['key' => 'current_stage', 'label' => 'Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                 'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'duplicate' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
                 'pending_credit' => 'bg-purple-50 text-purple-700 border border-purple-200',
@@ -2763,15 +2398,12 @@ class LeadKanban extends Component
                 'connected' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'qualified' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'interested' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'follow_up' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'site_visit' => 'bg-purple-50 text-purple-700 border border-purple-200',
                 'negotiation' => 'bg-blue-50 text-blue-700 border border-blue-200',
                 'booking' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'closed_won' => 'bg-green-100 text-green-800 border border-green-300',
                 'closed_lost' => 'bg-red-50 text-red-700 border border-red-200',
-                'lost' => 'bg-red-50 text-red-700 border border-red-200',
             ]],
-            ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Source', 'type' => 'text', 'priority' => 2]] : []),
             ['key' => 'last_activity', 'label' => 'Last Activity', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs text-muted'],
             ['key' => 'next_followup', 'label' => 'Next Follow-up', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs font-mono text-muted'],
             ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
@@ -2779,7 +2411,7 @@ class LeadKanban extends Component
                 'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
                 'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
             ]],
-            ['key' => 'created_at', 'label' => 'Created Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
         ];
     }
@@ -3047,108 +2679,6 @@ class LeadKanban extends Component
                 headings: $headings,
                 columns: $columns,
                 statusColumns: ['current_stage']
-            ),
-            $filename
-        );
-    }
-
-    public function exportAnalyticsReport()
-    {
-        $data = $this->analyticsData;
-        $dateLabel = ucfirst(str_replace('_', ' ', $this->analyticsRange));
-        $exportRows = collect();
-
-        // 1. KPI Summary
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'Total Leads',
-            'value' => (string) $data['kpis']['total'],
-            'detail' => '100%',
-        ]);
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'New Leads',
-            'value' => (string) $data['kpis']['new'],
-            'detail' => ($data['kpis']['total'] > 0 ? round(($data['kpis']['new'] / $data['kpis']['total']) * 100, 1) : 0) . '%',
-        ]);
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'In Progress',
-            'value' => (string) $data['kpis']['in_progress'],
-            'detail' => ($data['kpis']['total'] > 0 ? round(($data['kpis']['in_progress'] / $data['kpis']['total']) * 100, 1) : 0) . '%',
-        ]);
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'Follow-ups Due',
-            'value' => (string) $data['kpis']['followups_due'],
-            'detail' => 'Due',
-        ]);
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'Closed Won',
-            'value' => (string) $data['kpis']['closed_won'],
-            'detail' => ($data['kpis']['total'] > 0 ? round(($data['kpis']['closed_won'] / $data['kpis']['total']) * 100, 1) : 0) . '%',
-        ]);
-        $exportRows->push([
-            'section' => 'KPI Summary',
-            'metric' => 'Lost Leads',
-            'value' => (string) $data['kpis']['lost'],
-            'detail' => ($data['kpis']['total'] > 0 ? round(($data['kpis']['lost'] / $data['kpis']['total']) * 100, 1) : 0) . '%',
-        ]);
-
-        // 2. Stages
-        foreach ($data['stages']['breakdown'] as $stg) {
-            $exportRows->push([
-                'section' => 'Stage Breakdown',
-                'metric' => $stg['label'],
-                'value' => (string) $stg['count'],
-                'detail' => $stg['percentage'] . '%',
-            ]);
-        }
-
-        // 3. Status Distribution
-        foreach ($data['status_distribution'] as $st) {
-            $exportRows->push([
-                'section' => 'Status Distribution',
-                'metric' => $st['label'],
-                'value' => (string) $st['count'],
-                'detail' => $st['percentage'] . '%',
-            ]);
-        }
-
-        // 4. Sources
-        foreach ($data['sources'] as $src) {
-            $exportRows->push([
-                'section' => 'Lead Source',
-                'metric' => $src['label'],
-                'value' => (string) $src['count'],
-                'detail' => $src['percentage'] . '%',
-            ]);
-        }
-
-        // 5. Team Performance
-        foreach ($data['team_performance'] as $tp) {
-            $exportRows->push([
-                'section' => 'Team Performance',
-                'metric' => $tp['name'] . ' (' . $tp['email'] . ')',
-                'value' => "Assigned: {$tp['assigned']} | Contacted: {$tp['contacted']} | Won: {$tp['converted']}",
-                'detail' => "Conversion: {$tp['conversion_rate']}%",
-            ]);
-        }
-
-        $headings = ['Category / Section', 'Dimension / Name', 'Count / Value', 'Percentage / Rate'];
-        $columns = ['section', 'metric', 'value', 'detail'];
-        $filename = 'Lead_Panther_Analytics_Report_' . now()->format('Ymd_His') . '.xlsx';
-
-        $this->dispatch('toast', type: 'success', message: 'Analytics report exported successfully.');
-
-        return Excel::download(
-            new BaseStyledExport(
-                data: $exportRows,
-                title: 'Lead Analytics & Reporting Dashboard',
-                subtitle: "Exported: " . now()->format('d M Y, H:i') . " | Range: {$dateLabel}",
-                headings: $headings,
-                columns: $columns
             ),
             $filename
         );

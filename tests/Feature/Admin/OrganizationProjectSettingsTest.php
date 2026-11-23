@@ -104,4 +104,135 @@ class OrganizationProjectSettingsTest extends TestCase
         $this->assertTrue($client->hasRole('Builder/Developer'));
         $this->assertDatabaseHas('client_wallets', ['client_id' => $client->id, 'balance' => 0]);
     }
+
+    public function test_can_remove_project_with_zero_leads(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Zero Leads Org', 'status' => 'active']);
+        $client = User::factory()->create(['organization_id' => $org->id, 'name' => 'Zero Leads Owner']);
+        $client->assignRole('Builder/Developer');
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Empty Project', 'status' => 'active']);
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->assertSee('Empty Project')
+            ->assertSee('Remove')
+            ->call('openRemoveProjectModal', $project->id)
+            ->assertSet('showRemoveProjectModal', true)
+            ->assertSet('projectAssignedLeadsCount', 0)
+            ->call('confirmRemoveProject')
+            ->assertSet('showRemoveProjectModal', false)
+            ->assertDispatched('toast', type: 'success');
+
+        $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+    }
+
+    public function test_removing_project_with_assigned_leads_requires_destination_project_and_moves_leads(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Multi Project Org', 'status' => 'active']);
+        $client = User::factory()->create(['organization_id' => $org->id, 'name' => 'Multi Project Owner']);
+        $client->assignRole('Builder/Developer');
+
+        $projectA = Project::create(['client_id' => $client->id, 'name' => 'Boulevard walk by H&S', 'status' => 'active']);
+        $projectB = Project::create(['client_id' => $client->id, 'name' => 'Elan Boulevard', 'status' => 'active']);
+
+        $source = \App\Models\LeadSource::create(['name' => 'meta_ads']);
+        $campaignA = \App\Models\Campaign::create(['project_id' => $projectA->id, 'name' => 'Campaign A', 'lead_source_id' => $source->id, 'status' => 'active']);
+        $campaignB = \App\Models\Campaign::create(['project_id' => $projectB->id, 'name' => 'Campaign B', 'lead_source_id' => $source->id, 'status' => 'active']);
+
+        $lead1 = \App\Models\Lead::create([
+            'lead_code' => 'LP-TEST-001',
+            'client_id' => $client->id,
+            'campaign_id' => $campaignA->id,
+            'lead_source_id' => $source->id,
+            'name' => 'Lead One',
+            'mobile' => '9876543210',
+            'status' => 'new',
+        ]);
+        $lead2 = \App\Models\Lead::create([
+            'lead_code' => 'LP-TEST-002',
+            'client_id' => $client->id,
+            'campaign_id' => $campaignA->id,
+            'lead_source_id' => $source->id,
+            'name' => 'Lead Two',
+            'mobile' => '9876543211',
+            'status' => 'new',
+        ]);
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->call('openRemoveProjectModal', $projectA->id)
+            ->assertSet('showRemoveProjectModal', true)
+            ->assertSet('projectAssignedLeadsCount', 2)
+            ->assertSee('2 Lead(s) Assigned')
+            ->assertSee('Move Leads to Project')
+            // Attempt to confirm without selecting destination project
+            ->call('confirmRemoveProject')
+            ->assertHasErrors('destinationProjectId')
+            // Now select project B as destination
+            ->set('destinationProjectId', $projectB->id)
+            ->call('confirmRemoveProject')
+            ->assertHasNoErrors()
+            ->assertSet('showRemoveProjectModal', false)
+            ->assertDispatched('toast', type: 'success');
+
+        // Project A is deleted
+        $this->assertDatabaseMissing('projects', ['id' => $projectA->id]);
+        // Project B still exists
+        $this->assertDatabaseHas('projects', ['id' => $projectB->id]);
+
+        // Leads are moved to project B (their campaign is under project B)
+        $this->assertEquals($projectB->id, $lead1->fresh()->project->id);
+        $this->assertEquals($projectB->id, $lead2->fresh()->project->id);
+
+        // Audit log exists
+        $this->assertDatabaseHas('audit_logs', [
+            'organization_id' => $org->id,
+            'action' => 'project.removed',
+            'subject_id' => $projectA->id,
+        ]);
+    }
+
+    public function test_cannot_remove_only_project_if_it_has_assigned_leads(): void
+    {
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $org = Organization::create(['name' => 'Single Project Org', 'status' => 'active']);
+        $client = User::factory()->create(['organization_id' => $org->id, 'name' => 'Single Owner']);
+        $client->assignRole('Builder/Developer');
+
+        $project = Project::create(['client_id' => $client->id, 'name' => 'Only Project', 'status' => 'active']);
+        $source = \App\Models\LeadSource::create(['name' => 'direct']);
+        $campaign = \App\Models\Campaign::create(['project_id' => $project->id, 'name' => 'Only Campaign', 'lead_source_id' => $source->id, 'status' => 'active']);
+
+        \App\Models\Lead::create([
+            'lead_code' => 'LP-TEST-003',
+            'client_id' => $client->id,
+            'campaign_id' => $campaign->id,
+            'lead_source_id' => $source->id,
+            'name' => 'Solo Lead',
+            'mobile' => '9876543212',
+            'status' => 'new',
+        ]);
+
+        $component = Livewire::actingAs($admin)->test(OrganizationDetail::class, ['organization' => $org]);
+
+        $component->set('activeTab', 'clients')
+            ->call('openRemoveProjectModal', $project->id)
+            ->assertSet('showRemoveProjectModal', true)
+            ->assertSet('projectAssignedLeadsCount', 1)
+            ->assertSee('There are no other projects mapped to this organization')
+            ->call('confirmRemoveProject')
+            ->assertHasErrors('destinationProjectId');
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
 }

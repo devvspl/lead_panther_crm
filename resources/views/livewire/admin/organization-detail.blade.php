@@ -888,11 +888,29 @@
                 @error('mappingProjectName')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             <div class="bg-surface rounded-2xl border border-border overflow-x-auto">
-                <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th></tr></thead><tbody class="divide-y divide-border">
+                <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th><th class="p-4 text-right">Actions</th></tr></thead><tbody class="divide-y divide-border">
                     @forelse($projects as $project)
-                        <tr><td class="p-4 font-bold">{{ $project->name }}</td><td class="p-4">{{ $project->client_name }}</td><td class="p-4">{{ ucfirst($project->status) }}</td><td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</td></tr>
+                        <tr>
+                            <td class="p-4 font-bold">
+                                <span>{{ $project->name }}</span>
+                                @if(isset($project->leads_count) && $project->leads_count > 0)
+                                    <span class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+                                        {{ $project->leads_count }} {{ Str::plural('lead', $project->leads_count) }}
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="p-4">{{ $project->client_name }}</td>
+                            <td class="p-4">{{ ucfirst($project->status) }}</td>
+                            <td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</td>
+                            <td class="p-4 text-right">
+                                <button type="button" wire:click="openRemoveProjectModal({{ $project->id }})" title="Remove Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer text-xs font-semibold">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    <span>Remove</span>
+                                </button>
+                            </td>
+                        </tr>
                     @empty
-                        <tr><td colspan="4" class="p-8 text-center text-muted">No projects mapped to this organization.</td></tr>
+                        <tr><td colspan="5" class="p-8 text-center text-muted">No projects mapped to this organization.</td></tr>
                     @endforelse
                 </tbody></table>
             </div>
@@ -1514,6 +1532,90 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </x-modal>
+
+    <!-- MODAL 5: REMOVE PROJECT & REASSIGN LEADS -->
+    <x-modal name="remove-org-project-modal" :show="$showRemoveProjectModal" maxWidth="md">
+        <div class="p-5 sm:p-6 space-y-5">
+            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-red-50 text-red-600 dark:bg-red-900/30">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Remove Project</h3>
+                        <p class="text-xs text-muted">Project: <strong class="text-ink">{{ $projectToRemoveName }}</strong></p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeRemoveProjectModal"
+                    class="text-muted hover:text-ink cursor-pointer p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            @if($projectAssignedLeadsCount > 0)
+                <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 space-y-2">
+                    <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-bold text-xs">
+                        <svg class="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span>{{ $projectAssignedLeadsCount }} Lead(s) Assigned</span>
+                    </div>
+                    <p class="text-xs text-amber-700 dark:text-amber-300">
+                        This project currently has <strong class="font-bold">{{ $projectAssignedLeadsCount }} assigned lead(s)</strong>.
+                        Please select which project these leads should be moved to before removing this project.
+                    </p>
+                </div>
+
+                @if($this->otherProjects->isNotEmpty())
+                    <div class="space-y-1.5">
+                        <label class="font-bold text-ink text-xs">
+                            Move Leads to Project <span class="text-red-500">*</span>
+                        </label>
+                        <select wire:model="destinationProjectId"
+                            class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                            <option value="">-- Select Destination Project --</option>
+                            @foreach($this->otherProjects as $otherP)
+                                <option value="{{ $otherP->id }}">{{ $otherP->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('destinationProjectId')
+                            <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
+                        @enderror
+                    </div>
+                @else
+                    <div class="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
+                        There are no other projects mapped to this organization. Please create or map another project first so the assigned leads can be moved.
+                    </div>
+                @endif
+            @else
+                <div class="p-4 rounded-xl bg-canvas border border-border text-xs text-muted space-y-1">
+                    <p>Are you sure you want to remove <strong class="text-ink">{{ $projectToRemoveName }}</strong>?</p>
+                    <p class="text-[11px] text-muted">This project has <strong class="text-ink">0 leads</strong> assigned. Once removed, it will be unmapped from this organization.</p>
+                </div>
+            @endif
+
+            <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                <button type="button" wire:click="closeRemoveProjectModal"
+                    class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" wire:click="confirmRemoveProject" wire:loading.attr="disabled"
+                    @if($projectAssignedLeadsCount > 0 && $this->otherProjects->isEmpty()) disabled @endif
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+                    <span wire:loading.remove wire:target="confirmRemoveProject">
+                        {{ $projectAssignedLeadsCount > 0 ? 'Move Leads & Remove Project' : 'Remove Project' }}
+                    </span>
+                    <span wire:loading wire:target="confirmRemoveProject">Removing...</span>
+                </button>
+            </div>
         </div>
     </x-modal>
 

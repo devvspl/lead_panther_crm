@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 use Throwable;
@@ -177,6 +179,191 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: 'Project pricing saved.');
     }
 
+    public function getProjectLeadsCount(int $projectId): int
+    {
+        $hasProjectCol = Schema::hasColumn('leads', 'project_id');
+        $campaignIds = Campaign::withoutGlobalScopes()->where('project_id', $projectId)->pluck('id')->toArray();
+
+        return Lead::withoutGlobalScopes()->where(function ($q) use ($projectId, $campaignIds, $hasProjectCol) {
+            if (!empty($campaignIds)) {
+                $q->whereIn('campaign_id', $campaignIds);
+            }
+            if ($hasProjectCol) {
+                $q->orWhere('project_id', $projectId);
+            }
+            if (empty($campaignIds) && !$hasProjectCol) {
+                $q->whereRaw('0 = 1');
+            }
+        })->count();
+    }
+
+    public function openRemoveProjectModal(int $projectId): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
+        if (empty($clientIds)) {
+            $clientIds = User::where('organization_id', $this->organization->id)->pluck('id')->toArray();
+        }
+
+        $project = Project::withoutGlobalScopes()->whereIn('client_id', $clientIds)->findOrFail($projectId);
+
+        $this->projectToRemoveId = $project->id;
+        $this->projectToRemoveName = $project->name;
+        $this->projectAssignedLeadsCount = $this->getProjectLeadsCount($project->id);
+        $this->destinationProjectId = null;
+        $this->resetErrorBag();
+        $this->showRemoveProjectModal = true;
+    }
+
+    public function closeRemoveProjectModal(): void
+    {
+        $this->showRemoveProjectModal = false;
+        $this->projectToRemoveId = null;
+        $this->projectToRemoveName = null;
+        $this->projectAssignedLeadsCount = 0;
+        $this->destinationProjectId = null;
+        $this->resetErrorBag();
+    }
+
+    public function getOtherProjectsProperty()
+    {
+        if (!$this->projectToRemoveId) {
+            return collect();
+        }
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
+        if (empty($clientIds)) {
+            $clientIds = User::where('organization_id', $this->organization->id)->pluck('id')->toArray();
+        }
+        return Project::withoutGlobalScopes()
+            ->whereIn('client_id', $clientIds)
+            ->where('id', '!=', $this->projectToRemoveId)
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function confirmRemoveProject(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        if (!$this->projectToRemoveId) {
+            return;
+        }
+
+        $clientIds = $this->billingClients()->pluck('id')->toArray();
+        if (empty($clientIds)) {
+            $clientIds = User::where('organization_id', $this->organization->id)->pluck('id')->toArray();
+        }
+
+        $project = Project::withoutGlobalScopes()->whereIn('client_id', $clientIds)->findOrFail($this->projectToRemoveId);
+        $leadsCount = $this->getProjectLeadsCount($project->id);
+        $destinationProject = null;
+
+        if ($leadsCount > 0) {
+            $otherProjectIds = $this->otherProjects->pluck('id')->toArray();
+
+            if (empty($otherProjectIds)) {
+                $this->addError('destinationProjectId', 'Cannot remove this project because it has assigned leads and no other project exists in this organization to receive them.');
+                return;
+            }
+
+            $this->validate([
+                'destinationProjectId' => ['required', 'integer', Rule::in($otherProjectIds)],
+            ], [
+                'destinationProjectId.required' => 'Please select a destination project to move the assigned leads to.',
+                'destinationProjectId.in' => 'Selected destination project is invalid or does not belong to this organization.',
+            ]);
+
+            $destinationProject = Project::withoutGlobalScopes()->findOrFail($this->destinationProjectId);
+        }
+
+        $projectName = $project->name;
+        $targetProjectId = $this->destinationProjectId;
+
+        DB::transaction(function () use ($project, $leadsCount, $targetProjectId, $destinationProject) {
+            $hasProjectCol = Schema::hasColumn('leads', 'project_id');
+            $oldCampaignIds = Campaign::withoutGlobalScopes()->where('project_id', $project->id)->pluck('id')->toArray();
+
+            // 1. Move assigned leads to destination project
+            if ($leadsCount > 0 && $targetProjectId && $destinationProject) {
+                $destCampaign = Campaign::withoutGlobalScopes()->where('project_id', $targetProjectId)->first();
+                if (!$destCampaign) {
+                    $sourceId = LeadSource::first()?->id ?? LeadSource::firstOrCreate(['name' => 'direct'])->id;
+                    $destCampaign = Campaign::create([
+                        'project_id' => $targetProjectId,
+                        'name' => $destinationProject->name . ' Campaign',
+                        'lead_source_id' => $sourceId,
+                        'status' => 'active',
+                    ]);
+                }
+
+                $leadsToUpdate = Lead::withoutGlobalScopes()->where(function ($q) use ($project, $oldCampaignIds, $hasProjectCol) {
+                    if (!empty($oldCampaignIds)) {
+                        $q->whereIn('campaign_id', $oldCampaignIds);
+                    }
+                    if ($hasProjectCol) {
+                        $q->orWhere('project_id', $project->id);
+                    }
+                });
+
+                $updatePayload = [
+                    'campaign_id' => $destCampaign->id,
+                    'client_id' => $destinationProject->client_id,
+                ];
+                if ($hasProjectCol) {
+                    $updatePayload['project_id'] = $targetProjectId;
+                }
+                $leadsToUpdate->update($updatePayload);
+            }
+
+            // 2. Cascade or reassign references in related tables
+            foreach (['campaigns', 'lead_form_mappings', 'meta_ad_records', 'channel_partners', 'upload_batches', 'lead_delivery_items', 'lead_delivery_plans', 'client_delivery_batches'] as $table) {
+                if (Schema::hasTable($table) && Schema::hasColumn($table, 'project_id')) {
+                    DB::table($table)->where('project_id', $project->id)->update(['project_id' => $targetProjectId]);
+                }
+            }
+
+            if (Schema::hasTable('distribution_rules')) {
+                DB::table('distribution_rules')->where('project_id', $project->id)->delete();
+            }
+            if (Schema::hasTable('project_units')) {
+                DB::table('project_units')->where('project_id', $project->id)->delete();
+            }
+
+            // 3. Audit Log
+            AuditLog::create([
+                'organization_id' => $this->organization->id,
+                'user_id' => auth()->id(),
+                'action' => 'project.removed',
+                'subject_type' => Project::class,
+                'subject_id' => $project->id,
+                'from_value' => json_encode([
+                    'name' => $project->name,
+                    'client_id' => $project->client_id,
+                    'assigned_leads_count' => $leadsCount,
+                ]),
+                'to_value' => json_encode([
+                    'moved_to_project_id' => $targetProjectId,
+                    'moved_to_project_name' => $destinationProject?->name,
+                ]),
+                'created_at' => now(),
+            ]);
+
+            // 4. Delete the project
+            $project->delete();
+        });
+
+        $this->organization->load('clients.projects', 'clients.wallet');
+        $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
+
+        if ($leadsCount > 0 && $destinationProject) {
+            $this->dispatch('toast', type: 'success', message: "Project '{$projectName}' removed. {$leadsCount} lead(s) moved to '{$destinationProject->name}'.");
+        } else {
+            $this->dispatch('toast', type: 'success', message: "Project '{$projectName}' removed successfully.");
+        }
+
+        $this->closeRemoveProjectModal();
+    }
+
     // Active Navigation Tab: 'overview' | 'team' | 'clients' | 'credits' | 'activity'
     #[Url(as: 'tab', history: true, keep: true)]
     public string $activeTab = 'overview';
@@ -299,6 +486,13 @@ class OrganizationDetail extends Component
     public string $newClientName = '';
     public string $newClientBillingEmail = '';
     public string $newClientStatus = 'active';
+
+    // Project Removal & Lead Reassignment
+    public bool $showRemoveProjectModal = false;
+    public ?int $projectToRemoveId = null;
+    public ?string $projectToRemoveName = null;
+    public int $projectAssignedLeadsCount = 0;
+    public ?int $destinationProjectId = null;
 
     // Directly Assigned Leads Management (Retained for background compatibility)
     public string $leadSearch = '';
@@ -1022,6 +1216,18 @@ class OrganizationDetail extends Component
             ->where('users.organization_id', $orgId)
             ->whereIn('projects.client_id', $clientIds)
             ->select('projects.*', 'users.name as client_name')
+            ->selectSub(function ($query) {
+                $hasProjectCol = Schema::hasColumn('leads', 'project_id');
+                $query->from('leads')
+                    ->join('campaigns', 'leads.campaign_id', '=', 'campaigns.id')
+                    ->where(function ($w) use ($hasProjectCol) {
+                        $w->whereColumn('campaigns.project_id', 'projects.id');
+                        if ($hasProjectCol) {
+                            $w->orWhereColumn('leads.project_id', 'projects.id');
+                        }
+                    })
+                    ->selectRaw('count(*)');
+            }, 'leads_count')
             ->orderBy('projects.name')
             ->get();
 

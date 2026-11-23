@@ -9,11 +9,11 @@ use App\Support\LeadPropertyAndBudgetExtractor;
 class HealLeadDetailsCommand extends Command
 {
     protected $signature = 'leads:heal-meta-details {--all : Process all leads}';
-    protected $description = 'Heal static default budget, property type, and location values using actual Meta submissions and form answers.';
+    protected $description = 'Heal static default budget, property type, location, city, and name values using actual Meta submissions and form answers.';
 
     public function handle(): int
     {
-        $this->info('Starting lead property type, budget, and location healing...');
+        $this->info('Starting lead property type, budget, location, and details healing...');
 
         $query = Lead::withoutGlobalScopes();
         if (!$this->option('all')) {
@@ -28,7 +28,9 @@ class HealLeadDetailsCommand extends Command
                   ->orWhere('location', '')
                   ->orWhere('budget', 7500000.00)
                   ->orWhereNull('budget')
-                  ->orWhere('budget', '<=', 0);
+                  ->orWhere('budget', '<=', 0)
+                  ->orWhere('city', 'Mumbai')
+                  ->orWhereIn('name', ['Meta Lead User', 'Inbound Lead', 'Meta Lead']);
             });
         }
 
@@ -43,16 +45,26 @@ class HealLeadDetailsCommand extends Command
                 $originalBudget = $lead->budget;
                 $originalPropertyType = $lead->property_type;
                 $originalLocation = $lead->location;
+                $originalCity = $lead->city;
+                $originalName = $lead->name;
 
                 $resolvedBudget = LeadPropertyAndBudgetExtractor::resolveBudget($lead);
                 $resolvedPropertyType = LeadPropertyAndBudgetExtractor::resolvePropertyType($lead);
                 $resolvedLocation = LeadPropertyAndBudgetExtractor::resolveLocation($lead);
+                $resolvedCity = LeadPropertyAndBudgetExtractor::resolveCity($lead);
+                $resolvedName = LeadPropertyAndBudgetExtractor::resolveName($lead);
 
-                if ($originalBudget != $resolvedBudget || $originalPropertyType !== $resolvedPropertyType || $originalLocation !== $resolvedLocation) {
+                if ($originalBudget != $resolvedBudget 
+                    || $originalPropertyType !== $resolvedPropertyType 
+                    || $originalLocation !== $resolvedLocation
+                    || $originalCity !== $resolvedCity
+                    || $originalName !== $resolvedName) {
                     $lead->updateQuietly([
                         'budget' => $resolvedBudget,
                         'property_type' => $resolvedPropertyType,
                         'location' => $resolvedLocation,
+                        'city' => $resolvedCity,
+                        'name' => $resolvedName,
                     ]);
                     $updatedCount++;
                 }

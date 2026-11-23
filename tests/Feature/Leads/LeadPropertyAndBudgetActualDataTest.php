@@ -212,4 +212,63 @@ class LeadPropertyAndBudgetActualDataTest extends TestCase
         $this->assertEquals(3499000.00, (float) $fresh->budget);
         $this->assertEquals('Retail Space (100 Sq. Ft.)', $fresh->property_type);
     }
+
+    public function test_meta_lead_mapper_does_not_use_static_fallbacks_for_missing_fields(): void
+    {
+        $raw = [
+            'id' => '123456789012345',
+            'created_time' => '2026-11-23T10:00:00+0000',
+            'field_data' => [
+                ['name' => 'phone_number', 'values' => ['+919811223344']],
+            ],
+        ];
+
+        $mapper = new MetaLeadMapper();
+        $mapped = $mapper->map($raw);
+
+        // Name should be 'Lead 919811223344' rather than fake 'Meta Lead User'
+        $this->assertEquals('Lead 919811223344', $mapped['name']);
+        $this->assertEquals('919811223344', $mapped['mobile']);
+        // City, budget, property_type should be null, not fake defaults
+        $this->assertNull($mapped['city']);
+        $this->assertNull($mapped['budget']);
+        $this->assertNull($mapped['property_type']);
+        $this->assertNull($mapped['location']);
+        // UTM campaign should not be fake 'Meta Spring Campaign'
+        $this->assertNull($mapped['raw_utm']['utm_campaign']);
+    }
+
+    public function test_heal_lead_details_command_removes_fake_mumbai_and_fake_names(): void
+    {
+        $org = Organization::create(['name' => 'Healing Org', 'status' => 'active']);
+        $client = Client::create(['name' => 'Healing Client', 'organization_id' => $org->id, 'status' => 'active']);
+        $source = LeadSource::firstOrCreate(['name' => 'meta']);
+
+        $lead = Lead::create([
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'client_id' => $client->id,
+            'lead_source_id' => $source->id,
+            'name' => 'Meta Lead User',
+            'mobile' => '919811223344',
+            'city' => 'Mumbai', // Fake fallback
+            'status' => 'new',
+            'current_stage' => 'new',
+        ]);
+
+        LeadMetadata::create([
+            'lead_id' => $lead->id,
+            'key' => 'meta_form_answers',
+            'value' => json_encode([
+                'FULL NAME' => 'Amitabh Sharma',
+                'CITY' => 'Noida',
+            ]),
+        ]);
+
+        $this->artisan('leads:heal-meta-details')
+            ->assertSuccessful();
+
+        $fresh = $lead->fresh();
+        $this->assertEquals('Amitabh Sharma', $fresh->name);
+        $this->assertEquals('Noida', $fresh->city);
+    }
 }

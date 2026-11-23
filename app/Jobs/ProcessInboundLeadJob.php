@@ -68,7 +68,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                     if (!$token) throw new \RuntimeException('Page access token is required to retrieve this lead.');
                     if ($token) {
                         $fbRes = app(\App\Services\MetaAdAccountService::class)->get((string) $leadgenId, $token, [
-                            'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic',
+                            'fields' => 'id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic,platform',
                         ]);
                         if (empty($fbRes['field_data'])) throw new \RuntimeException('Meta lead details are unavailable; retry after restoring lead retrieval access.');
                         $raw = array_merge($raw, $fbRes);
@@ -261,14 +261,14 @@ class ProcessInboundLeadJob implements ShouldQueue
                     'client_id' => $clientId,
                     'campaign_id' => $campaignId,
                     'lead_source_id' => $leadSource->id,
-                    'name' => $mapped['name'] ?? 'Inbound Lead',
-                    'mobile' => $mobile,
+                    'name' => !empty($mapped['name']) ? $mapped['name'] : ($mobile ? "Lead {$mobile}" : 'Inbound Lead'),
+                    'mobile' => $mobile ?: '',
                     'email' => $email,
-                    'city' => $mapped['city'] ?? 'Mumbai',
-                    'location' => $mapped['location'] ?? null,
+                    'city' => !empty($mapped['city']) ? $mapped['city'] : null,
+                    'location' => !empty($mapped['location']) ? $mapped['location'] : null,
                     'budget' => $budget,
                     'property_type' => !empty($mapped['property_type']) ? $mapped['property_type'] : null,
-                    'requirement' => $mapped['requirement'] ?? 'Inbound lead captured via ' . ucfirst($type),
+                    'requirement' => !empty($mapped['requirement']) ? $mapped['requirement'] : null,
                     'status' => 'new',
                     'current_stage' => 'new',
                     'assigned_to' => null,
@@ -281,11 +281,25 @@ class ProcessInboundLeadJob implements ShouldQueue
                     'value' => $mapped['raw_utm']['utm_source'] ?? $type,
                 ]);
 
+                if (!empty($mapped['raw_utm']['utm_campaign'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'utm_campaign', 'value' => (string) $mapped['raw_utm']['utm_campaign']]);
+                }
+                if (!empty($mapped['raw_utm']['utm_content'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'utm_content', 'value' => (string) $mapped['raw_utm']['utm_content']]);
+                }
                 if (!empty($mapped['leadgen_id'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $mapped['leadgen_id']]);
                 }
                 if (!empty($mapped['form'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_id', 'value' => (string) $mapped['form']]);
+                }
+                $formName = $mapped['form_name'] ?? ($mapping?->form_name ?? null);
+                if (!empty($formName)) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_name', 'value' => (string) $formName]);
+                }
+                $pageId = $mapped['page_id'] ?? ($raw['entry'][0]['id'] ?? ($raw['page_id'] ?? null));
+                if (!empty($pageId)) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_page_id', 'value' => (string) $pageId]);
                 }
                 if (!empty($mapped['campaign'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_name', 'value' => $mapped['campaign']]);
@@ -297,8 +311,26 @@ class ProcessInboundLeadJob implements ShouldQueue
                 if (!empty($mapped['ad_set'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_name', 'value' => $mapped['ad_set']]);
                 }
+                if (!empty($mapped['ad_set_id'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_adset_id', 'value' => (string) $mapped['ad_set_id']]);
+                }
                 if (!empty($mapped['ad'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_name', 'value' => $mapped['ad']]);
+                }
+                if (!empty($mapped['ad_id'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_id', 'value' => (string) $mapped['ad_id']]);
+                }
+                $createdTime = $mapped['created_time'] ?? ($raw['created_time'] ?? null);
+                if (!empty($createdTime)) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_created_time', 'value' => (string) $createdTime]);
+                }
+                $platform = $mapped['platform'] ?? ($raw['platform'] ?? null);
+                if (!empty($platform)) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_platform', 'value' => (string) $platform]);
+                }
+                $isOrganic = $mapped['is_organic'] ?? ($raw['is_organic'] ?? null);
+                if ($isOrganic !== null) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_is_organic', 'value' => $isOrganic ? '1' : '0']);
                 }
                 if (!empty($mapped['custom_fields'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);

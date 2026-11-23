@@ -255,6 +255,134 @@ class LeadPropertyAndBudgetExtractor
     }
 
     /**
+     * Resolve the actual city for a Lead model.
+     * Cleans up the old static fallback 'Mumbai' if the submission didn't actually specify Mumbai.
+     */
+    public static function resolveCity(Lead $lead): ?string
+    {
+        $existing = $lead->city;
+        $actualCity = null;
+        $submissionMentionsMumbai = false;
+
+        // 1. Check meta_form_answers directly
+        $rawAnswers = $lead->metadata->where('key', 'meta_form_answers')->first()?->value;
+        if (!empty($rawAnswers)) {
+            $decoded = json_decode($rawAnswers, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $k => $v) {
+                    $kNorm = strtolower(trim(str_replace(['_', '-'], ' ', (string) $k)));
+                    if (str_contains(strtolower((string) $v), 'mumbai') || str_contains($kNorm, 'mumbai')) {
+                        $submissionMentionsMumbai = true;
+                    }
+                    if ($actualCity === null && (str_contains($kNorm, 'city') || str_contains($kNorm, 'town') || str_contains($kNorm, 'living in') || str_contains($kNorm, 'residence'))) {
+                        $valClean = trim((string) $v);
+                        if ($valClean !== '' && !preg_match('/\b(yes|no)\b/i', $valClean)) {
+                            $actualCity = ucwords(strtolower($valClean));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Check MetaSubmissionParser
+        $parsedMeta = MetaSubmissionParser::parse($lead);
+        if ($parsedMeta['is_meta']) {
+            foreach ($parsedMeta['questions'] as $qa) {
+                $q = strtolower((string) ($qa['question'] ?? ''));
+                $a = trim((string) ($qa['answer'] ?? ''));
+                if (str_contains(strtolower($a), 'mumbai') || str_contains($q, 'mumbai')) {
+                    $submissionMentionsMumbai = true;
+                }
+                if ($actualCity === null && (str_contains($q, 'city') || str_contains($q, 'town') || str_contains($q, 'living in') || str_contains($q, 'residence'))) {
+                    if ($a !== '' && !preg_match('/\b(yes|no)\b/i', $a)) {
+                        $actualCity = ucwords(strtolower($a));
+                    }
+                }
+            }
+
+            // Also check requirement text
+            if (str_contains(strtolower((string) $lead->requirement), 'mumbai')) {
+                $submissionMentionsMumbai = true;
+            }
+
+            // If existing is the fake static fallback 'Mumbai' and Mumbai was never mentioned
+            if ($existing === 'Mumbai' && !$submissionMentionsMumbai) {
+                $healedCity = $actualCity ?: null;
+                $lead->updateQuietly(['city' => $healedCity]);
+                return $healedCity;
+            }
+
+            if (!empty($actualCity)) {
+                if ($existing !== $actualCity) {
+                    $lead->updateQuietly(['city' => $actualCity]);
+                }
+                return $actualCity;
+            }
+        }
+
+        return $existing;
+    }
+
+    /**
+     * Resolve actual customer name for a Lead model.
+     * Eliminates fake static fallbacks like 'Meta Lead User' or 'Inbound Lead'.
+     */
+    public static function resolveName(Lead $lead): string
+    {
+        $existing = $lead->name;
+        if (!in_array($existing, ['Meta Lead User', 'Inbound Lead', 'Meta Lead', ''], true)) {
+            return $existing;
+        }
+
+        // 1. Check meta_form_answers
+        $rawAnswers = $lead->metadata->where('key', 'meta_form_answers')->first()?->value;
+        if (!empty($rawAnswers)) {
+            $decoded = json_decode($rawAnswers, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $k => $v) {
+                    $kNorm = strtolower(trim(str_replace(['_', '-'], ' ', (string) $k)));
+                    if (in_array($kNorm, ['full name', 'name', 'your name', 'client name', 'customer name', 'first name', 'contact person']) || str_contains($kNorm, 'full name') || str_contains($kNorm, 'your name')) {
+                        if (!empty($v) && strlen((string) $v) <= 100) {
+                            $lead->updateQuietly(['name' => (string) $v]);
+                            return (string) $v;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Check raw_json
+        $rawJson = $lead->metadata->where('key', 'raw_json')->first()?->value;
+        if (!empty($rawJson)) {
+            $rawDecoded = json_decode($rawJson, true);
+            if (is_array($rawDecoded)) {
+                $rawName = $rawDecoded['full_name'] ?? $rawDecoded['name'] ?? null;
+                if (!empty($rawName) && strlen((string) $rawName) <= 100) {
+                    $lead->updateQuietly(['name' => (string) $rawName]);
+                    return (string) $rawName;
+                }
+                if (!empty($rawDecoded['field_data']) && is_array($rawDecoded['field_data'])) {
+                    foreach ($rawDecoded['field_data'] as $field) {
+                        $fName = strtolower(trim(str_replace(['_', '-'], ' ', (string) ($field['name'] ?? ''))));
+                        if (in_array($fName, ['full name', 'name', 'your name', 'customer name']) || str_contains($fName, 'full name')) {
+                            $val = is_array($field['values'] ?? null) ? ($field['values'][0] ?? null) : ($field['values'] ?? null);
+                            if (!empty($val)) {
+                                $lead->updateQuietly(['name' => (string) $val]);
+                                return (string) $val;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $cleanMobile = preg_replace('/[^0-9]/', '', (string) $lead->mobile);
+        $fallbackName = !empty($cleanMobile) ? "Lead {$cleanMobile}" : "Lead #{$lead->id}";
+        $lead->updateQuietly(['name' => $fallbackName]);
+        return $fallbackName;
+    }
+
+    /**
      * Resolve the actual budget for a Lead model.
      * Returns the float budget, or null if not specified.
      */

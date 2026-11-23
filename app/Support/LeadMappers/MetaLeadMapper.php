@@ -194,14 +194,13 @@ class MetaLeadMapper
             $name = trim("{$firstName} {$lastName}");
         }
 
-        if (empty($name)) {
-            $name = 'Meta Lead User';
-        }
-
         // Clean mobile number (keep digits only)
-        $cleanMobile = $mobile ? preg_replace('/[^0-9]/', '', (string) $mobile) : '9876543210';
-        if (strlen($cleanMobile) === 0) {
-            $cleanMobile = '9876543210';
+        $cleanMobile = $mobile ? preg_replace('/[^0-9]/', '', (string) $mobile) : '';
+
+        // If name is not provided, do not use fake human names like 'Meta Lead User'
+        if (empty($name)) {
+            $leadId = $leadVal['id'] ?? $leadVal['leadgen_id'] ?? $raw['id'] ?? $raw['leadgen_id'] ?? null;
+            $name = $cleanMobile ? "Lead {$cleanMobile}" : ($leadId ? "Lead #{$leadId}" : 'Meta Lead');
         }
 
         // Clean email (store null if missing or invalid)
@@ -229,7 +228,12 @@ class MetaLeadMapper
         $adName = $leadVal['ad_name'] ?? $raw['ad_name'] ?? null;
         $adId = $leadVal['ad_id'] ?? $raw['ad_id'] ?? null;
         $formId = $leadVal['form_id'] ?? $raw['form_id'] ?? null;
+        $formName = $leadVal['form_name'] ?? $raw['form_name'] ?? null;
+        $pageId = $leadVal['page_id'] ?? $raw['page_id'] ?? ($raw['entry'][0]['id'] ?? null);
         $leadgenId = $leadVal['id'] ?? $leadVal['leadgen_id'] ?? $raw['id'] ?? $raw['leadgen_id'] ?? null;
+        $createdTime = $leadVal['created_time'] ?? $raw['created_time'] ?? null;
+        $platform = $leadVal['platform'] ?? $raw['platform'] ?? null;
+        $isOrganic = $leadVal['is_organic'] ?? $raw['is_organic'] ?? null;
 
         // Build a detailed human-readable requirement text preserving all form responses
         $reqParts = [];
@@ -264,7 +268,8 @@ class MetaLeadMapper
         if ($campaignName) $metaAttribution[] = "Campaign: {$campaignName}";
         if ($adsetName) $metaAttribution[] = "AdSet: {$adsetName}";
         if ($adName) $metaAttribution[] = "Ad: {$adName}";
-        if ($formId) $metaAttribution[] = "Form: #{$formId}";
+        if ($formName) $metaAttribution[] = "Form: {$formName}";
+        elseif ($formId) $metaAttribution[] = "Form: #{$formId}";
 
         if (!empty($metaAttribution)) {
             $reqParts[] = "Meta Context: " . implode(' | ', $metaAttribution);
@@ -272,16 +277,16 @@ class MetaLeadMapper
 
         $requirement = !empty($reqParts) 
             ? implode("\n• ", array_merge(['Meta Lead Submission:'], $reqParts))
-            : "Meta Lead Ingestion from Form #{$formId}";
+            : ($formId ? "Meta Lead Ingestion from Form #{$formId}" : "Meta Lead Submission");
 
         return [
             'name' => $name,
             'mobile' => $cleanMobile,
             'email' => $cleanEmail,
-            'city' => $city ?: '',
+            'city' => $city ?: null,
             'location' => $location ?: null,
-            'budget' => $budget ?: '',
-            'property_type' => $propertyType ?: '',
+            'budget' => $budget ?: null,
+            'property_type' => $propertyType ?: null,
             'requirement' => $requirement,
             'source' => 'meta',
             'extracted_details' => $extracted ?? [],
@@ -292,13 +297,18 @@ class MetaLeadMapper
             'ad' => $adName,
             'ad_id' => $adId,
             'form' => $formId,
+            'form_name' => $formName,
+            'page_id' => $pageId,
+            'created_time' => $createdTime,
+            'platform' => $platform,
+            'is_organic' => $isOrganic,
             'leadgen_id' => $leadgenId,
             'custom_fields' => $allFieldAnswers,
             'raw_utm' => [
-                'utm_source' => 'facebook',
+                'utm_source' => $platform && strtolower((string) $platform) === 'ig' ? 'instagram' : 'facebook',
                 'utm_medium' => 'cpc',
-                'utm_campaign' => $campaignName ?: 'Meta Spring Campaign',
-                'utm_content' => $adName,
+                'utm_campaign' => $campaignName ?: null,
+                'utm_content' => $adName ?: null,
             ],
         ];
     }

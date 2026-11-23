@@ -534,14 +534,14 @@ class MetaLeadSyncService
                             'client_id' => $leadClientId,
                             'campaign_id' => $targetCampaignId,
                             'lead_source_id' => $leadSource->id,
-                            'name' => $mapped['name'] ?? 'Meta Lead',
-                            'mobile' => $mobile,
+                            'name' => !empty($mapped['name']) ? $mapped['name'] : ($mobile ? "Lead {$mobile}" : 'Meta Lead'),
+                            'mobile' => $mobile ?: '',
                             'email' => $email,
-                            'city' => $mapped['city'] ?? '',
-                            'location' => $mapped['location'] ?? null,
+                            'city' => !empty($mapped['city']) ? $mapped['city'] : null,
+                            'location' => !empty($mapped['location']) ? $mapped['location'] : null,
                             'budget' => $numericBudget,
                             'property_type' => !empty($mapped['property_type']) ? $mapped['property_type'] : null,
-                            'requirement' => $mapped['requirement'] ?? "Meta Ads sync from form '{$formName}' (#{$currentFormId})",
+                            'requirement' => !empty($mapped['requirement']) ? $mapped['requirement'] : null,
                             'status' => 'new',
                             'current_stage' => 'new',
                             'assigned_to' => null,
@@ -551,6 +551,17 @@ class MetaLeadSyncService
                         Log::info("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Created new Lead: {$lead->name} (#{$lead->lead_code}, ID: {$lead->id}), Mobile: {$lead->mobile}, Project: {$leadProjectName}, Campaign ID: " . ($lead->campaign_id ?: 'None'));
 
                         // Save Comprehensive Meta Metadata
+                        LeadMetadata::create([
+                            'lead_id' => $lead->id,
+                            'key' => 'utm_source',
+                            'value' => $mapped['raw_utm']['utm_source'] ?? 'meta',
+                        ]);
+                        if (!empty($mapped['raw_utm']['utm_campaign'])) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'utm_campaign', 'value' => (string) $mapped['raw_utm']['utm_campaign']]);
+                        }
+                        if (!empty($mapped['raw_utm']['utm_content'])) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'utm_content', 'value' => (string) $mapped['raw_utm']['utm_content']]);
+                        }
                         if (!empty($rawLead['id'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_leadgen_id', 'value' => (string) $rawLead['id']]);
                         }
@@ -559,6 +570,10 @@ class MetaLeadSyncService
                         }
                         if (!empty($formName)) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_name', 'value' => $formName]);
+                        }
+                        $pageId = $mapped['page_id'] ?? ($rawLead['page_id'] ?? null);
+                        if (!empty($pageId)) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_page_id', 'value' => (string) $pageId]);
                         }
                         if (!empty($mapped['campaign'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_campaign_name', 'value' => $mapped['campaign']]);
@@ -581,8 +596,17 @@ class MetaLeadSyncService
                         if (!empty($mapped['ad_id'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_ad_id', 'value' => (string) $mapped['ad_id']]);
                         }
-                        if (!empty($rawLead['created_time'])) {
-                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_created_time', 'value' => (string) $rawLead['created_time']]);
+                        $createdTime = $rawLead['created_time'] ?? ($mapped['created_time'] ?? null);
+                        if (!empty($createdTime)) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_created_time', 'value' => (string) $createdTime]);
+                        }
+                        $platform = $rawLead['platform'] ?? ($mapped['platform'] ?? null);
+                        if (!empty($platform)) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_platform', 'value' => (string) $platform]);
+                        }
+                        $isOrganic = $rawLead['is_organic'] ?? ($mapped['is_organic'] ?? null);
+                        if ($isOrganic !== null) {
+                            LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_is_organic', 'value' => $isOrganic ? '1' : '0']);
                         }
                         if (!empty($mapped['custom_fields'])) {
                             LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);

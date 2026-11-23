@@ -139,6 +139,7 @@ class MetaSubmissionParser
             // Bullet characters (•, â€¢, Ã¢â‚¬Â¢) separate items even if all on a single line without newlines
             $normalizedReq = preg_replace('/(?:\s*(?:Ã¢â‚¬Â¢|â€¢|•)\s*|\n+)/u', "\n", $normalizedReq);
             $lines = explode("\n", $normalizedReq);
+            $seenQuestions = [];
 
             foreach ($lines as $line) {
                 $cleanLine = trim($line);
@@ -164,11 +165,16 @@ class MetaSubmissionParser
                     $q = trim(mb_substr($cleanLine, 0, $colonPos));
                     $a = trim(mb_substr($cleanLine, $colonPos + 1));
                     if (! empty($q) && ! self::shouldIgnoreKey($q)) {
-                        $questions[] = [
-                            'raw_key' => $q,
-                            'question' => self::formatQuestionLabel($q),
-                            'answer' => $a !== '' ? $a : 'N/A',
-                        ];
+                        $label = self::formatQuestionLabel($q);
+                        $labelKey = strtolower($label);
+                        if (!isset($seenQuestions[$labelKey])) {
+                            $seenQuestions[$labelKey] = true;
+                            $questions[] = [
+                                'raw_key' => $q,
+                                'question' => $label,
+                                'answer' => $a !== '' ? $a : 'N/A',
+                            ];
+                        }
                     }
                 }
             }
@@ -234,6 +240,8 @@ class MetaSubmissionParser
             'email',
             'email address',
             'inbox url',
+            'property',
+            'budget',
         ];
 
         return in_array($normalizedSpace, $ignoredPhrases, true);

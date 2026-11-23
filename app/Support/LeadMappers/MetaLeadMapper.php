@@ -138,12 +138,16 @@ class MetaLeadMapper
                     // Match City
                     elseif (str_contains($keyNormalized, 'city') || str_contains($keyNormalized, 'town') || str_contains($keyNormalized, 'living in') || str_contains($keyNormalized, 'residence')) {
                         $city = $cleanVal;
-                        $customQuestions[$rawKey] = $cleanVal;
+                        if (!in_array($keyNormalized, ['city', 'town'])) {
+                            $customQuestions[$rawKey] = $cleanVal;
+                        }
                     }
                     // Match Location / Sector / Locality
                     elseif (str_contains($keyNormalized, 'location') || str_contains($keyNormalized, 'locality') || str_contains($keyNormalized, 'sector') || str_contains($keyNormalized, 'preferred area')) {
                         $location = $cleanVal;
-                        $customQuestions[$rawKey] = $cleanVal;
+                        if (!in_array($keyNormalized, ['location', 'locality'])) {
+                            $customQuestions[$rawKey] = $cleanVal;
+                        }
                     }
                     // Match Budget / Price
                     elseif (str_contains($keyNormalized, 'budget') || str_contains($keyNormalized, 'price') || str_contains($keyNormalized, 'investment')) {
@@ -164,15 +168,19 @@ class MetaLeadMapper
             }
         }
 
-        // Run smart extractor over collected fields if budget or propertyType is still empty or non-specific
-        if (empty($budget) || empty($propertyType) || preg_match('/(?:₹|rs\.?|inr|\blakh|\bcr|\bcrore|\brental\s+income|\bself\s+use|\binvestment|\byes|\bno)\b/i', (string) $propertyType)) {
-            $extracted = \App\Support\LeadPropertyAndBudgetExtractor::extractFromQuestions($allFieldAnswers);
-            if (empty($budget) && !empty($extracted['budget'])) {
-                $budget = $extracted['budget'];
-            }
-            if (!empty($extracted['property_type'])) {
+        // Run smart extractor over collected fields for budget, propertyType, location, etc.
+        $extracted = \App\Support\LeadPropertyAndBudgetExtractor::extractFromQuestions($allFieldAnswers);
+        if (empty($budget) && !empty($extracted['budget'])) {
+            $budget = $extracted['budget'];
+        }
+        if (!empty($extracted['property_type'])) {
+            $isOnlySize = preg_match('/^\d+(?:\.\d+)?\s*(?:sq\.?\s*ft\.?|sqft|sq\s*yards?|sq\s*meters?)$/i', trim((string) $propertyType));
+            if (empty($propertyType) || $isOnlySize || preg_match('/(?:₹|rs\.?|inr|\blakh|\bcr|\bcrore|\brental\s+income|\bself\s+use|\binvestment|\byes|\bno)\b/i', (string) $propertyType)) {
                 $propertyType = $extracted['property_type'];
             }
+        }
+        if (empty($location) && !empty($extracted['location'])) {
+            $location = $extracted['location'];
         }
 
         // Capture top-level remarks / notes if provided
@@ -194,6 +202,12 @@ class MetaLeadMapper
         $cleanMobile = $mobile ? preg_replace('/[^0-9]/', '', (string) $mobile) : '9876543210';
         if (strlen($cleanMobile) === 0) {
             $cleanMobile = '9876543210';
+        }
+
+        // Clean email (store null if missing or invalid)
+        $cleanEmail = $email ? strtolower(trim($email)) : null;
+        if ($cleanEmail === '' || !filter_var($cleanEmail, FILTER_VALIDATE_EMAIL)) {
+            $cleanEmail = null;
         }
 
         // Clean budget and property type if they came from top-level raw fields
@@ -235,6 +249,14 @@ class MetaLeadMapper
         foreach ($customQuestions as $q => $a) {
             $cleanQ = trim($q, "?:!-_ \t\n\r\0\x0B");
             $readableQ = ucwords(str_replace(['_', '-'], ' ', $cleanQ));
+            $lowerQ = strtolower($readableQ);
+            // Avoid duplicate lines if already added as primary attributes
+            if ($city && in_array($lowerQ, ['city', 'town']) && strcasecmp($a, $city) === 0) {
+                continue;
+            }
+            if ($location && in_array($lowerQ, ['location', 'locality']) && strcasecmp($a, $location) === 0) {
+                continue;
+            }
             $reqParts[] = "{$readableQ}: {$a}";
         }
 
@@ -255,13 +277,14 @@ class MetaLeadMapper
         return [
             'name' => $name,
             'mobile' => $cleanMobile,
-            'email' => $email ?: '',
+            'email' => $cleanEmail,
             'city' => $city ?: '',
             'location' => $location ?: null,
             'budget' => $budget ?: '',
             'property_type' => $propertyType ?: '',
             'requirement' => $requirement,
             'source' => 'meta',
+            'extracted_details' => $extracted ?? [],
             'campaign' => $campaignName,
             'campaign_id' => $campaignId,
             'ad_set' => $adsetName,

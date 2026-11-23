@@ -141,6 +141,33 @@ class LeadPropertyAndBudgetActualDataTest extends TestCase
         $this->assertEquals(3499000, $mapped['budget']);
         $this->assertEquals('Retail Space (100 Sq. Ft.)', $mapped['property_type']);
         $this->assertEquals('Babarala', $mapped['city']);
+        $this->assertEquals('Greater Noida West', $mapped['location']);
+    }
+
+    public function test_lead_details_storage_for_lead_with_call_time_and_visit_time_and_location(): void
+    {
+        $mapper = new MetaLeadMapper();
+        $mapped = $mapper->map([
+            'full_name' => 'Sandeep Kumar',
+            'phone_number' => '919999999999',
+            'field_data' => [
+                ['name' => 'WHICH RETAIL SPACE SIZE ARE YOU INTERESTED IN', 'values' => ['100 Sq. Ft. — ₹34.99 Lakh Est. Rental ₹29, 158/month']],
+                ['name' => 'SUITABLE TIME FOR CALL', 'values' => ['☎️ 10:00 AM – 12:00 PM']],
+                ['name' => 'CITY', 'values' => ['Noida']],
+                ['name' => 'WHEN WOULD YOU LIKE TO SCHEDULE YOUR SITE VISIT', 'values' => ['Within 15 Days']],
+                ['name' => 'DO YOU WANT TO BUY A COMMERCIAL RETAIL SPACE IN GREATER NOIDA WEST', 'values' => ['Rental Income']],
+            ],
+            'campaign_name' => 'BW_01',
+            'adset_name' => 'BW_01',
+            'ad_name' => 'BW_01',
+            'form_id' => '1857617518772178',
+        ]);
+
+        $this->assertEquals(3499000, $mapped['budget']);
+        $this->assertEquals('Retail Space (100 Sq. Ft.)', $mapped['property_type']);
+        $this->assertEquals('Noida', $mapped['city']);
+        $this->assertEquals('Greater Noida West', $mapped['location']);
+        $this->assertNull($mapped['email']);
     }
 
     public function test_meta_lead_sync_parse_budget_returns_null_instead_of_75_lakhs_for_missing_budget(): void

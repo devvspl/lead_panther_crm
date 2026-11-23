@@ -198,7 +198,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 }
 
                 $mobile = $mapped['mobile'] ?? '';
-                $email = $mapped['email'] ?? 'unknown@example.com';
+                $email = !empty($mapped['email']) && $mapped['email'] !== 'unknown@example.com' ? $mapped['email'] : null;
 
                 // 2. 90-Day Duplicate Check
                 $existingLead = Lead::where('client_id', $clientId)
@@ -302,6 +302,15 @@ class ProcessInboundLeadJob implements ShouldQueue
                 }
                 if (!empty($mapped['custom_fields'])) {
                     LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'meta_form_answers', 'value' => json_encode($mapped['custom_fields'])]);
+                }
+                if (!empty($mapped['extracted_details']['purpose'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'investment_purpose', 'value' => $mapped['extracted_details']['purpose']]);
+                }
+                if (!empty($mapped['extracted_details']['call_time'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'preferred_call_time', 'value' => $mapped['extracted_details']['call_time']]);
+                }
+                if (!empty($mapped['extracted_details']['visit_time'])) {
+                    LeadMetadata::create(['lead_id' => $lead->id, 'key' => 'preferred_visit_time', 'value' => $mapped['extracted_details']['visit_time']]);
                 }
 
                 LeadMetadata::create([

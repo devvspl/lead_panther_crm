@@ -399,6 +399,11 @@ class Lead extends Model
         return \App\Support\LeadPropertyAndBudgetExtractor::resolveBudget($this);
     }
 
+    public function getActualLocationAttribute(): ?string
+    {
+        return \App\Support\LeadPropertyAndBudgetExtractor::resolveLocation($this);
+    }
+
     public function getBudgetFormattedAttribute(): string
     {
         if (!\App\Support\FinancialVisibility::allowed()) return '—';

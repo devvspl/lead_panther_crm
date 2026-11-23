@@ -162,7 +162,7 @@
                     <div>
                         <span class="text-[10px] text-muted block">City / Location</span>
                         <span class="font-semibold text-ink block mt-0.5">{{ $lead->city ?: 'N/A' }}
-                            {{ $lead->location ? '(' . $lead->location . ')' : '' }}</span>
+                            {{ $lead->actual_location ? '(' . $lead->actual_location . ')' : '' }}</span>
                     </div>
                     @endif
                     @if($displayConfig['project'] ?? true)

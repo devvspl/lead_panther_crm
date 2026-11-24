@@ -591,14 +591,12 @@
                                                     @else
                                                         <button type="button"
                                                             wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'original')"
-                                                            class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View
-                                                            Original</button>
+                                                            class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View Original</button>
                                                         @if((is_object($row) ? $row->status : $row['status']) === 'approved')
                                                             @if(is_object($row) ? $row->replacement_lead_id : ($row['replacement_lead_id'] ?? null))
                                                                 <button type="button"
                                                                     wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'replacement')"
-                                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View
-                                                                    Replacement</button>
+                                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View Replacement</button>
                                                             @else
                                                                 <span class="text-[11px] text-muted">No replacement linked</span>
                                                             @endif
@@ -1077,14 +1075,12 @@
                                                     @else
                                                         <button type="button"
                                                             wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'original')"
-                                                            class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View
-                                                            Original</button>
+                                                            class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-canvas text-ink hover:bg-surface cursor-pointer">View Original</button>
                                                         @if((is_object($row) ? $row->status : $row['status']) === 'approved')
                                                             @if(is_object($row) ? $row->replacement_lead_id : ($row['replacement_lead_id'] ?? null))
                                                                 <button type="button"
                                                                     wire:click="viewClaimLead({{ is_object($row) ? $row->id : $row['id'] }}, 'replacement')"
-                                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View
-                                                                    Replacement</button>
+                                                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800 cursor-pointer">View Replacement</button>
                                                             @else
                                                                 <span class="text-[11px] text-muted">No replacement linked</span>
                                                             @endif

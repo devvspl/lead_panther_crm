@@ -42,6 +42,26 @@ use App\Livewire\Settings\UserInvite;
 // Signed Public Proposal Viewer Route
 Route::get('/proposals/view/{proposal}', [ProposalViewerController::class, 'view'])->name('proposals.public_view')->middleware('signed');
 
+// PWA Manifest, Offline Fallback & Service Worker
+Route::get('/manifest.json', function () {
+    return response(file_get_contents(public_path('manifest.json')), 200, [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+});
+Route::get('/offline.html', function () {
+    return response(file_get_contents(public_path('offline.html')), 200, [
+        'Content-Type' => 'text/html; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+});
+Route::get('/sw.js', function () {
+    return response(file_get_contents(public_path('sw.js')), 200, [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        'Cache-Control' => 'no-cache',
+    ]);
+});
+
 // Public Landing, Documentation & Legal Pages
 Route::get('/', function () {
     if (auth()->check()) {

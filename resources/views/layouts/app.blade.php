@@ -7,6 +7,19 @@
 
         <title>{{ config('app.name', 'Lead Panther CRM') }}</title>
 
+        <!-- PWA Web App Manifest & Meta Tags -->
+        <link rel="manifest" href="{{ asset('manifest.json') }}">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="Lead Panther">
+        <meta name="application-name" content="Lead Panther">
+        <meta name="theme-color" content="#0A0A0A">
+        <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('icons/apple-touch-icon.png') }}">
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192x192.png') }}">
+        <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+
         <!-- Google Fonts for Theme Customization -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -306,12 +319,15 @@
         <!-- Global Reusable Confirmation Modal -->
         <x-ui.confirmation-modal />
         <x-ui.browser-push-prompt />
+        <x-ui.pwa-install-modal />
 
         @auth
             @if(auth()->user()->hasAnyRole(['Super Admin', 'super-admin']))
                 <livewire:leads.super-admin-lead-modal />
             @endif
         @endauth
+
+        <script src="{{ asset('pwa-install.js') }}?v={{ filemtime(public_path('pwa-install.js')) }}" data-navigate-once></script>
 
         @livewireScripts
     </body>

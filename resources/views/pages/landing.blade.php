@@ -7,6 +7,18 @@
     <meta name="description"
         content="Lead Panther CRM - Automated multi-source lead capture, credit-based distribution, and real-time SLA tracking for real estate builders, channel partners, and sales teams.">
     <title>Lead Panther CRM - Turn Every Lead Into a Closed Deal</title>
+    <!-- PWA Web App Manifest & Meta Tags -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Lead Panther">
+    <meta name="application-name" content="Lead Panther">
+    <meta name="theme-color" content="#0A0A0A">
+    <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('icons/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icons/icon-192x192.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <x-ui.vite-assets />
 </head>
 
@@ -35,7 +47,17 @@
             </nav>
 
             <!-- Buttons Right -->
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <button type="button" onclick="window.triggerLeadPantherInstall()" data-pwa-install-button
+                    class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas transition cursor-pointer">
+                    <svg data-pwa-icon-install class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM12 9v4m0 0l-2-2m2 2l2-2" />
+                    </svg>
+                    <svg data-pwa-icon-installed class="w-3.5 h-3.5 text-emerald-600 shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span data-pwa-install-label>Install App</span>
+                </button>
                 <a href="{{ route('login') }}"
                     class="text-sm font-medium text-ink hover:text-muted transition-colors px-3 py-2">
                     Log in
@@ -502,6 +524,8 @@
         </div>
     </footer>
 
+    <x-ui.pwa-install-modal />
+    <script src="{{ asset('pwa-install.js') }}?v={{ filemtime(public_path('pwa-install.js')) }}" data-navigate-once></script>
 </body>
 
 </html>

@@ -100,6 +100,19 @@
                         class="flex items-center px-4 py-2 text-xs font-medium text-ink hover:bg-canvas transition">
                         Settings
                     </a>
+                    <button type="button" onclick="window.triggerLeadPantherInstall()" data-pwa-install-button
+                        class="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-ink hover:bg-canvas transition cursor-pointer text-left">
+                        <span class="flex items-center gap-2">
+                            <svg data-pwa-icon-install class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM12 9v4m0 0l-2-2m2 2l2-2" />
+                            </svg>
+                            <svg data-pwa-icon-installed class="w-4 h-4 text-emerald-600 shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span data-pwa-install-label>Install App</span>
+                        </span>
+                        <span data-pwa-badge class="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider hidden bg-emerald-100 text-emerald-800 border border-emerald-200">Installed</span>
+                    </button>
                 </div>
 
                 <div class="border-t border-border my-1"></div>

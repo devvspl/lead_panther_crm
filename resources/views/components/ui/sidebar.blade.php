@@ -127,15 +127,15 @@
     <div class="pt-2 pb-1 border-t border-border mt-auto flex-shrink-0">
         <button type="button" onclick="window.triggerLeadPantherInstall()" data-pwa-install-button
             x-on:click="closeMobileSidebar()"
-            x-on:mouseenter="showSidebarTooltip($event, window.isLeadPantherPWAInstalled ? 'App Installed' : 'Install Lead Panther App')"
+            x-on:mouseenter="showSidebarTooltip($event, window.isLeadPantherPWAInstalled ? 'App Installed' : 'Install Lead Panther')"
             x-on:mouseleave="hideSidebarTooltip()"
             :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
-            class="group relative flex items-center text-sm font-medium rounded-lg text-ink hover:bg-canvas transition cursor-pointer select-none">
+            class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer select-none">
             <div class="flex-shrink-0 flex items-center justify-center">
-                <svg data-pwa-icon-install class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg data-pwa-icon-install class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM12 9v4m0 0l-2-2m2 2l2-2" />
                 </svg>
-                <svg data-pwa-icon-installed class="w-5 h-5 text-emerald-600 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg data-pwa-icon-installed class="w-5 h-5 text-emerald-600 flex-shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>

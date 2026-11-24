@@ -32,6 +32,7 @@
         <div class="min-h-screen flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
             {{ $slot }}
         </div>
+        <x-ui.pwa-install-modal />
         <script src="{{ asset('pwa-install.js') }}?v={{ filemtime(public_path('pwa-install.js')) }}" data-navigate-once></script>
         @livewireScripts
     </body>

@@ -27,17 +27,75 @@
         },
 
         isInstalled() {
-            // Standalone or navigator.standalone is definitive proof of running inside the PWA
             if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
                 return true;
             }
             return localStorage.getItem('leadpanther_pwa_installed') === 'true';
         },
 
+        openModal(tab = null) {
+            if (tab) {
+                window.dispatchEvent(new CustomEvent('pwa-select-tab', { detail: tab }));
+            }
+            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pwa-install-modal' }));
+        },
+
+        async promptAndroid() {
+            if (window.__pwaInstallPrompt) {
+                try {
+                    window.__pwaInstallPrompt.prompt();
+                    const choice = await window.__pwaInstallPrompt.userChoice;
+                    if (choice && choice.outcome === 'accepted') {
+                        localStorage.setItem('leadpanther_pwa_installed', 'true');
+                        this.updateUI();
+                        this.showToast('Installing Lead Panther...', 'success');
+                    }
+                    window.__pwaInstallPrompt = null;
+                } catch (err) {
+                    console.warn('PWA install prompt error:', err);
+                }
+            }
+        },
+
+        async install() {
+            const installed = this.isInstalled();
+            if (installed) {
+                this.openModal();
+                return;
+            }
+
+            // iOS Safari: Open project modal with iOS instructions
+            if (this.isIOS()) {
+                this.openModal('ios');
+                return;
+            }
+
+            // Android / Chromium: if native prompt is available, trigger browser installation prompt
+            if (window.__pwaInstallPrompt) {
+                try {
+                    window.__pwaInstallPrompt.prompt();
+                    const choice = await window.__pwaInstallPrompt.userChoice;
+                    if (choice && choice.outcome === 'accepted') {
+                        localStorage.setItem('leadpanther_pwa_installed', 'true');
+                        this.updateUI();
+                        this.showToast('Installing Lead Panther...', 'success');
+                    }
+                    window.__pwaInstallPrompt = null;
+                } catch (err) {
+                    console.warn('PWA install error:', err);
+                    this.openModal('android');
+                }
+                return;
+            }
+
+            // Desktop or prompt not captured yet: open modal with clear guidance
+            const defaultTab = this.isIOS() ? 'ios' : (/Android/i.test(navigator.userAgent) ? 'android' : 'desktop');
+            this.openModal(defaultTab);
+        },
+
         init() {
             // Register service worker if supported
             if ('serviceWorker' in navigator) {
-                // Ensure registration does not block critical page load
                 window.addEventListener('load', () => {
                     navigator.serviceWorker.register('/browser-push-sw.js', { scope: '/' })
                         .catch(err => console.debug('PWA Service Worker registration:', err));
@@ -65,40 +123,6 @@
             this.updateUI();
             document.addEventListener('livewire:navigated', () => this.updateUI());
             window.addEventListener('popstate', () => this.updateUI());
-        },
-
-        async install() {
-            const installed = this.isInstalled();
-            if (installed) {
-                this.showToast('Lead Panther is already installed on this device.', 'info');
-                return;
-            }
-
-            // iOS Safari: Show step-by-step Add to Home Screen instructions modal
-            if (this.isIOS()) {
-                window.dispatchEvent(new CustomEvent('open-pwa-ios-modal'));
-                return;
-            }
-
-            // Android / Chrome / Edge: Trigger native PWA installation prompt
-            if (window.__pwaInstallPrompt) {
-                try {
-                    window.__pwaInstallPrompt.prompt();
-                    const choice = await window.__pwaInstallPrompt.userChoice;
-                    if (choice && choice.outcome === 'accepted') {
-                        localStorage.setItem('leadpanther_pwa_installed', 'true');
-                        this.updateUI();
-                        this.showToast('Installing Lead Panther...', 'success');
-                    }
-                    window.__pwaInstallPrompt = null;
-                } catch (err) {
-                    console.warn('PWA install error:', err);
-                }
-                return;
-            }
-
-            // Fallback for browsers that already dismissed prompt or require manual menu installation
-            window.dispatchEvent(new CustomEvent('open-pwa-help-modal'));
         },
 
         updateUI() {
@@ -141,6 +165,7 @@
 
     window.LeadPantherPWA = LeadPantherPWA;
     window.triggerLeadPantherInstall = () => LeadPantherPWA.install();
+    window.openLeadPantherInstallModal = (tab) => LeadPantherPWA.openModal(tab);
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => LeadPantherPWA.init());

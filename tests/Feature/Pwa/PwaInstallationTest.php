@@ -92,6 +92,8 @@ class PwaInstallationTest extends TestCase
         // Install App triggers in topbar dropdown & mobile sidebar
         $response->assertSee('data-pwa-install-button', false);
         $response->assertSee('data-pwa-install-label', false);
+        $response->assertSee('data-pwa-badge-new', false);
+        $response->assertSee('NEW', false);
         $response->assertSee('window.triggerLeadPantherInstall()', false);
         $response->assertSee('Install Lead Panther', false);
     }

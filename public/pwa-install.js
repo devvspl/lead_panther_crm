@@ -135,6 +135,7 @@
                 const iconInstall = btn.querySelector('[data-pwa-icon-install]');
                 const iconInstalled = btn.querySelector('[data-pwa-icon-installed]');
                 const badge = btn.querySelector('[data-pwa-badge]');
+                const badgeNew = btn.querySelector('[data-pwa-badge-new]');
 
                 if (installed) {
                     btn.setAttribute('data-installed', 'true');
@@ -143,13 +144,15 @@
                     if (iconInstall) iconInstall.classList.add('hidden');
                     if (iconInstalled) iconInstalled.classList.remove('hidden');
                     if (badge) badge.classList.remove('hidden');
+                    if (badgeNew) badgeNew.classList.add('hidden');
                 } else {
                     btn.setAttribute('data-installed', 'false');
-                    btn.setAttribute('title', 'Install Lead Panther on your phone');
-                    if (label) label.textContent = 'Install App';
+                    btn.setAttribute('title', 'Install Lead Panther on your device');
+                    if (label) label.textContent = 'Install Lead Panther';
                     if (iconInstall) iconInstall.classList.remove('hidden');
                     if (iconInstalled) iconInstalled.classList.add('hidden');
                     if (badge) badge.classList.add('hidden');
+                    if (badgeNew) badgeNew.classList.remove('hidden');
                 }
             });
         },

@@ -49,10 +49,10 @@
         </div>
 
         <!-- Header Actions -->
-        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2.5 min-w-0 max-w-full">
+        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             <!-- Full Workbook Excel Export Button -->
             <button type="button" wire:click="exportFullExcel"
-                class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                class="w-full sm:w-auto justify-center px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
                 title="Export All Clients Tabs into Multi-Sheet Excel">
                 <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -64,7 +64,7 @@
             <!-- Suspend / Activate -->
             <button type="button" wire:click="toggleOrganizationStatus"
                 wire:confirm="Are you sure you want to change this organization's status?"
-                class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                class="w-full sm:w-auto justify-center px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                 @if($organization->status === 'active')
                     <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -84,7 +84,7 @@
 
             @if(!$isEditing)
                 <button type="button" wire:click="startEditing"
-                    class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                    class="w-full sm:w-auto justify-center px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                     <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -94,7 +94,7 @@
             @endif
 
             <button type="button" wire:click="openAddMemberModal"
-                class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-ink text-white hover:bg-neutral-800 text-xs font-semibold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+                class="w-full sm:w-auto justify-center px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-ink text-white hover:bg-neutral-800 text-xs font-semibold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -168,12 +168,12 @@
     <div data-organization-kpis class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3.5 items-stretch">
         @foreach($overviewMetrics as $metric)
             @php $isBalance = $metric['balance'] ?? false; @endphp
-            <div class="min-w-0 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-1.5 sm:gap-2 {{ $isBalance ? 'col-span-2 sm:col-span-2 lg:col-span-1' : '' }}">
+            <div class="min-w-0 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-1 sm:gap-2 {{ $isBalance ? 'col-span-2 sm:col-span-2 lg:col-span-1' : '' }}">
                 <div class="flex items-center justify-between gap-1.5 text-muted text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">
                     <span class="truncate">{{ $metric['label'] }}</span>
                     <x-ui.team-icon :name="$metric['icon']" class="text-primary w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 </div>
-                <div class="text-xl sm:text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
+                <div class="text-lg sm:text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
                 <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[9px] sm:text-[10px] text-muted">
                     <span class="truncate">{{ $metric['description'] }}</span>
                     @if($isBalance)

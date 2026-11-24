@@ -79,8 +79,8 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // All dynamic CRM requests (API, Livewire, leads, etc.): direct network only
-    event.respondWith(fetch(event.request));
+    // All other requests (Livewire updates, API calls, dynamic data): let browser handle natively
+    return;
 });
 
 // Push notification handling

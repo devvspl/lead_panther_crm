@@ -32,7 +32,6 @@
                         <input type="radio" wire:model.live="settings.assignment_mode" value="automatic" class="text-primary focus:ring-primary h-4 w-4">
                         <span class="text-xs font-bold text-ink">Automatic Assignment</span>
                     </div>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Auto</span>
                 </div>
 
                 <!-- Option 2: Manual Assignment (Builder / Developer) -->
@@ -41,7 +40,6 @@
                         <input type="radio" wire:model.live="settings.assignment_mode" value="manual" class="text-primary focus:ring-primary h-4 w-4">
                         <span class="text-xs font-bold text-ink">Manual Assignment (Builder)</span>
                     </div>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">Manual</span>
                 </div>
             </div>
         </div>

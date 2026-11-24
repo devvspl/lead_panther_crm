@@ -155,38 +155,6 @@
         </div>
     @endif
 
-    <!-- Organization KPIs: tab counts and workflows remain independent. -->
-    @php
-        $overviewMetrics = [
-            ['label' => 'Team Members', 'value' => $activeTeamMembersCount, 'description' => 'Active members', 'icon' => 'team'],
-            ['label' => 'Active Projects', 'value' => $activeProjectsCount, 'description' => 'Currently active', 'icon' => 'project'],
-            ['label' => 'Total Leads', 'value' => $totalLeadsCount, 'description' => 'Client leads', 'icon' => 'leads'],
-            ['label' => 'Assigned Leads', 'value' => $directlyAssignedLeadsCount, 'description' => 'With active members', 'icon' => 'check'],
-            ['label' => 'Available Lead Credits', 'value' => $totalWalletBalance, 'description' => 'Remaining credits', 'icon' => 'wallet', 'balance' => true],
-        ];
-    @endphp
-    <div data-organization-kpis class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3.5 items-stretch">
-        @foreach($overviewMetrics as $metric)
-            @php $isBalance = $metric['balance'] ?? false; @endphp
-            <div class="min-w-0 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-surface border border-border shadow-2xs flex flex-col justify-between gap-1 sm:gap-2 {{ $isBalance ? 'col-span-2 sm:col-span-2 lg:col-span-1' : '' }}">
-                <div class="flex items-center justify-between gap-1.5 text-muted text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">
-                    <span class="truncate">{{ $metric['label'] }}</span>
-                    <x-ui.team-icon :name="$metric['icon']" class="text-primary w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                </div>
-                <div class="text-lg sm:text-2xl font-bold font-mono break-words {{ $isBalance ? ($totalWalletBalance >= 50 ? 'text-success' : 'text-warning') : 'text-ink' }}">{{ number_format($metric['value']) }}</div>
-                <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[9px] sm:text-[10px] text-muted">
-                    <span class="truncate">{{ $metric['description'] }}</span>
-                    @if($isBalance)
-                        <div class="w-full flex items-center justify-between gap-1 flex-wrap pt-1 mt-0.5 border-t border-border/50 text-[9px] sm:text-[10px]">
-                            <span class="truncate">Total: {{ number_format($totalLeadCredits) }} / Used: {{ number_format($usedLeadCredits) }} / Remaining: {{ number_format($totalWalletBalance) }} Credits</span>
-                            <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold shrink-0 {{ $totalWalletBalance >= 50 ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20' }}">{{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}</span>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        @endforeach
-    </div>
-
     <!-- Tabbed Navigation Bar -->
     <div class="border-b border-border -mx-4 px-4 sm:mx-0 sm:px-0">
         <nav class="flex space-x-1 sm:space-x-4 -mb-px overflow-x-auto text-xs font-semibold no-scrollbar">

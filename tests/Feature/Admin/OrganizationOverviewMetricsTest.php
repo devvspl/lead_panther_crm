@@ -77,21 +77,20 @@ class OrganizationOverviewMetricsTest extends TestCase
             ->assertViewHas('activeProjectsCount',2)
             ->assertViewHas('totalLeadsCount',3)
             ->assertViewHas('directlyAssignedLeadsCount',1)
-            ->assertViewHas('totalWalletBalance',50);
-        $kpis = explode('<!-- Tabbed Navigation Bar -->',explode('data-organization-kpis',$component->html(),2)[1],2)[0];
-        foreach (['Team Members','Active Projects','Total Leads','Assigned Leads','Available Lead Credits','Sufficient'] as $label) $this->assertStringContainsString($label,$kpis);
-        foreach (['<span>Clients</span>','Opening Balance','Projects & Rate'] as $label) $this->assertStringNotContainsString($label,$kpis);
-        $this->assertSame(5,substr_count($kpis,'<svg'));
+            ->assertViewHas('totalWalletBalance',50)
+            ->assertDontSee('data-organization-kpis', false);
         $component->set('userSearch','No matching name')->assertViewHas('activeTeamMembersCount',3)->assertViewHas('totalLeadsCount',3);
 
         Livewire::test(OrganizationDetail::class,['organization'=>$b])
             ->assertViewHas('activeTeamMembersCount',1)->assertViewHas('activeProjectsCount',1)
             ->assertViewHas('totalLeadsCount',1)->assertViewHas('directlyAssignedLeadsCount',0)
-            ->assertViewHas('totalWalletBalance',7)->assertSee('Low Credits');
+            ->assertViewHas('totalWalletBalance',7)
+            ->assertDontSee('data-organization-kpis', false);
         Livewire::test(OrganizationDetail::class,['organization'=>$empty])
             ->assertViewHas('activeTeamMembersCount',0)->assertViewHas('activeProjectsCount',0)
             ->assertViewHas('totalLeadsCount',0)->assertViewHas('directlyAssignedLeadsCount',0)
-            ->assertViewHas('totalWalletBalance',0.0);
+            ->assertViewHas('totalWalletBalance',0.0)
+            ->assertDontSee('data-organization-kpis', false);
     }
 
     public function test_member_project_assignment_and_wallet_changes_are_reflected_on_refresh(): void
@@ -105,14 +104,38 @@ class OrganizationOverviewMetricsTest extends TestCase
         $lead = $this->lead($owner,$executive);
         $component = Livewire::test(OrganizationDetail::class,['organization'=>$org])
             ->assertViewHas('activeTeamMembersCount',2)->assertViewHas('activeProjectsCount',1)
-            ->assertViewHas('directlyAssignedLeadsCount',1)->assertViewHas('totalWalletBalance',50.0)->assertSee('Sufficient');
+            ->assertViewHas('directlyAssignedLeadsCount',1)->assertViewHas('totalWalletBalance',50.0)
+            ->assertDontSee('data-organization-kpis', false);
         $executive->update(['status'=>'inactive']);
         $project->update(['status'=>'inactive']);
         $wallet->update(['balance'=>23]);
         $component->call('$refresh')->assertViewHas('activeTeamMembersCount',1)->assertViewHas('activeProjectsCount',0)
             ->assertViewHas('totalLeadsCount',1)->assertViewHas('directlyAssignedLeadsCount',0)
-            ->assertViewHas('totalWalletBalance',23)->assertSee('Low Credits');
+            ->assertViewHas('totalWalletBalance',23);
         $lead->update(['assigned_to'=>null]);
         $component->call('$refresh')->assertViewHas('directlyAssignedLeadsCount',0);
+    }
+
+    public function test_kpi_boxes_are_completely_removed_from_all_tabs(): void
+    {
+        $org = Organization::create(['name' => 'Tab Switching Org', 'status' => 'active']);
+        $this->owner('Tab Owner', $org);
+
+        $component = Livewire::test(OrganizationDetail::class, ['organization' => $org]);
+
+        // Default tab is 'overview': KPI boxes should not be visible
+        $component->assertDontSee('data-organization-kpis', false);
+
+        // Switch to 'leads' tab: KPI boxes must not be visible
+        $component->call('setTab', 'leads');
+        $component->assertDontSee('data-organization-kpis', false);
+
+        // Switch to 'team' tab: KPI boxes must not be visible
+        $component->call('setTab', 'team');
+        $component->assertDontSee('data-organization-kpis', false);
+
+        // Switch back to 'overview': KPI boxes must still not be visible
+        $component->call('setTab', 'overview');
+        $component->assertDontSee('data-organization-kpis', false);
     }
 }

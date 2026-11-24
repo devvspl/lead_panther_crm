@@ -35,12 +35,15 @@ class OrganizationProjectSettingsTest extends TestCase
             ->call('saveProjectMapping')->assertHasNoErrors();
         $project = Project::withoutGlobalScopes()->where('name', 'Mapped Project')->firstOrFail();
         $this->assertEquals($owner->id, $project->client_id);
-        $component->set('activeTab', 'credits')->assertSee('Project-wise Lead Pricing')
+        $component->set('activeTab', 'clients')->assertSee('Lead Cost')
             ->set('projectRates.'.$project->id, '23.50')->call('saveProjectRate', $project->id)->assertHasErrors('projectRates.'.$project->id);
         $component->set('projectRates.'.$project->id, '23')->call('saveProjectRate', $project->id)->assertHasNoErrors();
         $this->assertEquals(23, $project->fresh()->lead_cost);
         $component->set('projectRates.'.$project->id, '')->call('saveProjectRate', $project->id)->assertHasNoErrors();
         $this->assertNull($project->fresh()->lead_cost);
+        $component->set('activeTab', 'credits')
+            ->assertDontSee('Project-wise Lead Pricing')
+            ->assertDontSee('Reconciliations and corrections are recorded in the ledger');
         $otherOrg = Organization::create(['name' => 'Other Org']);
         $other = User::factory()->create(['organization_id' => $otherOrg->id]);
         $other->assignRole('Builder/Developer');

@@ -894,7 +894,30 @@
                             </td>
                             <td class="p-4">{{ $project->client_name }}</td>
                             <td class="p-4">{{ ucfirst($project->status) }}</td>
-                            <td class="p-4">{{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</td>
+                            <td class="p-4">
+                                <form wire:submit="saveProjectRate({{ $project->id }})" class="flex items-center gap-1.5">
+                                    <input type="number" step="1" min="1"
+                                        wire:model="projectRates.{{ $project->id }}"
+                                        aria-label="Lead cost for {{ $project->name }}"
+                                        placeholder="{{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }}"
+                                        class="w-24 h-8 rounded-lg border border-border bg-canvas px-2.5 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:border-primary" />
+                                    <button type="submit"
+                                        title="Save Lead Cost"
+                                        class="h-8 px-2.5 rounded-lg bg-ink hover:bg-ink/90 text-white text-[11px] font-semibold transition cursor-pointer shrink-0">
+                                        Save
+                                    </button>
+                                </form>
+                                <div class="text-[10px] text-muted mt-1">
+                                    @if($project->lead_cost !== null)
+                                        <span class="text-primary font-medium">Override: {{ number_format($project->lead_cost, 0) }} cr</span>
+                                    @else
+                                        <span>Inherited: {{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }} cr</span>
+                                    @endif
+                                </div>
+                                @error('projectRates.'.$project->id)
+                                    <p class="text-[10px] text-red-600 mt-0.5">{{ $message }}</p>
+                                @enderror
+                            </td>
                             <td class="p-4 text-right">
                                 <div class="inline-flex items-center gap-2 justify-end">
                                     <button type="button" wire:click="openEditProjectModal({{ $project->id }})" title="Edit Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer text-xs font-semibold">
@@ -1002,21 +1025,6 @@
                 </div>
             </div>
 
-            <p class="text-xs text-muted rounded-lg border border-border p-3">Total: {{ number_format($totalLeadCredits) }} Credits / Used: {{ number_format($usedLeadCredits) }} Credits / Remaining: {{ number_format($totalWalletBalance) }} Credits. Reconciliations and corrections are recorded in the ledger.</p>
-
-            <section class="bg-surface rounded-2xl border border-border p-5 space-y-4">
-                <h3 class="text-sm font-bold text-ink">Project-wise Lead Pricing</h3>
-                <p class="text-xs text-muted">Set a project override or leave it blank to inherit organization pricing. Team pricing, when configured for delivery, follows the existing pricing hierarchy. Wallets belong to billing clients.</p>
-                @forelse($projects as $project)
-                    <form wire:submit="saveProjectRate({{ $project->id }})" wire:key="project-rate-{{ $project->id }}" class="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-border pt-3">
-                        <div class="flex-1"><strong class="text-xs">{{ $project->name }}</strong><p class="text-xs text-muted">{{ $project->client_name }} · {{ $project->lead_cost !== null ? 'Project override' : 'Inherited organization/global rate' }}: {{ number_format($project->lead_cost ?? $organization->lead_cost ?? $globalDefaultLeadCost, 0) }} Credits</p></div>
-                        <div><input type="number" step="1" min="1" wire:model="projectRates.{{ $project->id }}" aria-label="Lead cost for {{ $project->name }}" placeholder="Inherit organization rate" class="w-full sm:w-48 rounded-lg border border-border bg-canvas p-2 text-xs" />@error('projectRates.'.$project->id)<p class="text-xs text-red-600">{{ $message }}</p>@enderror</div>
-                        <button type="submit" class="rounded-lg bg-ink text-white px-4 py-2 text-xs font-semibold">Save Rate</button>
-                    </form>
-                @empty
-                    <p class="text-xs text-muted">Map projects in the Projects tab to configure project pricing.</p>
-                @endforelse
-            </section>
             <!-- Controls bar for Credits Ledger -->
             <div
                 class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">

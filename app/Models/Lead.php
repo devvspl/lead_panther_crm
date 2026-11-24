@@ -127,7 +127,7 @@ class Lead extends Model
         $actions = match (static::normalizeStage($this->current_stage)) {
             'new', 'assigned', 'contacted' => ['logCallAction', 'markInterestedAction', 'addRemarksAction'],
             'interested' => ['addRemarksAction', 'scheduleFollowupAction'],
-            'follow_up' => ['scheduleFollowupAction', 'completeFollowupAction', 'rescheduleFollowupAction', 'scheduleMeetingAction'],
+            'follow_up' => ['scheduleFollowupAction', 'completeFollowupAction', 'rescheduleFollowupAction', 'cancelFollowupAction', 'scheduleMeetingAction'],
             'meeting_scheduled' => ['scheduleMeetingAction', 'updateMeetingStatusAction', 'saveSiteVisitAction'],
             'site_visit' => ['saveSiteVisitAction', 'saveNegotiationAction'],
             'negotiation' => ['saveNegotiationAction', 'saveBookingAction'],
@@ -469,6 +469,63 @@ class Lead extends Model
             return 'Response ' . $this->first_response_at->diffForHumans();
         }
         return 'Created ' . ($this->created_at ? $this->created_at->diffForHumans() : '-');
+    }
+
+    public function nextPendingFollowup(): ?Followup
+    {
+        return $this->followups()
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', Followup::STATUS_PENDING);
+            })
+            ->orderBy('due_at', 'asc')
+            ->first();
+    }
+
+    public function lastCompletedFollowup(): ?Followup
+    {
+        return $this->followups()
+            ->where('status', Followup::STATUS_COMPLETED)
+            ->orderBy('completed_at', 'desc')
+            ->orderBy('due_at', 'desc')
+            ->first();
+    }
+
+    public function getLastFollowupAttribute(): string
+    {
+        $f = $this->lastCompletedFollowup();
+        if ($f && ($f->completed_at || $f->due_at)) {
+            $date = $f->completed_at ?? $f->due_at;
+            return Carbon::parse($date)->format('M d, H:i');
+        }
+
+        return '-';
+    }
+
+    public function getLastFollowupOutcomeAttribute(): ?string
+    {
+        $f = $this->lastCompletedFollowup();
+        if (! $f) {
+            return null;
+        }
+
+        return $f->outcome_label ?? $f->outcome ?? ($f->outcome_notes ? \Illuminate\Support\Str::limit($f->outcome_notes, 30) : null);
+    }
+
+    public function getFollowupUrgencyAttribute(): string
+    {
+        $f = $this->nextPendingFollowup();
+        if (! $f || ! $f->due_at) {
+            return 'none';
+        }
+
+        if ($f->due_at->isPast()) {
+            return 'overdue';
+        }
+        if ($f->due_at->isToday()) {
+            return 'due_today';
+        }
+
+        return 'upcoming';
     }
 
     public function getNextFollowupAttribute(): string

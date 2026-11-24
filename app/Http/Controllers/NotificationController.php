@@ -18,8 +18,9 @@ class NotificationController extends Controller
             $processing = \App\Models\InternalLeadProcessing::findOrFail($id);
             abort_unless(app(\App\Services\LeadDistributionService::class)->canProcessInternal($processing, $user), 403);
             $target = route('leads.index', ['queue' => 'internal', 'processing' => $processing->id]);
-        } elseif ($entity === 'lead') {
-            $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->findOrFail($id);
+        } elseif ($entity === 'lead' || $entity === 'followup') {
+            $leadId = $entity === 'followup' ? (\App\Models\Followup::find($id)?->lead_id ?? ($data['lead_id'] ?? $id)) : $id;
+            $lead = (Lead::usesSalesPanel() ? Lead::panelQuery() : Lead::query())->findOrFail($leadId);
             $target = route('leads.index', ['search' => $lead->lead_code, 'notification_lead' => $lead->id]);
         } elseif (in_array($entity, ['campaign', 'project'])) {
             $campaign = $entity === 'campaign' ? Campaign::withoutGlobalScopes()->findOrFail($id) : null;

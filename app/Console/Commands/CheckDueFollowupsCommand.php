@@ -2,44 +2,47 @@
 
 namespace App\Console\Commands;
 
+use App\Models\InternalLeadProcessing;
+use App\Services\FollowupEscalationService;
+use App\Services\LeadDistributionService;
 use Illuminate\Console\Command;
-use App\Models\Followup;
-use App\Models\User;
-use App\Notifications\FollowupDueNotification;
 
 class CheckDueFollowupsCommand extends Command
 {
     protected $signature = 'followups:check-due';
-    protected $description = 'Check and send notifications for due follow-ups';
+    protected $description = 'Check, remind, and escalate scheduled lead follow-ups across executive, team leader, and builder tiers.';
 
-    public function handle(): int
+    public function handle(FollowupEscalationService $escalationService): int
     {
-        $dueFollowups = Followup::where('due_at', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('status')->orWhere('status', 'pending');
-            })
-            ->get();
-
-        $count = 0;
-        \App\Models\InternalLeadProcessing::whereNull('handover_requested_at')->whereNull('forwarded_at')->where('next_followup_at', '<=', now())
+        // 1. Process Internal Processing queue follow-ups
+        InternalLeadProcessing::whereNull('handover_requested_at')
+            ->whereNull('forwarded_at')
+            ->where('next_followup_at', '<=', now())
             ->chunkById(100, function ($records) {
-                foreach ($records as $record) app(\App\Services\LeadDistributionService::class)->internalAlert($record, 'internal_followup_due', 'Internal follow-up is due', 'followup:'.$record->id.':'.$record->next_followup_at->toIso8601String());
+                foreach ($records as $record) {
+                    app(LeadDistributionService::class)->internalAlert(
+                        $record,
+                        'internal_followup_due',
+                        'Internal follow-up is due',
+                        'followup:' . $record->id . ':' . $record->next_followup_at->toIso8601String()
+                    );
+                }
             });
-        foreach ($dueFollowups as $followup) {
-            $lead = \App\Models\Lead::withoutGlobalScopes()->find($followup->lead_id);
-            if (! $lead || $lead->delivery_pending) continue;
-            $service = app(\App\Services\NotificationDeliveryService::class);
-            $key = 'followup:'.$followup->id.':'.$followup->due_at->toDateTimeString();
-            $user = User::find($lead->assigned_to);
-            $alreadySent = $user && \Illuminate\Notifications\DatabaseNotification::where('event_key', hash('sha256', $user->id.'|'.$key))->exists();
-            $service->leadAlert($lead, 'followup_due', 'Follow-up reminder due', "Follow-up for {$lead->lead_code} is due.", $key, 'followup');
-            if ($user && ! $alreadySent && $service->webAllowed($user, 'followup', false) && $user->organization_id == User::find($lead->client_id)?->organization_id) {
-                $user->notify(new FollowupDueNotification($followup));
-            }
-            $count++;
-        }
 
-        $this->info("Follow-up check completed: notified for {$count} due follow-ups.");
+        // 2. Process all sales follow-up reminders and escalations
+        $results = $escalationService->process();
+
+        $totalNotified = array_sum($results);
+        $this->info(sprintf(
+            'Follow-up engine processed: %d actions (Upcoming: %d, Due: %d, Overdue: %d, TL Escalated: %d, Admin Escalated: %d).',
+            $totalNotified,
+            $results['upcoming'],
+            $results['due'],
+            $results['overdue_executive'],
+            $results['escalated_tl'],
+            $results['escalated_admin']
+        ));
+
         return Command::SUCCESS;
     }
 }

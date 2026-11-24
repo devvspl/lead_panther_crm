@@ -454,6 +454,90 @@
             </div>
 
             <!-- ========================================================= -->
+            <!-- SECTION 5B: FOLLOW-UP & REMINDER OVERVIEW                 -->
+            <!-- ========================================================= -->
+            @php
+                $nextFu = $lead->nextPendingFollowup();
+                $lastFu = $lead->lastCompletedFollowup();
+                $urgency = $lead->followup_urgency;
+            @endphp
+            <div class="p-4 bg-canvas rounded-xl border border-border space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Follow-Up Schedule &amp; Activity
+                    </span>
+                    @if($urgency === 'overdue')
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            Overdue Follow-up
+                        </span>
+                    @elseif($urgency === 'due_today')
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Due Today
+                        </span>
+                    @elseif($urgency === 'upcoming')
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            Scheduled
+                        </span>
+                    @else
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                            No Pending Action
+                        </span>
+                    @endif
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <!-- Next Follow-up -->
+                    <div class="p-2.5 rounded-lg bg-surface border border-border space-y-1">
+                        <div class="flex items-center justify-between text-[10px] text-muted font-semibold">
+                            <span>NEXT SCHEDULED</span>
+                            @if($nextFu)
+                                <span class="capitalize px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">{{ $nextFu->type_label }}</span>
+                            @endif
+                        </div>
+                        @if($nextFu)
+                            <div class="font-bold text-ink text-sm">
+                                {{ $nextFu->due_at->format('d M Y, h:i A') }}
+                            </div>
+                            <p class="text-[11px] text-muted truncate" title="{{ $nextFu->note }}">{{ $nextFu->note ?: 'Customer follow-up discussion' }}</p>
+                            @if($nextFu->escalation_level > 0)
+                                <span class="inline-block mt-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                    ⚠️ Escalation Level {{ $nextFu->escalation_level }}: {{ $nextFu->escalation_notes }}
+                                </span>
+                            @endif
+                        @else
+                            <div class="text-muted font-medium py-1">No upcoming follow-up scheduled</div>
+                        @endif
+                    </div>
+
+                    <!-- Last Follow-up -->
+                    <div class="p-2.5 rounded-lg bg-surface border border-border space-y-1">
+                        <div class="flex items-center justify-between text-[10px] text-muted font-semibold">
+                            <span>LAST COMPLETED</span>
+                            @if($lastFu && $lastFu->outcome)
+                                <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">{{ $lastFu->outcome_label }}</span>
+                            @endif
+                        </div>
+                        @if($lastFu)
+                            <div class="font-bold text-ink text-sm">
+                                {{ ($lastFu->completed_at ?? $lastFu->due_at)->format('d M Y, h:i A') }}
+                            </div>
+                            <p class="text-[11px] text-muted truncate" title="{{ $lastFu->outcome_notes ?: $lastFu->note }}">
+                                {{ $lastFu->outcome_notes ?: ($lastFu->note ?: 'Follow-up discussion completed') }}
+                            </p>
+                            @if($lastFu->completedBy)
+                                <p class="text-[10px] text-muted font-mono">By {{ $lastFu->completedBy->name }}</p>
+                            @endif
+                        @else
+                            <div class="text-muted font-medium py-1">No prior completed follow-ups</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================= -->
             <!-- SECTION 6: DYNAMIC STAGE-SPECIFIC DETAILS & ACTIONS       -->
             <!-- ========================================================= -->
             <div class="p-4 rounded-xl border-2 border-primary/20 bg-primary/5 space-y-4">
@@ -550,15 +634,24 @@
                                     placeholder="e.g. Looking for 3 BHK high-floor facing park, ready to visit next weekend..."
                                     class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5"></textarea>
                             </div>
-                            <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
-                                    <label class="text-[10px] font-semibold text-muted">Schedule Follow-up Date &amp;
-                                        Time</label>
+                                    <label class="text-[10px] font-semibold text-muted">Follow-up Type</label>
+                                    <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5 cursor-pointer">
+                                        <option value="call">Phone Call</option>
+                                        <option value="whatsapp">WhatsApp Message</option>
+                                        <option value="meeting">Face-to-Face Meeting</option>
+                                        <option value="site_visit">Site Visit</option>
+                                        <option value="other">Other Action</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-semibold text-muted">Schedule Date &amp; Time</label>
                                     <input type="datetime-local" wire:model="followupDueAt"
                                         class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                 </div>
                                 <div>
-                                    <label class="text-[10px] font-semibold text-muted">Follow-up Call Objective</label>
+                                    <label class="text-[10px] font-semibold text-muted">Objective / Agenda</label>
                                     <input type="text" wire:model="followupNote" placeholder="Confirm site visit appointment"
                                         class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                 </div>
@@ -574,59 +667,241 @@
                         <!-- STAGE: FOLLOW-UP & REMINDER                           -->
                         <!-- ----------------------------------------------------- -->
                     @elseif($actionStage === 'follow_up')
-                        <div class="space-y-3 bg-surface p-3.5 rounded-lg border border-border">
-                            <span class="text-xs font-bold text-ink block">Active Follow-up Queue</span>
+                        <div class="space-y-4 bg-surface p-3.5 rounded-lg border border-border">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-ink block">Follow-Up Management</span>
+                                <span class="text-[10px] text-muted font-medium">Stage 3 &bull; Scheduled Actions</span>
+                            </div>
                             @php
-                                $activeFollowup = $lead->followups()->where('status', 'pending')->orderBy('due_at', 'asc')->first();
+                                $activeFollowup = $lead->followups()->where(function($q) { $q->whereNull('status')->orWhere('status', 'pending'); })->orderBy('due_at', 'asc')->first();
                             @endphp
                             @if($activeFollowup)
-                                <div
-                                    class="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200 text-xs flex items-center justify-between">
-                                    <div>
-                                        <span class="font-bold text-amber-900 block">Scheduled Follow-up Call</span>
-                                        <p class="text-[11px] text-amber-800">{{ $activeFollowup->note ?: 'Follow-up discussion' }}
-                                        </p>
+                                <div class="p-3 rounded-lg bg-amber-50/70 border border-amber-200 text-xs space-y-2">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="space-y-0.5">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="font-bold text-amber-950">{{ $activeFollowup->type_label }}</span>
+                                                <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-800">Pending</span>
+                                                @if($activeFollowup->urgency === 'overdue')
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-300">Overdue</span>
+                                                @elseif($activeFollowup->urgency === 'due_today')
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">Due Today</span>
+                                                @endif
+                                            </div>
+                                            <p class="text-amber-900 font-medium">{{ $activeFollowup->note ?: 'Follow-up discussion scheduled' }}</p>
+                                        </div>
+                                        <span class="font-mono text-xs font-bold text-amber-900 bg-surface px-2.5 py-1 rounded border border-amber-200 shrink-0">
+                                            {{ \Carbon\Carbon::parse($activeFollowup->due_at)->format('M d, H:i') }}
+                                        </span>
                                     </div>
-                                    <span
-                                        class="font-mono text-[11px] font-bold text-amber-800 bg-surface px-2 py-1 rounded border border-amber-200">
-                                        {{ \Carbon\Carbon::parse($activeFollowup->due_at)->format('M d, H:i') }}
-                                    </span>
+
+                                    @if($activeFollowup->escalation_level > 0)
+                                        <div class="p-2 rounded bg-rose-100/80 border border-rose-300 text-[11px] text-rose-900 flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                            <span><strong>Escalated (Tier {{ $activeFollowup->escalation_level }}):</strong> {{ $activeFollowup->escalation_notes }}</span>
+                                        </div>
+                                    @endif
+
+                                    <!-- Action Buttons -->
+                                    <div class="flex items-center gap-2 pt-1 flex-wrap">
+                                        <button type="button" wire:click="$set('completingFollowupId', {{ $activeFollowup->id }})"
+                                            class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex-1 cursor-pointer transition">
+                                            Complete Follow-Up
+                                        </button>
+                                        <button type="button" wire:click="$set('reschedulingFollowupId', {{ $activeFollowup->id }})"
+                                            class="px-3 py-1.5 rounded-lg bg-surface border border-border text-ink hover:bg-canvas font-semibold text-xs cursor-pointer transition">
+                                            Reschedule
+                                        </button>
+                                        <button type="button" wire:click="$set('cancellingFollowupId', {{ $activeFollowup->id }})"
+                                            class="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold text-xs cursor-pointer transition">
+                                            Cancel
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-2 pt-1">
-                                    <button type="button" wire:click="completeFollowupAction({{ $activeFollowup->id }})"
-                                        class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex-1 cursor-pointer">
-                                        Mark Completed
-                                    </button>
-                                    <button type="button" wire:click="$set('completingFollowupId', {{ $activeFollowup->id }})"
-                                        class="px-3 py-1.5 rounded-lg bg-surface border border-border text-ink hover:bg-canvas font-semibold text-xs cursor-pointer">
-                                        Reschedule Call
-                                    </button>
-                                </div>
+
+                                <!-- Inline Complete Form -->
                                 @if($completingFollowupId === $activeFollowup->id)
-                                    <input aria-label="New follow-up time" type="datetime-local" wire:model="followupDueAt"
-                                        class="w-full text-xs rounded-lg border-border">
-                                    <textarea aria-label="Follow-up remarks" wire:model="followupNote"
-                                        class="w-full text-xs rounded-lg border-border"></textarea>
-                                    <x-ui.button wire:click="rescheduleFollowupAction({{ $activeFollowup->id }})">Save Rescheduled
-                                        Follow-up</x-ui.button>
+                                    <div class="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/40 space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-emerald-950">Record Follow-Up Outcome</span>
+                                            <button type="button" wire:click="$set('completingFollowupId', null)" class="text-xs text-muted hover:text-ink cursor-pointer">&times; Close</button>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                            <div>
+                                                <label class="text-[10px] font-semibold text-ink">Outcome Status <span class="text-rose-500">*</span></label>
+                                                <select wire:model="followupOutcome" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                    @foreach(\App\Models\Followup::outcomeOptions() as $val => $lbl)
+                                                        <option value="{{ $val }}">{{ $lbl }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-semibold text-ink">Discussion Notes / Remarks</label>
+                                                <input type="text" wire:model="followupOutcomeNotes" placeholder="Client feedback and discussion summary"
+                                                    class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5">
+                                            </div>
+                                        </div>
+
+                                        <!-- Schedule Next Step Checkbox -->
+                                        <div class="pt-2 border-t border-emerald-200/60 space-y-2">
+                                            <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-ink">
+                                                <input type="checkbox" wire:model.live="scheduleNextFollowup" class="rounded border-border text-primary focus:ring-primary">
+                                                <span>Schedule Next Follow-Up Step</span>
+                                            </label>
+
+                                            @if($scheduleNextFollowup)
+                                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                                                    <div>
+                                                        <label class="text-[10px] font-semibold text-muted">Next Type</label>
+                                                        <select wire:model="nextFollowupType" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                            <option value="call">Phone Call</option>
+                                                            <option value="whatsapp">WhatsApp</option>
+                                                            <option value="meeting">Meeting</option>
+                                                            <option value="site_visit">Site Visit</option>
+                                                            <option value="other">Other</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-[10px] font-semibold text-muted">Next Date &amp; Time</label>
+                                                        <input type="datetime-local" wire:model="nextFollowupDueAt"
+                                                            class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-[10px] font-semibold text-muted">Next Objective</label>
+                                                        <input type="text" wire:model="nextFollowupNote" placeholder="Confirm pricing / token"
+                                                            class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5">
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <div class="flex items-center gap-2 pt-1">
+                                            <button type="button" wire:click="completeFollowupAction({{ $activeFollowup->id }})"
+                                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex-1 cursor-pointer">
+                                                Save &amp; Complete Follow-up
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Inline Reschedule Form -->
+                                @if($reschedulingFollowupId === $activeFollowup->id)
+                                    <div class="p-3.5 rounded-lg border border-blue-200 bg-blue-50/40 space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-blue-950">Reschedule Follow-Up</span>
+                                            <button type="button" wire:click="$set('reschedulingFollowupId', null)" class="text-xs text-muted hover:text-ink cursor-pointer">&times; Close</button>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                            <div>
+                                                <label class="text-[10px] font-semibold text-ink">Type</label>
+                                                <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                    <option value="call">Phone Call</option>
+                                                    <option value="whatsapp">WhatsApp</option>
+                                                    <option value="meeting">Meeting</option>
+                                                    <option value="site_visit">Site Visit</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-semibold text-ink">New Date &amp; Time <span class="text-rose-500">*</span></label>
+                                                <input type="datetime-local" wire:model="followupDueAt"
+                                                    class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-semibold text-ink">Updated Agenda / Remarks</label>
+                                                <input type="text" wire:model="followupNote" placeholder="Client requested evening call"
+                                                    class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5">
+                                            </div>
+                                        </div>
+                                        <button type="button" wire:click="rescheduleFollowupAction({{ $activeFollowup->id }})"
+                                            class="w-full py-2 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-lg transition cursor-pointer">
+                                            Save Rescheduled Follow-up
+                                        </button>
+                                    </div>
+                                @endif
+
+                                <!-- Inline Cancel Form -->
+                                @if($cancellingFollowupId === $activeFollowup->id)
+                                    <div class="p-3.5 rounded-lg border border-rose-200 bg-rose-50/40 space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-rose-950">Cancel Scheduled Follow-Up</span>
+                                            <button type="button" wire:click="$set('cancellingFollowupId', null)" class="text-xs text-muted hover:text-ink cursor-pointer">&times; Close</button>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-semibold text-rose-900">Cancellation Reason</label>
+                                            <textarea wire:model="cancellationReason" rows="2" placeholder="e.g. Customer requested not to call, or advance to site visit directly"
+                                                class="w-full text-xs p-2 rounded-lg border border-rose-200 bg-surface text-ink mt-0.5"></textarea>
+                                        </div>
+                                        <button type="button" wire:click="cancelFollowupAction({{ $activeFollowup->id }})"
+                                            class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer">
+                                            Confirm Cancellation
+                                        </button>
+                                    </div>
                                 @endif
                             @else
                                 <p class="text-xs text-muted">No pending follow-up scheduled. Schedule a new one below:</p>
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="text-[10px] font-semibold text-muted">Type</label>
+                                        <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5 cursor-pointer">
+                                            <option value="call">Phone Call</option>
+                                            <option value="whatsapp">WhatsApp Message</option>
+                                            <option value="meeting">Face-to-Face Meeting</option>
+                                            <option value="site_visit">Site Visit</option>
+                                            <option value="other">Other Action</option>
+                                        </select>
+                                    </div>
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Date &amp; Time</label>
                                         <input type="datetime-local" wire:model="followupDueAt"
                                             class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                     </div>
                                     <div>
-                                        <label class="text-[10px] font-semibold text-muted">Call Objective</label>
-                                        <input type="text" wire:model="followupNote" placeholder="Next follow-up objective"
+                                        <label class="text-[10px] font-semibold text-muted">Agenda / Objective</label>
+                                        <input type="text" wire:model="followupNote" placeholder="Follow-up call objective"
                                             class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5">
                                     </div>
                                 </div>
                                 <x-ui.button wire:click="scheduleFollowupAction" variant="primary" class="w-full text-xs">
                                     Schedule Follow-up
                                 </x-ui.button>
+                            @endif
+
+                            <!-- Follow-up History Trail -->
+                            @if(!empty($leadFollowups) && $leadFollowups->count() > 0)
+                                <div class="pt-3 border-t border-border space-y-2">
+                                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Follow-up History ({{ $leadFollowups->count() }})</span>
+                                    <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                                        @foreach($leadFollowups as $fu)
+                                            <div class="p-2 rounded-lg bg-surface border border-border text-xs flex items-start justify-between gap-2">
+                                                <div class="min-w-0 flex-1 space-y-0.5">
+                                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                                        <span class="font-bold text-ink">{{ $fu->type_label }}</span>
+                                                        @if($fu->status === 'completed')
+                                                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                {{ $fu->outcome_label ?: 'Completed' }}
+                                                            </span>
+                                                        @elseif($fu->status === 'cancelled')
+                                                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">Cancelled</span>
+                                                        @else
+                                                            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>
+                                                        @endif
+                                                    </div>
+                                                    <p class="text-[11px] text-muted truncate">
+                                                        {{ $fu->outcome_notes ?: ($fu->note ?: 'No notes recorded') }}
+                                                    </p>
+                                                    @if($fu->status === 'cancelled' && $fu->cancellation_reason)
+                                                        <p class="text-[10px] text-rose-700 italic">Reason: {{ $fu->cancellation_reason }}</p>
+                                                    @endif
+                                                </div>
+                                                <div class="text-right shrink-0">
+                                                    <span class="text-[10px] font-mono text-muted block">{{ \Carbon\Carbon::parse($fu->due_at)->format('d M, H:i') }}</span>
+                                                    <span class="text-[9px] text-muted block">By {{ $fu->creator?->name ?? 'User' }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
                             @endif
                         </div>
 

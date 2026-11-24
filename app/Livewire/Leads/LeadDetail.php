@@ -59,7 +59,27 @@ class LeadDetail extends Component
 
     public string $followupNote = '';
 
+    public string $followupType = 'call';
+
+    public string $followupOutcome = 'connected';
+
+    public string $followupOutcomeNotes = '';
+
     public ?int $completingFollowupId = null;
+
+    public ?int $reschedulingFollowupId = null;
+
+    public ?int $cancellingFollowupId = null;
+
+    public string $cancellationReason = '';
+
+    public bool $scheduleNextFollowup = false;
+
+    public string $nextFollowupDueAt = '';
+
+    public string $nextFollowupType = 'call';
+
+    public string $nextFollowupNote = '';
 
     public string $followupCompleteOutcome = 'Completed';
 
@@ -150,6 +170,17 @@ class LeadDetail extends Component
         // Prepopulate default form dates and fields
         $this->followupDueAt = now()->addDays(1)->format('Y-m-d\TH:i');
         $this->followupNote = '';
+        $this->followupType = 'call';
+        $this->followupOutcome = 'connected';
+        $this->followupOutcomeNotes = '';
+        $this->completingFollowupId = null;
+        $this->reschedulingFollowupId = null;
+        $this->cancellingFollowupId = null;
+        $this->cancellationReason = '';
+        $this->scheduleNextFollowup = false;
+        $this->nextFollowupDueAt = now()->addDays(2)->format('Y-m-d\TH:i');
+        $this->nextFollowupType = 'call';
+        $this->nextFollowupNote = '';
         $this->meetingScheduledAt = now()->addDays(1)->format('Y-m-d\TH:i');
         $this->meetingLocation = 'Site Office';
         $this->visitDate = now()->addDays(2)->format('Y-m-d\TH:i');
@@ -397,22 +428,42 @@ class LeadDetail extends Component
 
         $this->validate([
             'followupDueAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
+            'followupType' => 'required|string|in:call,whatsapp,meeting,site_visit,other',
             'followupNote' => 'nullable|string|max:500',
         ]);
 
         $user = auth()->user();
 
-        Followup::create([
+        $fu = Followup::create([
             'lead_id' => $lead->id,
             'created_by' => $user?->id ?? 1,
             'due_at' => Carbon::parse($this->followupDueAt),
-            'note' => $this->followupNote ?: 'Customer follow-up call',
+            'type' => $this->followupType ?: 'call',
+            'note' => $this->followupNote ?: 'Customer follow-up ' . ($this->followupType ?: 'call'),
             'status' => 'pending',
         ]);
 
-        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'contacted', 'interested'])) {
-            $this->recordStageTransition($lead, 'follow_up', "Follow-up scheduled for {$this->followupDueAt}");
+        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'assigned', 'contacted', 'interested'])) {
+            $this->recordStageTransition($lead, 'follow_up', "Follow-up ({$fu->type_label}) scheduled for {$this->followupDueAt}");
         }
+
+        AuditLog::create([
+            'user_id' => auth()->id() ?? 1,
+            'action' => 'lead.followup_scheduled',
+            'subject_type' => Lead::class,
+            'subject_id' => $lead->id,
+            'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+            'from_value' => null,
+            'to_value' => json_encode([
+                'followup_id' => $fu->id,
+                'due_at' => $this->followupDueAt,
+                'type' => $fu->type,
+                'note' => $fu->note,
+            ]),
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+            'created_at' => now(),
+        ]);
 
         $this->followupNote = '';
         $this->dispatch('toast', type: 'success', message: 'Follow-up scheduled successfully.');
@@ -432,18 +483,58 @@ class LeadDetail extends Component
             if (Lead::usesSalesPanel()) {
                 $this->validatePendingFollowup($fu);
             }
-            $fu->update(['status' => 'completed']);
+
+            if ($this->scheduleNextFollowup) {
+                $this->validate([
+                    'nextFollowupDueAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
+                    'nextFollowupType' => 'required|string|in:call,whatsapp,meeting,site_visit,other',
+                    'nextFollowupNote' => 'nullable|string|max:500',
+                ]);
+            }
+
+            $outcomeNotes = $this->followupOutcomeNotes ?: $this->followupNote;
+            $fu->update([
+                'status' => 'completed',
+                'outcome' => $this->followupOutcome ?: 'connected',
+                'outcome_notes' => $outcomeNotes,
+                'completed_at' => now(),
+                'completed_by' => auth()->id(),
+            ]);
+
+            $nextFu = null;
+            if ($this->scheduleNextFollowup && $this->nextFollowupDueAt) {
+                $nextFu = Followup::create([
+                    'lead_id' => $lead->id,
+                    'created_by' => auth()->id() ?? 1,
+                    'due_at' => Carbon::parse($this->nextFollowupDueAt),
+                    'type' => $this->nextFollowupType ?: 'call',
+                    'note' => $this->nextFollowupNote ?: 'Follow-up next step',
+                    'status' => 'pending',
+                ]);
+            }
+
             AuditLog::create([
                 'user_id' => auth()->id() ?? 1,
                 'action' => 'lead.followup_completed',
                 'subject_type' => Lead::class,
                 'subject_id' => $lead->id,
-                'from_value' => json_encode(['status' => 'pending']),
-                'to_value' => json_encode(['status' => 'completed', 'outcome' => $this->followupCompleteOutcome]),
+                'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+                'from_value' => json_encode(['followup_id' => $fu->id, 'status' => 'pending']),
+                'to_value' => json_encode([
+                    'status' => 'completed',
+                    'outcome' => $fu->outcome,
+                    'outcome_notes' => $fu->outcome_notes,
+                    'next_followup_id' => $nextFu?->id,
+                    'next_due_at' => $this->nextFollowupDueAt ?: null,
+                ]),
                 'ip_address' => request()->ip() ?? '127.0.0.1',
                 'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
                 'created_at' => now(),
             ]);
+
+            $this->completingFollowupId = null;
+            $this->scheduleNextFollowup = false;
+            $this->followupOutcomeNotes = '';
             $this->dispatch('toast', type: 'success', message: 'Follow-up marked completed.');
             $this->dispatch('lead-updated');
         }
@@ -458,6 +549,8 @@ class LeadDetail extends Component
 
         $this->validate([
             'followupDueAt' => Lead::usesSalesPanel() ? 'required|date|after:now' : 'required|date',
+            'followupType' => 'nullable|string|in:call,whatsapp,meeting,site_visit,other',
+            'followupNote' => 'nullable|string|max:500',
         ]);
 
         $fu = Followup::where('lead_id', $lead->id)->find($followupId);
@@ -468,8 +561,12 @@ class LeadDetail extends Component
             $oldDue = $fu->due_at;
             $fu->update([
                 'due_at' => Carbon::parse($this->followupDueAt),
+                'type' => $this->followupType ?: $fu->type,
                 'note' => $this->followupNote ?: $fu->note,
                 'status' => 'pending',
+                'escalation_level' => 0,
+                'escalated_at' => null,
+                'escalation_notes' => null,
             ]);
 
             AuditLog::create([
@@ -477,14 +574,60 @@ class LeadDetail extends Component
                 'action' => 'lead.followup_rescheduled',
                 'subject_type' => Lead::class,
                 'subject_id' => $lead->id,
-                'from_value' => json_encode(['due_at' => $oldDue]),
-                'to_value' => json_encode(['due_at' => $this->followupDueAt, 'note' => $this->followupNote]),
+                'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+                'from_value' => json_encode(['due_at' => $oldDue?->toIso8601String()]),
+                'to_value' => json_encode(['due_at' => $this->followupDueAt, 'type' => $fu->type, 'note' => $this->followupNote]),
                 'ip_address' => request()->ip() ?? '127.0.0.1',
                 'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
                 'created_at' => now(),
             ]);
 
-            $this->dispatch('toast', type: 'success', message: 'Follow-up rescheduled.');
+            $this->reschedulingFollowupId = null;
+            $this->dispatch('toast', type: 'success', message: 'Follow-up rescheduled successfully.');
+            $this->dispatch('lead-updated');
+        }
+    }
+
+    protected function performCancelFollowupAction(int $followupId): void
+    {
+        $lead = $this->getActiveLead();
+        if (! $lead) {
+            return;
+        }
+
+        $this->validate([
+            'cancellationReason' => 'nullable|string|max:500',
+        ]);
+
+        $fu = Followup::where('lead_id', $lead->id)->find($followupId);
+        if ($fu) {
+            if (Lead::usesSalesPanel()) {
+                $this->validatePendingFollowup($fu);
+            }
+
+            $fu->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancelled_by' => auth()->id(),
+                'cancellation_reason' => $this->cancellationReason ?: 'Cancelled by user',
+            ]);
+
+            AuditLog::create([
+                'user_id' => auth()->id() ?? 1,
+                'action' => 'lead.followup_cancelled',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+                'from_value' => json_encode(['followup_id' => $fu->id, 'status' => 'pending']),
+                'to_value' => json_encode(['status' => 'cancelled', 'reason' => $fu->cancellation_reason]),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent() ?? 'LeadPantherCRM/1.0',
+                'created_at' => now(),
+            ]);
+
+            $this->cancellingFollowupId = null;
+            $this->cancellationReason = '';
+            $this->dispatch('toast', type: 'success', message: 'Follow-up cancelled.');
             $this->dispatch('lead-updated');
         }
     }
@@ -886,6 +1029,11 @@ class LeadDetail extends Component
         $this->saveLeadAction('rescheduleFollowupAction', fn () => $this->performRescheduleFollowupAction($followupId));
     }
 
+    public function cancelFollowupAction(int $followupId): void
+    {
+        $this->saveLeadAction('cancelFollowupAction', fn () => $this->performCancelFollowupAction($followupId));
+    }
+
     public function scheduleMeetingAction(): void
     {
         $this->saveLeadAction('scheduleMeetingAction', fn () => $this->performScheduleMeetingAction());
@@ -1152,7 +1300,7 @@ class LeadDetail extends Component
             if ($lead) {
                 $communications = LeadCommunication::where('lead_id', $this->leadId)->latest()->get();
                 $statusHistory = LeadStatusHistory::where('lead_id', $this->leadId)->with('changer')->latest('changed_at')->get();
-                $leadFollowups = Followup::where('lead_id', $this->leadId)->orderBy('due_at', 'desc')->get();
+                $leadFollowups = Followup::where('lead_id', $this->leadId)->with(['creator', 'completedBy', 'cancelledBy'])->orderBy('due_at', 'desc')->get();
                 $leadCalls = LeadCall::where('lead_id', $this->leadId)->latest('called_at')->get();
                 $latestMeeting = $lead->meetings()->latest()->first();
                 $latestSiteVisit = $lead->siteVisits()->latest()->first();

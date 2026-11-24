@@ -31,12 +31,12 @@ class NavigationConfig
 
         $roleMap = [
             'super-admin' => array_merge([
-                'dashboard', 'leads', 'bulk-import', 'distribution', 'credits',
+                'dashboard', 'leads', 'followups', 'bulk-import', 'distribution', 'credits',
                 'replacements', 'reports', 'integrations', 'organizations', 'users', 'audit-logs', 'notifications',
                 'failed-jobs', 'recharge-queue', 'backups', 'git-sync', 'archived-leads'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
-                'dashboard', 'leads', 'team', 'replacements', 'reports'
+                'dashboard', 'leads', 'followups', 'team', 'replacements', 'reports'
             ],
             'team-leader' => ['dashboard','leads','team','followups','reports'],
             'broker' => [
@@ -129,7 +129,11 @@ class NavigationConfig
             ],
             'followups' => [
                 'key' => 'followups',
-                'label' => 'My Follow-ups',
+                'label' => match ($roleKey) {
+                    'team-leader' => 'Team Follow-ups',
+                    'sales-executive' => 'My Follow-ups',
+                    default => 'Follow-ups',
+                },
                 'url' => $hasFollowups ? route('followups.index') : $leadsRoute,
                 'data_nav_route' => 'followups',
                 'data_nav_exact' => 'false',

@@ -383,9 +383,12 @@
                                                 @php
                                                     $badgeStyle = $col['badgeStyle'] ?? null;
                                                     $badgeClass = is_callable($badgeStyle) ? $badgeStyle($val, $row) : ($col['badgeMap'][$val] ?? 'bg-canvas text-ink border border-border');
-                                                    $badgeLabel = $col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val));
+                                                    $badgeLabel = (isset($col['labelFormatter']) && is_callable($col['labelFormatter']))
+                                                        ? $col['labelFormatter']($val, $row)
+                                                        : ($col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val)));
                                                 @endphp
                                                 <span
+                                                    @if(is_object($row) && isset($row->first_response_sla_tooltip) && in_array($colKey, ['first_response_timing', 'first_response_time', 'sla_badge'])) title="{{ $row->first_response_sla_tooltip }}" @endif
                                                     class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
@@ -915,9 +918,13 @@
                                                 @php
                                                     $badgeStyle = $col['badgeStyle'] ?? null;
                                                     $badgeClass = is_callable($badgeStyle) ? $badgeStyle($val, $row) : ($col['badgeMap'][$val] ?? 'bg-canvas text-ink border border-border');
-                                                    $badgeLabel = $col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val));
+                                                    $badgeLabel = (isset($col['labelFormatter']) && is_callable($col['labelFormatter']))
+                                                        ? $col['labelFormatter']($val, $row)
+                                                        : ($col['labels'][$val] ?? ucfirst(str_replace('_', ' ', (string) $val)));
                                                 @endphp
-                                                <span class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
+                                                <span
+                                                    @if(is_object($row) && isset($row->first_response_sla_tooltip) && in_array($colKey, ['first_response_timing', 'first_response_time', 'sla_badge'])) title="{{ $row->first_response_sla_tooltip }}" @endif
+                                                    class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
                                             @elseif($type === 'avatar-stack')

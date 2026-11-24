@@ -42,7 +42,7 @@ class EndToEndLeadWorkflowTest extends TestCase
 
         $this->org = Organization::create(['name' => 'Lodha Developers', 'status' => 'active', 'type' => 'builder']);
         $this->client = Client::create(['organization_id' => $this->org->id, 'name' => 'Lodha Real Estate']);
-        $this->project = Project::create(['client_id' => $this->client->id, 'name' => 'Lodha Altamount']);
+        $this->project = Project::create(['client_id' => $this->client->id, 'name' => 'Lodha Altamount', 'lead_cost' => 10.00]);
         $this->wallet = CreditWallet::create(['client_id' => $this->client->id, 'balance' => 50.00]);
 
         $this->salesExecutive = User::factory()->create([

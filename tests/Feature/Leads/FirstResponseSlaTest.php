@@ -217,4 +217,123 @@ class FirstResponseSlaTest extends TestCase
 
         $this->assertNotNull($lead->fresh()->first_response_at);
     }
+
+    public function test_first_response_timing_formats_and_highlights_correctly(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        [$org, $owner, $exec, $lead] = $this->executiveFixture(15);
+
+        // 1. Not responded yet, 5 minutes elapsed (within 15m SLA)
+        $this->travel(5)->minutes();
+        $this->assertEquals('Waiting 5 min', $lead->fresh()->first_response_timing);
+        $this->assertEquals('pending', $lead->fresh()->first_response_sla_status);
+        $this->assertStringContainsString('amber', $lead->fresh()->first_response_timing_class);
+
+        // 2. Not responded yet, 25 minutes elapsed (overdue 15m SLA)
+        $this->travel(20)->minutes(); // total 25 min
+        $this->assertEquals('Waiting 25 min', $lead->fresh()->first_response_timing);
+        $this->assertEquals('breached', $lead->fresh()->first_response_sla_status);
+        $this->assertStringContainsString('red', $lead->fresh()->first_response_timing_class);
+
+        // 3. Responded at 5 minutes (SLA Met)
+        $metLead = Lead::create([
+            'client_id' => $owner->id,
+            'assigned_to' => $exec->id,
+            'lead_source_id' => $lead->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Fast Prospect',
+            'mobile' => '9888811111',
+            'status' => 'contacted',
+            'current_stage' => 'contacted',
+            'created_at' => now()->subMinutes(10),
+            'delivered_at' => now()->subMinutes(10),
+            'delivery_pending' => false,
+            'first_response_at' => now()->subMinutes(5), // 5 min after creation
+        ]);
+        $this->assertEquals('5 min', $metLead->first_response_timing);
+        $this->assertEquals('met', $metLead->first_response_sla_status);
+        $this->assertStringContainsString('emerald', $metLead->first_response_timing_class);
+
+        // 4. Responded at 25 minutes (SLA Breached)
+        $breachedLead = Lead::create([
+            'client_id' => $owner->id,
+            'assigned_to' => $exec->id,
+            'lead_source_id' => $lead->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Late Prospect',
+            'mobile' => '9888822222',
+            'status' => 'contacted',
+            'current_stage' => 'contacted',
+            'created_at' => now()->subMinutes(40),
+            'delivered_at' => now()->subMinutes(40),
+            'delivery_pending' => false,
+            'first_response_at' => now()->subMinutes(15), // 25 min after creation
+        ]);
+        $this->assertEquals('25 min', $breachedLead->first_response_timing);
+        $this->assertEquals('breached', $breachedLead->first_response_sla_status);
+        $this->assertStringContainsString('red', $breachedLead->first_response_timing_class);
+
+        // 5. Responded at 1 hr 20 min (80 minutes)
+        $longLead = Lead::create([
+            'client_id' => $owner->id,
+            'assigned_to' => $exec->id,
+            'lead_source_id' => $lead->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Long Prospect',
+            'mobile' => '9888833333',
+            'status' => 'contacted',
+            'current_stage' => 'contacted',
+            'created_at' => now()->subMinutes(100),
+            'delivered_at' => now()->subMinutes(100),
+            'delivery_pending' => false,
+            'first_response_at' => now()->subMinutes(20), // 80 min after creation
+        ]);
+        $this->assertEquals('1 hr 20 min', $longLead->first_response_timing);
+        $this->assertEquals('breached', $longLead->first_response_sla_status);
+
+        // 6. Terminal unresponded lead returns 'Not Responded'
+        $closedLead = Lead::create([
+            'client_id' => $owner->id,
+            'lead_source_id' => $lead->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Invalid Prospect',
+            'mobile' => '9888844444',
+            'status' => 'closed',
+            'current_stage' => 'invalid',
+            'created_at' => now()->subHours(2),
+            'delivered_at' => now()->subHours(2),
+            'delivery_pending' => false,
+        ]);
+        $this->assertEquals('Not Responded', $closedLead->first_response_timing);
+        $this->assertEquals('neutral', $closedLead->first_response_sla_status);
+    }
+
+    public function test_my_leads_table_renders_first_response_timing_badges(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        [$org, $owner, $exec, $lead] = $this->executiveFixture(15);
+        $owner->assignRole('Builder/Developer');
+
+        // Fast lead responded in 5 min
+        Lead::create([
+            'client_id' => $owner->id,
+            'assigned_to' => $exec->id,
+            'lead_source_id' => $lead->lead_source_id,
+            'lead_code' => Lead::generateUniqueLeadCode(),
+            'name' => 'Table Fast Prospect',
+            'mobile' => '9111122222',
+            'status' => 'contacted',
+            'current_stage' => 'contacted',
+            'created_at' => now()->subMinutes(10),
+            'delivered_at' => now()->subMinutes(10),
+            'delivery_pending' => false,
+            'first_response_at' => now()->subMinutes(5),
+        ]);
+
+        \Livewire\Livewire::actingAs($owner)
+            ->test(\App\Livewire\Leads\LeadKanban::class)
+            ->call('switchViewMode', 'table')
+            ->assertSee('First Response SLA')
+            ->assertSee('5 min');
+    }
 }

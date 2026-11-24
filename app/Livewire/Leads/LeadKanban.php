@@ -2370,11 +2370,7 @@ class LeadKanban extends Component
                     'pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
                     'closed' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
                 ]],
-                ['key' => 'sla_badge', 'label' => 'First Response SLA', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
-                    'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
-                    'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
-                    'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                ]],
+                ['key' => 'first_response_timing', 'label' => 'First Response SLA', 'type' => 'badge', 'priority' => 1, 'badgeStyle' => fn ($val, $row) => is_object($row) ? ($row->first_response_timing_class ?? 'bg-canvas text-ink border border-border') : 'bg-canvas text-ink border border-border', 'labelFormatter' => fn ($val, $row) => is_object($row) ? $row->first_response_timing : $val],
                 ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
             ];
         }
@@ -2406,11 +2402,7 @@ class LeadKanban extends Component
             ]],
             ['key' => 'last_activity', 'label' => 'Last Activity', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs text-muted'],
             ['key' => 'next_followup', 'label' => 'Next Follow-up', 'type' => 'text', 'priority' => 2, 'class' => 'text-xs font-mono text-muted'],
-            ['key' => 'sla_badge', 'label' => 'SLA Status', 'type' => 'badge', 'priority' => 1, 'badgeMap' => [
-                'SLA Met' => 'bg-green-50 text-green-700 border border-green-200',
-                'SLA Breached' => 'bg-red-50 text-red-700 border border-red-200',
-                'SLA Pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
-            ]],
+            ['key' => 'first_response_timing', 'label' => 'First Response SLA', 'type' => 'badge', 'priority' => 1, 'badgeStyle' => fn ($val, $row) => is_object($row) ? ($row->first_response_timing_class ?? 'bg-canvas text-ink border border-border') : 'bg-canvas text-ink border border-border', 'labelFormatter' => fn ($val, $row) => is_object($row) ? $row->first_response_timing : $val],
             ['key' => 'created_at', 'label' => 'Created', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
         ];

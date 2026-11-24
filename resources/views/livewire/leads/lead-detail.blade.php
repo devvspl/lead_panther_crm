@@ -443,7 +443,7 @@
                         <div class="mt-0.5">
                             <x-ui.badge status="{{ $lead->sla_badge }}">{{ $lead->sla_badge }}</x-ui.badge>
                             <p class="text-[10px] text-muted mt-1">Deadline: {{ $lead->executive_response_due_at?->format('d M H:i') ?? 'Not assigned' }}</p>
-                            @if($lead->executive_response_time !== null)<p class="text-[10px] text-muted">Response: {{ $lead->executive_response_time }} min</p>@endif
+                            <p class="text-[10px] text-muted font-medium mt-0.5">Response Timing: {{ $lead->first_response_timing }}</p>
                         </div>
                     </div>
                     <div>

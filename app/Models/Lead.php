@@ -440,6 +440,143 @@ class Lead extends Model
             ? round($this->executive_assigned_at->diffInSeconds($this->executive_first_response_at) / 60, 2) : null;
     }
 
+    /**
+     * Human-readable first response timing or elapsed waiting time.
+     * Examples: '5 min', '25 min', '1 hr 20 min', 'Waiting 45 min', 'Not Responded'
+     */
+    public function getFirstResponseTimingAttribute(): string
+    {
+        $start = $this->client_response_start ?: $this->created_at;
+        $responseAt = $this->first_response_at ?: $this->executive_first_response_at;
+
+        if ($responseAt && $start) {
+            $seconds = max(0, $start->diffInSeconds($responseAt));
+            $minutes = (int) round($seconds / 60);
+
+            return static::formatHumanTiming($minutes);
+        }
+
+        if (! $start || $this->internal_processing_pending || $this->delivery_pending) {
+            return 'Not Responded';
+        }
+
+        if ($this->isTerminalStage() && ! $responseAt) {
+            return 'Not Responded';
+        }
+
+        $elapsedSeconds = max(0, $start->diffInSeconds(now()));
+        $elapsedMinutes = (int) round($elapsedSeconds / 60);
+
+        return 'Waiting ' . static::formatHumanTiming($elapsedMinutes);
+    }
+
+    public function getFirstResponseTimeAttribute(): string
+    {
+        return $this->first_response_timing;
+    }
+
+    /**
+     * Formats minutes into human-readable timing (e.g. '5 min', '25 min', '1 hr 20 min').
+     */
+    public static function formatHumanTiming(int $minutes): string
+    {
+        if ($minutes < 1) {
+            return '< 1 min';
+        }
+        if ($minutes < 60) {
+            return "{$minutes} min";
+        }
+        $hours = (int) floor($minutes / 60);
+        $remMinutes = $minutes % 60;
+        if ($hours < 24) {
+            return $remMinutes > 0 ? "{$hours} hr {$remMinutes} min" : "{$hours} hr";
+        }
+        $days = (int) floor($hours / 24);
+        $remHours = $hours % 24;
+
+        return $remHours > 0 ? "{$days}d {$remHours}h" : "{$days}d";
+    }
+
+    /**
+     * Determine SLA compliance status: 'met', 'breached', 'pending', or 'neutral'.
+     */
+    public function getFirstResponseSlaStatusAttribute(): string
+    {
+        if ($this->internal_processing_pending || $this->delivery_pending) {
+            return 'neutral';
+        }
+
+        $start = $this->client_response_start ?: $this->created_at;
+        $responseAt = $this->first_response_at ?: $this->executive_first_response_at;
+
+        if ($this->isTerminalStage() && ! $responseAt) {
+            return 'neutral';
+        }
+
+        // When executive SLA deadline is configured, honor existing SLA calculation
+        if ($this->assigned_to && $this->executive_response_due_at) {
+            if ($responseAt) {
+                return $responseAt->gt($this->executive_response_due_at) ? 'breached' : 'met';
+            }
+
+            return now()->gt($this->executive_response_due_at) ? 'breached' : 'pending';
+        }
+
+        // When no executive deadline is set, use organization threshold (default 15 minutes)
+        $thresholdMinutes = 15;
+        $org = $this->organization;
+        if ($org && isset($org->executive_response_minutes)) {
+            $thresholdMinutes = (int) $org->executive_response_minutes;
+        }
+
+        if ($responseAt && $start) {
+            $diffMinutes = $start->diffInMinutes($responseAt);
+
+            return $diffMinutes <= $thresholdMinutes ? 'met' : 'breached';
+        }
+
+        if ($start) {
+            $elapsedMinutes = $start->diffInMinutes(now());
+
+            return $elapsedMinutes > $thresholdMinutes ? 'breached' : 'pending';
+        }
+
+        return 'neutral';
+    }
+
+    /**
+     * SLA badge CSS class for first response timing display.
+     */
+    public function getFirstResponseTimingClassAttribute(): string
+    {
+        $status = $this->first_response_sla_status;
+
+        return match ($status) {
+            'met' => 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+            'breached' => 'bg-red-50 text-red-700 border border-red-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800',
+            'pending' => 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
+            default => 'bg-neutral-100 text-neutral-700 border border-neutral-300 dark:bg-neutral-800 dark:text-neutral-300',
+        };
+    }
+
+    /**
+     * Informative tooltip for first response SLA display.
+     */
+    public function getFirstResponseSlaTooltipAttribute(): string
+    {
+        $status = $this->first_response_sla_status;
+        $timing = $this->first_response_timing;
+
+        return match ($status) {
+            'met' => "First response in {$timing} (SLA Met)",
+            'breached' => $this->first_response_at || $this->executive_first_response_at
+                ? "First response in {$timing} (SLA Breached)"
+                : "Overdue! {$timing} elapsed (SLA Breached)",
+            'pending' => "Awaiting first response — {$timing} elapsed (Within SLA)",
+            default => 'Not Responded',
+        };
+    }
+
     public function getInternalVerificationAttribute(): string { return $this->internalProcessing?->forwarded_at ? ucfirst($this->internalProcessing->verification_status) : 'Direct delivery'; }
     public function getInternalHandoverAttribute(): string { return $this->internalProcessing?->forwarded_at?->format('M d, Y H:i') ?? '—'; }
     public function getClientResponseStartAttribute() { return $this->delivered_at ? ($this->internalProcessing?->forwarded_at ?? $this->created_at) : $this->created_at; }

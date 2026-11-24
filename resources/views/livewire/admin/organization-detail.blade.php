@@ -917,8 +917,18 @@
     @endif
     <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
-        <livewire:credits.reconciliation :organization-id="$organization->id" :key="'credits-reconcile-'.$organization->id" />
         <div class="space-y-6">
+            <!-- Credits Summary & Action Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-bold text-ink">Lead Credits Summary</h3>
+                    <p class="text-xs text-muted">Baseline allocation, purchases, deductions, and available spendable balance.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <livewire:credits.reconciliation :organization-id="$organization->id" :key="'credits-reconcile-'.$organization->id" />
+                </div>
+            </div>
+
             <!-- Credits Header & KPI Strip (5-Card Strip with Opening, Recharged, Consumed, Refunded, and Available Lead Creditss) -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <!-- 1. Opening Credits -->

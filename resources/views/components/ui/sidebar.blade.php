@@ -129,10 +129,10 @@
             x-on:click="closeMobileSidebar()"
             x-on:mouseenter="showSidebarTooltip($event, window.isLeadPantherPWAInstalled ? 'App Installed' : 'Install Lead Panther (NEW)')"
             x-on:mouseleave="hideSidebarTooltip()"
-            :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-2.5 w-full'"
-            class="group relative flex items-center text-sm font-medium rounded-xl bg-purple-500/10 hover:bg-purple-500/15 text-purple-950 dark:text-purple-200 border border-purple-500/20 hover:border-purple-500/30 shadow-2xs transition-all duration-200 cursor-pointer select-none">
+            :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
+            class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer select-none">
             <div class="flex-shrink-0 flex items-center justify-center">
-                <svg data-pwa-icon-install class="w-5 h-5 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg data-pwa-icon-install class="w-5 h-5 flex-shrink-0 text-muted group-hover:text-ink transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM12 8v5m0 0l-2-2m2 2l2-2" />
                 </svg>
                 <svg data-pwa-icon-installed class="w-5 h-5 text-emerald-600 flex-shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,9 +144,9 @@
                   x-transition:enter-start="opacity-0 -translate-x-2"
                   x-transition:enter-end="opacity-100 translate-x-0"
                   class="whitespace-nowrap overflow-hidden truncate flex-1 text-left flex items-center justify-between gap-1.5">
-                <span data-pwa-install-label class="font-semibold text-xs text-purple-900 dark:text-purple-100 truncate">Install Lead Panther</span>
-                <span data-pwa-badge-new class="inline-flex items-center text-[9px] font-extrabold px-1.5 py-0.5 rounded-md tracking-wider uppercase bg-purple-600 text-white shadow-2xs shrink-0">NEW</span>
-                <span data-pwa-badge class="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider hidden bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">Installed</span>
+                <span data-pwa-install-label class="truncate">Install Lead Panther</span>
+                <span data-pwa-badge-new class="inline-flex items-center px-1.5 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 shrink-0">NEW</span>
+                <span data-pwa-badge class="inline-flex items-center px-1.5 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider hidden bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">Installed</span>
             </span>
         </button>
     </div>

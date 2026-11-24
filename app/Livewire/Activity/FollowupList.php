@@ -60,6 +60,12 @@ class FollowupList extends Component
     public ?int $cancellingFollowupId = null;
     public string $cancellationReason = '';
 
+    // Reassign state
+    public ?int $reassigningFollowupId = null;
+    public ?int $reassigneeId = null;
+    public string $reassignDueAt = '';
+    public string $reassignNote = '';
+
     public function mount(?Lead $lead = null): void
     {
         $this->lead = $lead;
@@ -149,6 +155,29 @@ class FollowupList extends Component
                 'completed_at' => now(),
                 'completed_by' => auth()->id(),
             ]);
+
+            if ($followup->isRequested() && $followup->requested_by) {
+                $followup->update([
+                    'request_status' => Followup::REQUEST_COMPLETED,
+                ]);
+
+                $requester = User::find($followup->requested_by);
+                if ($requester && $requester->status === 'active') {
+                    app(\App\Services\NotificationDeliveryService::class)->sendWeb(
+                        $requester,
+                        'followup_request_completed',
+                        'Follow-Up Request Completed: ' . ($followup->lead?->name ?? 'Lead'),
+                        auth()->user()->name . " completed the requested follow-up for " . ($followup->lead?->name ?? 'Lead') . ". Outcome: " . ($followup->outcome_label ?? $followup->outcome),
+                        'followup_req_done:' . $followup->id . ':' . now()->timestamp,
+                        'followup',
+                        $followup->lead?->client?->organization_id ?? $requester->organization_id,
+                        'lead',
+                        $followup->lead_id,
+                        important: true,
+                        context: ['lead_id' => $followup->lead_id, 'followup_id' => $followup->id]
+                    );
+                }
+            }
 
             if ($this->scheduleNextFollowup && $this->nextDueAt) {
                 Followup::create([
@@ -270,6 +299,116 @@ class FollowupList extends Component
         $this->dispatch('toast', type: 'success', message: 'Follow-up cancelled.');
     }
 
+    public function openReassign(int $followupId): void
+    {
+        $fu = Followup::findOrFail($followupId);
+        $this->reassigningFollowupId = $fu->id;
+        $this->reassigneeId = $fu->assigned_to;
+        $this->reassignDueAt = $fu->due_at ? $fu->due_at->format('Y-m-d\TH:i') : now()->addDay()->format('Y-m-d\TH:i');
+        $this->reassignNote = $fu->note ?: '';
+    }
+
+    public function saveReassign(): void
+    {
+        if (! $this->reassigningFollowupId) {
+            return;
+        }
+
+        $fu = Followup::lockForUpdate()->findOrFail($this->reassigningFollowupId);
+        $user = auth()->user();
+
+        $this->validate([
+            'reassigneeId' => 'required|exists:users,id',
+            'reassignDueAt' => 'nullable|date',
+            'reassignNote' => 'nullable|string|max:1000',
+        ]);
+
+        $newAssignee = User::findOrFail($this->reassigneeId);
+        $oldAssignee = $fu->assigned_to ? User::find($fu->assigned_to) : null;
+
+        $fu->update([
+            'assigned_to' => $newAssignee->id,
+            'assigned_by' => $user->id,
+            'assigned_at' => now(),
+            'due_at' => $this->reassignDueAt ? Carbon::parse($this->reassignDueAt) : $fu->due_at,
+            'note' => $this->reassignNote ?: $fu->note,
+            'escalation_level' => 0,
+            'escalated_at' => null,
+            'escalation_notes' => null,
+        ]);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'organization_id' => $fu->lead?->client?->organization_id ?? $user->organization_id,
+            'action' => 'lead.followup_reassigned',
+            'subject_type' => Lead::class,
+            'subject_id' => $fu->lead_id,
+            'from_value' => json_encode(['assigned_to' => $oldAssignee?->name]),
+            'to_value' => json_encode(['assigned_to' => $newAssignee->name, 'due_at' => $fu->due_at?->toIso8601String()]),
+            'created_at' => now(),
+        ]);
+
+        app(\App\Services\NotificationDeliveryService::class)->sendWeb(
+            $newAssignee,
+            'followup_assigned',
+            'Follow-Up Reassigned: ' . ($fu->lead?->name ?? 'Lead'),
+            $user->name . ' reassigned a follow-up to you.',
+            'followup_reassigned:' . $fu->id . ':' . now()->timestamp,
+            'followup',
+            $fu->lead?->client?->organization_id ?? $user->organization_id,
+            'lead',
+            $fu->lead_id,
+            important: true,
+            context: ['lead_id' => $fu->lead_id, 'followup_id' => $fu->id]
+        );
+
+        $this->reassigningFollowupId = null;
+        $this->dispatch('toast', type: 'success', message: "Follow-up reassigned to {$newAssignee->name}.");
+    }
+
+    public function acknowledgeRequest(int $followupId, string $status = 'accepted'): void
+    {
+        $fu = Followup::findOrFail($followupId);
+        $user = auth()->user();
+
+        $fu->update([
+            'request_status' => $status,
+            'acknowledged_at' => now(),
+        ]);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'organization_id' => $fu->lead?->client?->organization_id ?? $user->organization_id,
+            'action' => 'lead.followup_request_' . $status,
+            'subject_type' => Lead::class,
+            'subject_id' => $fu->lead_id,
+            'to_value' => json_encode(['request_status' => $status]),
+            'created_at' => now(),
+        ]);
+
+        if ($fu->requested_by) {
+            $requester = User::find($fu->requested_by);
+            if ($requester && $requester->status === 'active') {
+                $statusLabel = $status === 'in_progress' ? 'started working on' : 'accepted';
+                app(\App\Services\NotificationDeliveryService::class)->sendWeb(
+                    $requester,
+                    'followup_request_updated',
+                    'Follow-Up Request ' . ucfirst($status) . ': ' . ($fu->lead?->name ?? 'Lead'),
+                    "{$user->name} has {$statusLabel} your follow-up request.",
+                    'followup_req_status:' . $fu->id . ':' . $status . ':' . now()->timestamp,
+                    'followup',
+                    $fu->lead?->client?->organization_id ?? $requester->organization_id,
+                    'lead',
+                    $fu->lead_id,
+                    important: false,
+                    context: ['lead_id' => $fu->lead_id, 'followup_id' => $fu->id]
+                );
+            }
+        }
+
+        $this->dispatch('toast', type: 'success', message: 'Request status updated.');
+    }
+
     protected function getScopedBaseQuery()
     {
         $user = auth()->user();
@@ -283,13 +422,27 @@ class FollowupList extends Component
             ]),
             'creator',
             'completedBy',
+            'assignedTo',
+            'assignedBy',
+            'requestedBy',
         ]);
 
         if (Lead::usesSalesPanel()) {
-            $query->whereIn('lead_id', Lead::panelQuery()->select('leads.id'));
+            if ($roleKey === 'sales-executive') {
+                $query->where(function ($q) use ($user) {
+                    $q->where('assigned_to', $user->id)
+                      ->orWhere(function ($sub) use ($user) {
+                          $sub->whereNull('assigned_to')
+                              ->whereIn('lead_id', Lead::panelQuery()->select('leads.id'));
+                      });
+                });
+            } else {
+                $query->whereIn('lead_id', Lead::panelQuery()->select('leads.id'));
+            }
         } elseif (! $user->hasAnyRole(['Super Admin', 'super-admin'])) {
             $query->where(function ($q) use ($user) {
-                $q->where('created_by', $user->id)
+                $q->where('assigned_to', $user->id)
+                  ->orWhere('created_by', $user->id)
                   ->orWhereHas('lead', fn ($lq) => $lq->where('assigned_to', $user->id)->orWhere('client_id', $user->id));
             });
         }
@@ -354,6 +507,7 @@ class FollowupList extends Component
         $overdueCount = (clone $baseQuery)->pending()->where('due_at', '<', now())->count();
         $completedCount = (clone $baseQuery)->where('status', 'completed')->count();
         $escalatedCount = (clone $baseQuery)->where('escalation_level', '>', 0)->count();
+        $requestsCount = (clone $baseQuery)->whereNotNull('requested_by')->whereIn('request_status', ['pending', 'accepted', 'in_progress'])->count();
 
         // Tab-specific filtering
         $tabQuery = match ($this->activeTab) {
@@ -362,6 +516,7 @@ class FollowupList extends Component
             'overdue' => (clone $baseQuery)->pending()->where('due_at', '<', now())->orderBy('due_at', 'asc'),
             'completed' => (clone $baseQuery)->where('status', 'completed')->latest('completed_at'),
             'escalated' => (clone $baseQuery)->where('escalation_level', '>', 0)->orderBy('escalation_level', 'desc')->orderBy('due_at', 'asc'),
+            'requests' => (clone $baseQuery)->whereNotNull('requested_by')->orderBy('due_at', 'asc'),
             default => (clone $baseQuery)->orderBy('due_at', 'asc'),
         };
 
@@ -393,6 +548,7 @@ class FollowupList extends Component
             'overdueCount' => $overdueCount,
             'completedCount' => $completedCount,
             'escalatedCount' => $escalatedCount,
+            'requestsCount' => $requestsCount,
             'organizations' => $organizations,
             'projects' => $projects,
             'executives' => $executives,

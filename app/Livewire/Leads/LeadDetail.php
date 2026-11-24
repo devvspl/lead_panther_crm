@@ -4,6 +4,7 @@ namespace App\Livewire\Leads;
 
 use Livewire\Component;
 use App\Models\Lead;
+use App\Models\User;
 use App\Models\LeadCommunication;
 use App\Models\LeadCall;
 use App\Models\Meeting;
@@ -22,6 +23,7 @@ use Livewire\Attributes\On;
 use App\Models\Project;
 use App\Models\ProjectUnit;
 use App\Services\LeadJourneyService;
+use App\Services\NotificationDeliveryService;
 use App\Support\NavigationConfig;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -82,6 +84,27 @@ class LeadDetail extends Component
     public string $nextFollowupNote = '';
 
     public string $followupCompleteOutcome = 'Completed';
+
+    // Assign Follow-Up Modal State
+    public bool $showAssignFollowupModal = false;
+    public ?int $assigneeId = null;
+    public string $assignDueAt = '';
+    public string $assignType = 'call';
+    public string $assignNote = '';
+
+    // Reassign Follow-Up Modal State
+    public bool $showReassignFollowupModal = false;
+    public ?int $reassignFollowupId = null;
+    public ?int $reassigneeId = null;
+    public string $reassignDueAt = '';
+    public string $reassignNote = '';
+
+    // Request Follow-Up Modal State
+    public bool $showRequestFollowupModal = false;
+    public ?int $requestAssigneeId = null;
+    public string $requestDueAt = '';
+    public string $requestType = 'call';
+    public string $requestNote = '';
 
     // Meeting Form
     public string $meetingScheduledAt = '';
@@ -242,7 +265,7 @@ class LeadDetail extends Component
         }
 
         if ($roleKey === 'sales-executive' || $user->hasRole('sales-executive') || $user->hasRole('Sales Executive')) {
-            return (int) $lead->assigned_to === (int) $user->id;
+            return (int) $lead->assigned_to === (int) $user->id || $lead->followups()->where('assigned_to', $user->id)->exists();
         }
 
         if ($roleKey === 'builder' || $user->hasRole('builder') || $user->hasRole('Builder')) {
@@ -500,6 +523,29 @@ class LeadDetail extends Component
                 'completed_at' => now(),
                 'completed_by' => auth()->id(),
             ]);
+
+            if ($fu->isRequested() && $fu->requested_by) {
+                $fu->update([
+                    'request_status' => Followup::REQUEST_COMPLETED,
+                ]);
+
+                $requester = User::find($fu->requested_by);
+                if ($requester && $requester->status === 'active') {
+                    app(NotificationDeliveryService::class)->sendWeb(
+                        $requester,
+                        'followup_request_completed',
+                        'Follow-Up Request Completed: ' . $lead->name,
+                        auth()->user()->name . " has completed the requested follow-up for {$lead->name} ({$lead->lead_code}) with outcome: " . ($fu->outcome_label ?? $fu->outcome) . ($outcomeNotes ? ". Remarks: " . $outcomeNotes : '.'),
+                        'followup_req_done:' . $fu->id . ':' . now()->timestamp,
+                        'followup',
+                        $lead->client?->organization_id ?? $requester->organization_id,
+                        'lead',
+                        $lead->id,
+                        important: true,
+                        context: ['lead_id' => $lead->id, 'followup_id' => $fu->id]
+                    );
+                }
+            }
 
             $nextFu = null;
             if ($this->scheduleNextFollowup && $this->nextFollowupDueAt) {
@@ -1034,6 +1080,360 @@ class LeadDetail extends Component
         $this->saveLeadAction('cancelFollowupAction', fn () => $this->performCancelFollowupAction($followupId));
     }
 
+    public function canManageFollowupAssignment(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+        if ($user->hasAnyRole(['Super Admin', 'super-admin'])) {
+            return true;
+        }
+        if ($user->hasAnyRole(['Builder/Developer', 'Builder', 'builder', 'Client'])) {
+            return true;
+        }
+        if (\App\Support\TeamAccess::isLeader($user)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getSelectableExecutivesProperty()
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return collect();
+        }
+
+        if ($user->hasAnyRole(['Super Admin', 'super-admin'])) {
+            $orgId = $this->lead?->client?->organization_id ?? $this->lead?->assignedTo?->organization_id;
+
+            return User::where('status', 'active')
+                ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+                ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive']))
+                ->orderBy('name')
+                ->get();
+        }
+
+        if (\App\Support\TeamAccess::isLeader($user)) {
+            $teamIds = \App\Models\SalesTeamMember::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->pluck('sales_team_id');
+
+            $memberUserIds = \App\Models\SalesTeamMember::whereIn('sales_team_id', $teamIds)
+                ->where('is_active', true)
+                ->pluck('user_id');
+
+            return User::whereIn('id', $memberUserIds)
+                ->where('status', 'active')
+                ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive', 'Team Leader']))
+                ->orderBy('name')
+                ->get();
+        }
+
+        $orgId = $user->organization_id ?? $this->lead?->client?->organization_id;
+        if ($orgId) {
+            return User::where('organization_id', $orgId)
+                ->where('status', 'active')
+                ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive']))
+                ->orderBy('name')
+                ->get();
+        }
+
+        return collect();
+    }
+
+    public function openAssignFollowupModal(): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $lead = $this->getActiveLead();
+        $this->assigneeId = $lead?->assigned_to ?: $this->selectableExecutives->first()?->id;
+        $this->assignDueAt = now()->addDays(1)->hour(11)->minute(0)->format('Y-m-d\TH:i');
+        $this->assignType = 'call';
+        $this->assignNote = '';
+        $this->showAssignFollowupModal = true;
+    }
+
+    public function saveAssignFollowup(): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $lead = $this->getActiveLead();
+        if (! $lead) {
+            return;
+        }
+
+        $this->validate([
+            'assigneeId' => 'required|exists:users,id',
+            'assignDueAt' => 'required|date',
+            'assignType' => 'required|string|in:call,whatsapp,meeting,site_visit,other',
+            'assignNote' => 'nullable|string|max:1000',
+        ]);
+
+        $assignee = User::findOrFail($this->assigneeId);
+
+        $fu = Followup::create([
+            'lead_id' => $lead->id,
+            'assigned_to' => $assignee->id,
+            'assigned_by' => auth()->id(),
+            'assigned_at' => now(),
+            'due_at' => Carbon::parse($this->assignDueAt),
+            'type' => $this->assignType,
+            'note' => $this->assignNote ?: 'Follow-up assigned by management',
+            'status' => 'pending',
+            'created_by' => auth()->id(),
+        ]);
+
+        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'assigned', 'contacted', 'interested'])) {
+            $this->recordStageTransition($lead, 'follow_up', "Follow-up assigned to {$assignee->name} for {$this->assignDueAt}");
+        }
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+            'action' => 'lead.followup_assigned',
+            'subject_type' => Lead::class,
+            'subject_id' => $lead->id,
+            'to_value' => json_encode([
+                'followup_id' => $fu->id,
+                'assigned_to' => $assignee->name,
+                'assigned_to_id' => $assignee->id,
+                'due_at' => $this->assignDueAt,
+                'type' => $this->assignType,
+                'note' => $this->assignNote,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        app(NotificationDeliveryService::class)->sendWeb(
+            $assignee,
+            'followup_assigned',
+            'Follow-Up Assigned: ' . $lead->name,
+            auth()->user()->name . " assigned you a follow-up for {$lead->name} ({$lead->lead_code}) scheduled for " . Carbon::parse($this->assignDueAt)->format('M d, H:i') . ($this->assignNote ? ': ' . $this->assignNote : '.'),
+            'followup_assigned:' . $fu->id . ':' . now()->timestamp,
+            'followup',
+            $lead->client?->organization_id ?? auth()->user()?->organization_id,
+            'lead',
+            $lead->id,
+            important: true,
+            context: ['lead_id' => $lead->id, 'followup_id' => $fu->id]
+        );
+
+        $this->showAssignFollowupModal = false;
+        $this->dispatch('toast', type: 'success', message: "Follow-up assigned to {$assignee->name}.");
+        $this->dispatch('lead-updated');
+    }
+
+    public function openReassignFollowupModal(int $followupId): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $fu = Followup::findOrFail($followupId);
+        $this->reassignFollowupId = $fu->id;
+        $this->reassigneeId = $fu->assigned_to ?: $this->selectableExecutives->first()?->id;
+        $this->reassignDueAt = $fu->due_at?->format('Y-m-d\TH:i') ?: now()->addDay()->format('Y-m-d\TH:i');
+        $this->reassignNote = $fu->note ?: '';
+        $this->showReassignFollowupModal = true;
+    }
+
+    public function saveReassignFollowup(): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $fu = Followup::findOrFail($this->reassignFollowupId);
+        $lead = $this->getActiveLead();
+
+        $this->validate([
+            'reassigneeId' => 'required|exists:users,id',
+            'reassignDueAt' => 'nullable|date',
+            'reassignNote' => 'nullable|string|max:1000',
+        ]);
+
+        $oldAssignee = $fu->assigned_to ? User::find($fu->assigned_to) : null;
+        $newAssignee = User::findOrFail($this->reassigneeId);
+
+        $fu->update([
+            'assigned_to' => $newAssignee->id,
+            'assigned_by' => auth()->id(),
+            'assigned_at' => now(),
+            'due_at' => $this->reassignDueAt ? Carbon::parse($this->reassignDueAt) : $fu->due_at,
+            'note' => $this->reassignNote ?: $fu->note,
+            'escalation_level' => 0,
+            'escalated_at' => null,
+            'escalation_notes' => null,
+        ]);
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'organization_id' => $lead?->client?->organization_id ?? auth()->user()?->organization_id,
+            'action' => 'lead.followup_reassigned',
+            'subject_type' => Lead::class,
+            'subject_id' => $fu->lead_id,
+            'from_value' => json_encode(['assigned_to' => $oldAssignee?->name, 'assigned_to_id' => $oldAssignee?->id]),
+            'to_value' => json_encode(['assigned_to' => $newAssignee->name, 'assigned_to_id' => $newAssignee->id, 'due_at' => $fu->due_at?->toIso8601String()]),
+            'created_at' => now(),
+        ]);
+
+        app(NotificationDeliveryService::class)->sendWeb(
+            $newAssignee,
+            'followup_assigned',
+            'Follow-Up Reassigned to You: ' . ($lead?->name ?? 'Prospect'),
+            auth()->user()->name . ' reassigned a follow-up for ' . ($lead?->name ?? 'Lead') . ' to you.',
+            'followup_reassigned:' . $fu->id . ':' . now()->timestamp,
+            'followup',
+            $lead?->client?->organization_id ?? auth()->user()?->organization_id,
+            'lead',
+            $fu->lead_id,
+            important: true,
+            context: ['lead_id' => $fu->lead_id, 'followup_id' => $fu->id]
+        );
+
+        $this->showReassignFollowupModal = false;
+        $this->dispatch('toast', type: 'success', message: "Follow-up reassigned to {$newAssignee->name}.");
+        $this->dispatch('lead-updated');
+    }
+
+    public function openRequestFollowupModal(): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $lead = $this->getActiveLead();
+        $this->requestAssigneeId = $lead?->assigned_to ?: $this->selectableExecutives->first()?->id;
+        $this->requestDueAt = now()->addDays(1)->hour(15)->minute(0)->format('Y-m-d\TH:i');
+        $this->requestType = 'call';
+        $this->requestNote = '';
+        $this->showRequestFollowupModal = true;
+    }
+
+    public function saveRequestFollowup(): void
+    {
+        abort_unless($this->canManageFollowupAssignment(), 403);
+        $lead = $this->getActiveLead();
+        if (! $lead) {
+            return;
+        }
+
+        // Prevent duplicate pending requests for the same lead
+        $hasActiveRequest = Followup::where('lead_id', $lead->id)
+            ->whereNotNull('requested_by')
+            ->whereIn('request_status', ['pending', 'accepted', 'in_progress'])
+            ->exists();
+
+        if ($hasActiveRequest) {
+            $this->dispatch('toast', type: 'error', message: 'There is already an active follow-up request pending completion for this lead.');
+
+            return;
+        }
+
+        $this->validate([
+            'requestAssigneeId' => 'required|exists:users,id',
+            'requestDueAt' => 'required|date',
+            'requestType' => 'required|string|in:call,whatsapp,meeting,site_visit,other',
+            'requestNote' => 'required|string|max:1000',
+        ]);
+
+        $assignee = User::findOrFail($this->requestAssigneeId);
+
+        $fu = Followup::create([
+            'lead_id' => $lead->id,
+            'assigned_to' => $assignee->id,
+            'assigned_by' => auth()->id(),
+            'assigned_at' => now(),
+            'requested_by' => auth()->id(),
+            'requested_at' => now(),
+            'request_status' => Followup::REQUEST_PENDING,
+            'due_at' => Carbon::parse($this->requestDueAt),
+            'type' => $this->requestType,
+            'note' => $this->requestNote,
+            'status' => 'pending',
+            'created_by' => auth()->id(),
+        ]);
+
+        if (in_array(Lead::usesSalesPanel() ? Lead::normalizeStage($lead->current_stage) : $lead->current_stage, ['new', 'assigned', 'contacted', 'interested'])) {
+            $this->recordStageTransition($lead, 'follow_up', "Follow-up requested from {$assignee->name} due {$this->requestDueAt}");
+        }
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'organization_id' => $lead->client?->organization_id ?? auth()->user()?->organization_id,
+            'action' => 'lead.followup_requested',
+            'subject_type' => Lead::class,
+            'subject_id' => $lead->id,
+            'to_value' => json_encode([
+                'followup_id' => $fu->id,
+                'requested_by' => auth()->user()->name,
+                'assigned_to' => $assignee->name,
+                'assigned_to_id' => $assignee->id,
+                'due_at' => $this->requestDueAt,
+                'instructions' => $this->requestNote,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        app(NotificationDeliveryService::class)->sendWeb(
+            $assignee,
+            'followup_requested',
+            'New Follow-Up Request: ' . $lead->name,
+            auth()->user()->name . " requested a follow-up for {$lead->name} ({$lead->lead_code}) by " . Carbon::parse($this->requestDueAt)->format('M d, H:i') . '. Instructions: ' . $this->requestNote,
+            'followup_requested:' . $fu->id . ':' . now()->timestamp,
+            'followup',
+            $lead->client?->organization_id ?? auth()->user()?->organization_id,
+            'lead',
+            $lead->id,
+            important: true,
+            context: ['lead_id' => $lead->id, 'followup_id' => $fu->id]
+        );
+
+        $this->showRequestFollowupModal = false;
+        $this->dispatch('toast', type: 'success', message: "Follow-up requested from {$assignee->name}.");
+        $this->dispatch('lead-updated');
+    }
+
+    public function acknowledgeFollowupRequest(int $followupId, string $status = 'accepted'): void
+    {
+        $fu = Followup::findOrFail($followupId);
+        $user = auth()->user();
+
+        $assigneeId = $fu->assigned_to ?: $fu->lead?->assigned_to;
+        abort_unless($assigneeId === $user->id || $user->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        $fu->update([
+            'request_status' => $status,
+            'acknowledged_at' => now(),
+        ]);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'organization_id' => $fu->lead?->client?->organization_id ?? $user->organization_id,
+            'action' => 'lead.followup_request_' . $status,
+            'subject_type' => Lead::class,
+            'subject_id' => $fu->lead_id,
+            'from_value' => json_encode(['request_status' => 'pending']),
+            'to_value' => json_encode(['request_status' => $status, 'acknowledged_at' => now()->toIso8601String()]),
+            'created_at' => now(),
+        ]);
+
+        if ($fu->requested_by) {
+            $requester = User::find($fu->requested_by);
+            if ($requester && $requester->status === 'active') {
+                $statusLabel = $status === 'in_progress' ? 'started working on' : 'accepted';
+                app(NotificationDeliveryService::class)->sendWeb(
+                    $requester,
+                    'followup_request_updated',
+                    'Follow-Up Request ' . ucfirst($status) . ': ' . $fu->lead?->name,
+                    "{$user->name} has {$statusLabel} your follow-up request for {$fu->lead?->name}.",
+                    'followup_req_status:' . $fu->id . ':' . $status . ':' . now()->timestamp,
+                    'followup',
+                    $fu->lead?->client?->organization_id ?? $requester->organization_id,
+                    'lead',
+                    $fu->lead_id,
+                    important: false,
+                    context: ['lead_id' => $fu->lead_id, 'followup_id' => $fu->id]
+                );
+            }
+        }
+
+        $this->dispatch('toast', type: 'success', message: 'Follow-up request marked as ' . ($status === 'in_progress' ? 'In Progress' : 'Accepted') . '.');
+        $this->dispatch('lead-updated');
+    }
+
     public function scheduleMeetingAction(): void
     {
         $this->saveLeadAction('scheduleMeetingAction', fn () => $this->performScheduleMeetingAction());
@@ -1300,7 +1700,7 @@ class LeadDetail extends Component
             if ($lead) {
                 $communications = LeadCommunication::where('lead_id', $this->leadId)->latest()->get();
                 $statusHistory = LeadStatusHistory::where('lead_id', $this->leadId)->with('changer')->latest('changed_at')->get();
-                $leadFollowups = Followup::where('lead_id', $this->leadId)->with(['creator', 'completedBy', 'cancelledBy'])->orderBy('due_at', 'desc')->get();
+                $leadFollowups = Followup::where('lead_id', $this->leadId)->with(['creator', 'completedBy', 'cancelledBy', 'assignedTo', 'assignedBy', 'requestedBy'])->orderBy('due_at', 'desc')->get();
                 $leadCalls = LeadCall::where('lead_id', $this->leadId)->latest('called_at')->get();
                 $latestMeeting = $lead->meetings()->latest()->first();
                 $latestSiteVisit = $lead->siteVisits()->latest()->first();

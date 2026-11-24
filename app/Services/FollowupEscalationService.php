@@ -55,8 +55,8 @@ class FollowupEscalationService
                 continue;
             }
 
-            $executive = $lead->assigned_to ? User::find($lead->assigned_to) : null;
-            if (! $executive || $executive->status !== 'active') {
+            $executive = $this->resolveExecutiveFor($followup, $lead);
+            if (! $executive) {
                 continue;
             }
 
@@ -102,8 +102,8 @@ class FollowupEscalationService
                 continue;
             }
 
-            $executive = $lead->assigned_to ? User::find($lead->assigned_to) : null;
-            if (! $executive || $executive->status !== 'active') {
+            $executive = $this->resolveExecutiveFor($followup, $lead);
+            if (! $executive) {
                 continue;
             }
 
@@ -157,8 +157,8 @@ class FollowupEscalationService
                 continue;
             }
 
-            $executive = $lead->assigned_to ? User::find($lead->assigned_to) : null;
-            if (! $executive || $executive->status !== 'active') {
+            $executive = $this->resolveExecutiveFor($followup, $lead);
+            if (! $executive) {
                 continue;
             }
 
@@ -205,14 +205,14 @@ class FollowupEscalationService
             }
 
             $orgId = User::find($lead->client_id)?->organization_id ?? User::find($lead->assigned_to)?->organization_id;
-            $teamLeader = $this->resolveTeamLeaderFor($lead, $orgId);
+            $teamLeader = $this->resolveTeamLeaderFor($lead, $orgId, $followup);
 
             if (! $teamLeader || $teamLeader->status !== 'active') {
                 continue;
             }
 
             $eventKey = 'followup_escalate_tl:' . $followup->id . ':' . $followup->due_at->toDateTimeString();
-            $executiveName = $lead->assignedTo?->name ?? 'Unassigned Executive';
+            $executiveName = $followup->assignedTo?->name ?? $lead->assignedTo?->name ?? 'Unassigned Executive';
 
             $notification = $this->notificationService->sendWeb(
                 $teamLeader,
@@ -338,12 +338,28 @@ class FollowupEscalationService
     }
 
     /**
+     * Resolve the executive responsible for performing the follow-up.
+     */
+    protected function resolveExecutiveFor(Followup $followup, Lead $lead): ?User
+    {
+        $executiveId = $followup->assigned_to ?: $lead->assigned_to;
+        if (! $executiveId) {
+            return null;
+        }
+
+        $user = User::find($executiveId);
+
+        return ($user && $user->status === 'active') ? $user : null;
+    }
+
+    /**
      * Resolve Team Leader responsible for the lead or executive.
      */
-    protected function resolveTeamLeaderFor(Lead $lead, ?int $organizationId): ?User
+    protected function resolveTeamLeaderFor(Lead $lead, ?int $organizationId, ?Followup $followup = null): ?User
     {
-        if ($lead->assigned_to) {
-            $teamIds = SalesTeamMember::where('user_id', $lead->assigned_to)
+        $executiveId = $followup?->assigned_to ?: $lead->assigned_to;
+        if ($executiveId) {
+            $teamIds = SalesTeamMember::where('user_id', $executiveId)
                 ->where('is_active', true)
                 ->pluck('sales_team_id');
 

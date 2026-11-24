@@ -467,25 +467,35 @@
                         <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         Follow-Up Schedule &amp; Activity
                     </span>
-                    @if($urgency === 'overdue')
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                            Overdue Follow-up
-                        </span>
-                    @elseif($urgency === 'due_today')
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            Due Today
-                        </span>
-                    @elseif($urgency === 'upcoming')
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            Scheduled
-                        </span>
-                    @else
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
-                            No Pending Action
-                        </span>
-                    @endif
+                    <div class="flex items-center gap-1.5">
+                        @if($this->canManageFollowupAssignment())
+                            <button type="button" wire:click="openAssignFollowupModal" class="px-2 py-1 rounded bg-surface border border-border text-[10px] font-bold text-ink hover:bg-canvas transition flex items-center gap-1 cursor-pointer">
+                                <span>Assign Follow-Up</span>
+                            </button>
+                            <button type="button" wire:click="openRequestFollowupModal" class="px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary hover:bg-primary/20 transition flex items-center gap-1 cursor-pointer">
+                                <span>Request Follow-Up</span>
+                            </button>
+                        @endif
+                        @if($urgency === 'overdue')
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                Overdue Follow-up
+                            </span>
+                        @elseif($urgency === 'due_today')
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                Due Today
+                            </span>
+                        @elseif($urgency === 'upcoming')
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                Scheduled
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                No Pending Action
+                            </span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -502,11 +512,53 @@
                                 {{ $nextFu->due_at->format('d M Y, h:i A') }}
                             </div>
                             <p class="text-[11px] text-muted truncate" title="{{ $nextFu->note }}">{{ $nextFu->note ?: 'Customer follow-up discussion' }}</p>
+
+                            <!-- Assignment & Request Metadata Badges -->
+                            <div class="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
+                                @if($nextFu->assignedTo)
+                                    <span class="px-1.5 py-0.5 rounded bg-surface border border-border text-ink font-semibold flex items-center gap-1">
+                                        <span>👤 {{ $nextFu->assignedTo->name }}</span>
+                                        @if($nextFu->assignedBy)
+                                            <span class="text-muted text-[9px]">(by {{ $nextFu->assignedBy->name }})</span>
+                                        @endif
+                                    </span>
+                                @endif
+
+                                @if($nextFu->isRequested())
+                                    <span class="px-1.5 py-0.5 rounded font-bold border {{ $nextFu->request_status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($nextFu->request_status === 'in_progress' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : ($nextFu->request_status === 'accepted' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200')) }}">
+                                        Req: {{ $nextFu->request_status_label }}
+                                        @if($nextFu->requestedBy)
+                                            <span class="font-normal opacity-80">(by {{ $nextFu->requestedBy->name }})</span>
+                                        @endif
+                                    </span>
+                                @endif
+                            </div>
+
                             @if($nextFu->escalation_level > 0)
                                 <span class="inline-block mt-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                                     ⚠️ Escalation Level {{ $nextFu->escalation_level }}: {{ $nextFu->escalation_notes }}
                                 </span>
                             @endif
+
+                            <!-- Action Row for Reassignment / Request Acceptance -->
+                            <div class="flex flex-wrap items-center gap-2 pt-1.5 border-t border-border/60">
+                                @if($this->canManageFollowupAssignment())
+                                    <button type="button" wire:click="openReassignFollowupModal({{ $nextFu->id }})" class="text-[10px] font-semibold text-primary hover:underline cursor-pointer">
+                                        Reassign Executive
+                                    </button>
+                                @endif
+
+                                @if($nextFu->isRequested() && in_array($nextFu->request_status, ['pending', null]) && (auth()->id() === ($nextFu->assigned_to ?: $lead->assigned_to) || auth()->user()?->hasAnyRole(['Super Admin', 'super-admin'])))
+                                    <div class="flex items-center gap-1">
+                                        <button type="button" wire:click="acknowledgeFollowupRequest({{ $nextFu->id }}, 'accepted')" class="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[9px] cursor-pointer">
+                                            Accept Request
+                                        </button>
+                                        <button type="button" wire:click="acknowledgeFollowupRequest({{ $nextFu->id }}, 'in_progress')" class="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] cursor-pointer">
+                                            Start Working
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
                         @else
                             <div class="text-muted font-medium py-1">No upcoming follow-up scheduled</div>
                         @endif
@@ -529,6 +581,13 @@
                             </p>
                             @if($lastFu->completedBy)
                                 <p class="text-[10px] text-muted font-mono">By {{ $lastFu->completedBy->name }}</p>
+                            @endif
+                            @if($lastFu->isRequested())
+                                <div class="pt-1">
+                                    <span class="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                        Completed on request by {{ $lastFu->requestedBy?->name ?? 'Management' }}
+                                    </span>
+                                </div>
                             @endif
                         @else
                             <div class="text-muted font-medium py-1">No prior completed follow-ups</div>
@@ -1483,6 +1542,171 @@
             </x-ui.button>
         </div>
     </div>
+    @endif
+
+    <!-- Assign Follow-Up Modal -->
+    @if($showAssignFollowupModal)
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-ink">Assign Follow-Up to Executive</h3>
+                    <button type="button" wire:click="$set('showAssignFollowupModal', false)" class="text-muted hover:text-ink text-sm cursor-pointer">&times;</button>
+                </div>
+                <p class="text-xs text-muted">Assign a follow-up task to a team executive while keeping lead ownership unchanged.</p>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-bold text-ink">Select Executive <span class="text-rose-500">*</span></label>
+                        <select wire:model="assigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <option value="">-- Choose Executive --</option>
+                            @foreach($this->selectableExecutives as $exec)
+                                <option value="{{ $exec->id }}">{{ $exec->name }} ({{ $exec->roles->pluck('name')->first() ?? 'Executive' }})</option>
+                            @endforeach
+                        </select>
+                        @error('assigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="font-bold text-ink">Action Type <span class="text-rose-500">*</span></label>
+                            <select wire:model="assignType" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                                <option value="call">Phone Call</option>
+                                <option value="whatsapp">WhatsApp Message</option>
+                                <option value="meeting">Face-to-Face Meeting</option>
+                                <option value="site_visit">Site Visit</option>
+                                <option value="other">Other Action</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-ink">Date &amp; Time <span class="text-rose-500">*</span></label>
+                            <input type="datetime-local" wire:model="assignDueAt" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                            @error('assignDueAt') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Follow-up Instructions / Requirements</label>
+                        <textarea wire:model="assignNote" rows="3" placeholder="Specify instructions, customer requirements, or key questions for the executive..."
+                            class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
+                        @error('assignNote') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('showAssignFollowupModal', false)" class="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveAssignFollowup" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-xs cursor-pointer shadow-xs">
+                        Assign Follow-Up
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Reassign Follow-Up Modal -->
+    @if($showReassignFollowupModal)
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-ink">Reassign Follow-Up</h3>
+                    <button type="button" wire:click="$set('showReassignFollowupModal', false)" class="text-muted hover:text-ink text-sm cursor-pointer">&times;</button>
+                </div>
+                <p class="text-xs text-muted">Delegate this pending task to another executive. The lead owner will remain unchanged.</p>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-bold text-ink">New Responsible Executive <span class="text-rose-500">*</span></label>
+                        <select wire:model="reassigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <option value="">-- Choose Executive --</option>
+                            @foreach($this->selectableExecutives as $exec)
+                                <option value="{{ $exec->id }}">{{ $exec->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('reassigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Adjust Scheduled Time (Optional)</label>
+                        <input type="datetime-local" wire:model="reassignDueAt" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Instructions / Notes</label>
+                        <textarea wire:model="reassignNote" rows="2" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('showReassignFollowupModal', false)" class="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveReassignFollowup" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-xs cursor-pointer shadow-xs">
+                        Confirm Reassignment
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Request Follow-Up Modal -->
+    @if($showRequestFollowupModal)
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-ink">Request Follow-Up from Executive</h3>
+                    <button type="button" wire:click="$set('showRequestFollowupModal', false)" class="text-muted hover:text-ink text-sm cursor-pointer">&times;</button>
+                </div>
+                <p class="text-xs text-muted">Formally request a follow-up action with specific instructions and a required deadline.</p>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-bold text-ink">Responsible Executive <span class="text-rose-500">*</span></label>
+                        <select wire:model="requestAssigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <option value="">-- Choose Executive --</option>
+                            @foreach($this->selectableExecutives as $exec)
+                                <option value="{{ $exec->id }}">{{ $exec->name }} ({{ $exec->roles->pluck('name')->first() ?? 'Executive' }})</option>
+                            @endforeach
+                        </select>
+                        @error('requestAssigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="font-bold text-ink">Action Type <span class="text-rose-500">*</span></label>
+                            <select wire:model="requestType" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                                <option value="call">Phone Call</option>
+                                <option value="whatsapp">WhatsApp Message</option>
+                                <option value="meeting">Face-to-Face Meeting</option>
+                                <option value="site_visit">Site Visit</option>
+                                <option value="other">Other Action</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-ink">Target Deadline <span class="text-rose-500">*</span></label>
+                            <input type="datetime-local" wire:model="requestDueAt" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                            @error('requestDueAt') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-ink">Follow-Up Instructions / Customer Requirements <span class="text-rose-500">*</span></label>
+                        <textarea wire:model="requestNote" rows="3" placeholder="Provide clear instructions on customer needs, quotation details, or required questions..."
+                            class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
+                        @error('requestNote') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('showRequestFollowupModal', false)" class="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveRequestFollowup" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-xs cursor-pointer shadow-xs">
+                        Submit Follow-Up Request
+                    </button>
+                </div>
+            </div>
+        </div>
     @endif
     @if(auth()->user()?->hasAnyRole(['Super Admin','super-admin']))
         <livewire:leads.lead-archive-dialog />

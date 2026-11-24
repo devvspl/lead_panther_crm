@@ -21,7 +21,7 @@
         </div>
 
         <!-- Metric KPI Cards -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <!-- Total -->
             <button type="button" wire:click="setTab('all')" class="p-3.5 rounded-xl border {{ $activeTab === 'all' ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
                 <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Total</span>
@@ -55,6 +55,13 @@
                 <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider block">Escalated</span>
                 <span class="text-xl font-bold text-purple-700 block mt-1">{{ number_format($escalatedCount) }}</span>
                 <span class="text-[10px] text-purple-600">TL / Admin alert</span>
+            </button>
+
+            <!-- Follow-up Requests -->
+            <button type="button" wire:click="setTab('requests')" class="p-3.5 rounded-xl border {{ $activeTab === 'requests' ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
+                <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Requests</span>
+                <span class="text-xl font-bold text-indigo-700 block mt-1">{{ number_format($requestsCount) }}</span>
+                <span class="text-[10px] text-indigo-600">Delegated tasks</span>
             </button>
 
             <!-- Completed -->
@@ -135,6 +142,7 @@
                 'today' => 'Due Today (' . $todayCount . ')',
                 'upcoming' => 'Upcoming (' . $upcomingCount . ')',
                 'overdue' => 'Overdue (' . $overdueCount . ')',
+                'requests' => 'Requests (' . $requestsCount . ')',
                 'escalated' => 'Escalated (' . $escalatedCount . ')',
                 'completed' => 'Completed (' . $completedCount . ')',
             ] as $tabKey => $tabLabel)
@@ -227,9 +235,22 @@
                                 <!-- Assigned Executive -->
                                 <td class="p-3">
                                     <div class="font-semibold text-ink">
-                                        {{ $leadRecord?->assignedTo?->name ?: 'Unassigned' }}
+                                        {{ $fu->assignedTo?->name ?: ($leadRecord?->assignedTo?->name ?: 'Unassigned') }}
                                     </div>
-                                    <div class="text-[10px] text-muted">
+                                    @if($fu->assignedBy)
+                                        <div class="text-[9px] text-muted">Assigned by {{ $fu->assignedBy->name }}</div>
+                                    @endif
+                                    @if($fu->isRequested())
+                                        <div class="mt-0.5">
+                                            <span class="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border {{ $fu->request_status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($fu->request_status === 'in_progress' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : ($fu->request_status === 'accepted' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200')) }}">
+                                                Req: {{ $fu->request_status_label }}
+                                                @if($fu->requestedBy)
+                                                    <span class="font-normal opacity-75">({{ $fu->requestedBy->name }})</span>
+                                                @endif
+                                            </span>
+                                        </div>
+                                    @endif
+                                    <div class="text-[10px] text-muted mt-0.5">
                                         {{ $leadRecord?->client?->organization?->name ?: '—' }}
                                     </div>
                                 </td>
@@ -272,6 +293,12 @@
                                 <!-- Actions -->
                                 <td class="p-3 text-right space-x-1 whitespace-nowrap">
                                     @if($fu->status === 'pending')
+                                        @if($fu->isRequested() && in_array($fu->request_status, ['pending', null]) && (auth()->id() === ($fu->assigned_to ?: $leadRecord?->assigned_to) || auth()->user()?->hasAnyRole(['Super Admin', 'super-admin'])))
+                                            <button type="button" wire:click="acknowledgeRequest({{ $fu->id }}, 'accepted')"
+                                                class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] cursor-pointer transition">
+                                                Accept
+                                            </button>
+                                        @endif
                                         <button type="button" wire:click="markDone({{ $fu->id }})"
                                             class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition">
                                             Complete
@@ -279,6 +306,10 @@
                                         <button type="button" wire:click="openReschedule({{ $fu->id }})"
                                             class="px-2 py-1 rounded bg-surface border border-border text-ink hover:bg-canvas font-semibold text-[10px] cursor-pointer transition">
                                             Reschedule
+                                        </button>
+                                        <button type="button" wire:click="openReassign({{ $fu->id }})"
+                                            class="px-2 py-1 rounded bg-surface border border-border text-primary hover:bg-canvas font-semibold text-[10px] cursor-pointer transition">
+                                            Reassign
                                         </button>
                                         <button type="button" wire:click="openCancel({{ $fu->id }})"
                                             class="px-1.5 py-1 rounded text-rose-600 hover:bg-rose-50 font-semibold text-[10px] cursor-pointer transition">
@@ -442,6 +473,46 @@
                     </button>
                     <button type="button" wire:click="saveCancel" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer shadow-xs">
                         Confirm Cancellation
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Reassign Modal -->
+    @if($reassigningFollowupId)
+        <div class="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
+            <div class="bg-surface rounded-card border border-border p-6 shadow-xl max-w-md w-full space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-ink">Reassign Follow-Up</h3>
+                    <button type="button" wire:click="$set('reassigningFollowupId', null)" class="text-muted hover:text-ink text-sm cursor-pointer">&times;</button>
+                </div>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-bold text-ink">Assign To Executive <span class="text-rose-500">*</span></label>
+                        <select wire:model="reassigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <option value="">-- Select Executive --</option>
+                            @foreach($executives as $exec)
+                                <option value="{{ $exec->id }}">{{ $exec->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('reassigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="font-bold text-ink">Scheduled Date &amp; Time</label>
+                        <input type="datetime-local" wire:model="reassignDueAt" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1">
+                    </div>
+                    <div>
+                        <label class="font-bold text-ink">Instructions / Notes</label>
+                        <textarea wire:model="reassignNote" rows="2" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1"></textarea>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                    <button type="button" wire:click="$set('reassigningFollowupId', null)" class="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-ink hover:bg-canvas cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveReassign" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-xs cursor-pointer shadow-xs">
+                        Save Reassignment
                     </button>
                 </div>
             </div>

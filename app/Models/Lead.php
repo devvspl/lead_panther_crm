@@ -75,7 +75,10 @@ class Lead extends Model
             $query->where('delivery_pending', false);
         }
         if ($role === 'sales-executive') {
-            return $query->where('assigned_to', $user->id);
+            return $query->where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('followups', fn ($fq) => $fq->where('assigned_to', $user->id));
+            });
         }
         if ($role === 'builder') {
             return $query->where(function ($q) use ($user) {

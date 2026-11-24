@@ -18,6 +18,9 @@ class Followup extends Model
         'cancelled_at' => 'datetime',
         'escalated_at' => 'datetime',
         'escalation_level' => 'integer',
+        'assigned_at' => 'datetime',
+        'requested_at' => 'datetime',
+        'acknowledged_at' => 'datetime',
     ];
 
     public const TYPE_CALL = 'call';
@@ -29,6 +32,11 @@ class Followup extends Model
     public const STATUS_PENDING = 'pending';
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
+
+    public const REQUEST_PENDING = 'pending';
+    public const REQUEST_ACCEPTED = 'accepted';
+    public const REQUEST_IN_PROGRESS = 'in_progress';
+    public const REQUEST_COMPLETED = 'completed';
 
     public static function typeLabels(): array
     {
@@ -75,6 +83,47 @@ class Followup extends Model
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function assignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_by');
+    }
+
+    public function requestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function isRequested(): bool
+    {
+        return ! empty($this->requested_by);
+    }
+
+    public function isAssigned(): bool
+    {
+        return ! empty($this->assigned_to) || ! empty($this->assigned_by);
+    }
+
+    public function getEffectiveAssigneeAttribute(): ?User
+    {
+        return $this->assignedTo ?: $this->lead?->assignedTo ?: $this->creator;
+    }
+
+    public function getRequestStatusLabelAttribute(): string
+    {
+        return match ($this->request_status) {
+            self::REQUEST_ACCEPTED => 'Accepted',
+            self::REQUEST_IN_PROGRESS => 'In Progress',
+            self::REQUEST_COMPLETED => 'Completed',
+            self::REQUEST_PENDING => 'Pending',
+            default => ucfirst(str_replace('_', ' ', $this->request_status ?? 'Pending')),
+        };
     }
 
     public function scopePending(Builder $query): Builder

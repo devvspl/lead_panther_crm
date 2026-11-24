@@ -21,7 +21,12 @@ class NotificationDeliveryService
             ->where('internal_processing_pending', false)->whereNotNull('delivered_at');
         $role = \App\Support\NavigationConfig::getRoleKey($user);
         if ($role === 'team-leader') return \App\Support\TeamAccess::scopeLeads($query, $user);
-        if ($role === 'sales-executive') return $query->where('assigned_to', $user->id);
+        if ($role === 'sales-executive') {
+            return $query->where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('followups', fn ($fq) => $fq->where('assigned_to', $user->id));
+            });
+        }
         return $query->where(function ($q) use ($user, $role) {
             $q->where('client_id', $user->id);
             if ($role === 'builder' && $user->organization_id) $q->orWhereHas('client', fn ($owner) => $owner->where('organization_id', $user->organization_id));

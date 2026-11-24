@@ -257,80 +257,327 @@
         <livewire:leads.client-lead-manager :organization-id="$organization->id" :key="'client-leads-'.$organization->id" />
     @endif
 
+    <!-- TAB 6: CAMPAIGN DETAILS & DELIVERY -->
     @if($activeTab === 'campaigns')
-        <section class="space-y-5" wire:poll.30s>
+        <section class="space-y-6" wire:poll.30s>
             @forelse($this->deliveryProjects as $row)
                 @php
                     $project = $row['project'];
                     $projectKey = 'project_'.$project->id;
                 @endphp
-                <article id="delivery-project-{{ $project->id }}" class="bg-surface border border-border rounded-xl overflow-hidden" wire:key="delivery-project-{{ $project->id }}" x-data="{ open: false }" x-init="open = window.location.hash === '#' + $el.id || (!!window.location.hash && Array.from($el.querySelectorAll('[id]')).some(node => '#' + node.id === window.location.hash))">
-                    <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="delivery-project-content-{{ $project->id }}" class="flex w-full items-center justify-between gap-4 p-4 sm:p-5 text-left hover:bg-canvas/50 transition">
-                        <span class="min-w-0 space-y-2"><span class="block text-sm font-bold text-ink">{{ $project->name }}</span><span class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"><span>{{ ucfirst($project->status) }} · {{ count($row['campaigns']) }} campaigns</span><span>Daily limit: {{ $project->delivery_daily_limit ? number_format($project->delivery_daily_limit) : 'Unlimited' }}</span><span>Interval: {{ $project->delivery_interval_minutes ? $project->delivery_interval_minutes.' min' : 'Immediate' }}</span><span>Delivered today: {{ number_format($row['stats']['today']) }} · Pending: {{ number_format($row['stats']['pending']) }}</span></span></span>
-                        <span class="flex shrink-0 items-center gap-2 text-xs font-semibold text-primary"><span x-text="open ? 'Collapse' : 'Configure'"></span><svg class="h-4 w-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg></span>
-                    </button>
-                    <div id="delivery-project-content-{{ $project->id }}" x-show="open" x-cloak class="border-t border-border p-4 sm:p-5 space-y-5">
-                    <h4 class="text-sm font-semibold text-ink">Project Default Settings</h4>
-                    <form wire:submit="saveDeliverySettings('project', {{ $project->id }})" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                        <label class="text-xs text-ink">Daily Lead Limit (0 = unlimited)
-                            <input type="number" min="0" max="100000" wire:model="deliverySettings.{{ $projectKey }}.limit" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
-                            @error('deliverySettings.'.$projectKey.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
-                        </label>
-                        <label class="text-xs text-ink">Delivery Interval (Minutes; 0 = immediate)
-                            <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $projectKey }}.interval" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2">
-                            @error('deliverySettings.'.$projectKey.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
-                        </label>
-                        <label class="text-xs text-ink">Delivery status
-                            <x-ui.themed-select class="w-full" searchable  wire:model="deliverySettings.{{ $projectKey }}.enabled" trigger-class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2"><option value="1">Active</option><option value="0">Inactive</option></x-ui.themed-select>
-                        </label>
-                        <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
-                    </form>
-                    <details class="rounded-lg border border-border p-3"><summary class="text-xs font-semibold text-ink cursor-pointer">Live Delivery Statistics <span class="font-normal text-muted">· Project totals</span></summary><div class="mt-3"><x-ui.delivery-statistics :stats="$row['stats']" /></div><p class="text-xs text-muted mt-2">Daily capacity is summed across campaigns.</p></details>
-                    <h4 class="text-sm font-semibold text-ink border-t border-border pt-4">Campaign Override Settings</h4>
-                    @forelse($row['campaigns'] as $item)
-                        @php
-                            $campaign = $item['campaign'];
-                            $key = 'campaign_'.$campaign->id;
-                            $effective = $item['effective'];
-                        @endphp
-                        <div id="delivery-campaign-{{ $campaign->id }}" class="border border-border rounded-lg overflow-hidden" wire:key="delivery-campaign-{{ $campaign->id }}" x-data="{ expanded: false }" x-init="expanded = window.location.hash === '#' + $el.id">
-                            <button type="button" @click="expanded = !expanded" :aria-expanded="expanded.toString()" aria-controls="delivery-campaign-content-{{ $campaign->id }}" class="flex items-center justify-between gap-3 w-full p-3 sm:p-4 text-left hover:bg-canvas/50 transition">
-                                <span class="min-w-0 space-y-1"><span class="block text-sm font-semibold text-ink">{{ $campaign->name }}</span><span class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted"><span>{{ $campaign->leadSource?->name ?? 'Not linked' }} · {{ $project->delivery_enabled && $project->status === 'active' && $campaign->status === 'active' ? 'Active' : 'Paused' }}</span><span>Daily: {{ $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']) }} ({{ $effective['limit_source'] }})</span><span>Interval: {{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' min' }} ({{ $effective['interval_source'] }})</span></span></span>
-                                <svg class="h-4 w-4 shrink-0 text-muted transition-transform" :class="expanded && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                            <div id="delivery-campaign-content-{{ $campaign->id }}" x-show="expanded" x-cloak class="border-t border-border p-3 sm:p-4 space-y-3">
-                            <p class="text-xs text-muted">Campaign status: {{ ucfirst($campaign->status) }}</p>
-                            <form wire:submit="saveDeliverySettings('campaign', {{ $campaign->id }})" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                                <div class="text-xs text-ink">
-                                    <label>Daily Lead Limit (0 = unlimited)
-                                        <input type="number" min="0" max="100000" wire:model="deliverySettings.{{ $key }}.limit" @disabled($deliverySettings[$key]['inherit_limit'] ?? true) placeholder="Inherit project" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2 disabled:opacity-50">
-                                    </label>
-                                    <label class="flex gap-2 mt-2"><input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_limit"> Inherit Project Default</label>
-                                    @error('deliverySettings.'.$key.'.limit') <span class="text-red-600">{{ $message }}</span> @enderror
+                <article id="delivery-project-{{ $project->id }}" class="bg-surface border border-border rounded-2xl shadow-2xs overflow-hidden" wire:key="delivery-project-{{ $project->id }}">
+                    <!-- Compact Project Summary Card Header -->
+                    <div class="p-5 sm:p-6 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div class="min-w-0 space-y-1">
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <h4 class="text-base font-bold text-ink">{{ $project->name }}</h4>
+                                    @if($project->delivery_enabled && $project->status === 'active')
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            Delivery Active
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            Delivery Paused
+                                        </span>
+                                    @endif
+                                    <span class="px-2 py-0.5 rounded-md text-[11px] font-medium bg-canvas border border-border text-muted">
+                                        {{ ucfirst($project->status) }}
+                                    </span>
                                 </div>
-                                <div class="text-xs text-ink">
-                                    <label>Delivery Interval (Minutes; 0 = immediate)
-                                        <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $key }}.interval" @disabled($deliverySettings[$key]['inherit_interval'] ?? true) placeholder="Inherit project" class="block w-full mt-1 rounded-lg border border-border bg-canvas p-2 disabled:opacity-50">
-                                    </label>
-                                    <label class="flex gap-2 mt-2"><input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_interval"> Inherit Project Default</label>
-                                    @error('deliverySettings.'.$key.'.interval') <span class="text-red-600">{{ $message }}</span> @enderror
-                                </div>
-                                <button type="submit" wire:loading.attr="disabled" class="rounded-lg bg-primary text-white px-4 py-2 text-sm">Save Settings</button>
-                            </form>
-                            <div class="text-xs text-ink bg-canvas border border-border rounded-lg p-3">
-                                Effective daily limit: <strong>{{ $effective['limit'] === 0 ? 'Unlimited' : $effective['limit'] }}</strong> ({{ $effective['limit_source'] }}) |
-                                Effective interval: <strong>{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' minutes' }}</strong> ({{ $effective['interval_source'] }})
+                                <p class="text-xs text-muted">
+                                    Project default settings apply to all campaigns linked to {{ $project->name }} unless overridden.
+                                </p>
                             </div>
-                            <details class="rounded-lg border border-border p-3"><summary class="text-xs font-semibold text-ink cursor-pointer">Live Delivery Statistics · {{ number_format($item['stats']['today']) }} delivered today · {{ number_format($item['stats']['pending']) }} pending</summary><div class="mt-3"><x-ui.delivery-statistics :stats="$item['stats']" /></div></details>
+
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" x-on:click="$dispatch('open-modal', 'project-delivery-settings-{{ $project->id }}')"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold transition shadow-2xs hover:border-primary/50 cursor-pointer">
+                                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span>Configure Settings</span>
+                                </button>
                             </div>
                         </div>
-                    @empty
-                        <p class="text-sm text-muted">No campaigns linked to this project.</p>
-                    @endforelse
+
+                        <!-- Compact Key Metrics Summary Row -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                            <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Daily Limit</span>
+                                <div class="text-sm font-bold font-mono text-ink">
+                                    {{ $project->delivery_daily_limit ? number_format($project->delivery_daily_limit) : 'Unlimited' }}
+                                </div>
+                                <span class="text-[10px] text-muted">{{ $project->delivery_daily_limit ? 'Leads / day' : '0 = Unlimited' }}</span>
+                            </div>
+                            <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Delivery Interval</span>
+                                <div class="text-sm font-bold font-mono text-ink">
+                                    {{ $project->delivery_interval_minutes ? $project->delivery_interval_minutes.' min' : 'Immediate' }}
+                                </div>
+                                <span class="text-[10px] text-muted">{{ $project->delivery_interval_minutes ? 'Between leads' : '0 = Immediate' }}</span>
+                            </div>
+                            <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Campaigns</span>
+                                <div class="text-sm font-bold font-mono text-ink">
+                                    {{ count($row['campaigns']) }} Linked
+                                </div>
+                                <span class="text-[10px] text-muted">Mapped to project</span>
+                            </div>
+                            <div class="p-3 rounded-xl bg-canvas border border-border space-y-0.5">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Delivered Today</span>
+                                <div class="text-sm font-bold font-mono text-emerald-600">
+                                    {{ number_format($row['stats']['today']) }}
+                                </div>
+                                <span class="text-[10px] text-muted">Pending: {{ number_format($row['stats']['pending']) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Delivery Statistics Collapsible -->
+                        <details class="rounded-xl border border-border bg-canvas/30 p-3">
+                            <summary class="text-xs font-semibold text-ink cursor-pointer flex items-center justify-between">
+                                <span>Live Delivery Statistics <span class="font-normal text-muted">· Project totals</span></span>
+                                <span class="text-[11px] text-primary">Toggle Stats</span>
+                            </summary>
+                            <div class="mt-3">
+                                <x-ui.delivery-statistics :stats="$row['stats']" />
+                            </div>
+                            <p class="text-[11px] text-muted mt-2">Daily capacity is summed across campaigns.</p>
+                        </details>
                     </div>
+
+                    <!-- Campaign Override Settings Section -->
+                    <div class="border-t border-border p-5 sm:p-6 space-y-4 bg-canvas/20">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h5 class="text-sm font-bold text-ink">Campaign Override Settings</h5>
+                                <p class="text-xs text-muted">Displaying individual campaign configurations, inheritance rules, and delivery limits.</p>
+                            </div>
+                            <span class="text-xs text-muted font-medium">{{ count($row['campaigns']) }} {{ Str::plural('campaign', count($row['campaigns'])) }}</span>
+                        </div>
+
+                        <div class="space-y-3">
+                            @forelse($row['campaigns'] as $item)
+                                @php
+                                    $campaign = $item['campaign'];
+                                    $key = 'campaign_'.$campaign->id;
+                                    $effective = $item['effective'];
+                                    $isInherited = $campaign->delivery_daily_limit === null && $campaign->delivery_interval_minutes === null;
+                                @endphp
+                                <div id="delivery-campaign-{{ $campaign->id }}"
+                                    class="p-4 rounded-xl bg-surface border border-border shadow-2xs hover:border-border/80 transition space-y-3"
+                                    wire:key="delivery-campaign-{{ $campaign->id }}">
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div class="min-w-0 space-y-1">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <h6 class="text-sm font-bold text-ink truncate">{{ $campaign->name }}</h6>
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $campaign->status === 'active' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300' }}">
+                                                    {{ ucfirst($campaign->status) }}
+                                                </span>
+                                                @if($campaign->leadSource)
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-canvas border border-border text-muted">
+                                                        {{ $campaign->leadSource->name }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                                                <span>Effective Daily: <strong class="text-ink">{{ $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']) }}</strong> <span class="text-[11px] text-muted">({{ $effective['limit_source'] }})</span></span>
+                                                <span>Effective Interval: <strong class="text-ink">{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' min' }}</strong> <span class="text-[11px] text-muted">({{ $effective['interval_source'] }})</span></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            @if($isInherited)
+                                                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                                    Project default
+                                                </span>
+                                            @else
+                                                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                                    Campaign override
+                                                </span>
+                                            @endif
+
+                                            <button type="button" x-on:click="$dispatch('open-modal', 'campaign-delivery-settings-{{ $campaign->id }}')"
+                                                class="px-3 py-1.5 bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs hover:border-primary/50 inline-flex items-center gap-1.5 cursor-pointer">
+                                                <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                                <span>Configure</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Campaign Live Delivery Stats Collapsible -->
+                                    <details class="text-xs border-t border-border/60 pt-2.5">
+                                        <summary class="font-semibold text-muted hover:text-ink cursor-pointer flex items-center justify-between">
+                                            <span>Live Delivery Statistics · {{ number_format($item['stats']['today']) }} delivered today · {{ number_format($item['stats']['pending']) }} pending</span>
+                                            <span class="text-[11px] text-primary">View Stats</span>
+                                        </summary>
+                                        <div class="mt-3">
+                                            <x-ui.delivery-statistics :stats="$item['stats']" />
+                                        </div>
+                                    </details>
+                                </div>
+
+                                <!-- Campaign Delivery Settings Centered Modal -->
+                                <x-ui.modal name="campaign-delivery-settings-{{ $campaign->id }}" maxWidth="lg" :centered="true">
+                                    <form wire:submit="saveDeliverySettings('campaign', {{ $campaign->id }})" class="p-5 sm:p-6 space-y-4">
+                                        <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                                            <div class="flex items-center gap-3">
+                                                <div class="p-2 rounded-xl bg-primary/10 text-primary">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-base font-bold text-ink">Campaign Delivery Settings</h4>
+                                                    <p class="text-xs text-muted">{{ $campaign->name }}</p>
+                                                </div>
+                                            </div>
+                                            <button type="button" x-on:click="$dispatch('close-modal', 'campaign-delivery-settings-{{ $campaign->id }}')"
+                                                class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+
+                                        <div class="p-3 rounded-xl bg-canvas border border-border text-xs text-ink space-y-1">
+                                            <div>Effective daily limit: <strong>{{ $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']) }}</strong> <span class="text-muted">({{ $effective['limit_source'] }})</span></div>
+                                            <div>Effective interval: <strong>{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' minutes' }}</strong> <span class="text-muted">({{ $effective['interval_source'] }})</span></div>
+                                        </div>
+
+                                        <div class="space-y-3.5">
+                                            <!-- Daily Lead Limit -->
+                                            <div>
+                                                <label class="block text-xs font-semibold text-ink mb-1">Daily Lead Limit (0 = unlimited)</label>
+                                                <input type="number" min="0" max="100000"
+                                                    wire:model="deliverySettings.{{ $key }}.limit"
+                                                    @disabled($deliverySettings[$key]['inherit_limit'] ?? true)
+                                                    placeholder="Inherit project ({{ $project->delivery_daily_limit ? number_format($project->delivery_daily_limit) : 'Unlimited' }})"
+                                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink disabled:opacity-50">
+                                                <label class="flex items-center gap-2 mt-1.5 text-xs text-ink cursor-pointer">
+                                                    <input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_limit" class="rounded border-border text-primary focus:ring-primary">
+                                                    <span>Inherit Project Default</span>
+                                                </label>
+                                                @error('deliverySettings.'.$key.'.limit') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                            </div>
+
+                                            <!-- Delivery Interval -->
+                                            <div>
+                                                <label class="block text-xs font-semibold text-ink mb-1">Delivery Interval (Minutes; 0 = immediate)</label>
+                                                <input type="number" min="0" max="10080"
+                                                    wire:model="deliverySettings.{{ $key }}.interval"
+                                                    @disabled($deliverySettings[$key]['inherit_interval'] ?? true)
+                                                    placeholder="Inherit project ({{ $project->delivery_interval_minutes ? $project->delivery_interval_minutes.' min' : 'Immediate' }})"
+                                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink disabled:opacity-50">
+                                                <label class="flex items-center gap-2 mt-1.5 text-xs text-ink cursor-pointer">
+                                                    <input type="checkbox" wire:model.live="deliverySettings.{{ $key }}.inherit_interval" class="rounded border-border text-primary focus:ring-primary">
+                                                    <span>Inherit Project Default</span>
+                                                </label>
+                                                @error('deliverySettings.'.$key.'.interval') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                            </div>
+
+                                            <!-- Campaign Delivery Status -->
+                                            <div>
+                                                <label class="block text-xs font-semibold text-ink mb-1">Campaign Delivery Status</label>
+                                                <select wire:model="deliverySettings.{{ $key }}.status" class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink">
+                                                    <option value="active">Active</option>
+                                                    <option value="paused">Paused</option>
+                                                    <option value="inactive">Inactive</option>
+                                                </select>
+                                                @error('deliverySettings.'.$key.'.status') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                                            <button type="button" x-on:click="$dispatch('close-modal', 'campaign-delivery-settings-{{ $campaign->id }}')"
+                                                class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer">
+                                                Save Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </x-ui.modal>
+                            @empty
+                                <p class="text-xs text-muted p-4 rounded-xl border border-dashed border-border text-center">No campaigns linked to this project.</p>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <!-- Project Delivery Settings Centered Modal -->
+                    <x-ui.modal name="project-delivery-settings-{{ $project->id }}" maxWidth="lg" :centered="true">
+                        <form wire:submit="saveDeliverySettings('project', {{ $project->id }})" class="p-5 sm:p-6 space-y-4">
+                            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                                <div class="flex items-center gap-3">
+                                    <div class="p-2 rounded-xl bg-primary/10 text-primary">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-base font-bold text-ink">Project Default Settings</h4>
+                                        <p class="text-xs text-muted">{{ $project->name }}</p>
+                                    </div>
+                                </div>
+                                <button type="button" x-on:click="$dispatch('close-modal', 'project-delivery-settings-{{ $project->id }}')"
+                                    class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="space-y-3.5">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink mb-1">Daily Lead Limit (0 = unlimited)</label>
+                                    <input type="number" min="0" max="100000" wire:model="deliverySettings.{{ $projectKey }}.limit"
+                                        class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink focus:ring-1 focus:ring-primary focus:border-primary">
+                                    <span class="text-[11px] text-muted block mt-0.5">Maximum leads delivered per day across all campaigns in this project.</span>
+                                    @error('deliverySettings.'.$projectKey.'.limit') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink mb-1">Delivery Interval (Minutes; 0 = immediate)</label>
+                                    <input type="number" min="0" max="10080" wire:model="deliverySettings.{{ $projectKey }}.interval"
+                                        class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink focus:ring-1 focus:ring-primary focus:border-primary">
+                                    <span class="text-[11px] text-muted block mt-0.5">Delay between consecutive lead deliveries to this project.</span>
+                                    @error('deliverySettings.'.$projectKey.'.interval') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink mb-1">Delivery Status</label>
+                                    <select wire:model="deliverySettings.{{ $projectKey }}.enabled" class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink">
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </select>
+                                    @error('deliverySettings.'.$projectKey.'.enabled') <span class="text-xs text-red-600 block mt-1">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                                <button type="button" x-on:click="$dispatch('close-modal', 'project-delivery-settings-{{ $project->id }}')"
+                                    class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer">
+                                    Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </x-ui.modal>
                 </article>
             @empty
-                <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center space-y-2"><h3 class="text-sm font-semibold text-ink">No campaigns mapped to this organization</h3><p class="text-xs text-muted">Map a lead form to a campaign and a client in this organization under Integrations. Active mappings will appear here automatically.</p><a href="{{ route('settings.integrations') }}" class="inline-block text-xs font-semibold text-primary hover:underline">Manage Integration Mappings</a></div>
+                <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center space-y-2">
+                    <h3 class="text-sm font-semibold text-ink">No campaigns mapped to this organization</h3>
+                    <p class="text-xs text-muted">Map a lead form to a campaign and a client in this organization under Integrations. Active mappings will appear here automatically.</p>
+                    <a href="{{ route('settings.integrations') }}" class="inline-block text-xs font-semibold text-primary hover:underline">Manage Integration Mappings</a>
+                </div>
             @endforelse
         </section>
     @endif

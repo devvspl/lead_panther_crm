@@ -143,7 +143,7 @@
                     if (label) label.textContent = 'App Installed';
                     if (iconInstall) iconInstall.classList.add('hidden');
                     if (iconInstalled) iconInstalled.classList.remove('hidden');
-                    if (badge) badge.classList.remove('hidden');
+                    if (badge) badge.classList.add('hidden');
                     if (badgeNew) badgeNew.classList.add('hidden');
                 } else {
                     btn.setAttribute('data-installed', 'false');

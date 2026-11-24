@@ -559,6 +559,7 @@ class OrganizationDetail extends Component
             "deliverySettings.$key.limit" => 'nullable|integer|min:0|max:100000',
             "deliverySettings.$key.interval" => 'nullable|integer|min:0|max:10080',
             "deliverySettings.$key.enabled" => 'sometimes|boolean',
+            "deliverySettings.$key.status" => 'sometimes|string|in:active,inactive,paused',
             "deliverySettings.$key.inherit_limit" => 'sometimes|boolean',
             "deliverySettings.$key.inherit_interval" => 'sometimes|boolean',
         ]);
@@ -570,6 +571,7 @@ class OrganizationDetail extends Component
                 ? null : (int) $value;
         }
         if ($type === 'project') $values['delivery_enabled'] = (bool) ($settings['enabled'] ?? $record->delivery_enabled);
+        if ($type === 'campaign' && isset($settings['status'])) $values['status'] = $settings['status'];
         try {
             $record->update($values);
         } catch (Throwable $e) {
@@ -577,6 +579,7 @@ class OrganizationDetail extends Component
             $this->dispatch('toast', type: 'error', message: 'Delivery settings could not be saved. Please try again.');
             return;
         }
+        $this->dispatch('close-modal', ($type === 'project' ? 'project-delivery-settings-'.$id : 'campaign-delivery-settings-'.$id));
         $this->dispatch('toast', type: 'success', message: 'Delivery settings saved. New leads will follow these settings; queued leads keep their scheduled delivery time.');
     }
 
@@ -650,6 +653,7 @@ class OrganizationDetail extends Component
                     'limit' => $record->delivery_daily_limit ?? ($type === 'project' ? 0 : null),
                     'interval' => $record->delivery_interval_minutes ?? ($type === 'project' ? 0 : null),
                     'enabled' => $type === 'project' ? (bool) $record->delivery_enabled : true,
+                    'status' => $record->status ?? 'active',
                     'inherit_limit' => $type === 'campaign' && $record->delivery_daily_limit === null,
                     'inherit_interval' => $type === 'campaign' && $record->delivery_interval_minutes === null,
                 ];

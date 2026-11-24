@@ -172,7 +172,7 @@
                             @php
                                 $leadRecord = $fu->lead;
                             @endphp
-                            <tr class="hover:bg-canvas/40 transition">
+                            <tr class="hover:bg-canvas/40 transition" wire:key="followup-row-{{ $fu->id }}">
                                 <!-- Customer & Project -->
                                 <td class="p-3">
                                     <div class="font-bold text-ink">
@@ -291,35 +291,10 @@
                                 </td>
 
                                 <!-- Actions -->
-                                <td class="p-3 text-right space-x-1 whitespace-nowrap">
-                                    @if($fu->status === 'pending')
-                                        @if($fu->isRequested() && in_array($fu->request_status, ['pending', null]) && (auth()->id() === ($fu->assigned_to ?: $leadRecord?->assigned_to) || auth()->user()?->hasAnyRole(['Super Admin', 'super-admin'])))
-                                            <button type="button" wire:click="acknowledgeRequest({{ $fu->id }}, 'accepted')"
-                                                class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] cursor-pointer transition">
-                                                Accept
-                                            </button>
-                                        @endif
-                                        <button type="button" wire:click="markDone({{ $fu->id }})"
-                                            class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition">
-                                            Complete
-                                        </button>
-                                        <button type="button" wire:click="openReschedule({{ $fu->id }})"
-                                            class="px-2 py-1 rounded bg-surface border border-border text-ink hover:bg-canvas font-semibold text-[10px] cursor-pointer transition">
-                                            Reschedule
-                                        </button>
-                                        <button type="button" wire:click="openReassign({{ $fu->id }})"
-                                            class="px-2 py-1 rounded bg-surface border border-border text-primary hover:bg-canvas font-semibold text-[10px] cursor-pointer transition">
-                                            Reassign
-                                        </button>
-                                        <button type="button" wire:click="openCancel({{ $fu->id }})"
-                                            class="px-1.5 py-1 rounded text-rose-600 hover:bg-rose-50 font-semibold text-[10px] cursor-pointer transition">
-                                            Cancel
-                                        </button>
-                                    @else
-                                        <a href="{{ route('leads.index') }}?search={{ $leadRecord?->lead_code ?: $fu->lead_id }}&notification_lead={{ $leadRecord?->id }}" wire:navigate class="px-2.5 py-1 rounded border border-border bg-surface text-ink hover:bg-canvas font-semibold text-[10px] inline-block">
-                                            View Lead
-                                        </a>
-                                    @endif
+                                <td class="p-3 text-right whitespace-nowrap">
+                                    <div class="flex items-center justify-end">
+                                        <x-ui.followup-actions-menu :followup="$fu" />
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -518,5 +493,7 @@
             </div>
         </div>
     @endif
+
+    <livewire:leads.lead-detail />
 
 </div>

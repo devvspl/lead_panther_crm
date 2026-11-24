@@ -43,7 +43,18 @@ use App\Livewire\Settings\UserInvite;
 Route::get('/proposals/view/{proposal}', [ProposalViewerController::class, 'view'])->name('proposals.public_view')->middleware('signed');
 
 // Public Landing, Documentation & Legal Pages
-Route::view('/', 'pages.landing')->name('landing');
+Route::get('/', function () {
+    if (auth()->check()) {
+        $user = auth()->user();
+        if (isset($user->organization) && $user->organization->status !== 'active') {
+            return redirect()->route('auth.pending-approval');
+        }
+
+        return redirect()->to(\App\Support\NavigationConfig::getDashboardRouteForUser($user));
+    }
+
+    return view('pages.landing');
+})->name('landing');
 Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Route::view('/docs', 'pages.docs')->name('docs');
 Route::view('/documentation', 'pages.docs');

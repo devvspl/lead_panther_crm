@@ -57,12 +57,11 @@ class NavigationConfig
         return $roleMap[$roleKey] ?? [];
     }
 
-    public static function getNavItemsForUser(?User $user): array
+    public static function getDashboardRouteForUser(?User $user): string
     {
-        $allowedKeys = static::getAllowedItemKeys($user);
         $roleKey = static::getRoleKey($user);
 
-        $dashboardRoute = match ($roleKey) {
+        return match ($roleKey) {
             'super-admin' => route('admin.dashboard'),
             'builder' => route('builder.dashboard'),
             'broker' => route('broker.dashboard'),
@@ -72,6 +71,14 @@ class NavigationConfig
             'client' => route('client.dashboard'),
             default => route('dashboard'),
         };
+    }
+
+    public static function getNavItemsForUser(?User $user): array
+    {
+        $allowedKeys = static::getAllowedItemKeys($user);
+        $roleKey = static::getRoleKey($user);
+
+        $dashboardRoute = static::getDashboardRouteForUser($user);
 
         $teamRoute = match ($roleKey) {
             'builder' => route('builder.team'),

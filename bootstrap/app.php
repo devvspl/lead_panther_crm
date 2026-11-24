@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web', 'auth']])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectUsersTo(function () {
+            $user = auth()->user();
+            return $user ? \App\Support\NavigationConfig::getDashboardRouteForUser($user) : route('dashboard');
+        });
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->web(append: [
             \App\Http\Middleware\EnsureAccountIsActive::class,

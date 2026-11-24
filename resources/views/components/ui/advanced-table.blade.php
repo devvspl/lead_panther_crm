@@ -389,7 +389,18 @@
                                                 @endphp
                                                 <span
                                                     @if(is_object($row) && isset($row->first_response_sla_tooltip) && in_array($colKey, ['first_response_timing', 'first_response_time', 'sla_badge'])) title="{{ $row->first_response_sla_tooltip }}" @endif
-                                                    class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
+                                                    class="{{ in_array($colKey, ['first_response_timing', 'first_response_time']) ? 'px-2 py-0.5 rounded-pill text-[10px] sm:text-[11px] font-bold whitespace-nowrap inline-flex items-center gap-1.5 shadow-2xs' : 'px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1' }} {{ $badgeClass }}">
+                                                    @if(in_array($colKey, ['first_response_timing', 'first_response_time']) && is_object($row) && isset($row->first_response_sla_status))
+                                                        @php
+                                                            $dotColor = match ($row->first_response_sla_status) {
+                                                                'breached' => 'bg-red-500',
+                                                                'met' => 'bg-emerald-500',
+                                                                'pending' => 'bg-amber-500',
+                                                                default => 'bg-neutral-400',
+                                                            };
+                                                        @endphp
+                                                        <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }} shrink-0"></span>
+                                                    @endif
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
                                             @elseif($type === 'avatar-stack')
@@ -924,7 +935,18 @@
                                                 @endphp
                                                 <span
                                                     @if(is_object($row) && isset($row->first_response_sla_tooltip) && in_array($colKey, ['first_response_timing', 'first_response_time', 'sla_badge'])) title="{{ $row->first_response_sla_tooltip }}" @endif
-                                                    class="px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1 {{ $badgeClass }}">
+                                                    class="{{ in_array($colKey, ['first_response_timing', 'first_response_time']) ? 'px-2 py-0.5 rounded-pill text-[10px] sm:text-[11px] font-bold whitespace-nowrap inline-flex items-center gap-1.5 shadow-2xs' : 'px-1.5 py-0.5 rounded-pill text-[9px] leading-tight font-bold whitespace-nowrap inline-flex items-center gap-1' }} {{ $badgeClass }}">
+                                                    @if(in_array($colKey, ['first_response_timing', 'first_response_time']) && is_object($row) && isset($row->first_response_sla_status))
+                                                        @php
+                                                            $dotColor = match ($row->first_response_sla_status) {
+                                                                'breached' => 'bg-red-500',
+                                                                'met' => 'bg-emerald-500',
+                                                                'pending' => 'bg-amber-500',
+                                                                default => 'bg-neutral-400',
+                                                            };
+                                                        @endphp
+                                                        <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }} shrink-0"></span>
+                                                    @endif
                                                     {{ \App\Support\ClientFacingText::label($badgeLabel) }}
                                                 </span>
                                             @elseif($type === 'avatar-stack')

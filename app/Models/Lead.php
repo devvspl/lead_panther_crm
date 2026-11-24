@@ -552,10 +552,10 @@ class Lead extends Model
         $status = $this->first_response_sla_status;
 
         return match ($status) {
-            'met' => 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
-            'breached' => 'bg-red-50 text-red-700 border border-red-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800',
-            'pending' => 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
-            default => 'bg-neutral-100 text-neutral-700 border border-neutral-300 dark:bg-neutral-800 dark:text-neutral-300',
+            'met' => 'bg-emerald-50 text-emerald-800 border border-emerald-300',
+            'breached' => 'bg-red-50 text-red-800 border border-red-300',
+            'pending' => 'bg-amber-50 text-amber-800 border border-amber-300',
+            default => 'bg-neutral-100 text-neutral-800 border border-neutral-300',
         };
     }
 

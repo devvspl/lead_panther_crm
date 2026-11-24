@@ -2299,10 +2299,6 @@ class LeadKanban extends Component
     protected function clientTableColumns(): array
     {
         if ($this->isSalesExecutive) {
-            return array_map(fn ($key, $label) => ['key' => $key, 'label' => $label, 'type' => $key === 'actions' ? 'lead_actions' : ($key === 'lead_code' ? 'lead_id' : ($key === 'mobile' ? 'phone' : 'text')), 'priority' => 1], ['lead_code', 'name', 'mobile', 'project_name', 'current_stage', 'status', 'next_followup', 'actions'], ['Lead ID', 'Customer Name', 'Mobile Number', 'Project', 'Current Stage', 'Lead Status', 'Next Follow-up', 'Actions']);
-        }
-
-        if ($this->isSalesExecutive) {
             return [
                 ['key' => 'lead_code', 'label' => 'Lead ID', 'type' => 'lead_id', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
                 ['key' => 'name', 'label' => 'Customer Name', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-bold text-ink'],
@@ -2335,6 +2331,7 @@ class LeadKanban extends Component
                     'closed' => 'bg-neutral-100 text-neutral-700 border border-neutral-300',
                 ]],
                 ['key' => 'next_followup', 'label' => 'Next Follow-up', 'type' => 'text', 'priority' => 1, 'class' => 'text-xs font-mono text-muted'],
+                ['key' => 'first_response_timing', 'label' => 'First Response SLA', 'type' => 'badge', 'priority' => 1, 'badgeStyle' => fn ($val, $row) => is_object($row) ? ($row->first_response_timing_class ?? 'bg-canvas text-ink border border-border') : 'bg-canvas text-ink border border-border', 'labelFormatter' => fn ($val, $row) => is_object($row) ? $row->first_response_timing : $val],
                 ['key' => 'actions', 'label' => 'Actions', 'type' => 'lead_actions', 'priority' => 1],
             ];
         }

@@ -57,14 +57,14 @@ class LeadDisplayConfigModal extends Component
             'description' => 'General inquiry notes, manual requirements, or portal comments.',
         ],
         'meta_submission' => [
-            'label' => 'Meta Lead Submission',
-            'category' => 'Meta Ads Intelligence',
-            'description' => 'Parsed question-and-answer responses from Meta / Facebook lead forms.',
+            'label' => 'Lead Form Responses',
+            'category' => 'Campaign & Form Intelligence',
+            'description' => 'Parsed question-and-answer responses from online lead forms.',
         ],
         'meta_context' => [
-            'label' => 'Meta Context',
-            'category' => 'Meta Ads Intelligence',
-            'description' => 'Campaign, Ad Set, Ad creative name, and Lead Form attribution.',
+            'label' => 'Campaign Attribution',
+            'category' => 'Campaign & Form Intelligence',
+            'description' => 'Campaign, Ad Set, Ad creative name, and Form attribution.',
         ],
     ];
 

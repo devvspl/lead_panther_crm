@@ -108,7 +108,8 @@ class LeadDetailBuilderViewTest extends TestCase
             ->call('openLead', $lead->id)
             ->assertSet('isOpen', true)
             // Should show structured Q&A and customer info
-            ->assertSee('Meta Lead Submission')
+            ->assertSee('Lead Form Responses')
+            ->assertDontSee('Meta Lead Submission')
             ->assertSee('Suitable Time For Call')
             ->assertSee('☎️ 10:00 AM - 12:00 PM')
             ->assertSee('Within 30 Days')

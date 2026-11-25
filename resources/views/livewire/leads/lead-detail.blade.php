@@ -37,8 +37,8 @@
                     if ($displayConfig['city'] ?? true) {
                         $subtitleParts[] = $lead->city ?: 'N/A';
                     }
-                    $actualBudget = $lead->actual_budget;
-                    if (($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed() && $actualBudget !== null && $actualBudget > 0) {
+                    $actualBudget = $lead->actual_budget ?: $lead->budget;
+                    if (($displayConfig['budget'] ?? true) && $actualBudget !== null && $actualBudget > 0) {
                         $subtitleParts[] = \App\Support\LeadPropertyAndBudgetExtractor::formatShortBudget($actualBudget);
                     }
                 @endphp
@@ -135,16 +135,20 @@
             @php
                 $displayConfig = $lead->effective_display_config ?? \App\Models\Organization::defaultLeadDisplayConfig();
             @endphp
-            <div class="p-4 bg-canvas rounded-xl border border-border space-y-3">
-                <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">1 &bull; Customer &amp;
-                    Project Info</span>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div class="p-3.5 bg-canvas rounded-xl border border-border space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">1 &bull; Customer &amp; Project Info</span>
+                    <span class="text-[10px] text-muted font-medium">
+                        Received: <strong class="text-ink font-semibold">{{ ($lead->delivered_at ?: $lead->created_at)?->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?: '—' }}</strong>
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
                     @if($displayConfig['phone'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Phone / Mobile</span>
                         <div class="flex items-center gap-1.5 mt-0.5">
-                            <span class="font-mono font-semibold text-ink">{{ $lead->mobile }}</span>
-                            <a href="tel:{{ $lead->mobile }}" class="text-primary hover:text-primary-dark"
+                            <span class="font-mono font-semibold text-ink text-xs">{{ $lead->mobile }}</span>
+                            <a href="tel:{{ $lead->mobile }}" class="text-primary hover:text-primary-dark transition"
                                 title="Call Customer">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -152,7 +156,7 @@
                                 </svg>
                             </a>
                             <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $lead->mobile) }}" target="_blank"
-                                class="text-emerald-600 hover:text-emerald-700" title="WhatsApp Chat">
+                                class="text-emerald-600 hover:text-emerald-700 transition" title="WhatsApp Chat">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path
                                         d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
@@ -164,13 +168,13 @@
                     @if($displayConfig['email'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Email Address</span>
-                        <span class="font-semibold text-ink truncate block mt-0.5">{{ $lead->email ?: 'N/A' }}</span>
+                        <span class="font-semibold text-ink truncate block mt-0.5 text-xs">{{ $lead->email ?: 'N/A' }}</span>
                     </div>
                     @endif
                     @if($displayConfig['city'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">City / Location</span>
-                        <span class="font-semibold text-ink block mt-0.5">{{ $lead->city ?: 'N/A' }}
+                        <span class="font-semibold text-ink block mt-0.5 text-xs">{{ $lead->city ?: 'N/A' }}
                             {{ $lead->actual_location ? '(' . $lead->actual_location . ')' : '' }}</span>
                     </div>
                     @endif
@@ -178,20 +182,20 @@
                     <div>
                         <span class="text-[10px] text-muted block">Project</span>
                         <span
-                            class="font-bold text-ink block mt-0.5">{{ $lead->project?->name ?: 'Direct Inbound' }}</span>
+                            class="font-bold text-ink block mt-0.5 text-xs truncate">{{ $lead->project?->name ?: 'Direct Inbound' }}</span>
                     </div>
                     @endif
                     @if($displayConfig['property_type'] ?? true)
                     <div>
                         <span class="text-[10px] text-muted block">Property Type</span>
                         <span
-                            class="font-semibold text-ink block mt-0.5">{{ $lead->actual_property_type ?: '—' }}</span>
+                            class="font-semibold text-ink block mt-0.5 text-xs">{{ $lead->actual_property_type ?: '—' }}</span>
                     </div>
                     @endif
-                    @if(($displayConfig['budget'] ?? true) && \App\Support\FinancialVisibility::allowed())
+                    @if(($displayConfig['budget'] ?? true) && ($lead->actual_budget || $lead->budget))
                     <div>
-                        <span class="text-[10px] text-muted block">Budget</span>
-                        <span class="font-bold text-ink block mt-0.5">{{ \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($lead->actual_budget) }}</span>
+                        <span class="text-[10px] text-muted block">Budget / Unit Price</span>
+                        <span class="font-bold text-primary block mt-0.5 text-xs">{{ \App\Support\LeadPropertyAndBudgetExtractor::formatBudget($lead->actual_budget ?: $lead->budget) }}</span>
                     </div>
                     @endif
                 </div>
@@ -201,61 +205,61 @@
                 @endphp
 
                 @if(($displayConfig['meta_submission'] ?? true) && $metaSubmission['is_meta'] && ($metaSubmission['has_submission_data'] || !empty($metaSubmission['questions'])))
-                    <div class="pt-3 border-t border-border space-y-3">
+                    <div class="pt-3 border-t border-border space-y-2.5">
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5 text-blue-600 inline" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                <svg class="w-3.5 h-3.5 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                 </svg>
-                                Meta Lead Submission
+                                Lead Form Responses
                             </span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface text-ink border border-border">
                                 {{ count($metaSubmission['questions']) }} {{ \Illuminate\Support\Str::plural('Response', count($metaSubmission['questions'])) }}
                             </span>
                         </div>
 
-                        <!-- Dynamic Questions & Answers List -->
-                        <div class="space-y-2">
+                        <!-- Dynamic Questions & Answers List (2-column compact grid) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             @foreach($metaSubmission['questions'] as $qa)
-                                <div class="p-2.5 bg-surface rounded-lg border border-border/80">
-                                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
+                                <div class="p-2.5 bg-surface rounded-lg border border-border/80 flex flex-col justify-between">
+                                    <span class="text-[10px] font-medium text-muted block mb-0.5">
                                         {{ $qa['question'] }}
                                     </span>
-                                    <p class="text-xs font-semibold text-ink leading-relaxed break-words whitespace-pre-line">
+                                    <p class="text-xs font-semibold text-ink leading-snug break-words whitespace-pre-line">
                                         {{ $qa['answer'] }}
                                     </p>
                                 </div>
                             @endforeach
                         </div>
 
-                        <!-- Meta Context Section -->
+                        <!-- Campaign Attribution Section -->
                         @if($displayConfig['meta_context'] ?? true)
-                        <div class="p-3 bg-blue-50/60 rounded-lg border border-blue-200/70 text-[11px] space-y-2">
-                            <span class="font-bold text-blue-900 block text-[10px] uppercase tracking-wider">
-                                Meta Context Attribution
+                        <div class="p-2.5 bg-surface rounded-lg border border-border text-[11px] space-y-1.5">
+                            <span class="font-bold text-ink block text-[10px] uppercase tracking-wider">
+                                Campaign &amp; Source Attribution
                             </span>
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-ink">
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-ink">
                                 <div>
                                     <span class="text-[10px] text-muted block">Campaign</span>
-                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['campaign'] }}">
+                                    <span class="font-semibold block truncate text-xs mt-0.5" title="{{ $metaSubmission['context']['campaign'] }}">
                                         {{ $metaSubmission['context']['campaign'] }}
                                     </span>
                                 </div>
                                 <div>
                                     <span class="text-[10px] text-muted block">Ad Set</span>
-                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['adset'] }}">
+                                    <span class="font-semibold block truncate text-xs mt-0.5" title="{{ $metaSubmission['context']['adset'] }}">
                                         {{ $metaSubmission['context']['adset'] }}
                                     </span>
                                 </div>
                                 <div>
                                     <span class="text-[10px] text-muted block">Ad (Creative)</span>
-                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['ad'] }}">
+                                    <span class="font-semibold block truncate text-xs mt-0.5" title="{{ $metaSubmission['context']['ad'] }}">
                                         {{ $metaSubmission['context']['ad'] }}
                                     </span>
                                 </div>
                                 <div>
                                     <span class="text-[10px] text-muted block">Lead Form</span>
-                                    <span class="font-semibold block truncate mt-0.5" title="{{ $metaSubmission['context']['form'] }}">
+                                    <span class="font-semibold block truncate text-xs mt-0.5" title="{{ $metaSubmission['context']['form'] }}">
                                         {{ $metaSubmission['context']['form'] }}
                                     </span>
                                 </div>
@@ -309,8 +313,8 @@
                 </div>
 
                 @if($metaSubmission['is_meta'])
-                    <div class="mt-2 p-2.5 bg-blue-50/70 rounded-lg border border-blue-200 text-[11px] space-y-1">
-                        <span class="font-bold text-blue-900 block text-[10px] uppercase">Meta Ads Ingestion Context:</span>
+                    <div class="mt-2 p-2.5 bg-surface rounded-lg border border-border text-[11px] space-y-1">
+                        <span class="font-bold text-ink block text-[10px] uppercase">Campaign Ingestion Context:</span>
                         <div class="grid grid-cols-2 gap-2 text-ink">
                             <div><span class="text-muted text-[10px]">Campaign:</span> <span
                                 class="font-semibold truncate block">{{ $metaSubmission['context']['campaign'] }}</span></div>

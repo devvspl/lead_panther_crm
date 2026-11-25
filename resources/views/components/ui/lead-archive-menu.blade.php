@@ -83,8 +83,8 @@
                     <div class="flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
                         <span class="text-xs font-bold text-ink uppercase tracking-wider">Lead Options</span>
-                        @if($actionLead?->lead_code)
-                            <span class="text-[11px] font-mono font-bold text-muted">#{{ $actionLead->lead_code }}</span>
+                        @if(!empty(data_get($actionLead, 'lead_code')))
+                            <span class="text-[11px] font-mono font-bold text-muted">#{{ data_get($actionLead, 'lead_code') }}</span>
                         @endif
                     </div>
                     <button type="button" @click="open=false" class="p-1 rounded-md text-muted hover:text-ink">

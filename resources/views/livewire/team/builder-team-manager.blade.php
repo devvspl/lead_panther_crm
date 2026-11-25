@@ -12,7 +12,7 @@
             <h1 class="text-xl font-bold tracking-tight text-ink">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Management' : 'Builder Direct Team Management' }}</h1>
             <p class="text-xs text-muted">Assignments and team members.</p>
         </div>
-        <button type="button" x-on:click="$dispatch('open-modal', 'add-team-member')" title="Add Team Member" aria-label="Add Team Member" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary-hover text-xs font-semibold whitespace-nowrap cursor-pointer shadow-xs">
+        <button type="button" wire:click="openAddMemberModal" title="Add Team Member" aria-label="Add Team Member" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary-hover text-xs font-semibold whitespace-nowrap cursor-pointer shadow-xs">
             <x-ui.team-icon name="add" /><span>Add Team Member</span>
         </button>
     </div>
@@ -223,13 +223,8 @@
             :iconOnlyActions="true"
             searchPlaceholder="Search team members by name, email, ID..."
             emptyTitle="No Sales Team Members Found"
-            emptyMessage="No sales team members registered yet.">
-            <x-slot:action>
-                <button type="button" wire:click="openAddMemberModal" title="Add Team Member" aria-label="Add Team Member" class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-hover text-xs font-semibold whitespace-nowrap cursor-pointer shadow-xs">
-                    <x-ui.team-icon name="add" /><span>Add Team Member</span>
-                </button>
-            </x-slot:action>
-        </x-ui.advanced-table>
+            emptyMessage="No sales team members registered yet."
+        />
     </div>
     </section>
     <x-modal name="team-member-editor" :show="$showMemberEditor" maxWidth="xl">

@@ -81,7 +81,7 @@
                     <span>View Lead Details</span>
                 </button>
 
-                <!-- 2. Open Lead in Pipeline Kanban -->
+                <!-- 2. Open Lead in Leads Pipeline -->
                 <a href="{{ route('leads.index') }}?search={{ $leadRecord?->lead_code ?: $fu->lead_id }}&notification_lead={{ $leadRecord?->id }}" wire:navigate
                     role="menuitem"
                     class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs font-semibold hover:bg-canvas hover:text-primary transition cursor-pointer">

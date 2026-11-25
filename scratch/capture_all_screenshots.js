@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
     ]);
 
     // 1. PIPELINE SECTION SCREENSHOTS
-    console.log('Capturing Pipeline Kanban...');
+    console.log('Capturing Leads Pipeline...');
     await page.goto('http://127.0.0.1:8000/leads', { waitUntil: 'networkidle2' });
     await new Promise(r => setTimeout(r, 1500));
     await page.screenshot({ path: path.join(dir, 'pipeline-kanban.png') });

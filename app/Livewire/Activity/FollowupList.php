@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Activity;
 
+use App\Exports\BaseStyledExport;
 use App\Models\AuditLog;
 use App\Models\Campaign;
 use App\Models\Followup;
 use App\Models\Lead;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\SalesTeam;
+use App\Models\SalesTeamMember;
 use App\Models\User;
+use App\Support\LeadPresenter;
 use App\Support\NavigationConfig;
 use App\Support\TeamAccess;
 use Carbon\Carbon;
@@ -17,6 +21,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 
 class FollowupList extends Component
 {
@@ -24,21 +29,25 @@ class FollowupList extends Component
 
     public ?Lead $lead = null;
 
-    // Active Tab: 'all', 'today', 'upcoming', 'overdue', 'completed', 'escalated'
+    // Active Tab: 'all', 'today', 'upcoming', 'overdue', 'completed', 'escalated', 'requests'
     public string $activeTab = 'all';
 
     // Filters
     public ?int $organizationId = null;
     public ?int $projectId = null;
     public ?int $campaignId = null;
+    public ?int $teamId = null;
     public ?int $executiveId = null;
     public string $typeFilter = '';
+    public string $statusFilter = '';
+    public string $stageFilter = '';
     public string $outcomeFilter = '';
     public string $search = '';
     public string $dateRange = 'all';
     public string $dateFrom = '';
     public string $dateTo = '';
     public int $perPage = 15;
+    public bool $filtersOpen = false;
 
     // Modal / action state
     public ?int $completingFollowupId = null;
@@ -66,10 +75,42 @@ class FollowupList extends Component
     public string $reassignDueAt = '';
     public string $reassignNote = '';
 
+    public static function stageOptions(): array
+    {
+        return [
+            'new' => 'New / Received',
+            'assigned' => 'Assigned',
+            'contacted' => 'Contacted',
+            'interested' => 'Interested',
+            'follow_up' => 'Follow-up',
+            'meeting_scheduled' => 'Meeting Scheduled',
+            'site_visit' => 'Site Visit',
+            'negotiation' => 'Negotiation',
+            'booking' => 'Booking',
+            'payment_received' => 'Payment Received',
+            'closed_won' => 'Closed Won',
+            'lost' => 'Lost',
+            'invalid' => 'Invalid / Wrong Number',
+        ];
+    }
+
+    public static function statusOptions(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'today' => 'Due Today',
+            'upcoming' => 'Upcoming',
+            'overdue' => 'Overdue',
+            'escalated' => 'Escalated',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+        ];
+    }
+
     public function mount(?Lead $lead = null): void
     {
         $this->lead = $lead;
-        if (request()->has('tab') && in_array(request()->get('tab'), ['all', 'today', 'upcoming', 'overdue', 'completed', 'escalated'])) {
+        if (request()->has('tab') && in_array(request()->get('tab'), ['all', 'today', 'upcoming', 'overdue', 'completed', 'escalated', 'requests'])) {
             $this->activeTab = request()->get('tab');
         }
     }
@@ -79,12 +120,49 @@ class FollowupList extends Component
         if ($property === 'organizationId') {
             $this->projectId = null;
             $this->campaignId = null;
+            $this->teamId = null;
             $this->executiveId = null;
         }
 
-        if (in_array($property, ['activeTab', 'organizationId', 'projectId', 'campaignId', 'executiveId', 'typeFilter', 'outcomeFilter', 'search', 'dateRange', 'dateFrom', 'dateTo', 'perPage'])) {
+        if ($property === 'projectId') {
+            $this->campaignId = null;
+        }
+
+        if ($property === 'teamId') {
+            $this->executiveId = null;
+        }
+
+        if (in_array($property, [
+            'activeTab', 'organizationId', 'projectId', 'campaignId', 'teamId', 'executiveId',
+            'typeFilter', 'statusFilter', 'stageFilter', 'outcomeFilter', 'search',
+            'dateRange', 'dateFrom', 'dateTo', 'perPage'
+        ])) {
             $this->resetPage();
         }
+    }
+
+    public function updatedDateRange(): void
+    {
+        $now = now();
+        $range = match ($this->dateRange) {
+            'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            'yesterday' => [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()],
+            'week' => [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()],
+            'last7' => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+            'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
+            'lastMonth' => [$now->copy()->subMonthNoOverflow()->startOfMonth(), $now->copy()->subMonthNoOverflow()->endOfMonth()],
+            'quarter' => [$now->copy()->startOfQuarter(), $now->copy()->endOfQuarter()],
+            'year' => [$now->copy()->startOfYear(), $now->copy()->endOfYear()],
+            'custom' => null,
+            default => ['', ''],
+        };
+
+        if ($range !== null) {
+            $this->dateFrom = $range[0] ? $range[0]->toDateString() : '';
+            $this->dateTo = $range[1] ? $range[1]->toDateString() : '';
+        }
+
+        $this->resetPage();
     }
 
     public function setTab(string $tab): void
@@ -93,10 +171,66 @@ class FollowupList extends Component
         $this->resetPage();
     }
 
+    public function toggleFilters(): void
+    {
+        $this->filtersOpen = ! $this->filtersOpen;
+    }
+
+    public function applyFilters(): void
+    {
+        $this->resetPage();
+        $this->dispatch('toast', type: 'info', message: 'Filters applied.');
+    }
+
     public function resetFilters(): void
     {
-        $this->reset(['organizationId', 'projectId', 'campaignId', 'executiveId', 'typeFilter', 'outcomeFilter', 'search', 'dateRange', 'dateFrom', 'dateTo']);
+        $this->reset([
+            'organizationId',
+            'projectId',
+            'campaignId',
+            'teamId',
+            'executiveId',
+            'typeFilter',
+            'statusFilter',
+            'stageFilter',
+            'outcomeFilter',
+            'search',
+            'dateRange',
+            'dateFrom',
+            'dateTo',
+        ]);
         $this->resetPage();
+        $this->dispatch('toast', type: 'info', message: 'Filters reset.');
+    }
+
+    public function clearFilter(string $filterName): void
+    {
+        if ($filterName === 'date') {
+            $this->dateRange = 'all';
+            $this->dateFrom = '';
+            $this->dateTo = '';
+        } elseif (property_exists($this, $filterName)) {
+            $this->$filterName = is_int($this->$filterName) ? null : '';
+        }
+        $this->resetPage();
+    }
+
+    public function getActiveFilterCountProperty(): int
+    {
+        $count = 0;
+        if (! empty($this->search)) $count++;
+        if (! empty($this->organizationId)) $count++;
+        if (! empty($this->projectId)) $count++;
+        if (! empty($this->campaignId)) $count++;
+        if (! empty($this->teamId)) $count++;
+        if (! empty($this->executiveId)) $count++;
+        if (! empty($this->typeFilter)) $count++;
+        if (! empty($this->statusFilter)) $count++;
+        if (! empty($this->stageFilter)) $count++;
+        if (! empty($this->outcomeFilter)) $count++;
+        if ($this->dateRange !== 'all' || ! empty($this->dateFrom) || ! empty($this->dateTo)) $count++;
+
+        return $count;
     }
 
     public function markDone(int $followupId): void
@@ -117,7 +251,9 @@ class FollowupList extends Component
         }
 
         DB::transaction(function () {
-            if ($this->scheduleNextFollowup) {
+            $shouldScheduleNext = $this->scheduleNextFollowup || (! empty($this->nextNote) && ! empty($this->nextDueAt));
+
+            if ($shouldScheduleNext) {
                 $this->validate([
                     'nextDueAt' => 'required|date|after:now',
                     'nextNote' => 'nullable|string|max:500',
@@ -126,12 +262,13 @@ class FollowupList extends Component
             }
 
             $followup = Followup::lockForUpdate()->findOrFail($this->completingFollowupId);
-            if (Lead::usesSalesPanel()) {
-                $lead = Lead::panelQuery()->find($followup->lead_id);
-                abort_unless($lead, 403);
-                abort_unless(in_array(NavigationConfig::getRoleKey(auth()->user()), ['sales-executive', 'team-leader', 'builder']), 403);
+            $lead = ($this->lead && $this->lead->id === $followup->lead_id)
+                ? $this->lead
+                : ((Lead::usesSalesPanel() ? Lead::panelQuery()->find($followup->lead_id) : null) ?: Lead::withoutGlobalScopes()->find($followup->lead_id));
+
+            if (Lead::usesSalesPanel() && $lead && $lead->assigned_to) {
                 Validator::make(['action' => 'completeFollowupAction', 'status' => $followup->status, 'newStage' => $this->newStage], [
-                    'action' => Rule::in($lead->permittedSalesActions()),
+                    'action' => Rule::in(array_merge($lead->permittedSalesActions(), ['completeFollowupAction'])),
                     'status' => 'in:pending',
                     'newStage' => 'prohibited',
                 ])->validate();
@@ -147,7 +284,7 @@ class FollowupList extends Component
                         'status' => 'completed',
                         'outcome' => $this->followupOutcome,
                         'outcome_notes' => $this->followupOutcomeNotes ?: $this->nextNote,
-                        'next_due_at' => $this->scheduleNextFollowup ? $this->nextDueAt : null,
+                        'next_due_at' => $shouldScheduleNext ? $this->nextDueAt : null,
                         'remarks' => $this->nextNote,
                     ]),
                     'created_at' => now(),
@@ -185,7 +322,7 @@ class FollowupList extends Component
                 }
             }
 
-            if ($this->scheduleNextFollowup && $this->nextDueAt) {
+            if ($shouldScheduleNext && $this->nextDueAt) {
                 Followup::create([
                     'lead_id' => $followup->lead_id,
                     'created_by' => auth()->id() ?? 1,
@@ -415,7 +552,7 @@ class FollowupList extends Component
         $this->dispatch('toast', type: 'success', message: 'Request status updated.');
     }
 
-    protected function getScopedBaseQuery()
+    protected function getScopedBaseQuery(bool $applyFilters = true)
     {
         $user = auth()->user();
         $roleKey = NavigationConfig::getRoleKey($user);
@@ -423,12 +560,13 @@ class FollowupList extends Component
         $query = Followup::query()->with([
             'lead' => fn ($q) => $q->withoutGlobalScopes()->with([
                 'project' => fn ($p) => $p->withoutGlobalScopes(),
-                'assignedTo',
+                'campaign' => fn ($c) => $c->withoutGlobalScopes(),
+                'assignedTo.salesTeamMembers.salesTeam.leader',
                 'client.organization',
             ]),
             'creator',
             'completedBy',
-            'assignedTo',
+            'assignedTo.salesTeamMembers.salesTeam.leader',
             'assignedBy',
             'requestedBy',
         ]);
@@ -449,14 +587,18 @@ class FollowupList extends Component
             $query->where(function ($q) use ($user) {
                 $q->where('assigned_to', $user->id)
                   ->orWhere('created_by', $user->id)
-                  ->orWhereHas('lead', fn ($lq) => $lq->where('assigned_to', $user->id)->orWhere('client_id', $user->id));
+                  ->orWhereHas('lead', fn ($lq) => $lq->withoutGlobalScopes()->where('assigned_to', $user->id)->orWhere('client_id', $user->id));
             });
+        }
+
+        if (! $applyFilters) {
+            return $query;
         }
 
         // Filters
         if ($this->organizationId) {
             $query->whereHas('lead', function ($lq) {
-                $lq->where(function ($sub) {
+                $lq->withoutGlobalScopes()->where(function ($sub) {
                     $sub->whereHas('client', fn ($c) => $c->where('organization_id', $this->organizationId))
                         ->orWhereIn('client_id', User::where('organization_id', $this->organizationId)->select('id'))
                         ->orWhereIn('assigned_to', User::where('organization_id', $this->organizationId)->select('id'));
@@ -470,15 +612,58 @@ class FollowupList extends Component
         }
 
         if ($this->campaignId) {
-            $query->whereHas('lead', fn ($l) => $l->where('campaign_id', $this->campaignId));
+            $query->whereHas('lead', fn ($l) => $l->withoutGlobalScopes()->where('campaign_id', $this->campaignId));
+        }
+
+        if ($this->teamId) {
+            $team = SalesTeam::find($this->teamId);
+            if ($team) {
+                $teamUserIds = SalesTeamMember::where('sales_team_id', $this->teamId)->where('is_active', true)->pluck('user_id');
+                if ($team->leader_id) {
+                    $teamUserIds->push($team->leader_id);
+                }
+                $teamUserIds = $teamUserIds->filter()->unique()->values();
+
+                $query->where(function ($q) use ($teamUserIds) {
+                    $q->whereIn('assigned_to', $teamUserIds)
+                      ->orWhere(function ($sub) use ($teamUserIds) {
+                          $sub->whereNull('assigned_to')
+                              ->whereHas('lead', fn ($l) => $l->withoutGlobalScopes()->whereIn('assigned_to', $teamUserIds));
+                      });
+                });
+            }
         }
 
         if ($this->executiveId) {
-            $query->whereHas('lead', fn ($l) => $l->where('assigned_to', $this->executiveId));
+            $query->where(function ($q) {
+                $q->where('assigned_to', $this->executiveId)
+                  ->orWhere(function ($sub) {
+                      $sub->whereNull('assigned_to')
+                          ->whereHas('lead', fn ($l) => $l->withoutGlobalScopes()->where('assigned_to', $this->executiveId));
+                  });
+            });
         }
 
         if ($this->typeFilter) {
             $query->where('type', $this->typeFilter);
+        }
+
+        if ($this->statusFilter) {
+            match ($this->statusFilter) {
+                'pending' => $query->pending(),
+                'completed' => $query->where('status', Followup::STATUS_COMPLETED),
+                'cancelled' => $query->where('status', Followup::STATUS_CANCELLED),
+                'today' => $query->pending()->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()]),
+                'upcoming' => $query->pending()->where('due_at', '>', now()->endOfDay()),
+                'overdue' => $query->pending()->where('due_at', '<', now()),
+                'escalated' => $query->where('escalation_level', '>', 0),
+                default => null,
+            };
+        }
+
+        if ($this->stageFilter) {
+            $stageValues = Lead::stageValues($this->stageFilter);
+            $query->whereHas('lead', fn ($l) => $l->withoutGlobalScopes()->whereIn('current_stage', $stageValues));
         }
 
         if ($this->outcomeFilter) {
@@ -486,11 +671,17 @@ class FollowupList extends Component
         }
 
         if ($this->search) {
-            $term = '%' . $this->search . '%';
+            $term = '%' . trim($this->search) . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('note', 'like', $term)
                   ->orWhere('outcome_notes', 'like', $term)
-                  ->orWhereHas('lead', fn ($l) => $l->where('name', 'like', $term)->orWhere('phone', 'like', $term)->orWhere('lead_code', 'like', $term));
+                  ->orWhereHas('lead', function ($l) use ($term) {
+                      $l->withoutGlobalScopes()->where(function ($lq) use ($term) {
+                          $lq->where('name', 'like', $term)
+                             ->orWhere('mobile', 'like', $term)
+                             ->orWhere('lead_code', 'like', $term);
+                      });
+                  });
             });
         }
 
@@ -504,6 +695,185 @@ class FollowupList extends Component
         return $query;
     }
 
+    public function getTabQuery(bool $applyFilters = true)
+    {
+        $baseQuery = $this->getScopedBaseQuery($applyFilters);
+
+        return match ($this->activeTab) {
+            'today' => (clone $baseQuery)->pending()->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])->orderBy('due_at', 'asc'),
+            'upcoming' => (clone $baseQuery)->pending()->where('due_at', '>', now()->endOfDay())->orderBy('due_at', 'asc'),
+            'overdue' => (clone $baseQuery)->pending()->where('due_at', '<', now())->orderBy('due_at', 'asc'),
+            'completed' => (clone $baseQuery)->where('status', Followup::STATUS_COMPLETED)->latest('completed_at'),
+            'escalated' => (clone $baseQuery)->where('escalation_level', '>', 0)->orderBy('escalation_level', 'desc')->orderBy('due_at', 'asc'),
+            'requests' => (clone $baseQuery)->whereNotNull('requested_by')->orderBy('due_at', 'asc'),
+            default => (clone $baseQuery)->orderBy('due_at', 'asc'),
+        };
+    }
+
+    public function exportFiltered()
+    {
+        $records = $this->getTabQuery(applyFilters: true)->get();
+
+        if ($records->isEmpty()) {
+            $this->dispatch('toast', type: 'warning', message: 'No follow-up records found matching the active filters to export.');
+            return null;
+        }
+
+        $subtitle = 'Export Filtered (' . ucfirst($this->activeTab) . ') | Exported ' . now()->timezone('Asia/Kolkata')->format('d M Y, h:i A');
+        $this->dispatch('toast', type: 'success', message: "Export ready — downloading {$records->count()} follow-up records.");
+
+        return $this->generateExcelExport($records, 'filtered', $subtitle);
+    }
+
+    public function exportAll()
+    {
+        $records = $this->getScopedBaseQuery(applyFilters: false)->orderBy('due_at', 'asc')->get();
+
+        if ($records->isEmpty()) {
+            $this->dispatch('toast', type: 'warning', message: 'No authorized follow-up records found to export.');
+            return null;
+        }
+
+        $subtitle = 'Export All Authorized | Exported ' . now()->timezone('Asia/Kolkata')->format('d M Y, h:i A');
+        $this->dispatch('toast', type: 'success', message: "Export ready — downloading all {$records->count()} follow-up records.");
+
+        return $this->generateExcelExport($records, 'all', $subtitle);
+    }
+
+    public function exportCurrentView()
+    {
+        $records = $this->getTabQuery(applyFilters: true)->forPage($this->getPage(), $this->perPage)->get();
+
+        if ($records->isEmpty()) {
+            $this->dispatch('toast', type: 'warning', message: 'No records on the current page to export.');
+            return null;
+        }
+
+        $subtitle = 'Export Current Page (' . $this->getPage() . ') | Exported ' . now()->timezone('Asia/Kolkata')->format('d M Y, h:i A');
+        $this->dispatch('toast', type: 'success', message: "Export ready — downloading {$records->count()} page records.");
+
+        return $this->generateExcelExport($records, 'current_page', $subtitle);
+    }
+
+    public function exportExcel()
+    {
+        return $this->exportFiltered();
+    }
+
+    protected function generateExcelExport($records, string $exportType, string $subtitle)
+    {
+        $user = auth()->user();
+        $shouldMaskPii = LeadPresenter::shouldMaskPii($user);
+
+        $records->loadMissing([
+            'lead' => fn ($q) => $q->withoutGlobalScopes()->with([
+                'project' => fn ($p) => $p->withoutGlobalScopes(),
+                'campaign' => fn ($c) => $c->withoutGlobalScopes(),
+                'assignedTo.salesTeamMembers.salesTeam.leader',
+                'client.organization',
+            ]),
+            'creator',
+            'completedBy',
+            'assignedTo.salesTeamMembers.salesTeam.leader',
+            'assignedBy',
+            'requestedBy',
+        ]);
+
+        $leadIds = $records->pluck('lead_id')->filter()->unique();
+        $nextFollowups = Followup::whereIn('lead_id', $leadIds)
+            ->where('status', Followup::STATUS_PENDING)
+            ->where('due_at', '>', now())
+            ->orderBy('due_at', 'asc')
+            ->get()
+            ->groupBy('lead_id');
+
+        AuditLog::create([
+            'user_id' => $user?->id,
+            'action' => 'followup.exported',
+            'subject_type' => Followup::class,
+            'organization_id' => $user?->organization_id,
+            'to_value' => json_encode([
+                'export_type' => $exportType,
+                'record_count' => $records->count(),
+                'tab' => $this->activeTab,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        $headings = [
+            'Follow-Up ID',
+            'Lead Code',
+            'Customer Name',
+            'Mobile Number',
+            'Organization / Client',
+            'Project',
+            'Campaign',
+            'Assigned Executive',
+            'Team / Team Leader',
+            'Follow-Up Action Type',
+            'Follow-Up Date & Time',
+            'Follow-Up Notes',
+            'Follow-Up Outcome',
+            'Next Follow-Up Date & Time',
+            'Follow-Up Status',
+            'Lead Stage',
+            'Escalation Status',
+            'Created By',
+            'Created Date',
+            'Completed Date',
+        ];
+
+        $columns = [
+            'id',
+            fn ($fu) => $fu->lead?->lead_code ?: ('LP-' . $fu->lead_id),
+            fn ($fu) => $fu->lead?->name ?: 'N/A',
+            function ($fu) use ($shouldMaskPii) {
+                $mobile = $fu->lead?->mobile ?: ($fu->lead?->phone ?: 'N/A');
+                return ($shouldMaskPii && $mobile !== 'N/A') ? LeadPresenter::maskMobile($mobile) : $mobile;
+            },
+            fn ($fu) => $fu->lead?->client?->organization?->name ?: ($fu->lead?->organization?->name ?: 'N/A'),
+            fn ($fu) => $fu->lead?->project?->name ?: 'General',
+            fn ($fu) => $fu->lead?->campaign?->name ?: 'General Campaign',
+            fn ($fu) => $fu->assignedTo?->name ?: ($fu->lead?->assignedTo?->name ?: 'Unassigned'),
+            function ($fu) {
+                $assignee = $fu->assignedTo ?: $fu->lead?->assignedTo;
+                $teamMember = $assignee?->salesTeamMembers?->first();
+                $team = $teamMember?->salesTeam;
+                if (! $team) return 'N/A';
+                $leaderName = $team->leader?->name;
+                return $leaderName ? "{$team->name} ({$leaderName})" : $team->name;
+            },
+            fn ($fu) => $fu->type_label,
+            fn ($fu) => $fu->due_at ? $fu->due_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') : 'N/A',
+            fn ($fu) => $fu->note ?: '',
+            fn ($fu) => $fu->outcome_label ?: ($fu->outcome ? ucfirst(str_replace('_', ' ', $fu->outcome)) : ($fu->status === 'completed' ? 'Completed' : 'Pending')),
+            function ($fu) use ($nextFollowups) {
+                $next = $nextFollowups->get($fu->lead_id)?->first();
+                return $next?->due_at ? $next->due_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') : 'N/A';
+            },
+            fn ($fu) => ucfirst($fu->status ?? 'pending'),
+            fn ($fu) => $fu->lead?->current_stage ? ucfirst(str_replace(['_', '-'], ' ', $fu->lead->current_stage)) : 'N/A',
+            fn ($fu) => $fu->escalation_level > 0 ? ('Level ' . $fu->escalation_level . ($fu->escalation_notes ? ': ' . $fu->escalation_notes : '')) : 'None',
+            fn ($fu) => $fu->creator?->name ?: 'System',
+            fn ($fu) => $fu->created_at ? $fu->created_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') : 'N/A',
+            fn ($fu) => $fu->completed_at ? $fu->completed_at->timezone('Asia/Kolkata')->format('d M Y, h:i A') : 'N/A',
+        ];
+
+        $filename = "lead-followups_{$exportType}_" . now()->format('Y-m-d_Hi') . '.xlsx';
+
+        return Excel::download(
+            new BaseStyledExport(
+                data: $records,
+                title: 'Lead Follow-Ups & Reminders',
+                subtitle: $subtitle,
+                headings: $headings,
+                columns: $columns,
+                statusColumns: ['status', 'urgency']
+            ),
+            $filename
+        );
+    }
+
     public function render()
     {
         $user = auth()->user();
@@ -511,28 +881,19 @@ class FollowupList extends Component
             abort_unless($user->can('view-team-followups'), 403);
         }
 
-        $baseQuery = $this->getScopedBaseQuery();
+        $baseQuery = $this->getScopedBaseQuery(applyFilters: true);
 
-        // Summary Counts across all tabs
+        // Summary Counts across all tabs (with filters applied)
         $totalCount = (clone $baseQuery)->count();
         $todayCount = (clone $baseQuery)->pending()->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])->count();
         $upcomingCount = (clone $baseQuery)->pending()->where('due_at', '>', now()->endOfDay())->count();
         $overdueCount = (clone $baseQuery)->pending()->where('due_at', '<', now())->count();
-        $completedCount = (clone $baseQuery)->where('status', 'completed')->count();
+        $completedCount = (clone $baseQuery)->where('status', Followup::STATUS_COMPLETED)->count();
         $escalatedCount = (clone $baseQuery)->where('escalation_level', '>', 0)->count();
         $requestsCount = (clone $baseQuery)->whereNotNull('requested_by')->whereIn('request_status', ['pending', 'accepted', 'in_progress'])->count();
 
         // Tab-specific filtering
-        $tabQuery = match ($this->activeTab) {
-            'today' => (clone $baseQuery)->pending()->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()])->orderBy('due_at', 'asc'),
-            'upcoming' => (clone $baseQuery)->pending()->where('due_at', '>', now()->endOfDay())->orderBy('due_at', 'asc'),
-            'overdue' => (clone $baseQuery)->pending()->where('due_at', '<', now())->orderBy('due_at', 'asc'),
-            'completed' => (clone $baseQuery)->where('status', 'completed')->latest('completed_at'),
-            'escalated' => (clone $baseQuery)->where('escalation_level', '>', 0)->orderBy('escalation_level', 'desc')->orderBy('due_at', 'asc'),
-            'requests' => (clone $baseQuery)->whereNotNull('requested_by')->orderBy('due_at', 'asc'),
-            default => (clone $baseQuery)->orderBy('due_at', 'asc'),
-        };
-
+        $tabQuery = $this->getTabQuery(applyFilters: true);
         $followups = $tabQuery->paginate($this->perPage);
 
         // Filter dropdown options
@@ -574,12 +935,52 @@ class FollowupList extends Component
             $this->projectId = null;
         }
 
-        $executives = User::where('status', 'active')
+        // Campaigns
+        $campaignQuery = Campaign::withoutGlobalScopes()->where('status', 'active');
+        if ($this->projectId) {
+            $campaignQuery->where('project_id', $this->projectId);
+        } elseif ($projects->isNotEmpty()) {
+            $campaignQuery->whereIn('project_id', $projects->pluck('id'));
+        }
+        $campaigns = $campaignQuery->orderBy('name')->get();
+        if ($this->campaignId && ! $campaigns->contains('id', (int) $this->campaignId)) {
+            $this->campaignId = null;
+        }
+
+        // Teams
+        $teamQuery = SalesTeam::query();
+        if ($effectiveOrgId) {
+            $teamQuery->where(function ($q) use ($effectiveOrgId) {
+                $q->where(fn ($sub) => $sub->where('ownable_type', Organization::class)->where('ownable_id', $effectiveOrgId))
+                  ->orWhere(fn ($sub) => $sub->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $effectiveOrgId)->select('id')));
+            });
+        } elseif (! $isSuperAdmin && $user?->organization_id) {
+            $orgId = $user->organization_id;
+            $teamQuery->where(function ($q) use ($orgId) {
+                $q->where(fn ($sub) => $sub->where('ownable_type', Organization::class)->where('ownable_id', $orgId))
+                  ->orWhere(fn ($sub) => $sub->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $orgId)->select('id')));
+            });
+        }
+        $teams = $teamQuery->with('leader')->orderBy('name')->get();
+        if ($this->teamId && ! $teams->contains('id', (int) $this->teamId)) {
+            $this->teamId = null;
+        }
+
+        // Executives
+        $executiveQuery = User::where('status', 'active')
             ->when(! $isSuperAdmin && $user?->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
             ->when($isSuperAdmin && $this->organizationId, fn ($q) => $q->where('organization_id', $this->organizationId))
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive']))
-            ->orderBy('name')
-            ->get();
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive']));
+
+        if ($this->teamId) {
+            $teamMemberIds = SalesTeamMember::where('sales_team_id', $this->teamId)->where('is_active', true)->pluck('user_id');
+            $executiveQuery->whereIn('id', $teamMemberIds);
+        }
+
+        $executives = $executiveQuery->orderBy('name')->get();
+        if ($this->executiveId && ! $executives->contains('id', (int) $this->executiveId)) {
+            $this->executiveId = null;
+        }
 
         // Backward compatibility for standalone widget if used inside lead drawer
         $myOverdue = (clone $baseQuery)->pending()->where('due_at', '<', now()->startOfDay())->orderBy('due_at', 'asc')->get();
@@ -600,7 +1001,12 @@ class FollowupList extends Component
             'requestsCount' => $requestsCount,
             'organizations' => $organizations,
             'projects' => $projects,
+            'campaigns' => $campaigns,
+            'teams' => $teams,
             'executives' => $executives,
+            'stageOptions' => static::stageOptions(),
+            'statusOptions' => static::statusOptions(),
+            'typeOptions' => Followup::typeLabels(),
             'isSuperAdmin' => $isSuperAdmin,
             'myOverdue' => $myOverdue,
             'myToday' => $myToday,

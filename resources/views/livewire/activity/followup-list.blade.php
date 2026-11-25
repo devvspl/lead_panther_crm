@@ -141,14 +141,6 @@
                         </span>
                     @endif
 
-                    @if($campaignId)
-                        @php $activeCamp = $campaigns->firstWhere('id', $campaignId); @endphp
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface border border-border text-ink">
-                            <span class="text-muted">Campaign:</span> <strong class="font-medium truncate max-w-[120px]">{{ $activeCamp?->name ?? $campaignId }}</strong>
-                            <button type="button" wire:click="clearFilter('campaignId')" class="text-muted hover:text-rose-600 cursor-pointer">&times;</button>
-                        </span>
-                    @endif
-
                     @if($teamId)
                         @php $activeTeam = $teams->firstWhere('id', $teamId); @endphp
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface border border-border text-ink">
@@ -236,17 +228,6 @@
                                 <option value="">All Projects</option>
                                 @foreach($projects as $proj)
                                     <option value="{{ $proj->id }}">{{ $proj->name }}</option>
-                                @endforeach
-                            </x-ui.themed-select>
-                        </div>
-
-                        <!-- Campaign -->
-                        <div>
-                            <label class="text-[11px] font-bold text-ink block mb-1">Campaign</label>
-                            <x-ui.themed-select wire:model.live="campaignId" placeholder="All Campaigns" :searchable="true" class="w-full">
-                                <option value="">All Campaigns</option>
-                                @foreach($campaigns as $camp)
-                                    <option value="{{ $camp->id }}">{{ $camp->name }}</option>
                                 @endforeach
                             </x-ui.themed-select>
                         </div>

@@ -76,6 +76,12 @@ class FollowupList extends Component
 
     public function updated($property): void
     {
+        if ($property === 'organizationId') {
+            $this->projectId = null;
+            $this->campaignId = null;
+            $this->executiveId = null;
+        }
+
         if (in_array($property, ['activeTab', 'organizationId', 'projectId', 'campaignId', 'executiveId', 'typeFilter', 'outcomeFilter', 'search', 'dateRange', 'dateFrom', 'dateTo', 'perPage'])) {
             $this->resetPage();
         }
@@ -449,11 +455,18 @@ class FollowupList extends Component
 
         // Filters
         if ($this->organizationId) {
-            $query->whereHas('lead.client', fn ($c) => $c->where('organization_id', $this->organizationId));
+            $query->whereHas('lead', function ($lq) {
+                $lq->where(function ($sub) {
+                    $sub->whereHas('client', fn ($c) => $c->where('organization_id', $this->organizationId))
+                        ->orWhereIn('client_id', User::where('organization_id', $this->organizationId)->select('id'))
+                        ->orWhereIn('assigned_to', User::where('organization_id', $this->organizationId)->select('id'));
+                });
+            });
         }
 
         if ($this->projectId) {
-            $query->whereHas('lead', fn ($l) => $l->where('project_id', $this->projectId));
+            $campaignIds = Campaign::withoutGlobalScopes()->where('project_id', $this->projectId)->pluck('id');
+            $query->whereHas('lead', fn ($l) => $l->withoutGlobalScopes()->whereIn('campaign_id', $campaignIds));
         }
 
         if ($this->campaignId) {
@@ -525,9 +538,45 @@ class FollowupList extends Component
         // Filter dropdown options
         $isSuperAdmin = $user && $user->hasAnyRole(['Super Admin', 'super-admin']);
         $organizations = $isSuperAdmin ? Organization::where('status', 'active')->orderBy('name')->get() : collect();
-        $projects = Project::withoutGlobalScopes()->where('status', 'active')->orderBy('name')->get();
+
+        $effectiveOrgId = $isSuperAdmin ? $this->organizationId : ($user?->organization_id);
+
+        $projectQuery = Project::withoutGlobalScopes()->where('status', 'active');
+        if ($effectiveOrgId) {
+            $projectQuery->where(function ($q) use ($effectiveOrgId, $user) {
+                $q->where('client_id', $effectiveOrgId)
+                  ->orWhereIn('client_id', User::where('organization_id', $effectiveOrgId)->select('id'))
+                  ->orWhereHas('client', fn ($c) => $c->where('organization_id', $effectiveOrgId))
+                  ->orWhereIn('id', function ($sub) use ($effectiveOrgId) {
+                      $sub->select('campaigns.project_id')
+                          ->from('leads')
+                          ->join('campaigns', 'leads.campaign_id', '=', 'campaigns.id')
+                          ->whereNull('leads.archived_at')
+                          ->where(function ($lq) use ($effectiveOrgId) {
+                              $lq->whereIn('leads.client_id', User::where('organization_id', $effectiveOrgId)->select('id'))
+                                 ->orWhereIn('leads.assigned_to', User::where('organization_id', $effectiveOrgId)->select('id'));
+                          });
+                  });
+                if ($user && $user->id) {
+                    $q->orWhere('client_id', $user->id);
+                }
+            });
+        } elseif (! $isSuperAdmin) {
+            if ($user?->id) {
+                $projectQuery->where('client_id', $user->id);
+            } else {
+                $projectQuery->whereRaw('1 = 0');
+            }
+        }
+        $projects = $projectQuery->orderBy('name')->get();
+
+        if ($this->projectId && ! $projects->contains('id', (int) $this->projectId)) {
+            $this->projectId = null;
+        }
+
         $executives = User::where('status', 'active')
-            ->when(! $isSuperAdmin && $user->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
+            ->when(! $isSuperAdmin && $user?->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
+            ->when($isSuperAdmin && $this->organizationId, fn ($q) => $q->where('organization_id', $this->organizationId))
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Executive', 'sales-executive', 'Sales Executive']))
             ->orderBy('name')
             ->get();

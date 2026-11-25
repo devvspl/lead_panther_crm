@@ -90,6 +90,11 @@ class FollowupActionsMenuTest extends TestCase
             'delivered_at' => now(),
             'executive_assigned_at' => now(),
         ]);
+
+        $this->lead->updateQuietly([
+            'delivery_pending' => false,
+            'internal_processing_pending' => false,
+        ]);
     }
 
     public function test_completed_tab_renders_three_dot_action_menu(): void
@@ -171,5 +176,93 @@ class FollowupActionsMenuTest extends TestCase
             ->assertSee('Offer special festival discount')
             ->assertSee('Accept Request')
             ->assertSee('Complete Follow-up');
+    }
+
+    public function test_project_filter_only_shows_projects_of_current_organization(): void
+    {
+        $otherOrg = Organization::create([
+            'name' => 'Other Organization',
+            'status' => 'active',
+        ]);
+        $otherClient = Client::create([
+            'organization_id' => $otherOrg->id,
+            'name' => 'Other Builder',
+            'email' => 'otherbuilder@example.com',
+            'status' => 'active',
+        ]);
+        $otherProject = Project::create([
+            'client_id' => $otherClient->id,
+            'name' => 'Unrelated Tower 9',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->builder);
+
+        Livewire::test(FollowupList::class)
+            ->assertSee('Boulevard walk by H&S')
+            ->assertDontSee('Unrelated Tower 9');
+
+        $this->actingAs($this->executive);
+
+        Livewire::test(FollowupList::class)
+            ->assertSee('Boulevard walk by H&S')
+            ->assertDontSee('Unrelated Tower 9');
+    }
+
+    public function test_super_admin_scopes_projects_when_organization_selected(): void
+    {
+        $superAdmin = User::factory()->create([
+            'name' => 'Super Admin User',
+            'email' => 'admin@example.com',
+            'status' => 'active',
+        ]);
+        $superAdmin->assignRole('Super Admin');
+
+        $otherOrg = Organization::create([
+            'name' => 'Deltek Org',
+            'status' => 'active',
+        ]);
+        $otherClient = Client::create([
+            'organization_id' => $otherOrg->id,
+            'name' => 'Deltek Builder',
+            'email' => 'deltek@example.com',
+            'status' => 'active',
+        ]);
+        Project::create([
+            'client_id' => $otherClient->id,
+            'name' => 'Deltek Residency',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(FollowupList::class)
+            ->assertSee('Boulevard walk by H&S')
+            ->assertSee('Deltek Residency');
+
+        Livewire::test(FollowupList::class)
+            ->set('organizationId', $this->org->id)
+            ->assertSee('Boulevard walk by H&S')
+            ->assertDontSee('Deltek Residency');
+    }
+
+    public function test_filtering_by_project_scopes_followups_correctly(): void
+    {
+        Followup::create([
+            'lead_id' => $this->lead->id,
+            'created_by' => $this->executive->id,
+            'assigned_to' => $this->executive->id,
+            'due_at' => now()->startOfDay()->addHours(10),
+            'status' => 'pending',
+            'type' => 'call',
+            'note' => 'Target project followup',
+        ]);
+
+        $this->actingAs($this->builder);
+
+        Livewire::test(FollowupList::class)
+            ->set('projectId', $this->project->id)
+            ->assertSee('Mohinder Singh')
+            ->assertSee('Target project followup');
     }
 }

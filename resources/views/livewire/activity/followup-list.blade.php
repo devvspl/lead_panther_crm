@@ -93,44 +93,44 @@
 
                 @if($isSuperAdmin && $organizations->count() > 0)
                     <div>
-                        <select wire:model.live="organizationId" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink cursor-pointer">
+                        <x-ui.themed-select wire:model.live="organizationId" placeholder="All Organizations" :searchable="true" class="w-full">
                             <option value="">All Organizations</option>
                             @foreach($organizations as $org)
                                 <option value="{{ $org->id }}">{{ $org->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                 @endif
 
                 <div>
-                    <select wire:model.live="projectId" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink cursor-pointer">
+                    <x-ui.themed-select wire:model.live="projectId" placeholder="All Projects" :searchable="true" class="w-full">
                         <option value="">All Projects</option>
                         @foreach($projects as $proj)
                             <option value="{{ $proj->id }}">{{ $proj->name }}</option>
                         @endforeach
-                    </select>
+                    </x-ui.themed-select>
                 </div>
 
                 @if($executives->count() > 0)
                     <div>
-                        <select wire:model.live="executiveId" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink cursor-pointer">
+                        <x-ui.themed-select wire:model.live="executiveId" placeholder="All Executives" :searchable="true" class="w-full">
                             <option value="">All Executives</option>
                             @foreach($executives as $exec)
                                 <option value="{{ $exec->id }}">{{ $exec->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                 @endif
 
                 <div>
-                    <select wire:model.live="typeFilter" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink cursor-pointer">
+                    <x-ui.themed-select wire:model.live="typeFilter" placeholder="All Action Types" class="w-full">
                         <option value="">All Action Types</option>
                         <option value="call">Phone Call</option>
                         <option value="whatsapp">WhatsApp</option>
                         <option value="meeting">Meeting</option>
                         <option value="site_visit">Site Visit</option>
                         <option value="other">Other</option>
-                    </select>
+                    </x-ui.themed-select>
                 </div>
             </div>
         </div>
@@ -330,11 +330,11 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">Outcome Status <span class="text-rose-500">*</span></label>
-                        <select wire:model="followupOutcome" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="followupOutcome" placeholder="Select Outcome" class="w-full mt-1">
                             @foreach(\App\Models\Followup::outcomeOptions() as $val => $lbl)
                                 <option value="{{ $val }}">{{ $lbl }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                     </div>
 
                     <div>
@@ -354,13 +354,13 @@
                             <div class="space-y-2.5 pt-1">
                                 <div>
                                     <label class="font-semibold text-muted">Next Action Type</label>
-                                    <select wire:model="nextFollowupType" class="w-full p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5 cursor-pointer">
+                                    <x-ui.themed-select wire:model="nextFollowupType" placeholder="Select Action Type" class="w-full mt-0.5">
                                         <option value="call">Phone Call</option>
                                         <option value="whatsapp">WhatsApp Message</option>
                                         <option value="meeting">Face-to-Face Meeting</option>
                                         <option value="site_visit">Site Visit</option>
                                         <option value="other">Other Action</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                                 <div>
                                     <label class="font-semibold text-muted">Next Date &amp; Time <span class="text-rose-500">*</span></label>
@@ -398,13 +398,13 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">Action Type</label>
-                        <select wire:model="rescheduleType" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="rescheduleType" placeholder="Select Action Type" class="w-full mt-1">
                             <option value="call">Phone Call</option>
                             <option value="whatsapp">WhatsApp Message</option>
                             <option value="meeting">Face-to-Face Meeting</option>
                             <option value="site_visit">Site Visit</option>
                             <option value="other">Other Action</option>
-                        </select>
+                        </x-ui.themed-select>
                     </div>
                     <div>
                         <label class="font-bold text-ink">New Date &amp; Time <span class="text-rose-500">*</span></label>
@@ -465,12 +465,12 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">Assign To Executive <span class="text-rose-500">*</span></label>
-                        <select wire:model="reassigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="reassigneeId" placeholder="-- Select Executive --" :searchable="true" class="w-full mt-1">
                             <option value="">-- Select Executive --</option>
                             @foreach($executives as $exec)
                                 <option value="{{ $exec->id }}">{{ $exec->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('reassigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
                     <div>

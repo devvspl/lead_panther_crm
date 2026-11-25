@@ -696,13 +696,13 @@
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Follow-up Type</label>
-                                    <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5 cursor-pointer">
+                                    <x-ui.themed-select wire:model="followupType" placeholder="Select Type" class="w-full mt-0.5">
                                         <option value="call">Phone Call</option>
                                         <option value="whatsapp">WhatsApp Message</option>
                                         <option value="meeting">Face-to-Face Meeting</option>
                                         <option value="site_visit">Site Visit</option>
                                         <option value="other">Other Action</option>
-                                    </select>
+                                    </x-ui.themed-select>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-semibold text-muted">Schedule Date &amp; Time</label>
@@ -788,11 +788,11 @@
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                             <div>
                                                 <label class="text-[10px] font-semibold text-ink">Outcome Status <span class="text-rose-500">*</span></label>
-                                                <select wire:model="followupOutcome" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                <x-ui.themed-select wire:model="followupOutcome" placeholder="Select Outcome" class="w-full mt-0.5">
                                                     @foreach(\App\Models\Followup::outcomeOptions() as $val => $lbl)
                                                         <option value="{{ $val }}">{{ $lbl }}</option>
                                                     @endforeach
-                                                </select>
+                                                </x-ui.themed-select>
                                             </div>
                                             <div>
                                                 <label class="text-[10px] font-semibold text-ink">Discussion Notes / Remarks</label>
@@ -812,13 +812,13 @@
                                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
                                                     <div>
                                                         <label class="text-[10px] font-semibold text-muted">Next Type</label>
-                                                        <select wire:model="nextFollowupType" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                        <x-ui.themed-select wire:model="nextFollowupType" placeholder="Select Type" class="w-full mt-0.5">
                                                             <option value="call">Phone Call</option>
                                                             <option value="whatsapp">WhatsApp</option>
                                                             <option value="meeting">Meeting</option>
                                                             <option value="site_visit">Site Visit</option>
                                                             <option value="other">Other</option>
-                                                        </select>
+                                                        </x-ui.themed-select>
                                                     </div>
                                                     <div>
                                                         <label class="text-[10px] font-semibold text-muted">Next Date &amp; Time</label>
@@ -853,13 +853,13 @@
                                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                                             <div>
                                                 <label class="text-[10px] font-semibold text-ink">Type</label>
-                                                <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-surface text-ink mt-0.5 cursor-pointer">
+                                                <x-ui.themed-select wire:model="followupType" placeholder="Select Type" class="w-full mt-0.5">
                                                     <option value="call">Phone Call</option>
                                                     <option value="whatsapp">WhatsApp</option>
                                                     <option value="meeting">Meeting</option>
                                                     <option value="site_visit">Site Visit</option>
                                                     <option value="other">Other</option>
-                                                </select>
+                                                </x-ui.themed-select>
                                             </div>
                                             <div>
                                                 <label class="text-[10px] font-semibold text-ink">New Date &amp; Time <span class="text-rose-500">*</span></label>
@@ -902,13 +902,13 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Type</label>
-                                        <select wire:model="followupType" class="w-full text-xs p-2 rounded-lg border border-border bg-canvas text-ink mt-0.5 cursor-pointer">
+                                        <x-ui.themed-select wire:model="followupType" placeholder="Select Type" class="w-full mt-0.5">
                                             <option value="call">Phone Call</option>
                                             <option value="whatsapp">WhatsApp Message</option>
                                             <option value="meeting">Face-to-Face Meeting</option>
                                             <option value="site_visit">Site Visit</option>
                                             <option value="other">Other Action</option>
-                                        </select>
+                                        </x-ui.themed-select>
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-semibold text-muted">Date &amp; Time</label>
@@ -1557,25 +1557,25 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">Select Executive <span class="text-rose-500">*</span></label>
-                        <select wire:model="assigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="assigneeId" placeholder="-- Choose Executive --" :searchable="true" class="w-full mt-1">
                             <option value="">-- Choose Executive --</option>
                             @foreach($this->selectableExecutives as $exec)
                                 <option value="{{ $exec->id }}">{{ $exec->name }} ({{ $exec->roles->pluck('name')->first() ?? 'Executive' }})</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('assigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="font-bold text-ink">Action Type <span class="text-rose-500">*</span></label>
-                            <select wire:model="assignType" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <x-ui.themed-select wire:model="assignType" placeholder="Action Type" class="w-full mt-1">
                                 <option value="call">Phone Call</option>
                                 <option value="whatsapp">WhatsApp Message</option>
                                 <option value="meeting">Face-to-Face Meeting</option>
                                 <option value="site_visit">Site Visit</option>
                                 <option value="other">Other Action</option>
-                            </select>
+                            </x-ui.themed-select>
                         </div>
                         <div>
                             <label class="font-bold text-ink">Date &amp; Time <span class="text-rose-500">*</span></label>
@@ -1617,12 +1617,12 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">New Responsible Executive <span class="text-rose-500">*</span></label>
-                        <select wire:model="reassigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="reassigneeId" placeholder="-- Choose Executive --" :searchable="true" class="w-full mt-1">
                             <option value="">-- Choose Executive --</option>
                             @foreach($this->selectableExecutives as $exec)
                                 <option value="{{ $exec->id }}">{{ $exec->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('reassigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
@@ -1662,25 +1662,25 @@
                 <div class="space-y-3 text-xs">
                     <div>
                         <label class="font-bold text-ink">Responsible Executive <span class="text-rose-500">*</span></label>
-                        <select wire:model="requestAssigneeId" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                        <x-ui.themed-select wire:model="requestAssigneeId" placeholder="-- Choose Executive --" :searchable="true" class="w-full mt-1">
                             <option value="">-- Choose Executive --</option>
                             @foreach($this->selectableExecutives as $exec)
                                 <option value="{{ $exec->id }}">{{ $exec->name }} ({{ $exec->roles->pluck('name')->first() ?? 'Executive' }})</option>
                             @endforeach
-                        </select>
+                        </x-ui.themed-select>
                         @error('requestAssigneeId') <span class="text-rose-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="font-bold text-ink">Action Type <span class="text-rose-500">*</span></label>
-                            <select wire:model="requestType" class="w-full p-2.5 rounded-lg border border-border bg-canvas text-ink mt-1 cursor-pointer">
+                            <x-ui.themed-select wire:model="requestType" placeholder="Action Type" class="w-full mt-1">
                                 <option value="call">Phone Call</option>
                                 <option value="whatsapp">WhatsApp Message</option>
                                 <option value="meeting">Face-to-Face Meeting</option>
                                 <option value="site_visit">Site Visit</option>
                                 <option value="other">Other Action</option>
-                            </select>
+                            </x-ui.themed-select>
                         </div>
                         <div>
                             <label class="font-bold text-ink">Target Deadline <span class="text-rose-500">*</span></label>

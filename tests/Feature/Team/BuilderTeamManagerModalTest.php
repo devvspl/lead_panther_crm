@@ -68,6 +68,7 @@ class BuilderTeamManagerModalTest extends TestCase
         Livewire::test(BuilderTeamManager::class)
             ->set('teamId', $this->team->id)
             ->assertDontSee('Update Role and Add to Team')
+            ->assertDontSee('Save Team')
             ->assertSee('Add Team Member')
             ->assertSee('Apex Core Sales Team');
     }

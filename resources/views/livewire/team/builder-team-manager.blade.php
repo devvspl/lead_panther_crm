@@ -10,7 +10,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-ink">{{ \App\Support\TeamAccess::isLeader(auth()->user()) ? 'My Team Management' : 'Builder Direct Team Management' }}</h1>
-            <p class="text-xs text-muted">Assignments and team members.</p>
+            <p class="text-xs text-muted">Assignments and team members{{ $teamName ? ' • ' . $teamName : '' }}.</p>
         </div>
         <button type="button" wire:click="openAddMemberModal" title="Add Team Member" aria-label="Add Team Member" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary-hover text-xs font-semibold whitespace-nowrap cursor-pointer shadow-xs">
             <x-ui.team-icon name="add" /><span>Add Team Member</span>
@@ -35,45 +35,20 @@
     </section>
 
     <section role="tabpanel" id="team-panel-management" aria-labelledby="team-tab-management" x-cloak x-show="activeTab === 'management'" class="space-y-4">
-    <div @if(count($teams) <= 1 && \App\Support\TeamAccess::isLeader(auth()->user()) && !$errors->any()) class="hidden" @else class="bg-surface rounded-card border border-border p-5 space-y-4 text-xs" @endif>
-        @if(\App\Support\TeamAccess::isLeader(auth()->user()) && empty($teams))
-            <p role="status" class="rounded-lg border border-border bg-canvas p-3 text-sm text-ink">Team access is inactive. Ask Super Admin to confirm your membership.</p>
-        @endif
-        <div class="flex items-end gap-3">
-            @if(count($teams) > 1)
-                <div class="flex-1">
-                    <label class="block font-semibold mb-1">Sales team</label>
-                    <livewire:shared.searchable-select wire:model.live="teamId" :value="$teamId" :options="$teams" placeholder="Select team" class="block w-full" :key="'managed-teams-'.($teamId ?? 'none').'-'.md5(json_encode($teams))" />
-                </div>
-            @endif
-            @unless(\App\Support\TeamAccess::isLeader(auth()->user()))
-                <button type="button" title="New Team" aria-label="New Team" wire:click="newTeam" class="border border-border rounded-lg px-3 py-2 hover:bg-canvas transition cursor-pointer">
-                    <x-ui.team-icon name="add" />
-                </button>
-            @endunless
-        </div>
+    @if(\App\Support\TeamAccess::isLeader(auth()->user()) && empty($teams))
+        <p role="status" class="rounded-lg border border-border bg-canvas p-3 text-sm text-ink">Team access is inactive. Ask Super Admin to confirm your membership.</p>
+    @endif
 
-        @unless(\App\Support\TeamAccess::isLeader(auth()->user()))
-            <div class="grid sm:grid-cols-3 gap-3 items-end">
-                <label>
-                    <span class="block font-semibold mb-1">Team name</span>
-                    <input wire:model="teamName" class="block w-full border border-border bg-canvas rounded-lg px-3 py-2 mt-1">
-                </label>
-                <div>
-                    <label class="block mb-1 font-semibold">Team Leader</label>
-                    <livewire:shared.searchable-select wire:model.live="teamLeaderId" :options="$leaders" placeholder="Select Team Leader" class="block w-full" :key="'team-leader-'.$teamId" />
-                </div>
-                <div>
-                    <button type="button" title="Save Team and Leader" aria-label="Save Team and Leader" wire:click="saveTeam" class="rounded-lg bg-primary hover:bg-primary-hover text-white px-4 py-2 font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 w-full sm:w-auto">
-                        <x-ui.team-icon name="check" />
-                        <span>Save Team</span>
-                    </button>
-                </div>
+    @if(count($teams) > 1)
+        <div class="flex items-center gap-2 text-xs">
+            <span class="font-semibold text-ink">Sales team:</span>
+            <div class="w-64">
+                <livewire:shared.searchable-select wire:model.live="teamId" :value="$teamId" :options="$teams" placeholder="Select team" class="block w-full" :key="'managed-teams-'.($teamId ?? 'none').'-'.md5(json_encode($teams))" />
             </div>
-        @endunless
+        </div>
+    @endif
 
-        @if($errors->any())<p class="text-danger">{{ $errors->first() }}</p>@endif
-    </div>
+    @if($errors->any())<p class="text-danger text-xs">{{ $errors->first() }}</p>@endif
 
     <!-- Add Team Member Modal -->
     <x-modal name="add-team-member" :show="$errors->hasAny(['memberName','memberEmail','roleName','password','existingMemberId','existingMemberRole']) || (bool)$generatedInviteLink" maxWidth="2xl">

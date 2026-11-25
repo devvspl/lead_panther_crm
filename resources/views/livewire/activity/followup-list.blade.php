@@ -66,58 +66,6 @@
             </div>
         </div>
 
-        <!-- Metric KPI Cards -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            <!-- Total -->
-            <button type="button" wire:click="setTab('all')" class="p-3.5 rounded-xl border {{ $activeTab === 'all' ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Total</span>
-                <span class="text-xl font-bold text-ink block mt-1">{{ number_format($totalCount) }}</span>
-                <span class="text-[10px] text-muted">All active records</span>
-            </button>
-
-            <!-- Due Today -->
-            <button type="button" wire:click="setTab('today')" class="p-3.5 rounded-xl border {{ $activeTab === 'today' ? 'border-amber-400 ring-1 ring-amber-400 bg-amber-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Due Today</span>
-                <span class="text-xl font-bold text-amber-700 block mt-1">{{ number_format($todayCount) }}</span>
-                <span class="text-[10px] text-amber-600">Action today</span>
-            </button>
-
-            <!-- Upcoming -->
-            <button type="button" wire:click="setTab('upcoming')" class="p-3.5 rounded-xl border {{ $activeTab === 'upcoming' ? 'border-blue-400 ring-1 ring-blue-400 bg-blue-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Upcoming</span>
-                <span class="text-xl font-bold text-blue-700 block mt-1">{{ number_format($upcomingCount) }}</span>
-                <span class="text-[10px] text-blue-600">Future scheduled</span>
-            </button>
-
-            <!-- Overdue -->
-            <button type="button" wire:click="setTab('overdue')" class="p-3.5 rounded-xl border {{ $activeTab === 'overdue' ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Overdue</span>
-                <span class="text-xl font-bold text-rose-700 block mt-1">{{ number_format($overdueCount) }}</span>
-                <span class="text-[10px] text-rose-600">Missed deadline</span>
-            </button>
-
-            <!-- Escalated -->
-            <button type="button" wire:click="setTab('escalated')" class="p-3.5 rounded-xl border {{ $activeTab === 'escalated' ? 'border-purple-400 ring-1 ring-purple-400 bg-purple-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider block">Escalated</span>
-                <span class="text-xl font-bold text-purple-700 block mt-1">{{ number_format($escalatedCount) }}</span>
-                <span class="text-[10px] text-purple-600">TL / Admin alert</span>
-            </button>
-
-            <!-- Follow-up Requests -->
-            <button type="button" wire:click="setTab('requests')" class="p-3.5 rounded-xl border {{ $activeTab === 'requests' ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Requests</span>
-                <span class="text-xl font-bold text-indigo-700 block mt-1">{{ number_format($requestsCount) }}</span>
-                <span class="text-[10px] text-indigo-600">Delegated tasks</span>
-            </button>
-
-            <!-- Completed -->
-            <button type="button" wire:click="setTab('completed')" class="p-3.5 rounded-xl border {{ $activeTab === 'completed' ? 'border-emerald-400 ring-1 ring-emerald-400 bg-emerald-50/50' : 'border-border bg-surface hover:bg-canvas' }} text-left transition cursor-pointer">
-                <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Completed</span>
-                <span class="text-xl font-bold text-emerald-700 block mt-1">{{ number_format($completedCount) }}</span>
-                <span class="text-[10px] text-emerald-600">Finished calls</span>
-            </button>
-        </div>
-
         <!-- Collapsible Filter & Search Container -->
         <div class="bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
             <!-- Filter Bar Toolbar -->

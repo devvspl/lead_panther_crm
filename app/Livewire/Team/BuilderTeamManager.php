@@ -140,7 +140,16 @@ class BuilderTeamManager extends Component
             if ($team->leader_id===$member->id && $this->existingMemberRole!=='Team Leader') $team->update(['leader_id'=>null]);
             if ($this->existingMemberRole==='Team Leader') $team->update(['leader_id'=>$member->id]);
         });
-        $this->updatedTeamId(); $this->dispatch('toast',type:'success',message:'Member role and team assignment updated.');
+        $this->updatedTeamId();
+        $this->dispatch('close-modal', 'add-team-member');
+        $this->dispatch('toast',type:'success',message:'Member role and team assignment updated.');
+    }
+    public function openAddMemberModal(): void {
+        $this->reset(['memberName', 'memberEmail', 'password', 'existingMemberId', 'generatedInviteLink']);
+        $this->roleName = 'Executive';
+        $this->existingMemberRole = 'Executive';
+        $this->resetValidation();
+        $this->dispatch('open-modal', 'add-team-member');
     }
     public function toggleMember(int $userId): void {
         $this->guard(); $team=$this->teams()->findOrFail($this->teamId);

@@ -47,9 +47,11 @@ trait ConfiguresTeamAssignment
     {
         $leader = \App\Support\TeamAccess::isLeader($actor);
         $isSuperAdmin = $actor->hasRole('Super Admin') || $actor->hasRole('super-admin');
+        $isBuilder = $actor->is_active && $actor->organization_id === $org->id
+            && $actor->hasAnyRole(['Builder/Developer','Builder','builder','builder-admin']);
         $current = $this->assignmentDefaults($org);
         $leaderIds = [];
-        if ($leader && !$isSuperAdmin) {
+        if ($leader && !$isSuperAdmin && !$isBuilder) {
             abort_unless($actor->is_active && $actor->organization_id === $org->id && $actor->can('assign-team-leads')
                 && $current['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($current['team_id'])->exists(), 403);
             $leaderIds = \App\Support\TeamAccess::executives($actor, false)->whereIn('id', SalesTeamMember::where('sales_team_id', $current['team_id'])->select('user_id'))->pluck('id')->all();
@@ -61,7 +63,7 @@ trait ConfiguresTeamAssignment
             unset($member);
             if (!in_array($input['method'], ['round_robin','equal_distribution','manual']) && !($input['method'] === 'priority' && $current['method'] === 'priority')) throw ValidationException::withMessages(['settings.method'=>'Choose Round Robin, Equal Distribution or Manual Assignment.']);
         } else {
-            abort_unless($actor->is_active && $isSuperAdmin, 403);
+            abort_unless($actor->is_active && ($isSuperAdmin || $isBuilder), 403);
         }
 
         // Determine effective assignment mode
@@ -96,9 +98,9 @@ trait ConfiguresTeamAssignment
             || array_diff(array_keys($data['members']), $this->assignmentExecutives($org->id)->pluck('id')->all())) {
             throw ValidationException::withMessages(['assignment' => 'Select projects, campaigns and executives belonging to this organization.']);
         }
-        DB::transaction(function () use ($org, $data, $actor, $leader, $leaderIds, $isSuperAdmin) {
+        DB::transaction(function () use ($org, $data, $actor, $leader, $leaderIds, $isSuperAdmin, $isBuilder) {
             $org = Organization::whereKey($org->id)->lockForUpdate()->firstOrFail();
-            if ($leader && !$isSuperAdmin) {
+            if ($leader && !$isSuperAdmin && !$isBuilder) {
                 $latest = $this->assignmentDefaults($org);
                 abort_unless($latest['team_id'] === $data['team_id'] && \App\Support\TeamAccess::teams($actor)->whereKey($data['team_id'])->exists(),403);
                 foreach (['timezone','project_ids','campaign_ids'] as $key) $data[$key] = $latest[$key];

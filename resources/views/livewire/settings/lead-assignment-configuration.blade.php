@@ -57,7 +57,11 @@
         <p class="text-xs text-muted">Inactive or unavailable executives are skipped.</p>
 
         @if($errors->any())<p class="text-sm text-danger">{{ $errors->first() }}</p>@endif
-        <div class="flex gap-2"><button title="Save Settings" aria-label="Save Settings" class="inline-flex items-center gap-2 bg-primary hover:bg-primary-hover text-white rounded-lg px-4 py-2 text-xs font-semibold" wire:loading.attr="disabled"><x-ui.team-icon name="check" /><span>Save Settings</span></button>@unless($isTeamLeader)<button type="button" title="Assign Pending Batch" aria-label="Assign Pending Batch" wire:click="assignPending" wire:loading.attr="disabled" class="border border-border rounded-lg px-4 py-2 text-xs"><x-ui.team-icon name="check" /></button>@endunless</div>
+        <div>
+            <button type="submit" title="Save Settings" aria-label="Save Settings" class="inline-flex items-center gap-2 bg-primary hover:bg-primary-hover text-white rounded-lg px-4 py-2 text-xs font-semibold" wire:loading.attr="disabled">
+                <x-ui.team-icon name="check" /><span>Save Settings</span>
+            </button>
+        </div>
     </form>
     @else<p class="text-xs text-muted">Ask Super Admin to select your assignment team.</p>@endif
     @php

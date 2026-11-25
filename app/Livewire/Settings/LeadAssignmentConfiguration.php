@@ -25,13 +25,18 @@ class LeadAssignmentConfiguration extends Component
         $this->settings['assignment_mode'] = $org->getLeadAssignmentMode();
         $this->settings['enabled'] = ($this->settings['assignment_mode'] === Organization::ASSIGNMENT_MODE_AUTOMATIC);
 
+        $user = auth()->user();
+        $isSuperAdmin = $user && ($user->hasRole('Super Admin') || $user->hasRole('super-admin'));
+        $isBuilder = $user && $user->is_active && $user->organization_id === $this->organizationId
+            && $user->hasAnyRole(['Builder/Developer','Builder','builder','builder-admin']);
+
         // Read-only team viewers must not receive other teams' member settings in Livewire's snapshot.
-        if (!auth()->user()->hasRole('Super Admin')) {
-            if (TeamAccess::isLeader(auth()->user())) {
+        if (!$isSuperAdmin && !$isBuilder) {
+            if (TeamAccess::isLeader($user)) {
                 $all = $this->settings;
                 $this->settings = array_intersect_key($all, array_flip(['enabled','assignment_mode','method','daily_limit','batch_size','working_days','start_time','end_time']));
                 $this->settings['members'] = [];
-                foreach (TeamAccess::executives(auth()->user(), false)->whereIn('id', \App\Models\SalesTeamMember::where('sales_team_id', $all['team_id'])->select('user_id'))->get() as $member) {
+                foreach (TeamAccess::executives($user, false)->whereIn('id', \App\Models\SalesTeamMember::where('sales_team_id', $all['team_id'])->select('user_id'))->get() as $member) {
                     $this->settings['members'][$member->id] = ['available'=>$all['members'][$member->id]['available'] ?? true];
                 }
             } else {

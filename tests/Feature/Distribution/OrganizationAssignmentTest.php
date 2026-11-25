@@ -153,7 +153,7 @@ class OrganizationAssignmentTest extends TestCase
             ->set('settings.enabled',true)->set('settings.method','equal_distribution')->call('save')->assertHasNoErrors();
         $this->assertSame('equal_distribution',$this->org->fresh()->assignment_config['method']);
         $this->assertNotNull(AuditLog::where('action','assignment.configuration_updated')->first()->to_value);
-        Livewire::actingAs(User::find($this->owner->id))->test(LeadAssignmentConfiguration::class,['organizationId'=>$this->org->id])->assertSet('settings',[])->call('save')->assertForbidden();
+        Livewire::actingAs(User::find($this->owner->id))->test(LeadAssignmentConfiguration::class,['organizationId'=>$this->org->id])->assertSee('Lead Assignment Configuration')->assertNotSet('settings',[])->call('save')->assertHasNoErrors();
         Livewire::actingAs($this->agents[0])->test(LeadAssignmentConfiguration::class,['organizationId'=>$this->org->id])->assertForbidden();
         $other=Organization::create(['name'=>'Other org']);
         Livewire::actingAs(User::find($this->owner->id))->test(LeadAssignmentConfiguration::class,['organizationId'=>$other->id])->assertForbidden();

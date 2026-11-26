@@ -1,95 +1,66 @@
-<div class="space-y-4">
+<div class="bg-surface rounded-2xl border border-border p-5 sm:p-6 space-y-5 shadow-2xs">
     <!-- Header of the Lead Filtering Rules section -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-4 sm:p-5 rounded-2xl border border-border shadow-2xs">
-        <div>
-            <div class="flex items-center gap-2">
-                <span class="p-1.5 rounded-lg bg-primary/10 text-primary">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                </span>
-                <h3 class="text-base font-bold text-ink">Lead Filtering Rules</h3>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
-                    {{ $rules->where('is_active', true)->count() }} Active
-                </span>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div class="flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-canvas border border-border text-ink shrink-0">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
             </div>
-            <p class="text-xs text-muted mt-0.5">Automated lead qualification rules applied to Facebook campaigns and forms before leads enter CRM distribution.</p>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-base font-bold text-ink">Lead Filtering Rules</h3>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-canvas border border-border/80 text-ink">
+                        {{ $rules->where('is_active', true)->count() }} Active
+                    </span>
+                </div>
+                <p class="text-xs text-muted mt-0.5">Automated lead qualification rules applied to Facebook campaigns and forms before leads enter CRM distribution.</p>
+            </div>
         </div>
 
-        <div class="flex items-center gap-2 shrink-0 flex-wrap">
+        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
             <button type="button" wire:click="openTestModal"
-                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-surface text-ink text-xs font-semibold hover:bg-canvas transition shadow-2xs cursor-pointer">
-                <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100/50 text-xs font-semibold transition cursor-pointer shadow-2xs">
+                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Test Rules Preview</span>
             </button>
             <button type="button" wire:click="openCreateRuleModal"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-ink hover:bg-black text-white text-xs font-bold transition shadow-xs cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 <span>Add Filtering Rule</span>
             </button>
         </div>
     </div>
 
-    <!-- Navigation Sub-tabs: Configured Rules vs Filter Audit Logs -->
-    <div class="flex items-center gap-4 text-xs font-semibold border-b border-border">
+    <!-- Navigation Sub-tabs: Configured Rules vs Filter Execution Logs -->
+    <div class="flex items-center gap-5 text-xs font-semibold border-b border-border">
         <button type="button" wire:click="$set('subTab', 'rules')"
             @class([
                 'pb-2.5 transition border-b-2 cursor-pointer flex items-center gap-2',
-                'border-primary text-primary font-bold' => $subTab === 'rules',
+                'border-ink text-ink font-bold' => $subTab === 'rules',
                 'border-transparent text-muted hover:text-ink' => $subTab !== 'rules',
             ])>
             <span>Configured Filter Rules</span>
-            <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-canvas border border-border text-ink">{{ $rules->count() }}</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-canvas border border-border text-ink">{{ $rules->count() }}</span>
         </button>
 
         <button type="button" wire:click="$set('subTab', 'logs')"
             @class([
                 'pb-2.5 transition border-b-2 cursor-pointer flex items-center gap-2',
-                'border-primary text-primary font-bold' => $subTab === 'logs',
+                'border-ink text-ink font-bold' => $subTab === 'logs',
                 'border-transparent text-muted hover:text-ink' => $subTab !== 'logs',
             ])>
             <span>Filter Execution Logs</span>
-            <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-canvas border border-border text-ink">{{ $recentLogs->count() }}</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-canvas border border-border text-ink">{{ $recentLogs->count() }}</span>
         </button>
     </div>
 
     @if($subTab === 'rules')
-        <!-- Search & Scope Filter Controls -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div class="w-full sm:w-72">
-                <x-text-input wire:model.live.debounce.250ms="search" variant="compact" placeholder="Search rules..." />
-            </div>
-
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-                @if(count($campaigns) > 0)
-                    <div class="w-full sm:w-56">
-                        <select wire:model.live="filterCampaignId" class="w-full py-1.5 px-2.5 text-xs rounded-lg border border-border bg-canvas text-ink focus:ring-1 focus:ring-primary focus:outline-none">
-                            <option value="">All Campaigns Scope</option>
-                            @foreach($campaigns as $cId => $cName)
-                                <option value="{{ $cId }}">{{ $cName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-
-                @if(count($projects) > 0)
-                    <div class="w-full sm:w-48">
-                        <select wire:model.live="filterProjectId" class="w-full py-1.5 px-2.5 text-xs rounded-lg border border-border bg-canvas text-ink focus:ring-1 focus:ring-primary focus:outline-none">
-                            <option value="">All Projects Scope</option>
-                            @foreach($projects as $pId => $pName)
-                                <option value="{{ $pId }}">{{ $pName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- Rules Listing in standard CRM Table format -->
+        <!-- Configured Filter Rules Table -->
         @if($rules->isEmpty())
             <div class="p-8 text-center rounded-2xl border border-dashed border-border bg-canvas/40 space-y-3">
-                <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-12 h-12 rounded-2xl bg-canvas border border-border text-ink mx-auto flex items-center justify-center">
+                    <svg class="w-6 h-6 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
                 </div>
@@ -97,118 +68,131 @@
                     <h4 class="text-sm font-bold text-ink">No Lead Filtering Rules Configured</h4>
                     <p class="text-xs text-muted max-w-md mx-auto">When no rules are active, all leads fetched from connected Facebook campaigns and forms will be ingested directly into the CRM. Click Add Filtering Rule to set up custom criteria.</p>
                 </div>
-                <button type="button" wire:click="openCreateRuleModal" class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                <button type="button" wire:click="openCreateRuleModal" class="px-4 py-2 rounded-xl bg-ink text-white text-xs font-bold hover:bg-black transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     <span>Create Your First Rule</span>
                 </button>
             </div>
         @else
-            <div class="overflow-x-auto rounded-xl border border-border bg-surface shadow-2xs">
+            <div class="overflow-x-auto rounded-xl border border-border bg-surface">
                 <table class="w-full text-left text-xs divide-y divide-border">
-                    <thead class="bg-canvas border-b border-border text-muted font-bold uppercase text-[10px] tracking-wider">
+                    <thead class="bg-canvas/50 border-b border-border text-muted font-bold uppercase text-[10px] tracking-wider">
                         <tr>
                             <th class="py-3 px-3.5">Rule Name</th>
                             <th class="py-3 px-3.5">Campaign Scope</th>
                             <th class="py-3 px-3.5">Action</th>
-                            <th class="py-3 px-3.5">Conditions Summary</th>
+                            <th class="py-3 px-3.5">Conditions</th>
                             <th class="py-3 px-3.5">Status</th>
                             <th class="py-3 px-3.5">Created By</th>
+                            <th class="py-3 px-3.5">Created On</th>
                             <th class="py-3 px-3.5 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border bg-surface">
                         @foreach($rules as $rule)
-                            <tr class="hover:bg-canvas/50 transition">
+                            <tr class="hover:bg-canvas/40 transition">
                                 <!-- 1. Rule Name -->
-                                <td class="py-3 px-3.5">
-                                    <div class="font-bold text-ink">{{ $rule->name }}</div>
-                                    @if($rule->description)
-                                        <div class="text-[11px] text-muted max-w-xs truncate" title="{{ $rule->description }}">{{ $rule->description }}</div>
-                                    @endif
+                                <td class="py-3 px-3.5 font-bold text-ink whitespace-nowrap">
+                                    {{ $rule->name }}
                                 </td>
 
                                 <!-- 2. Campaign Scope -->
+                                <td class="py-3 px-3.5 whitespace-nowrap text-ink">
+                                    {{ $rule->scopeSummary() }}
+                                </td>
+
+                                <!-- 3. Action Badge -->
                                 <td class="py-3 px-3.5 whitespace-nowrap">
-                                    @if($rule->campaign)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-canvas border border-border text-ink">
-                                            Campaign: {{ $rule->campaign->name }}
-                                        </span>
-                                    @elseif($rule->project)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-canvas border border-border text-ink">
-                                            Project: {{ $rule->project->name }}
+                                    @if($rule->action === 'include')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            Include
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 border border-blue-200 text-blue-700">
-                                            All Campaigns
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                                            Exclude
                                         </span>
                                     @endif
                                 </td>
 
-                                <!-- 3. Action -->
-                                <td class="py-3 px-3.5 whitespace-nowrap">
-                                    @if($rule->action === 'exclude')
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
-                                            Exclude Lead
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            Include Lead
-                                        </span>
-                                    @endif
-                                </td>
-
-                                <!-- 4. Conditions Summary -->
+                                <!-- 4. Conditions Pills -->
                                 <td class="py-3 px-3.5">
-                                    <div class="font-mono text-[11px] text-ink max-w-sm break-words leading-relaxed">
-                                        {{ $rule->humanSummary() }}
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        @php
+                                            $groups = $rule->conditions['groups'] ?? [];
+                                            $condItems = [];
+                                            $gLogic = $rule->group_logic ?: ($rule->conditions['group_logic'] ?? 'AND');
+                                            foreach ($groups as $g) {
+                                                $conds = $g['conditions'] ?? [];
+                                                foreach ($conds as $c) {
+                                                    $op = match($c['operator'] ?? 'equals') {
+                                                        'equals' => '=',
+                                                        'not_equals' => '!=',
+                                                        'contains' => 'contains',
+                                                        'not_contains' => 'not contains',
+                                                        'is_empty' => 'is empty',
+                                                        'is_not_empty' => 'is not empty',
+                                                        default => $c['operator'] ?? '=',
+                                                    };
+                                                    $val = isset($c['value']) && $c['value'] !== '' ? $c['value'] : '';
+                                                    $condItems[] = trim(($c['field'] ?? 'field') . ' ' . $op . ' ' . $val);
+                                                }
+                                            }
+                                        @endphp
+                                        @foreach($condItems as $cIdx => $cText)
+                                            @if($cIdx > 0)
+                                                <span class="text-[10px] font-bold text-muted uppercase">{{ $gLogic }}</span>
+                                            @endif
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-canvas border border-border text-ink font-mono text-[11px] font-medium">
+                                                {{ $cText }}
+                                            </span>
+                                        @endforeach
                                     </div>
                                 </td>
 
                                 <!-- 5. Status -->
                                 <td class="py-3 px-3.5 whitespace-nowrap">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold {{ $rule->is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200' }}">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $rule->is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200' }}">
                                         {{ $rule->is_active ? 'Active' : 'Disabled' }}
                                     </span>
                                 </td>
 
                                 <!-- 6. Created By -->
-                                <td class="py-3 px-3.5 whitespace-nowrap text-muted text-xs font-medium">
+                                <td class="py-3 px-3.5 whitespace-nowrap text-muted text-xs">
                                     {{ $rule->creator?->name ?? 'Super Admin' }}
                                 </td>
 
-                                <!-- 7. Actions (3-dot dropdown menu) -->
+                                <!-- 7. Created On -->
+                                <td class="py-3 px-3.5 whitespace-nowrap text-muted text-xs">
+                                    {{ $rule->created_at?->format('M d, Y') ?? 'Nov 26, 2026' }}
+                                </td>
+
+                                <!-- 8. Actions (Edit pencil, toggle switch, delete trash) -->
                                 <td class="py-3 px-3.5 text-right whitespace-nowrap">
-                                    <x-ui.dropdown align="right" width="48">
-                                        <x-slot:trigger>
-                                            <button type="button" aria-label="Rule actions"
-                                                class="p-1.5 text-muted hover:text-ink hover:bg-canvas rounded-lg transition cursor-pointer">
-                                                <x-ui.team-icon name="more" />
-                                            </button>
-                                        </x-slot:trigger>
+                                    <div class="inline-flex items-center gap-2">
+                                        <!-- Edit Rule -->
+                                        <button type="button" wire:click="openEditRuleModal({{ $rule->id }})"
+                                            class="p-1 text-muted hover:text-ink transition cursor-pointer" title="Edit rule">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                        </button>
 
-                                        <x-slot:content>
-                                            <!-- Edit Rule -->
-                                            <button type="button" wire:click="openEditRuleModal({{ $rule->id }})"
-                                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-canvas hover:text-primary transition cursor-pointer">
-                                                <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                <span>Edit Rule</span>
-                                            </button>
+                                        <!-- Toggle Switch -->
+                                        <button type="button" wire:click="toggleRuleActive({{ $rule->id }})"
+                                            class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none {{ $rule->is_active ? 'bg-emerald-600' : 'bg-slate-300' }}"
+                                            role="switch" aria-checked="{{ $rule->is_active ? 'true' : 'false' }}"
+                                            title="{{ $rule->is_active ? 'Disable rule' : 'Enable rule' }}">
+                                            <span class="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ $rule->is_active ? 'translate-x-3' : 'translate-x-0' }}"></span>
+                                        </button>
 
-                                            <!-- Toggle Active / Disabled -->
-                                            <button type="button" wire:click="toggleRuleActive({{ $rule->id }})"
-                                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-canvas transition cursor-pointer">
-                                                <svg class="w-3.5 h-3.5 {{ $rule->is_active ? 'text-amber-500' : 'text-emerald-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v9m6.364-6.364a9 9 0 11-12.728 0" /></svg>
-                                                <span>{{ $rule->is_active ? 'Disable Rule' : 'Enable Rule' }}</span>
-                                            </button>
-
-                                            <!-- Delete Rule -->
-                                            <button type="button" wire:click="deleteRule({{ $rule->id }})" wire:confirm="Are you sure you want to delete this filtering rule?"
-                                                class="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer">
-                                                <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                <span>Delete Rule</span>
-                                            </button>
-                                        </x-slot:content>
-                                    </x-ui.dropdown>
+                                        <!-- Delete Rule -->
+                                        <button type="button" wire:click="deleteRule({{ $rule->id }})" wire:confirm="Are you sure you want to delete this rule?"
+                                            class="p-1 text-red-500 hover:text-red-700 transition cursor-pointer" title="Delete rule">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -230,7 +214,7 @@
             @else
                 <div class="overflow-x-auto rounded-xl border border-border bg-surface">
                     <table class="w-full text-left text-xs divide-y divide-border">
-                        <thead class="bg-canvas border-b border-border text-muted font-bold uppercase text-[10px] tracking-wider">
+                        <thead class="bg-canvas/50 border-b border-border text-muted font-bold uppercase text-[10px] tracking-wider">
                             <tr>
                                 <th class="p-3">Time</th>
                                 <th class="p-3">Lead</th>
@@ -262,20 +246,20 @@
         </div>
     @endif
 
-    <!-- 1. Create / Edit Lead Filtering Rule Modal -->
+    <!-- C. Create / Edit Lead Filtering Rule Modal (matches reference screenshot) -->
     <x-ui.modal name="lead-filter-rule-editor" maxWidth="xl" :centered="true">
         <form wire:submit="saveRule" class="p-5 sm:p-6 space-y-4">
             <!-- Modal Header -->
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
                 <div class="flex items-center gap-3">
-                    <div class="p-2 rounded-xl bg-primary/10 text-primary">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    <div class="p-2.5 rounded-xl bg-canvas border border-border text-ink shrink-0">
+                        <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                         </svg>
                     </div>
                     <div>
-                        <h4 class="text-base font-bold text-ink">{{ $editingRuleId ? 'Edit Lead Filtering Rule' : 'Create Lead Filtering Rule' }}</h4>
-                        <p class="text-xs text-muted">Dynamically include or skip leads fetched from Meta forms.</p>
+                        <h4 class="text-base font-bold text-ink">{{ $editingRuleId ? 'Edit Lead Filtering Rule' : 'Add Lead Filtering Rule' }}</h4>
+                        <p class="text-xs text-muted">Create a custom rule to include or exclude leads based on lead form answers.</p>
                     </div>
                 </div>
                 <button type="button" x-on:click="$dispatch('close-modal', 'lead-filter-rule-editor')"
@@ -284,82 +268,55 @@
                 </button>
             </div>
 
-            <!-- Rule Name & Description -->
-            <div class="space-y-3">
+            <!-- Row 1: Rule Name & Campaign Scope (2 columns) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <x-input-label for="ruleName" value="Rule Name" class="text-xs font-semibold text-ink mb-1" />
-                    <x-text-input id="ruleName" wire:model="ruleName" variant="compact" placeholder="e.g. Studio Buy Intent Filter" required />
+                    <x-input-label for="ruleName" class="text-xs font-semibold text-ink mb-1">
+                        Rule Name <span class="text-red-500">*</span>
+                    </x-input-label>
+                    <x-text-input id="ruleName" wire:model="ruleName" variant="compact" placeholder="Studio Buy Only" required />
                     <x-input-error :messages="$errors->get('ruleName')" class="mt-1 text-xs" />
                 </div>
 
-                <!-- Campaign Scope Selection -->
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1.5">Campaign Scope</label>
-                    <div class="grid grid-cols-3 gap-2 mb-2">
-                        <button type="button" wire:click="$set('ruleScopeType', 'all')"
-                            @class([
-                                'px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                'bg-primary/10 border-primary text-primary font-bold' => $ruleScopeType === 'all',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleScopeType !== 'all',
-                            ])>
-                            All Campaigns
-                        </button>
-                        <button type="button" wire:click="$set('ruleScopeType', 'project')"
-                            @class([
-                                'px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                'bg-primary/10 border-primary text-primary font-bold' => $ruleScopeType === 'project',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleScopeType !== 'project',
-                            ])>
-                            CRM Project
-                        </button>
-                        <button type="button" wire:click="$set('ruleScopeType', 'campaign')"
-                            @class([
-                                'px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                'bg-primary/10 border-primary text-primary font-bold' => $ruleScopeType === 'campaign',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleScopeType !== 'campaign',
-                            ])>
-                            Specific Campaign
-                        </button>
-                    </div>
-
-                    @if($ruleScopeType === 'project')
-                        <div>
-                            <x-ui.themed-select wire:model.live="ruleProjectId" :options="$projects" placeholder="Select CRM Project" :searchable="true" />
-                            <x-input-error :messages="$errors->get('ruleProjectId')" class="mt-1 text-xs" />
-                        </div>
-                    @elseif($ruleScopeType === 'campaign')
-                        <div>
-                            <x-ui.themed-select wire:model.live="ruleCampaignId" :options="$campaigns" placeholder="Select Campaign" :searchable="true" />
-                            <x-input-error :messages="$errors->get('ruleCampaignId')" class="mt-1 text-xs" />
-                        </div>
-                    @endif
-                </div>
-
-                <div>
-                    <x-input-label for="ruleDescription" value="Description (Optional)" class="text-xs font-semibold text-ink mb-1" />
-                    <x-text-input id="ruleDescription" wire:model="ruleDescription" variant="compact" placeholder="Explain the purpose of this rule..." />
+                    <x-input-label for="ruleScope" class="text-xs font-semibold text-ink mb-1">
+                        Campaign Scope <span class="text-red-500">*</span>
+                    </x-input-label>
+                    <x-ui.themed-select id="ruleScope" wire:model.live="ruleScope" :options="$this->scopeOptions" placeholder="Select Campaign Scope" :searchable="true" class="w-full" />
+                    <x-input-error :messages="$errors->get('ruleScope')" class="mt-1 text-xs" />
                 </div>
             </div>
 
-            <!-- Action: Include / Exclude Lead & Logic Across Groups -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border text-xs">
+            <!-- Row 2: Description (Optional) -->
+            <div>
+                <x-input-label for="ruleDescription" class="text-xs font-semibold text-ink mb-1">
+                    Description (Optional)
+                </x-input-label>
+                <textarea id="ruleDescription" wire:model="ruleDescription" rows="2"
+                    class="w-full rounded-lg border border-border bg-canvas px-3 py-2 text-ink text-xs focus:ring-1 focus:ring-ink focus:outline-none placeholder:text-muted"
+                    placeholder="Include only buy leads for studio campaigns."></textarea>
+            </div>
+
+            <!-- Row 3: Action & Condition Logic (2 columns) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Action: Include / Exclude -->
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1.5">Action on Condition Match</label>
+                    <label class="block text-xs font-semibold text-ink mb-1.5">Action <span class="text-red-500">*</span></label>
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" wire:click="$set('ruleAction', 'include')"
                             @class([
-                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer flex items-center justify-center gap-1.5',
+                                'px-3 py-2 text-xs font-semibold rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-1.5',
                                 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold' => $ruleAction === 'include',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleAction !== 'include',
+                                'bg-surface border-border text-muted hover:text-ink' => $ruleAction !== 'include',
                             ])>
                             <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             <span>Include Lead</span>
                         </button>
                         <button type="button" wire:click="$set('ruleAction', 'exclude')"
                             @class([
-                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer flex items-center justify-center gap-1.5',
+                                'px-3 py-2 text-xs font-semibold rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-1.5',
                                 'bg-red-50 border-red-300 text-red-700 font-bold' => $ruleAction === 'exclude',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleAction !== 'exclude',
+                                'bg-surface border-border text-muted hover:text-ink' => $ruleAction !== 'exclude',
                             ])>
                             <svg class="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             <span>Exclude Lead</span>
@@ -367,127 +324,97 @@
                     </div>
                 </div>
 
+                <!-- Condition Logic: All (AND) / Any (OR) -->
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1.5">Logic Across Groups</label>
+                    <label class="block text-xs font-semibold text-ink mb-1.5">Condition Logic <span class="text-red-500">*</span></label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button type="button" wire:click="$set('ruleGroupLogic', 'OR')"
+                        <button type="button" wire:click="$set('ruleConditionLogic', 'AND')"
                             @class([
-                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                'bg-primary/10 border-primary text-primary font-bold' => $ruleGroupLogic === 'OR',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleGroupLogic !== 'OR',
+                                'px-3 py-2 text-xs font-semibold rounded-xl border text-center transition cursor-pointer',
+                                'bg-surface border-border text-ink font-bold shadow-2xs' => $ruleConditionLogic === 'AND',
+                                'bg-canvas border-border/70 text-muted hover:text-ink' => $ruleConditionLogic !== 'AND',
                             ])>
-                            ANY Group (OR)
+                            All (AND)
                         </button>
-                        <button type="button" wire:click="$set('ruleGroupLogic', 'AND')"
+                        <button type="button" wire:click="$set('ruleConditionLogic', 'OR')"
                             @class([
-                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                'bg-primary/10 border-primary text-primary font-bold' => $ruleGroupLogic === 'AND',
-                                'bg-canvas border-border text-muted hover:text-ink' => $ruleGroupLogic !== 'AND',
+                                'px-3 py-2 text-xs font-semibold rounded-xl border text-center transition cursor-pointer',
+                                'bg-surface border-border text-ink font-bold shadow-2xs' => $ruleConditionLogic === 'OR',
+                                'bg-canvas border-border/70 text-muted hover:text-ink' => $ruleConditionLogic !== 'OR',
                             ])>
-                            ALL Groups (AND)
+                            Any (OR)
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Dynamic Condition Groups -->
-            <div class="space-y-3 pt-2 border-t border-border">
-                <div class="flex items-center justify-between">
-                    <h5 class="text-xs font-bold text-ink uppercase tracking-wider">Condition Groups</h5>
-                    <button type="button" wire:click="addConditionGroup" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        <span>Add Condition Group</span>
-                    </button>
-                </div>
+            <!-- Row 4: Conditions Section -->
+            <div class="space-y-3 pt-2">
+                <h5 class="text-xs font-bold text-ink">Conditions</h5>
 
-                @foreach($conditionGroups as $gIndex => $group)
-                    <div class="p-3.5 rounded-xl border border-border bg-canvas/60 space-y-3" wire:key="condition-group-{{ $gIndex }}">
-                        <div class="flex items-center justify-between pb-2 border-b border-border/80 text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-ink">Group #{{ $gIndex + 1 }}</span>
-                                <span class="text-muted">· Match</span>
-                                <div class="w-28">
-                                    <x-ui.themed-select wire:model.live="conditionGroups.{{ $gIndex }}.logic"
-                                        :options="['AND' => 'ALL (AND)', 'OR' => 'ANY (OR)']"
-                                        placeholder="Logic" />
-                                </div>
+                <div class="space-y-2.5">
+                    @foreach($conditions as $cIndex => $cond)
+                        <div class="flex items-center gap-2 p-2.5 rounded-xl border border-border bg-canvas/40" wire:key="cond-row-{{ $cIndex }}">
+                            <!-- Drag handle 6-dots -->
+                            <div class="text-muted/60 shrink-0 cursor-grab px-0.5" title="Reorder">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M7 4a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm9-12a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                                </svg>
                             </div>
 
-                            @if(count($conditionGroups) > 1)
-                                <button type="button" wire:click="removeConditionGroup({{ $gIndex }})" class="text-muted hover:text-red-600 text-xs font-semibold cursor-pointer">
-                                    Remove Group
+                            <!-- Lead Field dropdown -->
+                            <div class="flex-1 min-w-0">
+                                <label class="block text-[10px] font-semibold text-muted mb-0.5">Lead Field <span class="text-red-500">*</span></label>
+                                <x-ui.themed-select wire:model.live="conditions.{{ $cIndex }}.field"
+                                    :options="$this->leadFieldOptions" placeholder="Lead Field" :searchable="true" class="w-full" />
+                            </div>
+
+                            <!-- Operator dropdown -->
+                            <div class="w-36 shrink-0">
+                                <label class="block text-[10px] font-semibold text-muted mb-0.5">Operator <span class="text-red-500">*</span></label>
+                                <x-ui.themed-select wire:model.live="conditions.{{ $cIndex }}.operator"
+                                    :options="$this->operatorOptions" placeholder="Operator" class="w-full" />
+                            </div>
+
+                            <!-- Value input -->
+                            <div class="w-40 shrink-0">
+                                <label class="block text-[10px] font-semibold text-muted mb-0.5">Value <span class="text-red-500">*</span></label>
+                                @if(in_array($cond['operator'] ?? '', ['is_empty', 'is_not_empty']))
+                                    <x-text-input variant="compact" disabled placeholder="N/A" class="bg-canvas/50 cursor-not-allowed italic" />
+                                @else
+                                    <x-text-input wire:model="conditions.{{ $cIndex }}.value" variant="compact" placeholder="buy" />
+                                @endif
+                            </div>
+
+                            <!-- Remove Condition action (red trash) -->
+                            <div class="shrink-0 pt-4">
+                                <button type="button" wire:click="removeConditionRow({{ $cIndex }})"
+                                    class="p-1.5 text-red-500 hover:text-red-700 transition cursor-pointer" title="Remove condition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
-                            @endif
+                            </div>
                         </div>
+                    @endforeach
+                </div>
 
-                        <!-- Conditions inside this group -->
-                        <div class="space-y-2">
-                            @foreach($group['conditions'] as $cIndex => $cond)
-                                <div class="grid grid-cols-12 gap-2 items-center" wire:key="cond-row-{{ $gIndex }}-{{ $cIndex }}">
-                                    <!-- 1. Lead Field Select -->
-                                    <div class="col-span-12 sm:col-span-4">
-                                        <x-ui.themed-select
-                                            wire:model.live="conditionGroups.{{ $gIndex }}.conditions.{{ $cIndex }}.field"
-                                            :options="$leadFieldOptions"
-                                            placeholder="Lead Field"
-                                            :searchable="true"
-                                            class="w-full" />
-                                    </div>
-
-                                    <!-- 2. Operator Select -->
-                                    <div class="col-span-12 sm:col-span-4">
-                                        <x-ui.themed-select
-                                            wire:model.live="conditionGroups.{{ $gIndex }}.conditions.{{ $cIndex }}.operator"
-                                            :options="$operatorOptions"
-                                            placeholder="Operator"
-                                            class="w-full" />
-                                    </div>
-
-                                    <!-- 3. Comparison Value Input -->
-                                    <div class="col-span-10 sm:col-span-3">
-                                        @if(in_array($cond['operator'] ?? '', ['is_empty', 'is_not_empty']))
-                                            <x-text-input variant="compact" disabled placeholder="N/A" class="bg-canvas/40 cursor-not-allowed italic" />
-                                        @else
-                                            <x-text-input
-                                                wire:model="conditionGroups.{{ $gIndex }}.conditions.{{ $cIndex }}.value"
-                                                variant="compact"
-                                                placeholder="Value (e.g. buy)" />
-                                        @endif
-                                    </div>
-
-                                    <!-- 4. Remove Condition Action -->
-                                    <div class="col-span-2 sm:col-span-1 text-right">
-                                        @if(count($group['conditions']) > 1)
-                                            <button type="button" wire:click="removeCondition({{ $gIndex }}, {{ $cIndex }})"
-                                                class="p-1.5 text-muted hover:text-red-600 rounded-lg transition cursor-pointer"
-                                                title="Remove condition">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            </button>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <!-- Add Condition within this group -->
-                        <div class="pt-1">
-                            <button type="button" wire:click="addCondition({{ $gIndex }})" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                <span>Add Condition</span>
-                            </button>
-                        </div>
-                    </div>
-                @endforeach
+                <!-- Add Condition action button -->
+                <div>
+                    <button type="button" wire:click="addConditionRow"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100/60 text-xs font-semibold transition cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                        <span>Add Condition</span>
+                    </button>
+                </div>
             </div>
 
-            <!-- Modal Action Buttons -->
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+            <!-- Modal Footer (Cancel & Save Rule buttons) -->
+            <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
                 <button type="button" x-on:click="$dispatch('close-modal', 'lead-filter-rule-editor')"
-                    class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                    class="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
                     Cancel
                 </button>
                 <button type="submit" wire:loading.attr="disabled"
-                    class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                    class="px-4 py-2 bg-ink hover:bg-black text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
                     <span wire:loading.remove wire:target="saveRule">Save Rule</span>
                     <span wire:loading wire:target="saveRule">Saving...</span>
                 </button>
@@ -495,7 +422,7 @@
         </form>
     </x-ui.modal>
 
-    <!-- 2. Test Rules Preview Modal -->
+    <!-- Test Rules Preview Modal -->
     <x-ui.modal name="lead-filter-test-preview" maxWidth="lg" :centered="true">
         <div class="p-5 sm:p-6 space-y-4">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
@@ -529,7 +456,7 @@
                             <div class="col-span-5">
                                 <x-ui.themed-select
                                     wire:model.live="testFields.{{ $index }}.field"
-                                    :options="$leadFieldOptions"
+                                    :options="$this->leadFieldOptions"
                                     placeholder="Field"
                                     :searchable="true"
                                     class="w-full" />

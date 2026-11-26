@@ -5,8 +5,10 @@ namespace App\Livewire\Settings;
 use App\Models\Campaign;
 use App\Models\LeadFilterLog;
 use App\Models\LeadFilterRule;
+use App\Models\MetaAdRecord;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\User;
 use App\Services\LeadFilterRuleEngine;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -25,11 +27,14 @@ class LeadFilteringRules extends Component
     public ?int $editingRuleId = null;
     public string $ruleName = '';
     public string $ruleDescription = '';
+    public string $ruleScope = 'all'; // 'all', 'camp_1', 'proj_1'
     public string $ruleScopeType = 'all'; // 'all', 'campaign', 'project'
     public ?int $ruleCampaignId = null;
     public ?int $ruleProjectId = null;
     public string $ruleAction = 'include'; // 'include' or 'exclude'
+    public string $ruleConditionLogic = 'AND'; // 'AND' or 'OR'
     public string $ruleGroupLogic = 'OR'; // 'AND' or 'OR' between groups
+    public array $conditions = [];
     public array $conditionGroups = [];
 
     // Modal state for Test Rules Preview
@@ -45,18 +50,58 @@ class LeadFilteringRules extends Component
     public function mount(?int $organizationId = null): void
     {
         $this->organizationId = $organizationId ?: (auth()->user()?->organization_id ?: (Organization::first()?->id ?? 1));
-        $this->resetConditionGroups();
+        $this->resetConditions();
         $this->resetTestFields();
     }
 
-    public function resetConditionGroups(): void
+    public function updatedRuleScope(string $val): void
     {
+        if (str_starts_with($val, 'camp_')) {
+            $this->ruleScopeType = 'campaign';
+            $this->ruleCampaignId = (int) substr($val, 5);
+            $this->ruleProjectId = null;
+        } elseif (str_starts_with($val, 'proj_')) {
+            $this->ruleScopeType = 'project';
+            $this->ruleProjectId = (int) substr($val, 5);
+            $this->ruleCampaignId = null;
+        } else {
+            $this->ruleScopeType = 'all';
+            $this->ruleCampaignId = null;
+            $this->ruleProjectId = null;
+        }
+    }
+
+    public function updatedConditions(): void
+    {
+        if (isset($this->conditionGroups[0])) {
+            $this->conditionGroups[0]['conditions'] = $this->conditions;
+        }
+    }
+
+    public function updatedRuleConditionLogic(): void
+    {
+        if (isset($this->conditionGroups[0])) {
+            $this->conditionGroups[0]['logic'] = $this->ruleConditionLogic;
+        }
+    }
+
+    public function updatedConditionGroups(): void
+    {
+        if (!empty($this->conditionGroups[0]['conditions'])) {
+            $this->conditions = $this->conditionGroups[0]['conditions'];
+            $this->ruleConditionLogic = $this->conditionGroups[0]['logic'] ?? 'AND';
+        }
+    }
+
+    public function resetConditions(): void
+    {
+        $this->conditions = [
+            ['field' => 'want_to_buy_studio', 'operator' => 'equals', 'value' => ''],
+        ];
         $this->conditionGroups = [
             [
-                'logic' => 'AND',
-                'conditions' => [
-                    ['field' => 'want_to_buy_studio', 'operator' => 'equals', 'value' => ''],
-                ],
+                'logic' => $this->ruleConditionLogic ?: 'AND',
+                'conditions' => $this->conditions,
             ],
         ];
     }
@@ -81,16 +126,20 @@ class LeadFilteringRules extends Component
         $this->ruleProjectId = $projectId ?: $this->filterProjectId;
 
         if ($this->ruleCampaignId) {
+            $this->ruleScope = 'camp_' . $this->ruleCampaignId;
             $this->ruleScopeType = 'campaign';
         } elseif ($this->ruleProjectId) {
+            $this->ruleScope = 'proj_' . $this->ruleProjectId;
             $this->ruleScopeType = 'project';
         } else {
+            $this->ruleScope = 'all';
             $this->ruleScopeType = 'all';
         }
 
         $this->ruleAction = 'include';
+        $this->ruleConditionLogic = 'AND';
         $this->ruleGroupLogic = 'OR';
-        $this->resetConditionGroups();
+        $this->resetConditions();
 
         $this->showRuleModal = true;
         $this->dispatch('open-modal', 'lead-filter-rule-editor');
@@ -108,10 +157,13 @@ class LeadFilteringRules extends Component
         $this->ruleProjectId = $rule->project_id;
 
         if ($rule->campaign_id) {
+            $this->ruleScope = 'camp_' . $rule->campaign_id;
             $this->ruleScopeType = 'campaign';
         } elseif ($rule->project_id) {
+            $this->ruleScope = 'proj_' . $rule->project_id;
             $this->ruleScopeType = 'project';
         } else {
+            $this->ruleScope = 'all';
             $this->ruleScopeType = 'all';
         }
 
@@ -119,14 +171,37 @@ class LeadFilteringRules extends Component
         $this->ruleGroupLogic = $rule->group_logic ?: 'OR';
 
         $rawGroups = $rule->conditions['groups'] ?? [];
-        if (empty($rawGroups)) {
-            $this->resetConditionGroups();
-        } else {
+        if (!empty($rawGroups)) {
             $this->conditionGroups = $rawGroups;
+            $this->ruleConditionLogic = $rawGroups[0]['logic'] ?? 'AND';
+            $this->conditions = $rawGroups[0]['conditions'] ?? [
+                ['field' => 'want_to_buy_studio', 'operator' => 'equals', 'value' => ''],
+            ];
+        } else {
+            $this->resetConditions();
         }
 
         $this->showRuleModal = true;
         $this->dispatch('open-modal', 'lead-filter-rule-editor');
+    }
+
+    public function addConditionRow(): void
+    {
+        $this->conditions[] = [
+            'field' => 'want_to_buy_studio',
+            'operator' => 'equals',
+            'value' => '',
+        ];
+        $this->conditionGroups[0]['conditions'] = $this->conditions;
+    }
+
+    public function removeConditionRow(int $index): void
+    {
+        if (count($this->conditions) > 1) {
+            unset($this->conditions[$index]);
+            $this->conditions = array_values($this->conditions);
+            $this->conditionGroups[0]['conditions'] = $this->conditions;
+        }
     }
 
     public function addConditionGroup(): void
@@ -155,6 +230,9 @@ class LeadFilteringRules extends Component
                 'operator' => 'equals',
                 'value' => '',
             ];
+            if ($groupIndex === 0) {
+                $this->conditions = $this->conditionGroups[0]['conditions'];
+            }
         }
     }
 
@@ -164,16 +242,35 @@ class LeadFilteringRules extends Component
             if (count($this->conditionGroups[$groupIndex]['conditions']) > 1) {
                 unset($this->conditionGroups[$groupIndex]['conditions'][$conditionIndex]);
                 $this->conditionGroups[$groupIndex]['conditions'] = array_values($this->conditionGroups[$groupIndex]['conditions']);
+                if ($groupIndex === 0) {
+                    $this->conditions = $this->conditionGroups[0]['conditions'];
+                }
             }
         }
     }
 
     public function saveRule(): void
     {
+        // Resolve scope from ruleScope single select if present
+        if (!empty($this->ruleScope) && $this->ruleScope !== 'all') {
+            if (str_starts_with($this->ruleScope, 'camp_')) {
+                $this->ruleScopeType = 'campaign';
+                $this->ruleCampaignId = (int) substr($this->ruleScope, 5);
+                $this->ruleProjectId = null;
+            } elseif (str_starts_with($this->ruleScope, 'proj_')) {
+                $this->ruleScopeType = 'project';
+                $this->ruleProjectId = (int) substr($this->ruleScope, 5);
+                $this->ruleCampaignId = null;
+            }
+        } elseif ($this->ruleScope === 'all' && empty($this->ruleCampaignId) && empty($this->ruleProjectId)) {
+            $this->ruleScopeType = 'all';
+            $this->ruleCampaignId = null;
+            $this->ruleProjectId = null;
+        }
+
         $this->validate([
             'ruleName' => 'required|string|max:120',
             'ruleAction' => 'required|in:include,exclude',
-            'ruleGroupLogic' => 'required|in:AND,OR',
             'ruleScopeType' => 'required|in:all,campaign,project',
             'ruleCampaignId' => 'nullable|integer',
             'ruleProjectId' => 'nullable|integer',
@@ -187,11 +284,27 @@ class LeadFilteringRules extends Component
             $projectId = $this->ruleProjectId ?: null;
         }
 
-        $engine = app(LeadFilterRuleEngine::class);
+        // Keep condition groups synced with condition builder
+        $groups = !empty($this->conditions)
+            ? [
+                [
+                    'logic' => $this->ruleConditionLogic ?: 'AND',
+                    'conditions' => $this->conditions,
+                ],
+            ]
+            : ($this->conditionGroups ?: [
+                [
+                    'logic' => 'AND',
+                    'conditions' => [['field' => 'want_to_buy_studio', 'operator' => 'equals', 'value' => '']],
+                ],
+            ]);
+
         $conditionsPayload = [
-            'group_logic' => $this->ruleGroupLogic,
-            'groups' => $this->conditionGroups,
+            'group_logic' => $this->ruleGroupLogic ?: 'OR',
+            'groups' => $groups,
         ];
+
+        $engine = app(LeadFilterRuleEngine::class);
         $engine->validateConditionsStructure($conditionsPayload);
 
         LeadFilterRule::updateOrCreate(
@@ -206,7 +319,7 @@ class LeadFilteringRules extends Component
                 'project_id' => $projectId,
                 'created_by' => auth()->id() ?? 1,
                 'action' => $this->ruleAction,
-                'group_logic' => $this->ruleGroupLogic,
+                'group_logic' => $this->ruleGroupLogic ?: 'OR',
                 'conditions' => $conditionsPayload,
                 'is_active' => true,
             ]
@@ -286,26 +399,65 @@ class LeadFilteringRules extends Component
     public function getLeadFieldOptionsProperty(): array
     {
         return [
-            'want_to_buy_studio' => 'want_to_buy_studio (Studio Buy/Rent Intent)',
-            'free_site_visit' => 'free_site_visit (Site Visit Intent)',
-            'city' => 'city (City)',
-            'location' => 'location (Preferred Location)',
-            'budget' => 'budget (Budget / Price Range)',
-            'property_type' => 'property_type (Property Type)',
-            'configuration' => 'configuration (BHK / Configuration)',
-            'requirement' => 'requirement (Requirement Intent)',
-            'full_name' => 'full_name (Full Name)',
-            'phone_number' => 'phone_number (Phone Number)',
-            'email' => 'email (Email Address)',
-            'campaign_name' => 'campaign_name (Campaign Name)',
-            'form_name' => 'form_name (Lead Form Name)',
-            'platform' => 'platform (Ad Platform)',
+            'want_to_buy_studio' => 'want_to_buy_studio',
+            'free_site_visit' => 'free_site_visit',
+            'city' => 'city',
+            'location' => 'location',
+            'budget' => 'budget',
+            'property_type' => 'property_type',
+            'configuration' => 'configuration',
+            'requirement' => 'requirement',
+            'full_name' => 'full_name',
+            'phone_number' => 'phone_number',
+            'email' => 'email',
+            'campaign_name' => 'campaign_name',
+            'form_name' => 'form_name',
+            'platform' => 'platform',
         ];
     }
 
     public function getOperatorOptionsProperty(): array
     {
         return LeadFilterRuleEngine::supportedOperators();
+    }
+
+    public function getScopeOptionsProperty(): array
+    {
+        $org = Organization::find($this->organizationId);
+        $options = [
+            'all' => 'All Campaigns',
+        ];
+
+        if ($org) {
+            $projects = $org->projects()->withoutGlobalScopes()->orderBy('projects.name')->pluck('projects.name', 'projects.id')->all();
+            $projectIds = array_keys($projects);
+
+            $camps = (!empty($projectIds))
+                ? Campaign::withoutGlobalScopes()->whereIn('project_id', $projectIds)->orderBy('campaigns.name')->pluck('campaigns.name', 'campaigns.id')->all()
+                : [];
+
+            if (empty($camps)) {
+                $clientIds = User::where('organization_id', $org->id)->pluck('id')->all();
+                $camps = MetaAdRecord::where('kind', 'campaign')
+                    ->where(function ($q) use ($clientIds, $projectIds) {
+                        if (!empty($projectIds)) $q->whereIn('project_id', $projectIds);
+                        if (!empty($clientIds)) $q->orWhereIn('client_id', $clientIds);
+                    })
+                    ->pluck('name', 'id')
+                    ->all();
+            }
+
+            foreach ($camps as $cId => $cName) {
+                $displayName = $cName . (str_contains($cName, '(') ? '' : ' (FB)');
+                $options['camp_' . $cId] = $displayName;
+            }
+
+            foreach ($projects as $pId => $pName) {
+                $options['proj_' . $pId] = 'Project: ' . $pName;
+            }
+        }
+
+        return $options;
     }
 
     public function render()
@@ -353,10 +505,24 @@ class LeadFilteringRules extends Component
                 ->all()
             : [];
 
+        if (empty($campaignOptions) && $org) {
+            $clientIds = User::where('organization_id', $org->id)->pluck('id')->all();
+            $metaCampNames = MetaAdRecord::where('kind', 'campaign')
+                ->where(function ($q) use ($clientIds, $projectIds) {
+                    if (!empty($projectIds)) $q->whereIn('project_id', $projectIds);
+                    if (!empty($clientIds)) $q->orWhereIn('client_id', $clientIds);
+                })
+                ->pluck('name', 'id')
+                ->all();
+            if (!empty($metaCampNames)) {
+                $campaignOptions = $metaCampNames;
+            }
+        }
+
         $recentLogs = LeadFilterLog::with('rule', 'campaign')
             ->where('organization_id', $this->organizationId)
             ->latest('id')
-            ->limit(20)
+            ->limit(38)
             ->get();
 
         return view('livewire.settings.lead-filtering-rules', [
@@ -366,6 +532,7 @@ class LeadFilteringRules extends Component
             'recentLogs' => $recentLogs,
             'leadFieldOptions' => $this->leadFieldOptions,
             'operatorOptions' => $this->operatorOptions,
+            'scopeOptions' => $this->scopeOptions,
         ])->layout('layouts.app');
     }
 }

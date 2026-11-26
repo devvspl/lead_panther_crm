@@ -177,7 +177,7 @@ class LeadFilteringRulesTest extends TestCase
         $campaignRule = LeadFilterRule::where('name', 'Studio Buy Campaign Only')->firstOrFail();
         $this->assertEquals($this->campaign->id, $campaignRule->campaign_id);
         $this->assertNull($campaignRule->project_id);
-        $this->assertEquals('Campaign: Studio Buy Campaign', $campaignRule->scopeSummary());
+        $this->assertEquals('Studio Buy Campaign (FB)', $campaignRule->scopeSummary());
     }
 
     public function test_rule_engine_evaluates_all_supported_operators_correctly(): void

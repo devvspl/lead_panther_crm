@@ -1359,7 +1359,7 @@
                                 <label class="block text-xs font-bold text-ink">Attachments
                                     <input type="file" wire:model="accountEmailAttachments" multiple class="mt-2 block w-full text-xs text-muted file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-border file:bg-canvas file:text-ink">
                                 </label>
-                                <p class="text-[11px] text-muted">Up to 5 files &middot; 10 MB per file &middot; 15 MB total. Invoices, documents and other files are supported.</p>
+                                <p class="text-[11px] text-muted">Up to 5 files &middot; 10 MB per file &middot; 15 MB total. Invoices, documents and other files are supported. Files are kept privately for seven days for retries.</p>
                                 <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary" role="status">Uploading attachments&hellip;</p>
                                 @foreach($accountEmailAttachments as $index => $attachment)
                                     <div class="flex items-center justify-between gap-2 rounded-lg bg-canvas px-3 py-2 text-xs text-ink" wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">

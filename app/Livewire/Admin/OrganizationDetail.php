@@ -1383,7 +1383,13 @@ class OrganizationDetail extends Component
         return $query;
     }
 
-    public function updatedSelectedTeamUserIds(): void { $this->loginDetailsBatch = ''; }
+    public function updatedSelectedTeamUserIds(): void
+    {
+        $this->loginDetailsBatch = '';
+        if (! in_array((int) $this->accountEmailPreviewUserId, array_map('intval', $this->selectedTeamUserIds), true)) {
+            $this->accountEmailPreviewUserId = (string) (array_values($this->selectedTeamUserIds)[0] ?? '');
+        }
+    }
 
     public function toggleAllTeamUsers(): void
     {

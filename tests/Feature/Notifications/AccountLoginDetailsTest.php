@@ -207,6 +207,7 @@ class AccountLoginDetailsTest extends TestCase
         $a = $this->member(['name' => 'Alice']); $b = $this->member(['name' => 'Bob']);
         $component = $this->teamComponent()->set('userSearch', 'Alice')->set('selectedTeamUserIds', [$a->id])
             ->call('openAccountEmailComposer')->set('selectedTeamUserIds', [$b->id])
+            ->assertSet('accountEmailPreviewUserId', (string) $b->id)
             ->call('sendSelectedLoginDetails')->assertHasNoErrors();
         $this->deliver();
         Mail::assertSent(BrandedNotificationMail::class, fn ($mail) => $mail->hasTo($b->email));

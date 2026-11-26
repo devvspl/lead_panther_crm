@@ -30,7 +30,7 @@ class MetaCampaignLeadService
         }
 
         if ($campaignId) {
-            $campaign = Campaign::find($campaignId);
+            $campaign = Campaign::withoutGlobalScopes()->find($campaignId);
             if (!$campaign || (int) $campaign->project_id !== (int) $project->id) {
                 $campaignId = null;
             }

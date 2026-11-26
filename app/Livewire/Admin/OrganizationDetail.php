@@ -12,6 +12,10 @@ use App\Models\Project;
 use App\Models\Lead;
 use App\Models\LeadSource;
 use App\Models\Campaign;
+use App\Models\MetaAdRecord;
+use App\Models\MetaAdAccount;
+use App\Models\PortalAccount;
+use App\Models\LeadFormMapping;
 use App\Models\CreditWallet;
 use App\Models\CreditTransaction;
 use App\Models\RechargeRequest;
@@ -516,37 +520,410 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: 'Organization delivery timezone saved. Existing queued schedules are preserved.');
     }
 
-    protected function mappedDeliveryCampaigns()
-    {
-        $owners = User::where('organization_id', $this->organization->id)->select('id');
-        return Campaign::withoutGlobalScopes()
-            ->whereIn('project_id', Project::withoutGlobalScopes()->whereIn('client_id', clone $owners)->select('id'))
-            ->whereExists(function ($query) use ($owners) {
-                $query->selectRaw('1')->from('lead_form_mappings as mapping')
-                    ->join('portal_accounts as account', 'account.id', '=', 'mapping.portal_account_id')
-                    ->whereColumn('mapping.campaign_id', 'campaigns.id')
-                    ->whereIn('mapping.client_id', $owners)
-                    ->where('mapping.status', 'active')->where('account.status', 'active')
-                    ->where(fn ($q) => $q->whereNull('mapping.project_id')->orWhereColumn('mapping.project_id', 'campaigns.project_id'));
-            });
-    }
+    // Campaign & Integration Mapping Management
+    public bool $showCampaignMappingModal = false;
+    public ?int $editingMappingRecordId = null;
+    public string $mappingSourceType = 'campaign'; // 'campaign' | 'form'
+    public ?int $mappingAccountId = null;
+    public string $mappingRemoteId = '';
+    public ?int $mappingProjectId = null;
+    public ?int $mappingDailyLimit = null;
+    public ?int $mappingDeliveryInterval = null;
+    public bool $mappingInheritLimit = true;
+    public bool $mappingInheritInterval = true;
 
     protected function mappedDeliveryProjects()
     {
-        return Project::withoutGlobalScopes()->whereIn('id', $this->mappedDeliveryCampaigns()->select('project_id'));
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+        return Project::withoutGlobalScopes()
+            ->where(function ($q) use ($owners) {
+                $q->whereIn('client_id', $owners);
+                if (Schema::hasColumn('projects', 'organization_id')) {
+                    $q->orWhere('organization_id', $this->organization->id);
+                }
+            });
+    }
+
+    protected function mappedDeliveryCampaigns()
+    {
+        $projectIds = $this->mappedDeliveryProjects()->select('id');
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+
+        return Campaign::withoutGlobalScopes()
+            ->whereIn('project_id', $projectIds)
+            ->where(function ($q) use ($owners) {
+                $q->whereExists(function ($sub) use ($owners) {
+                    $sub->selectRaw('1')->from('meta_ad_records as meta')
+                        ->where('meta.kind', 'campaign')
+                        ->where(function ($mq) use ($owners) {
+                            $mq->whereColumn('meta.crm_campaign_id', 'campaigns.id')
+                               ->orWhere(function ($mqq) use ($owners) {
+                                   $mqq->whereColumn('meta.project_id', 'campaigns.project_id')
+                                       ->where(function ($userQ) use ($owners) {
+                                           $userQ->whereIn('meta.client_id', clone $owners)
+                                                 ->orWhereNull('meta.client_id');
+                                       });
+                               });
+                        });
+                })
+                ->orWhereExists(function ($sub) use ($owners) {
+                    $sub->selectRaw('1')->from('lead_form_mappings as mapping')
+                        ->where(function ($mq) use ($owners) {
+                            $mq->whereColumn('mapping.campaign_id', 'campaigns.id')
+                               ->orWhere(function ($mqq) use ($owners) {
+                                   $mqq->whereColumn('mapping.project_id', 'campaigns.project_id')
+                                       ->whereIn('mapping.client_id', clone $owners);
+                               });
+                        });
+                })
+                ->orWhere('campaigns.status', 'active');
+            });
     }
 
     public function getDeliveryProjectsProperty()
     {
         $service = app(\App\Services\LeadDistributionService::class);
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+
         return $this->mappedDeliveryProjects()
-            ->orderBy('name')->get()->map(function ($project) use ($service) {
-                $campaigns = $this->mappedDeliveryCampaigns()->where('project_id', $project->id)->with('leadSource')->orderBy('name')->get();
-                return ['project' => $project, 'stats' => $service->deliveryStatistics($project, null, $campaigns->modelKeys()),
-                    'campaigns' => $campaigns->map(fn ($campaign) => ['campaign' => $campaign,
-                        'effective' => $service->effectiveDeliveryConfig($campaign, $project),
-                        'stats' => $service->deliveryStatistics($project, $campaign)])];
+            ->orderBy('name')->get()->map(function ($project) use ($service, $owners) {
+                // Ensure any MetaAdRecords mapped to this project or organization have their CRM campaign linked
+                $metaMappedRecords = MetaAdRecord::where('kind', 'campaign')
+                    ->where(function ($q) use ($owners, $project) {
+                        $q->where('project_id', $project->id)
+                          ->orWhere(function ($sub) use ($owners, $project) {
+                              $sub->whereIn('client_id', clone $owners)->where('project_id', $project->id);
+                          });
+                    })->get();
+
+                foreach ($metaMappedRecords as $meta) {
+                    if (!$meta->crm_campaign_id || !Campaign::withoutGlobalScopes()->where('id', $meta->crm_campaign_id)->where('project_id', $project->id)->exists()) {
+                        $crmCamp = Campaign::withoutGlobalScopes()
+                            ->where('project_id', $project->id)
+                            ->where('name', $meta->name)
+                            ->first();
+                        if (!$crmCamp) {
+                            $crmCamp = Campaign::create([
+                                'project_id' => $project->id,
+                                'name' => $meta->name,
+                                'utm_campaign' => Str::slug($meta->name),
+                                'status' => 'active',
+                            ]);
+                        }
+                        $meta->update(['crm_campaign_id' => $crmCamp->id, 'project_id' => $project->id]);
+                    }
+                }
+
+                $campaigns = $this->mappedDeliveryCampaigns()
+                    ->where('project_id', $project->id)
+                    ->with('leadSource')
+                    ->orderBy('name')
+                    ->get();
+
+                $metaByCampaignId = MetaAdRecord::where('kind', 'campaign')
+                    ->whereIn('crm_campaign_id', $campaigns->pluck('id'))
+                    ->with(['account', 'leadForm'])
+                    ->get()
+                    ->keyBy('crm_campaign_id');
+
+                $formsByCampaignId = LeadFormMapping::whereIn('campaign_id', $campaigns->pluck('id'))
+                    ->orWhere('project_id', $project->id)
+                    ->with('portalAccount')
+                    ->get()
+                    ->keyBy('campaign_id');
+
+                return [
+                    'project' => $project,
+                    'stats' => $service->deliveryStatistics($project, null, $campaigns->modelKeys()),
+                    'campaigns' => $campaigns->map(function ($campaign) use ($service, $project, $metaByCampaignId, $formsByCampaignId) {
+                        $metaRecord = $metaByCampaignId->get($campaign->id);
+                        $formMapping = $formsByCampaignId->get($campaign->id);
+
+                        $fbPageName = $metaRecord?->account?->name;
+                        if (!$fbPageName && $formMapping?->portalAccount) {
+                            $fbPageName = $formMapping->portalAccount->account_name ?: "Page #{$formMapping->portalAccount->account_id}";
+                        }
+                        $leadFormName = $metaRecord?->leadForm?->form_name ?: $formMapping?->form_name;
+
+                        return [
+                            'campaign' => $campaign,
+                            'effective' => $service->effectiveDeliveryConfig($campaign, $project),
+                            'stats' => $service->deliveryStatistics($project, $campaign),
+                            'meta_record' => $metaRecord,
+                            'form_mapping' => $formMapping,
+                            'remote_id' => $metaRecord?->remote_id,
+                            'facebook_page' => $fbPageName,
+                            'lead_form' => $leadFormName,
+                            'source_type' => $metaRecord ? 'meta_campaign' : ($formMapping ? 'lead_form' : 'crm_campaign'),
+                            'mapping_id' => $metaRecord?->id ?: $formMapping?->id,
+                        ];
+                    }),
+                ];
             });
+    }
+
+    public function loadDeliverySettings(): void
+    {
+        foreach (['project' => $this->mappedDeliveryProjects()->get(),
+            'campaign' => $this->mappedDeliveryCampaigns()->get()] as $type => $records) {
+            foreach ($records as $record) {
+                $this->deliverySettings[$type.'_'.$record->id] = [
+                    'limit' => $record->delivery_daily_limit ?? ($type === 'project' ? 0 : null),
+                    'interval' => $record->delivery_interval_minutes ?? ($type === 'project' ? 0 : null),
+                    'enabled' => $type === 'project' ? (bool) $record->delivery_enabled : true,
+                    'status' => $record->status ?? 'active',
+                    'inherit_limit' => $type === 'campaign' && $record->delivery_daily_limit === null,
+                    'inherit_interval' => $type === 'campaign' && $record->delivery_interval_minutes === null,
+                ];
+            }
+        }
+    }
+
+    public function getMetaAdAccountsProperty()
+    {
+        return MetaAdAccount::with(['pages', 'integration'])->whereIn('status', ['connected', 'active'])->get();
+    }
+
+    public function getMetaAccountOptionsProperty(): array
+    {
+        $options = ['' => 'Select Facebook Page / Ad Account'];
+        foreach ($this->metaAdAccounts as $acc) {
+            $pageNames = $acc->pages->pluck('account_name')->filter()->implode(', ');
+            $label = $acc->name . ($pageNames ? " ({$pageNames})" : " (ID: {$acc->ad_account_id})");
+            $options[$acc->id] = $label;
+        }
+        return $options;
+    }
+
+    public function getAvailableCampaignOptionsProperty(): array
+    {
+        $orgOwnerIds = $this->billingClients()->pluck('id')->all();
+
+        $camps = MetaAdRecord::where('kind', 'campaign')
+            ->when($this->mappingAccountId, fn($q) => $q->where('meta_ad_account_id', $this->mappingAccountId))
+            ->where(function ($query) use ($orgOwnerIds) {
+                $query->whereNull('client_id')
+                    ->orWhereIn('client_id', $orgOwnerIds);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $options = ['' => 'Select Facebook Campaign'];
+        foreach ($camps as $c) {
+            $statusLabel = $c->status ? ' [' . strtoupper($c->status) . ']' : '';
+            $options[$c->remote_id] = "{$c->name}{$statusLabel} (ID: {$c->remote_id})";
+        }
+        return $options;
+    }
+
+    public function getAvailableFormOptionsProperty(): array
+    {
+        $orgOwnerIds = $this->billingClients()->pluck('id')->all();
+
+        $forms = LeadFormMapping::query()
+            ->where(function ($query) use ($orgOwnerIds) {
+                $query->whereNull('client_id')
+                    ->orWhereIn('client_id', $orgOwnerIds);
+            })
+            ->orderBy('form_name')
+            ->get();
+
+        $options = ['' => 'Select Lead Form'];
+        foreach ($forms as $f) {
+            $options[$f->form_id] = "{$f->form_name} (ID: {$f->form_id})";
+        }
+        return $options;
+    }
+
+    public function getOrganizationProjectOptionsProperty(): array
+    {
+        $owners = User::where('organization_id', $this->organization->id)->select('id');
+        return Project::withoutGlobalScopes()
+            ->where(function ($q) use ($owners) {
+                $q->whereIn('client_id', $owners);
+                if (Schema::hasColumn('projects', 'organization_id')) {
+                    $q->orWhere('organization_id', $this->organization->id);
+                }
+            })
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    public function openAddCampaignMapping(): void
+    {
+        $this->reset([
+            'editingMappingRecordId',
+            'mappingRemoteId',
+            'mappingDailyLimit',
+            'mappingDeliveryInterval',
+        ]);
+        $this->mappingSourceType = 'campaign';
+        $this->mappingInheritLimit = true;
+        $this->mappingInheritInterval = true;
+
+        $firstAcc = MetaAdAccount::whereIn('status', ['connected', 'active'])->first();
+        $this->mappingAccountId = $firstAcc?->id;
+
+        $projects = $this->organizationProjectOptions;
+        $this->mappingProjectId = count($projects) === 1 ? array_key_first($projects) : null;
+
+        $this->resetValidation();
+        $this->dispatch('open-modal', 'organization-campaign-mapping');
+    }
+
+    public function editCampaignMapping(int $recordId, string $sourceType = 'campaign'): void
+    {
+        $this->resetValidation();
+        $this->editingMappingRecordId = $recordId;
+        $this->mappingSourceType = $sourceType;
+
+        if ($sourceType === 'campaign' || $sourceType === 'meta_campaign') {
+            $record = MetaAdRecord::findOrFail($recordId);
+            $this->mappingAccountId = $record->meta_ad_account_id;
+            $this->mappingRemoteId = (string) $record->remote_id;
+            $this->mappingProjectId = $record->project_id;
+
+            $crmCampaign = $record->crmCampaign;
+            if ($crmCampaign) {
+                $this->mappingDailyLimit = $crmCampaign->delivery_daily_limit;
+                $this->mappingDeliveryInterval = $crmCampaign->delivery_interval_minutes;
+                $this->mappingInheritLimit = $crmCampaign->delivery_daily_limit === null;
+                $this->mappingInheritInterval = $crmCampaign->delivery_interval_minutes === null;
+            } else {
+                $this->mappingDailyLimit = null;
+                $this->mappingDeliveryInterval = null;
+                $this->mappingInheritLimit = true;
+                $this->mappingInheritInterval = true;
+            }
+        } else {
+            $mapping = LeadFormMapping::findOrFail($recordId);
+            $this->mappingAccountId = $mapping->portal_account_id;
+            $this->mappingRemoteId = (string) $mapping->form_id;
+            $this->mappingProjectId = $mapping->project_id;
+
+            $campaign = $mapping->campaign;
+            if ($campaign) {
+                $this->mappingDailyLimit = $campaign->delivery_daily_limit;
+                $this->mappingDeliveryInterval = $campaign->delivery_interval_minutes;
+                $this->mappingInheritLimit = $campaign->delivery_daily_limit === null;
+                $this->mappingInheritInterval = $campaign->delivery_interval_minutes === null;
+            } else {
+                $this->mappingDailyLimit = null;
+                $this->mappingDeliveryInterval = null;
+                $this->mappingInheritLimit = true;
+                $this->mappingInheritInterval = true;
+            }
+        }
+
+        $this->dispatch('open-modal', 'organization-campaign-mapping');
+    }
+
+    public function saveCampaignMapping(): void
+    {
+        $this->validate([
+            'mappingProjectId' => 'required|integer',
+            'mappingRemoteId' => 'required|string',
+            'mappingDailyLimit' => 'nullable|integer|min:0|max:100000',
+            'mappingDeliveryInterval' => 'nullable|integer|min:0|max:10080',
+        ], [
+            'mappingProjectId.required' => 'Please select a CRM Project belonging to this organization.',
+            'mappingRemoteId.required' => 'Please select a Campaign or Form to map.',
+        ]);
+
+        $validProjectIds = array_keys($this->organizationProjectOptions);
+        abort_unless(in_array((int) $this->mappingProjectId, $validProjectIds, true), 422, 'The selected project does not belong to this organization.');
+
+        $project = Project::withoutGlobalScopes()->findOrFail($this->mappingProjectId);
+        $targetClientId = $project->client_id ?: $this->ensureBillingOwner()->id;
+
+        if ($this->mappingSourceType === 'campaign' || $this->mappingSourceType === 'meta_campaign') {
+            $record = MetaAdRecord::where('kind', 'campaign')
+                ->where(function ($q) {
+                    if ($this->editingMappingRecordId) {
+                        $q->where('id', $this->editingMappingRecordId);
+                    } else {
+                        $q->where('remote_id', $this->mappingRemoteId);
+                    }
+                })->firstOrFail();
+
+            $crmCampaign = Campaign::withoutGlobalScopes()
+                ->where('project_id', $project->id)
+                ->where('name', $record->name)
+                ->first();
+            if (!$crmCampaign) {
+                $crmCampaign = Campaign::create([
+                    'project_id' => $project->id,
+                    'name' => $record->name,
+                    'utm_campaign' => Str::slug($record->name),
+                    'status' => 'active',
+                ]);
+            }
+
+            $crmCampaign->update([
+                'delivery_daily_limit' => $this->mappingInheritLimit ? null : (int) $this->mappingDailyLimit,
+                'delivery_interval_minutes' => $this->mappingInheritInterval ? null : (int) $this->mappingDeliveryInterval,
+                'status' => 'active',
+            ]);
+
+            app(\App\Services\MetaCampaignLeadService::class)->saveMapping(
+                $record,
+                (int) $targetClientId,
+                (int) $project->id,
+                $crmCampaign->id
+            );
+
+            $this->dispatch('toast', type: 'success', message: "Facebook Campaign '{$record->name}' mapped to {$project->name} successfully.");
+        } else {
+            $mapping = LeadFormMapping::where('form_id', $this->mappingRemoteId)->first();
+            $formName = $mapping?->form_name ?: "Lead Form #{$this->mappingRemoteId}";
+
+            $campaign = Campaign::withoutGlobalScopes()
+                ->where('project_id', $project->id)
+                ->where('name', $formName)
+                ->first();
+            if (!$campaign) {
+                $campaign = Campaign::create([
+                    'project_id' => $project->id,
+                    'name' => $formName,
+                    'utm_campaign' => Str::slug($formName),
+                    'status' => 'active',
+                ]);
+            }
+
+            $campaign->update([
+                'delivery_daily_limit' => $this->mappingInheritLimit ? null : (int) $this->mappingDailyLimit,
+                'delivery_interval_minutes' => $this->mappingInheritInterval ? null : (int) $this->mappingDeliveryInterval,
+            ]);
+
+            LeadFormMapping::updateOrCreate(
+                ['form_id' => $this->mappingRemoteId],
+                [
+                    'portal_account_id' => $this->mappingAccountId ?: $mapping?->portal_account_id ?: 1,
+                    'form_name' => $formName,
+                    'client_id' => $targetClientId,
+                    'project_id' => $project->id,
+                    'campaign_id' => $campaign->id,
+                    'status' => 'active',
+                ]
+            );
+
+            $this->dispatch('toast', type: 'success', message: "Lead Form '{$formName}' mapped to {$project->name} successfully.");
+        }
+
+        $this->loadDeliverySettings();
+        $this->dispatch('close-modal', 'organization-campaign-mapping');
+    }
+
+    public function fetchMetaCampaignLeads(int $recordId): void
+    {
+        $record = MetaAdRecord::where('kind', 'campaign')->findOrFail($recordId);
+        try {
+            app(\App\Services\MetaCampaignLeadService::class)->start($record);
+            $this->dispatch('toast', type: 'success', message: "Lead fetch started for '{$record->name}'.");
+        } catch (Throwable $e) {
+            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+        }
     }
 
     public function saveDeliverySettings(string $type, int $id): void
@@ -643,22 +1020,10 @@ class OrganizationDetail extends Component
         $this->projectRates = Project::withoutGlobalScopes()->whereIn('client_id', $this->billingClients()->select('id'))->pluck('lead_cost', 'id')->all();
         $this->deliveryTimezone = $organization->delivery_timezone ?: config('app.timezone');
         $this->executiveResponseMinutes = $organization->executive_response_minutes ?? 15;
-        $this->editName = $organization->name;
-        $this->editStatus = $organization->status;
+        $this->editName = (string) ($organization->name ?? '');
+        $this->editStatus = (string) ($organization->status ?? 'active');
         $this->orgLeadCost = $organization->lead_cost !== null ? (int) $organization->lead_cost : null;
-        foreach (['project' => $this->mappedDeliveryProjects()->get(),
-            'campaign' => $this->mappedDeliveryCampaigns()->get()] as $type => $records) {
-            foreach ($records as $record) {
-                $this->deliverySettings[$type.'_'.$record->id] = [
-                    'limit' => $record->delivery_daily_limit ?? ($type === 'project' ? 0 : null),
-                    'interval' => $record->delivery_interval_minutes ?? ($type === 'project' ? 0 : null),
-                    'enabled' => $type === 'project' ? (bool) $record->delivery_enabled : true,
-                    'status' => $record->status ?? 'active',
-                    'inherit_limit' => $type === 'campaign' && $record->delivery_daily_limit === null,
-                    'inherit_interval' => $type === 'campaign' && $record->delivery_interval_minutes === null,
-                ];
-            }
-        }
+        $this->loadDeliverySettings();
 
         $requestedTab = request()->query('tab');
         if ($requestedTab && in_array($requestedTab, ['overview', 'team', 'clients', 'leads', 'credits', 'activity', 'campaigns'])) {

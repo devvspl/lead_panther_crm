@@ -260,6 +260,18 @@
     <!-- TAB 6: CAMPAIGN DETAILS & DELIVERY -->
     @if($activeTab === 'campaigns')
         <section class="space-y-6" wire:poll.30s>
+            <!-- Tab Header & Quick Actions -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-4 sm:p-5 rounded-2xl border border-border shadow-2xs">
+                <div>
+                    <h3 class="text-base font-bold text-ink">Campaign Details &amp; Delivery</h3>
+                    <p class="text-xs text-muted">Manage Facebook campaigns, lead forms, CRM project mappings, and automated lead delivery rules for {{ $organization->name }}.</p>
+                </div>
+                <button type="button" wire:click="openAddCampaignMapping" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    <span>Add Campaign Mapping</span>
+                </button>
+            </div>
+
             @forelse($this->deliveryProjects as $row)
                 @php
                     $project = $row['project'];
@@ -377,6 +389,21 @@
                                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $campaign->status === 'active' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300' }}">
                                                     {{ ucfirst($campaign->status) }}
                                                 </span>
+                                                @if(!empty($item['remote_id']))
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                                                        Meta ID: {{ $item['remote_id'] }}
+                                                    </span>
+                                                @endif
+                                                @if(!empty($item['facebook_page']))
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-canvas border border-border text-muted">
+                                                        Page: {{ $item['facebook_page'] }}
+                                                    </span>
+                                                @endif
+                                                @if(!empty($item['lead_form']))
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                                        Form: {{ $item['lead_form'] }}
+                                                    </span>
+                                                @endif
                                                 @if($campaign->leadSource)
                                                     <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-canvas border border-border text-muted">
                                                         {{ $campaign->leadSource->name }}
@@ -386,10 +413,15 @@
                                             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                                                 <span>Effective Daily: <strong class="text-ink">{{ $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']) }}</strong> <span class="text-[11px] text-muted">({{ $effective['limit_source'] }})</span></span>
                                                 <span>Effective Interval: <strong class="text-ink">{{ $effective['interval'] === 0 ? 'Immediate' : $effective['interval'].' min' }}</strong> <span class="text-[11px] text-muted">({{ $effective['interval_source'] }})</span></span>
+                                                @if(!empty($item['meta_record']) && $fetch = $item['meta_record']->lead_fetch_state)
+                                                    <span class="text-[11px] {{ ($fetch['status'] ?? '') === 'failed' ? 'text-red-500 font-semibold' : 'text-muted' }}">
+                                                        Fetch: {{ ucfirst($fetch['status'] ?? '') }} · {{ $fetch['created'] ?? 0 }} created · {{ $fetch['duplicates'] ?? 0 }} duplicates
+                                                    </span>
+                                                @endif
                                             </div>
                                         </div>
 
-                                        <div class="flex items-center gap-2 shrink-0">
+                                        <div class="flex items-center gap-2 shrink-0 flex-wrap">
                                             @if($isInherited)
                                                 <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
                                                     Project default
@@ -400,13 +432,29 @@
                                                 </span>
                                             @endif
 
+                                            @if(!empty($item['mapping_id']))
+                                                <button type="button" wire:click="editCampaignMapping({{ $item['mapping_id'] }}, '{{ $item['source_type'] }}')"
+                                                    class="px-2.5 py-1.5 bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs hover:border-primary/50 inline-flex items-center gap-1.5 cursor-pointer">
+                                                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                    <span>Edit Mapping</span>
+                                                </button>
+                                            @endif
+
                                             <button type="button" x-on:click="$dispatch('open-modal', 'campaign-delivery-settings-{{ $campaign->id }}')"
-                                                class="px-3 py-1.5 bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs hover:border-primary/50 inline-flex items-center gap-1.5 cursor-pointer">
+                                                class="px-2.5 py-1.5 bg-surface border border-border hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs hover:border-primary/50 inline-flex items-center gap-1.5 cursor-pointer">
                                                 <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                                 </svg>
-                                                <span>Configure</span>
+                                                <span>Configure Delivery</span>
                                             </button>
+
+                                            @if(!empty($item['meta_record']))
+                                                <button type="button" wire:click="fetchMetaCampaignLeads({{ $item['meta_record']->id }})" wire:loading.attr="disabled"
+                                                    class="px-2.5 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-bold text-primary hover:bg-primary/20 transition disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer">
+                                                    <span wire:loading.remove wire:target="fetchMetaCampaignLeads({{ $item['meta_record']->id }})">Fetch Leads</span>
+                                                    <span wire:loading wire:target="fetchMetaCampaignLeads({{ $item['meta_record']->id }})">Fetching...</span>
+                                                </button>
+                                            @endif
                                         </div>
                                     </div>
 
@@ -573,12 +621,159 @@
                     </x-ui.modal>
                 </article>
             @empty
-                <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center space-y-2">
-                    <h3 class="text-sm font-semibold text-ink">No campaigns mapped to this organization</h3>
-                    <p class="text-xs text-muted">Map a lead form to a campaign and a client in this organization under Integrations. Active mappings will appear here automatically.</p>
-                    <a href="{{ route('settings.integrations') }}" class="inline-block text-xs font-semibold text-primary hover:underline">Manage Integration Mappings</a>
+                <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center space-y-3">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                    </div>
+                    <h3 class="text-base font-semibold text-ink">No campaigns mapped to this organization</h3>
+                    <p class="text-xs text-muted max-w-md mx-auto">Map a Facebook campaign or lead form to route incoming leads directly to {{ $organization->name }}.</p>
+                    <div class="pt-2 flex items-center justify-center gap-3">
+                        <button type="button" wire:click="openAddCampaignMapping" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            <span>Add Campaign Mapping</span>
+                        </button>
+                        <a href="{{ route('settings.integrations') }}" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-canvas text-xs font-semibold text-muted hover:text-ink transition">Manage All Integrations</a>
+                    </div>
                 </div>
             @endforelse
+
+            <!-- Organization Campaign Mapping Modal -->
+            <x-ui.modal name="organization-campaign-mapping" maxWidth="lg" :centered="true">
+                <form wire:submit="saveCampaignMapping" class="p-5 sm:p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-xl bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                            </div>
+                            <div>
+                                <h4 class="text-base font-bold text-ink">{{ $editingMappingRecordId ? 'Edit Campaign Mapping' : 'Add Campaign Mapping' }}</h4>
+                                <p class="text-xs text-muted">Route Facebook leads directly to {{ $organization->name }}.</p>
+                            </div>
+                        </div>
+                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
+                            class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    <!-- Mapping Source Type Toggle -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1.5">Mapping Type</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" wire:click="$set('mappingSourceType', 'campaign')"
+                                @class([
+                                    'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
+                                    'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'campaign',
+                                    'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'campaign',
+                                ])>
+                                Facebook Campaign
+                            </button>
+                            <button type="button" wire:click="$set('mappingSourceType', 'form')"
+                                @class([
+                                    'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
+                                    'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'form',
+                                    'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'form',
+                                ])>
+                                Facebook Lead Form
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Facebook Page / Ad Account -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">Facebook Page / Ad Account</label>
+                        <x-ui.themed-select wire:model.live="mappingAccountId" :options="$this->metaAccountOptions" />
+                        @error('mappingAccountId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Select Campaign or Form -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">
+                            {{ $mappingSourceType === 'campaign' ? 'Facebook Campaign' : 'Facebook Lead Form' }} <span class="text-red-500">*</span>
+                        </label>
+                        @if($mappingSourceType === 'campaign')
+                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableCampaignOptions" :searchable="true" />
+                        @else
+                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableFormOptions" :searchable="true" />
+                        @endif
+                        @error('mappingRemoteId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Target Organization (Preselected & Readonly) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">Organization / Client</label>
+                        <div class="px-3.5 py-2.5 rounded-lg border border-border bg-canvas/70 text-xs text-ink flex items-center justify-between">
+                            <span class="font-semibold">{{ $organization->name }}</span>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                Preselected
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Target CRM Project -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">CRM Project <span class="text-red-500">*</span></label>
+                        <select wire:model="mappingProjectId" class="w-full rounded-lg border border-border bg-canvas p-2.5 text-xs text-ink focus:ring-1 focus:ring-primary focus:outline-none">
+                            <option value="">Select CRM Project</option>
+                            @foreach($this->organizationProjectOptions as $pId => $pName)
+                                <option value="{{ $pId }}">{{ $pName }}</option>
+                            @endforeach
+                        </select>
+                        @error('mappingProjectId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Delivery Settings Override Section -->
+                    <div class="border-t border-border pt-3 space-y-3">
+                        <h5 class="text-xs font-bold text-ink uppercase tracking-wider">Delivery Configuration</h5>
+
+                        <!-- Daily Limit -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-semibold text-ink">Daily Lead Limit</label>
+                                <label class="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer">
+                                    <input type="checkbox" wire:model.live="mappingInheritLimit" class="rounded border-border text-primary focus:ring-primary" />
+                                    <span>Use Project Default</span>
+                                </label>
+                            </div>
+                            @if(!$mappingInheritLimit)
+                                <input type="number" wire:model="mappingDailyLimit" min="0" max="100000" placeholder="0 = Unlimited"
+                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                            @endif
+                            @error('mappingDailyLimit') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <!-- Delivery Interval -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-semibold text-ink">Delivery Interval (Minutes)</label>
+                                <label class="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer">
+                                    <input type="checkbox" wire:model.live="mappingInheritInterval" class="rounded border-border text-primary focus:ring-primary" />
+                                    <span>Use Project Default</span>
+                                </label>
+                            </div>
+                            @if(!$mappingInheritInterval)
+                                <input type="number" wire:model="mappingDeliveryInterval" min="0" max="10080" placeholder="0 = Immediate"
+                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                            @endif
+                            @error('mappingDeliveryInterval') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
+                            class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                            <span wire:loading.remove wire:target="saveCampaignMapping">Save Mapping</span>
+                            <span wire:loading wire:target="saveCampaignMapping">Saving...</span>
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
         </section>
     @endif
     <!-- TAB 1: OVERVIEW -->

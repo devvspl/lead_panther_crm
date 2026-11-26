@@ -548,7 +548,7 @@
                 @if($mappingProjectsFailed)
                     <p role="alert" class="text-xs text-danger mb-2">Projects could not be loaded. <button type="button" wire:click="reloadMappingProjects" wire:loading.attr="disabled" class="underline">Retry</button></p>
                 @elseif($mappingClientValid && empty($projectsList))
-                    <p role="status" class="text-xs text-muted mb-2">No projects found for this organization.</p>
+                    <p role="status" class="text-xs text-muted mb-2">No projects available for this organization. No projects found for this organization.</p>
                 @endif
                 <div :inert="projectsRequestFailed" wire:loading.class="pointer-events-none opacity-50" wire:target="mappingClientId,reloadMappingProjects,openCampaignMapping">
                     <x-ui.themed-select

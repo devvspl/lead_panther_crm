@@ -419,27 +419,8 @@
                                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{{ $intervalVal }} min</span>
                                                 @endif
                                             @elseif($type === 'campaign_actions')
-                                                @php
-                                                    $mappingId = is_object($row) ? ($row->mapping_id ?? $row->id) : ($row['mapping_id'] ?? $row['id']);
-                                                    $sourceType = is_object($row) ? ($row->source_type ?? 'campaign') : ($row['source_type'] ?? 'campaign');
-                                                    $metaRecId = is_object($row) ? ($row->meta_record_id ?? null) : ($row['meta_record_id'] ?? null);
-                                                @endphp
-                                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                                                    <button type="button"
-                                                        wire:click="editCampaignMapping({{ $mappingId }}, '{{ $sourceType }}')"
-                                                        class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-primary/50 transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
-                                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                        <span>Edit Mapping</span>
-                                                    </button>
-                                                    @if(!empty($metaRecId))
-                                                        <button type="button"
-                                                            wire:click="fetchMetaCampaignLeads({{ $metaRecId }})"
-                                                            wire:loading.attr="disabled"
-                                                            class="px-2.5 py-1 text-xs font-bold rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer">
-                                                            <span wire:loading.remove wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetch Leads</span>
-                                                            <span wire:loading wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetching...</span>
-                                                        </button>
-                                                    @endif
+                                                <div class="flex items-center justify-end">
+                                                    <x-ui.campaign-actions-menu :row="$row" />
                                                 </div>
                                             @elseif($type === 'lead_id')
                                                 <button type="button"
@@ -1029,27 +1010,8 @@
                                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{{ $intervalVal }} min</span>
                                                 @endif
                                             @elseif($type === 'campaign_actions')
-                                                @php
-                                                    $mappingId = is_object($row) ? ($row->mapping_id ?? $row->id) : ($row['mapping_id'] ?? $row['id']);
-                                                    $sourceType = is_object($row) ? ($row->source_type ?? 'campaign') : ($row['source_type'] ?? 'campaign');
-                                                    $metaRecId = is_object($row) ? ($row->meta_record_id ?? null) : ($row['meta_record_id'] ?? null);
-                                                @endphp
-                                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                                                    <button type="button"
-                                                        wire:click="editCampaignMapping({{ $mappingId }}, '{{ $sourceType }}')"
-                                                        class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-primary/50 transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
-                                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                        <span>Edit Mapping</span>
-                                                    </button>
-                                                    @if(!empty($metaRecId))
-                                                        <button type="button"
-                                                            wire:click="fetchMetaCampaignLeads({{ $metaRecId }})"
-                                                            wire:loading.attr="disabled"
-                                                            class="px-2.5 py-1 text-xs font-bold rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer">
-                                                            <span wire:loading.remove wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetch Leads</span>
-                                                            <span wire:loading wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetching...</span>
-                                                        </button>
-                                                    @endif
+                                                <div class="flex items-center justify-end">
+                                                    <x-ui.campaign-actions-menu :row="$row" />
                                                 </div>
                                             @elseif($type === 'lead_id')
                                                 <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ $rowId }} })"

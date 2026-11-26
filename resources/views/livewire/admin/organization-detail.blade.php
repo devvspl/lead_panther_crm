@@ -936,9 +936,6 @@
                         <p class="text-xs text-muted mt-1">Projects are automatically assigned to {{ $organization->name }}'s billing owner.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" wire:click="openCreateClientModal" class="px-3 py-1.5 border border-border bg-surface hover:bg-canvas rounded-lg text-xs font-semibold text-ink flex items-center gap-1.5 cursor-pointer transition">
-                            <span>+ Add Client / Billing Owner</span>
-                        </button>
                         <x-ui.export-button target="exportTabExcel('clients')" label="Export Project" class="justify-center" />
                     </div>
                 </div>

@@ -405,31 +405,22 @@
                                                 </span>
                                             @elseif($type === 'avatar-stack')
                                                 @php
-                                                    $avatars = is_array($val) ? $val : (is_object($val) ? [$val] : []);
-                                                    $maxDisplay = $col['max'] ?? 3;
-                                                    $displayed = array_slice($avatars, 0, $maxDisplay);
-                                                    $overflow = count($avatars) - count($displayed);
+                                                    $avatars = is_array($val) ? $val : (is_object($val) ? [$val] : (!empty($val) ? [['name' => (string)$val]] : []));
                                                 @endphp
-                                                <div class="flex items-center -space-x-1.5 overflow-hidden">
-                                                    @forelse($displayed as $av)
-                                                        @php
-                                                            $avName = is_object($av) ? ($av->name ?? 'User') : ($av['name'] ?? 'User');
-                                                            $avInitial = strtoupper(substr($avName, 0, 1));
-                                                        @endphp
-                                                        <div class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-200 dark:bg-slate-700 text-ink text-[10px] font-bold border-2 border-surface"
-                                                            title="{{ $avName }}">
-                                                            {{ $avInitial }}
-                                                        </div>
-                                                    @empty
-                                                        <span class="text-muted text-[11px]">{{ $col['emptyText'] ?? 'Unassigned' }}</span>
-                                                    @endforelse
-                                                    @if($overflow > 0)
-                                                        <span
-                                                            class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-canvas text-muted text-[9px] font-bold border-2 border-surface font-mono">
-                                                            +{{ $overflow }}
-                                                        </span>
-                                                    @endif
-                                                </div>
+                                                @if(!empty($avatars))
+                                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                                        @foreach($avatars as $av)
+                                                            @php
+                                                                $avName = is_object($av) ? ($av->name ?? 'User') : ($av['name'] ?? 'User');
+                                                            @endphp
+                                                            <span class="font-medium text-ink text-xs whitespace-nowrap" title="{{ $avName }}">
+                                                                {{ $avName }}
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <span class="text-muted text-[11px]">{{ $col['emptyText'] ?? 'Unassigned' }}</span>
+                                                @endif
                                             @elseif($type === 'progress')
                                                 @php
                                                     $numericVal = (int) $val;
@@ -798,11 +789,7 @@
                                         @if($type === 'badge')
                                             <div class="inline-block h-5 w-16 bg-slate-200 rounded-pill"></div>
                                         @elseif($type === 'avatar-stack')
-                                            <div
-                                                class="flex items-center gap-2 {{ ($col['align'] ?? 'left') === 'center' ? 'justify-center' : (($col['align'] ?? 'left') === 'right' ? 'justify-end' : '') }}">
-                                                <div class="w-6 h-6 rounded-full bg-slate-200 flex-shrink-0"></div>
-                                                <div class="h-3.5 w-20 bg-slate-200 rounded"></div>
-                                            </div>
+                                            <div class="inline-block h-3.5 w-20 bg-slate-200 rounded"></div>
                                         @elseif($type === 'progress')
                                             <div
                                                 class="flex items-center gap-2 max-w-[120px] {{ ($col['align'] ?? 'left') === 'center' ? 'mx-auto' : (($col['align'] ?? 'left') === 'right' ? 'ml-auto' : '') }}">

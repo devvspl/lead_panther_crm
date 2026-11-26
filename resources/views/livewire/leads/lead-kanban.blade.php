@@ -1098,10 +1098,7 @@
 
                                         <!-- Footer: Assigned Agent & Age -->
                                         <div class="flex items-center justify-between border-t border-border pt-1.5 text-[10px] text-muted">
-                                            <div class="flex items-center space-x-1.5 min-w-0">
-                                                <div class="h-4.5 w-4.5 rounded-full bg-ink text-white flex items-center justify-center font-bold text-[9px] shrink-0">
-                                                    {{ strtoupper(substr($lead->assignedTo?->name ?? 'U', 0, 1)) }}
-                                                </div>
+                                            <div class="flex items-center min-w-0">
                                                 <span class="truncate font-medium text-ink">{{ $lead->assignedTo?->name ?: 'Unassigned' }}</span>
                                             </div>
                                             <span class="font-semibold text-muted shrink-0 font-mono">

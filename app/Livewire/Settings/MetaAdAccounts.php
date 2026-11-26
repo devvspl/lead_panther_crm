@@ -35,6 +35,9 @@ class MetaAdAccounts extends Component
     public string $mappingClientId = '';
     public string $mappingProjectId = '';
     public string $mappingCampaignId = '';
+    #[Locked] public array $mappingProjectOptions = [];
+    #[Locked] public bool $mappingClientValid = false;
+    #[Locked] public bool $mappingProjectsFailed = false;
 
     private function campaignRecord(int $id): MetaAdRecord
     {
@@ -49,26 +52,56 @@ class MetaAdAccounts extends Component
         $this->mappingRecordId = $record->id;
         $this->mappingProjectId = (string) ($record->project_id ?? $record->crmCampaign?->project_id ?? '');
         $this->mappingClientId = (string) ($record->client_id ?? $record->project?->client_id ?? $record->crmCampaign?->project?->client_id ?? '');
+        $this->reloadMappingProjects();
         $this->dispatch('open-modal', 'meta-campaign-mapping');
     }
 
-    public function updatedMappingClientId(): void { $this->reset('mappingProjectId', 'mappingCampaignId'); }
+    public function updatedMappingClientId(): void
+    {
+        $this->reset('mappingProjectId', 'mappingCampaignId');
+        $this->resetValidation(['mappingClientId', 'mappingProjectId']);
+        $this->reloadMappingProjects();
+    }
+
+    public function reloadMappingProjects(): void
+    {
+        $this->mappingProjectOptions = [];
+        $this->mappingClientValid = false;
+        $this->mappingProjectsFailed = false;
+        if (!ctype_digit($this->mappingClientId) || (int) $this->mappingClientId < 1) return;
+        try {
+            $client = \App\Models\User::where('status', 'active')->find($this->mappingClientId);
+            if (!$client) return;
+            $this->mappingClientValid = true;
+            $this->mappingProjectOptions = ($client->organization_id
+                ? $client->organization->projects()
+                : \App\Models\Project::where('client_id', $client->id))
+                ->orderBy('projects.name')->pluck('projects.name', 'projects.id')->all();
+            if ($this->mappingProjectId !== '' && !array_key_exists($this->mappingProjectId, $this->mappingProjectOptions)) $this->reset('mappingProjectId', 'mappingCampaignId');
+        } catch (\Throwable $e) {
+            $this->mappingProjectOptions = [];
+            $this->mappingProjectsFailed = true;
+            report($e);
+        }
+    }
     public function updatedMappingProjectId(): void { $this->reset('mappingCampaignId'); }
 
     public function saveCampaignMapping(): void
     {
         $this->validate([
-            'mappingClientId' => 'required|integer|exists:users,id',
+            'mappingClientId' => ['required', 'integer', Rule::exists('users', 'id')->where('status', 'active')],
             'mappingProjectId' => 'required|integer|exists:projects,id',
         ], [
             'mappingClientId.required' => 'Please select a Client / Organization.',
             'mappingProjectId.required' => 'CRM Project is required.',
             'mappingProjectId.exists' => 'The selected project does not exist.',
         ]);
+        $record = $this->campaignRecord($this->mappingRecordId);
         app(\App\Services\MetaCampaignLeadService::class)->saveMapping(
-            $this->campaignRecord($this->mappingRecordId),
+            $record,
             (int) $this->mappingClientId,
-            (int) $this->mappingProjectId
+            (int) $this->mappingProjectId,
+            $record->crm_campaign_id
         );
         $this->dispatch('close-modal', 'meta-campaign-mapping');
         $this->message = 'Campaign destination saved. Attributed leads will route to the selected Client / Organization and CRM Project.';
@@ -259,22 +292,10 @@ class MetaAdAccounts extends Component
 
         $records = $query?->with(['client.organization', 'project.client', 'crmCampaign.project.client'])->orderByDesc('report_date')->orderBy('name')->paginate(15, ['*'], 'metaRecordsPage');
 
-        $user = $this->mappingClientId ? \App\Models\User::with('organization')->find($this->mappingClientId) : null;
-        $projectsList = [];
-        if ($user) {
-            $clientIds = [$user->id];
-            if ($user->organization_id) {
-                $orgUserIds = \App\Models\User::where('organization_id', $user->organization_id)->pluck('id')->all();
-                $clientIds = array_unique(array_merge($clientIds, $orgUserIds));
-            }
-            $projectsList = \App\Models\Project::whereIn('client_id', $clientIds)->orderBy('name')->pluck('name', 'id')->all();
-        }
-
-        $mappingProjects = empty($this->mappingClientId)
-            ? ['' => 'Select client / organization first']
-            : (empty($projectsList)
-                ? ['' => 'No projects available for this organization.']
-                : (['' => 'Select CRM project'] + $projectsList));
+        $projectsList = $this->mappingProjectOptions;
+        $projectPlaceholder = !$this->mappingClientValid ? 'Select client / organization first'
+            : ($this->mappingProjectsFailed ? 'Projects could not be loaded' : (empty($projectsList) ? 'No projects found for this organization.' : 'Select CRM project'));
+        $mappingProjects = ['' => $projectPlaceholder] + $projectsList;
 
         return view('livewire.settings.meta-ad-accounts', [
             'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages', 'campaigns', 'adsets', 'ads', 'insights'])->orderBy('name')->get(),

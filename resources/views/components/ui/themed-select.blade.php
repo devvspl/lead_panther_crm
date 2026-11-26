@@ -12,11 +12,11 @@
     $slotContent = $slot ?? '';
     $wireModel = $attributes->wire('model')->value();
     $alpineModel = $attributes->whereStartsWith('x-model');
-    $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value']);
+    $nativeAttributes = $attributes->whereDoesntStartWith(['wire:model', 'x-model'])->except(['class', 'value', 'wire:key']);
     $owner = isset($this) && $this instanceof \Livewire\Component ? $this->getId() : 'page';
-    $popupKey = 'select-popup-'.sha1($owner.'|'.($wireModel ?? $alpineModel->first() ?? $attributes->get('name') ?? $placeholder).'|'.$attributes->get('id', ''));
+    $popupKey = 'select-popup-'.sha1($owner.'|'.($wireModel ?? $alpineModel->first() ?? $attributes->get('name') ?? $placeholder).'|'.$attributes->get('id', '').'|'.$attributes->get('wire:key', ''));
 @endphp
-<div x-id="['select-list', 'select-error']" x-modelable="value" {{ $alpineModel }}
+<div {{ $attributes->only('wire:key') }} x-id="['select-list', 'select-error']" x-modelable="value" {{ $alpineModel }}
     x-data="leadPantherSelect({
         value: @if($wireModel) $wire.entangle(@js($wireModel)){{ $attributes->wire('model')->hasModifier('live') ? '.live' : '' }} @else @js($attributes->get('value')) @endif,
         bound: @js((bool)$wireModel || count($alpineModel->getAttributes()) > 0 || $attributes->has('value')),

@@ -10,6 +10,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ThemedSelectTest extends TestCase
 {
+    public function test_dependent_select_key_remounts_the_alpine_root_instead_of_only_native_select(): void
+    {
+        $html = \Illuminate\Support\Facades\Blade::render('<x-ui.themed-select wire:model.live="mappingProjectId" wire:key="project-client-42" :options="[1 => \'Project\']" :searchable="true" />');
+        $this->assertMatchesRegularExpression('/<div[^>]*wire:key="project-client-42"[^>]*x-id=/', $html);
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*wire:key=/', $html);
+        $this->assertStringContainsString('$wire.entangle', $html);
+        $this->assertStringContainsString('.live', $html);
+    }
     use RefreshDatabase;
 
     public function test_direct_table_view_rendering_does_not_require_a_slot(): void
@@ -49,6 +57,7 @@ class ThemedSelectTest extends TestCase
     {
         $user = User::factory()->create();
         \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super-admin']);
+        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin']);
         $user->assignRole('super-admin');
 
         $this->actingAs($user);

@@ -526,7 +526,9 @@
     </details>
 
     <x-ui.modal name="meta-campaign-mapping" maxWidth="xl" centered>
-        <form wire:submit="saveCampaignMapping" class="space-y-4 p-6">
+        <form wire:submit="saveCampaignMapping" class="space-y-4 p-6"
+            x-data="{ projectsRequestFailed: false }"
+            x-init="$wire.$hook('commit', ({ succeed, fail }) => { succeed(() => { projectsRequestFailed = false }); fail(() => { projectsRequestFailed = true }) })">
             <h3 class="font-bold text-ink">Campaign Lead Destination</h3>
             <p class="text-xs text-muted">Historical and future attributed leads use this destination. Existing Page/form mappings stay unchanged.</p>
             
@@ -538,18 +540,26 @@
 
             <div>
                 <label class="block text-xs font-semibold mb-1">CRM Project <span class="text-danger">*</span></label>
-                @if($mappingClientId && empty($projectsList))
-                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 mb-2">
-                        No projects available for this organization.
-                    </div>
+                <p wire:loading.delay wire:target="mappingClientId,reloadMappingProjects,openCampaignMapping" role="status" class="text-xs text-muted mb-2">Loading projects…</p>
+                <div x-show="projectsRequestFailed" x-cloak role="alert" class="text-xs text-danger mb-2">
+                    Projects could not be loaded. Please retry.
+                    <button type="button" wire:click="reloadMappingProjects" class="underline" wire:loading.attr="disabled">Retry</button>
+                </div>
+                @if($mappingProjectsFailed)
+                    <p role="alert" class="text-xs text-danger mb-2">Projects could not be loaded. <button type="button" wire:click="reloadMappingProjects" wire:loading.attr="disabled" class="underline">Retry</button></p>
+                @elseif($mappingClientValid && empty($projectsList))
+                    <p role="status" class="text-xs text-muted mb-2">No projects found for this organization.</p>
                 @endif
-                <x-ui.themed-select
-                    wire:model.live="mappingProjectId"
-                    :options="$mappingProjects"
-                    :searchable="true"
-                    wire:key="mapping-project-{{ $mappingClientId }}"
-                    placeholder="{{ empty($mappingClientId) ? 'Select client / organization first' : (empty($projectsList) ? 'No projects available for this organization.' : 'Select CRM project') }}"
-                />
+                <div :inert="projectsRequestFailed" wire:loading.class="pointer-events-none opacity-50" wire:target="mappingClientId,reloadMappingProjects,openCampaignMapping">
+                    <x-ui.themed-select
+                        wire:model.live="mappingProjectId"
+                        :options="$mappingProjects"
+                        :searchable="true"
+                        :disabled="!$mappingClientValid || $mappingProjectsFailed || empty($projectsList)"
+                        wire:key="mapping-project-{{ $mappingClientId }}-{{ (int) $mappingProjectsFailed }}"
+                        placeholder="{{ !$mappingClientValid ? 'Select client / organization first' : 'Select CRM project' }}"
+                    />
+                </div>
                 @error('mappingProjectId')<p class="text-danger text-xs mt-1">{{ $message }}</p>@enderror
             </div>
 

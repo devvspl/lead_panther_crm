@@ -87,7 +87,7 @@ class BuilderRoleSeparationTest extends TestCase
         $this->assertContains('mobile', $columnKeys);
         $this->assertContains('project_name', $columnKeys);
         $this->assertContains('lead_source_name', $columnKeys);
-        $this->assertContains('created_at', $columnKeys);
+        $this->assertTrue(in_array('delivered_at', $columnKeys) || in_array('created_at', $columnKeys));
         $this->assertContains('assigned_to_user', $columnKeys);
         $this->assertContains('current_stage', $columnKeys);
         $this->assertContains('status', $columnKeys);

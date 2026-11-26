@@ -448,9 +448,12 @@
                                                     </svg>
                                                 </a>
                                             @elseif($type === 'date')
+                                                @php
+                                                    $dateVal = $val ?: (is_object($row) && $colKey === 'delivered_at' ? $row->created_at : null);
+                                                @endphp
                                                 <span class="text-muted font-mono text-[11px]"
-                                                    title="{{ $val ? \Carbon\Carbon::parse($val)->toDayDateTimeString() : '' }}">
-                                                    {{ $val ? \Carbon\Carbon::parse($val)->format($col['format'] ?? 'M d, Y H:i') : '—' }}
+                                                    title="{{ $dateVal ? \Carbon\Carbon::parse($dateVal)->toDayDateTimeString() : '' }}">
+                                                    {{ $dateVal ? \Carbon\Carbon::parse($dateVal)->format($col['format'] ?? 'M d, Y H:i') : '—' }}
                                                 </span>
                                             @elseif($type === 'phone' || ($col['key'] ?? '') === 'mobile')
                                                 @php
@@ -945,8 +948,11 @@
                                             @elseif($type === 'progress')
                                                 <span class="font-mono font-bold text-ink">{{ (int) $val }}%</span>
                                             @elseif($type === 'date')
+                                                @php
+                                                    $dateVal = $val ?: (is_object($row) && $colKey === 'delivered_at' ? $row->created_at : null);
+                                                @endphp
                                                 <span
-                                                    class="font-mono text-muted text-[11px]">{{ $val ? \Carbon\Carbon::parse($val)->format('M d, Y') : '—' }}</span>
+                                                    class="font-mono text-muted text-[11px]">{{ $dateVal ? \Carbon\Carbon::parse($dateVal)->format('M d, Y') : '—' }}</span>
                                             @elseif($type === 'phone' || ($col['key'] ?? '') === 'mobile')
                                                 @php
                                                     $rawPhone = $val ?? (is_object($row) ? ($row->mobile ?? '') : ($row['mobile'] ?? ''));

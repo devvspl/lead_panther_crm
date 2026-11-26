@@ -2343,7 +2343,7 @@ class LeadKanban extends Component
                 ['key' => 'mobile', 'label' => 'Mobile Number', 'type' => 'phone', 'priority' => 1, 'class' => 'font-mono text-ink text-xs'],
                 ['key' => 'project_name', 'label' => 'Project', 'type' => 'text', 'priority' => 1, 'class' => 'font-medium text-ink'],
                 ...(\App\Support\LeadSourceVisibility::allowed() ? [['key' => 'lead_source_name', 'label' => 'Lead Source', 'type' => 'text', 'priority' => 2]] : []),
-                ['key' => 'created_at', 'label' => 'Received Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+                ['key' => 'delivered_at', 'label' => 'Received Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
                 ['key' => 'assigned_to_user', 'label' => 'Assigned Team Member', 'type' => 'avatar-stack', 'priority' => 1],
                 ['key' => 'current_stage', 'label' => 'Current Stage', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                     'new' => 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -2637,7 +2637,10 @@ class LeadKanban extends Component
         $orgName = $user && $user->organization ? Str::slug($user->organization->name) : 'all';
         $filename = "leads-directory_{$orgName}_".now()->format('Y-m-d').'.xlsx';
 
-        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'City', 'Property Type', 'Budget', 'Project', 'Campaign', 'Source', 'Assigned Agent', 'Stage', 'Score', 'Created At'];
+        $isBuilderUser = $user && ($user->hasRole('builder') || $user->hasRole('Builder/Developer') || $this->isBuilder);
+        $dateHeading = $isBuilderUser ? 'Received Date' : 'Created At';
+
+        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'City', 'Property Type', 'Budget', 'Project', 'Campaign', 'Source', 'Assigned Agent', 'Stage', 'Score', $dateHeading];
         $columns = [
             'lead_code',
             'name',
@@ -2652,7 +2655,7 @@ class LeadKanban extends Component
             fn($l) => $l->assignedTo?->name ?: 'Unassigned',
             fn($l) => ucfirst(str_replace('_', ' ', (string)$l->current_stage)),
             'lead_score',
-            fn($l) => $l->created_at ? $l->created_at->format('M d, Y H:i') : '',
+            fn($l) => ($isBuilderUser ? ($l->delivered_at ?: $l->created_at) : $l->created_at)?->format('M d, Y H:i') ?: '',
         ];
 
         $subtitle = 'Exported '.now()->format('d M Y, H:i T').($this->search ? " | Search: {$this->search}" : '').($this->project ? " | ProjectID: {$this->project}" : '');

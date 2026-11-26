@@ -104,20 +104,30 @@ class IntegrationsManager extends Component
             ?? \App\Models\User::where('organization_id', $orgId)->orderBy('id')->first();
     }
 
+    protected array $orgPrimaryUserCache = [];
+    protected array $userOrgCache = [];
+
     public function normalizeClientIdToOrganizationPrimary(?int $clientId): ?int
     {
         if (!$clientId) return null;
-        $user = \App\Models\User::find($clientId);
-        if ($user && $user->organization_id) {
-            $primary = $this->getOrganizationPrimaryUser($user->organization_id);
-            return $primary ? $primary->id : $clientId;
+        if (!array_key_exists($clientId, $this->userOrgCache)) {
+            $user = \App\Models\User::find($clientId);
+            $this->userOrgCache[$clientId] = $user ? $user->organization_id : false;
+        }
+        $orgId = $this->userOrgCache[$clientId];
+        if ($orgId) {
+            if (!array_key_exists($orgId, $this->orgPrimaryUserCache)) {
+                $primary = $this->getOrganizationPrimaryUser($orgId);
+                $this->orgPrimaryUserCache[$orgId] = $primary ? $primary->id : null;
+            }
+            return $this->orgPrimaryUserCache[$orgId] ?: $clientId;
         }
         return $clientId;
     }
 
     public function updatedSelectedMappingAccountId(): void
     {
-        $account = PortalAccount::where('type', 'meta')->findOrFail($this->selectedMappingAccountId);
+        $account = PortalAccount::with(['formMappings.project', 'formMappings.campaign'])->where('type', 'meta')->findOrFail($this->selectedMappingAccountId);
         $this->reset('availableForms', 'formClientMap', 'formProjectMap', 'formCampaignMap', 'search', 'formFetchSummary');
         foreach ($account->formMappings as $mapping) {
             $this->availableForms[] = ['id' => $mapping->form_id, 'name' => $mapping->form_name,
@@ -170,6 +180,7 @@ class IntegrationsManager extends Component
             $this->metaDefaultClientId = $defaultClient ? (int) $defaultClient : null;
 
             $this->selectedMappingAccountId = $account->id;
+            $account->loadMissing(['formMappings.project', 'formMappings.campaign']);
             foreach ($account->formMappings as $mapping) {
                 // If previously saved campaign had " Campaign" suffix, strip it to match Meta exact name
                 if ($mapping->campaign && !empty($mapping->form_name) && $mapping->campaign->name === $mapping->form_name . ' Campaign') {
@@ -1065,7 +1076,7 @@ class IntegrationsManager extends Component
         $campaigns = Campaign::withoutGlobalScopes()->with('project')->where(fn ($q) => $q->where('status', 'active')
             ->orWhereIn('id', array_filter($this->formCampaignMap)))->orderBy('name')->get();
         $campaignDetails = $campaigns->keyBy('id');
-        $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->get()->keyBy('form_id');
+        $formDetails = LeadFormMapping::where('portal_account_id', $this->selectedMappingAccountId)->with(['ads.campaignRecord', 'campaign.project'])->get()->keyBy('form_id');
 
         $allProjects = Project::withoutGlobalScopes()->with(['client.organization'])->orderBy('name')->get();
         $projectsByOrg = [];
@@ -1104,7 +1115,7 @@ class IntegrationsManager extends Component
                     $fId = is_array($row) ? $row['id'] : $row->id;
                     $fName = is_array($row) ? ($row['name'] ?? null) : $row->name;
                     $mapping = $formDetails->get($fId);
-                    $linkedAds = $mapping?->ads()->with('campaignRecord')->get() ?? collect();
+                    $linkedAds = $mapping?->ads ?? collect();
                     $matchingAd = $linkedAds->first(fn ($a) => $a->campaignRecord && strtolower($a->campaignRecord->name) === strtolower((string) $fName))
                         ?? $linkedAds->first();
                     $campaign = $campaignDetails->get($this->formCampaignMap[$fId] ?? null) ?? $mapping?->campaign;

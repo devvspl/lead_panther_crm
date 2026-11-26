@@ -137,6 +137,25 @@ class User extends Authenticatable
         return $this->organization?->name ?: 'Platform HQ';
     }
 
+    protected static ?array $existingRoleNamesCache = null;
+
+    public static function getExistingRoleNames(): array
+    {
+        if (static::$existingRoleNamesCache === null) {
+            try {
+                static::$existingRoleNamesCache = \Spatie\Permission\Models\Role::pluck('name')->toArray();
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        return static::$existingRoleNamesCache;
+    }
+
+    public static function clearRoleNamesCache(): void
+    {
+        static::$existingRoleNamesCache = null;
+    }
+
     public static function normalizeRoleName(mixed $role): mixed
     {
         if (is_string($role)) {
@@ -151,20 +170,22 @@ class User extends Authenticatable
                 default => $role,
             };
 
+            $existing = static::getExistingRoleNames();
+
             // If target role exists, always prefer the canonical target
-            if (\Spatie\Permission\Models\Role::where('name', $target)->exists()) {
+            if (in_array($target, $existing, true)) {
                 return $target;
             }
 
             // Fallback for unmigrated test cases that created legacy names
-            if ($target === 'Builder/Developer' && \Spatie\Permission\Models\Role::where('name', 'Builder')->exists()) {
+            if ($target === 'Builder/Developer' && in_array('Builder', $existing, true)) {
                 return 'Builder';
             }
-            if ($target === 'Executive' && \Spatie\Permission\Models\Role::where('name', 'Sales Executive')->exists()) {
+            if ($target === 'Executive' && in_array('Sales Executive', $existing, true)) {
                 return 'Sales Executive';
             }
 
-            if (\Spatie\Permission\Models\Role::where('name', $role)->exists()) {
+            if (in_array($role, $existing, true)) {
                 return $role;
             }
 

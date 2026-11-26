@@ -229,6 +229,7 @@ class RoleBasedLeadManagementTest extends TestCase
             'current_stage',
             'status',
             'next_followup',
+            'first_response_timing',
             'actions',
         ], $colKeys);
         $this->assertNotContains('internal_verification', $colKeys);

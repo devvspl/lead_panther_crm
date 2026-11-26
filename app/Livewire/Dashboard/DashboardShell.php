@@ -1949,14 +1949,32 @@ class DashboardShell extends Component
                     ->whereBetween('created_at', [$wStart, $wEnd])->sum('credit_used');
             }
         } else {
-            // Daily
-            $dates = collect(range(min($days, 30), 0))->map(fn($i) => (clone $end)->subDays($i));
+            // Daily aggregated in 2 single queries instead of 3 queries per day
+            $minDays = min($days, 30);
+            $dates = collect(range($minDays, 0))->map(fn($i) => (clone $end)->subDays($i));
+            $earliest = (clone $end)->subDays($minDays)->startOfDay();
+            $latest = (clone $end)->endOfDay();
+
+            $dailyLeads = (clone $baseQuery)
+                ->whereBetween('created_at', [$earliest, $latest])
+                ->selectRaw("DATE(created_at) as date_val, COUNT(*) as received, COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned")
+                ->groupBy('date_val')
+                ->get()
+                ->keyBy('date_val');
+
+            $dailyCredits = CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                ->whereBetween('created_at', [$earliest, $latest])
+                ->selectRaw("DATE(created_at) as date_val, SUM(credit_used) as credits")
+                ->groupBy('date_val')
+                ->get()
+                ->keyBy('date_val');
+
             foreach ($dates as $d) {
+                $dateKey = $d->toDateString();
                 $labels[] = $d->format('d M');
-                $received[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->count();
-                $assigned[] = (clone $baseQuery)->whereDate('created_at', $d->toDateString())->whereNotNull('assigned_to')->count();
-                $credits[] = (int) CreditTransaction::whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
-                    ->whereDate('created_at', $d->toDateString())->sum('credit_used');
+                $received[] = (int) ($dailyLeads->get($dateKey)?->received ?? 0);
+                $assigned[] = (int) ($dailyLeads->get($dateKey)?->assigned ?? 0);
+                $credits[] = (int) ($dailyCredits->get($dateKey)?->credits ?? 0);
             }
         }
 

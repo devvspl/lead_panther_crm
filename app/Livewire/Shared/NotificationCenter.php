@@ -156,7 +156,7 @@ class NotificationCenter extends NotificationBell
             'organizations' => $admin ? \App\Models\Organization::orderBy('name')->get() : collect(),
             'recipients' => $admin ? \App\Models\User::when($this->organizationId, fn ($q) => $q->where('organization_id', $this->organizationId))->orderBy('name')->get() : collect(),
             'roles' => $admin ? \Spatie\Permission\Models\Role::orderBy('name')->pluck('name') : collect(),
-            'types' => $admin ? \App\Models\SystemNotification::query()->select('data->type as notification_type')->distinct()->get()->pluck('notification_type')->filter()->sort()->values() : collect(),
+            'types' => $admin ? cache()->remember('system_notification_distinct_types', 3600, fn () => \App\Models\SystemNotification::query()->select('data->type as notification_type')->distinct()->limit(50)->get()->pluck('notification_type')->filter()->sort()->values()) : collect(),
         ])->layout('layouts.app');
     }
 }

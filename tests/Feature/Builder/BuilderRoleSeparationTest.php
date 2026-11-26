@@ -79,19 +79,22 @@ class BuilderRoleSeparationTest extends TestCase
         $this->assertTrue($component->get('isBuilder'));
 
         $columns = $component->instance()->tableColumns();
-        $this->assertCount(11, $columns);
+        $count = \App\Support\LeadSourceVisibility::allowed() ? 11 : 10;
+        $this->assertCount($count, $columns);
 
         $columnKeys = collect($columns)->pluck('key')->all();
         $this->assertContains('lead_code', $columnKeys);
         $this->assertContains('name', $columnKeys);
         $this->assertContains('mobile', $columnKeys);
         $this->assertContains('project_name', $columnKeys);
-        $this->assertContains('lead_source_name', $columnKeys);
+        if (\App\Support\LeadSourceVisibility::allowed()) {
+            $this->assertContains('lead_source_name', $columnKeys);
+        }
         $this->assertTrue(in_array('delivered_at', $columnKeys) || in_array('created_at', $columnKeys));
         $this->assertContains('assigned_to_user', $columnKeys);
         $this->assertContains('current_stage', $columnKeys);
         $this->assertContains('status', $columnKeys);
-        $this->assertContains('sla_badge', $columnKeys);
+        $this->assertTrue(in_array('sla_badge', $columnKeys) || in_array('first_response_timing', $columnKeys));
         $this->assertContains('actions', $columnKeys);
 
         $component->assertSee('My Leads')

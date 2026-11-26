@@ -170,8 +170,22 @@ class Lead extends Model
         return $this->hasOneThrough(Project::class, Campaign::class, 'id', 'id', 'campaign_id', 'project_id');
     }
 
+    public function getProjectAttribute(): ?Project
+    {
+        if ($this->relationLoaded('project')) {
+            return $this->getRelationValue('project');
+        }
+        if ($this->relationLoaded('campaign') && $this->campaign) {
+            return $this->campaign->project;
+        }
+        return $this->getRelationValue('project');
+    }
+
     public function getProjectIdAttribute(): ?int
     {
+        if ($this->relationLoaded('campaign') && $this->campaign) {
+            return $this->campaign->project_id;
+        }
         $campaignId = $this->attributes['campaign_id'] ?? null;
         return $campaignId ? Campaign::withoutGlobalScopes()->whereKey($campaignId)->value('project_id') : null;
     }
@@ -350,6 +364,12 @@ class Lead extends Model
 
     public function getProjectNameAttribute(): string
     {
+        if ($this->relationLoaded('project') && $this->project) {
+            return $this->project->name;
+        }
+        if ($this->relationLoaded('campaign') && $this->campaign) {
+            return $this->campaign->project?->name ?: 'N/A';
+        }
         return $this->project?->name ?: 'N/A';
     }
 
@@ -672,7 +692,7 @@ class Lead extends Model
     {
         $f = (static::usesSalesPanel() ? $this->followups->where('status', 'pending') : $this->followups->where('due_at', '>=', now()))->sortBy('due_at')->first();
         if ($f && $f->due_at) {
-            return Carbon::parse($f->due_at)->format('M d, H:i');
+            return Carbon::parse($f->due_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A');
         }
 
         return '-';

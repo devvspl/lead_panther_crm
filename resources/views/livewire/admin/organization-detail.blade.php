@@ -736,7 +736,7 @@
                         @disabled(count($selectedTeamUserIds) === 0)
                         class="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold disabled:opacity-50">
                         <span wire:loading.remove wire:target="openAccountEmailComposer">Send Login Details</span>
-                        <span wire:loading wire:target="sendSelectedLoginDetails">Submitting…</span>
+                        <span wire:loading wire:target="openAccountEmailComposer">Opening&hellip;</span>
                     </button>
                     @error('selectedTeamUserIds') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                     <button type="button" wire:click="exportTabExcel('team')"
@@ -1303,9 +1303,9 @@
                 <div class="px-5 py-4 border-b border-border flex items-center justify-between gap-3 shrink-0">
                     <div>
                         <h2 class="text-base font-bold text-ink">Compose Account Email</h2>
-                        <p class="text-xs text-muted mt-1">{{ $organization->name }} � {{ count(array_unique($selectedTeamUserIds)) }} recipients � Separate personalized emails</p>
+                        <p class="text-xs text-muted mt-1">{{ $organization->name }} &middot; {{ count(array_unique($selectedTeamUserIds)) }} recipients &middot; Separate personalized emails</p>
                     </div>
-                    <button type="button" wire:click="$set('showAccountEmailComposer', false)" class="text-muted hover:text-ink text-xl" aria-label="Close email composer">�</button>
+                    <button type="button" wire:click="$set('showAccountEmailComposer', false)" class="text-muted hover:text-ink text-xl" aria-label="Close email composer">&times;</button>
                 </div>
                 <div class="overflow-y-auto min-h-0 p-5 space-y-4">
                     @if($errors->any())
@@ -1316,7 +1316,7 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                         <div class="space-y-4 min-w-0">
                             <fieldset class="space-y-2">
-                                <legend class="text-xs font-bold text-ink">To � Organization members</legend>
+                                <legend class="text-xs font-bold text-ink">To &middot; Organization members</legend>
                                 <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                                     @foreach($this->accountEmailSelectedRecipients as $recipient)
                                         <label class="inline-flex items-center gap-1.5 text-xs bg-primary/10 text-ink rounded-lg px-2 py-1" wire:key="account-email-to-{{ $recipient->id }}">
@@ -1325,7 +1325,7 @@
                                         </label>
                                     @endforeach
                                 </div>
-                                <input type="search" wire:model.live.debounce.300ms="accountEmailRecipientSearch" placeholder="Find another organization member�" aria-label="Search email recipients" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                                <input type="search" wire:model.live.debounce.300ms="accountEmailRecipientSearch" placeholder="Find another organization member&hellip;" aria-label="Search email recipients" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
                                 <details class="rounded-lg border border-border p-2">
                                     <summary class="text-xs text-primary cursor-pointer">Add or remove recipients</summary>
                                     <div class="max-h-36 overflow-y-auto mt-2 space-y-1">
@@ -1340,10 +1340,10 @@
                             </fieldset>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <label class="text-xs font-semibold text-ink">CC
-                                    <input type="text" wire:model="accountEmailCc" placeholder="name@example.com, �" class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
+                                    <input type="text" wire:model="accountEmailCc" placeholder="name@example.com, ..." class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
                                 </label>
                                 <label class="text-xs font-semibold text-ink">BCC
-                                    <input type="text" wire:model="accountEmailBcc" placeholder="name@example.com, �" class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
+                                    <input type="text" wire:model="accountEmailBcc" placeholder="name@example.com, ..." class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
                                 </label>
                             </div>
                             <label class="flex items-center gap-2 text-xs text-ink"><input type="checkbox" wire:model="accountEmailCopyToMe">Send me a BCC copy of each email</label>
@@ -1359,11 +1359,11 @@
                                 <label class="block text-xs font-bold text-ink">Attachments
                                     <input type="file" wire:model="accountEmailAttachments" multiple class="mt-2 block w-full text-xs text-muted file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-border file:bg-canvas file:text-ink">
                                 </label>
-                                <p class="text-[11px] text-muted">Up to 5 files � 10 MB per file � 15 MB total. Invoices, documents and other files are supported.</p>
-                                <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary" role="status">Uploading attachments�</p>
+                                <p class="text-[11px] text-muted">Up to 5 files &middot; 10 MB per file &middot; 15 MB total. Invoices, documents and other files are supported.</p>
+                                <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary" role="status">Uploading attachments&hellip;</p>
                                 @foreach($accountEmailAttachments as $index => $attachment)
                                     <div class="flex items-center justify-between gap-2 rounded-lg bg-canvas px-3 py-2 text-xs text-ink" wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">
-                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} � {{ number_format($attachment->getSize() / 1024, 0) }} KB</span>
+                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} &middot; {{ number_format($attachment->getSize() / 1024, 0) }} KB</span>
                                         <button type="button" wire:click="removeAccountEmailAttachment({{ $index }})" class="text-primary">Remove</button>
                                     </div>
                                 @endforeach
@@ -1388,7 +1388,7 @@
                     <div class="flex gap-2">
                         <button type="button" wire:click="$set('showAccountEmailComposer', false)" class="px-4 py-2 rounded-lg border border-border text-ink text-xs font-semibold">Cancel</button>
                         <button type="submit" wire:loading.attr="disabled" wire:target="sendSelectedLoginDetails,accountEmailAttachments" @disabled(count($selectedTeamUserIds) === 0) class="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-50">
-                            <span wire:loading.remove wire:target="sendSelectedLoginDetails">Send Emails</span><span wire:loading wire:target="sendSelectedLoginDetails">Sending�</span>
+                            <span wire:loading.remove wire:target="sendSelectedLoginDetails">Send Emails</span><span wire:loading wire:target="sendSelectedLoginDetails">Sending&hellip;</span>
                         </button>
                     </div>
                 </div>

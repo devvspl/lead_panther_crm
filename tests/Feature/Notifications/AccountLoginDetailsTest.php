@@ -197,7 +197,7 @@ class AccountLoginDetailsTest extends TestCase
                 $this->assertTrue($mail->hasBcc('private@example.com'));
                 $this->assertTrue($mail->hasBcc($this->admin->email));
                 $this->assertCount(1, $mail->to); $this->assertCount(1, $mail->cc); $this->assertCount(2, $mail->bcc);
-                return $mail->hasAttachmentFromStorageDisk('local', $attachment['path'], 'invoice.pdf');
+                return $mail->hasAttachmentFromStorageDisk('local', $attachment['path'], 'invoice.pdf', ['mime' => $attachment['mime']]);
             });
         }
     }

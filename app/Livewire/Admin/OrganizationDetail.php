@@ -638,6 +638,7 @@ class OrganizationDetail extends Component
                     'campaigns' => $campaigns->map(function ($campaign) use ($service, $project, $metaByCampaignId, $formsByCampaignId) {
                         $metaRecord = $metaByCampaignId->get($campaign->id);
                         $formMapping = $formsByCampaignId->get($campaign->id);
+                        $isMapped = ($metaRecord !== null || $formMapping !== null);
 
                         $fbPageName = $metaRecord?->account?->name;
                         if (!$fbPageName && $formMapping?->portalAccount) {
@@ -651,11 +652,12 @@ class OrganizationDetail extends Component
                             'stats' => $service->deliveryStatistics($project, $campaign),
                             'meta_record' => $metaRecord,
                             'form_mapping' => $formMapping,
+                            'is_mapped' => $isMapped,
                             'remote_id' => $metaRecord?->remote_id,
                             'facebook_page' => $fbPageName,
                             'lead_form' => $leadFormName,
                             'source_type' => $metaRecord ? 'meta_campaign' : ($formMapping ? 'lead_form' : 'crm_campaign'),
-                            'mapping_id' => $metaRecord?->id ?: $formMapping?->id,
+                            'mapping_id' => $metaRecord?->id ?: ($formMapping?->id ?: $campaign->id),
                         ];
                     }),
                 ];
@@ -698,6 +700,9 @@ class OrganizationDetail extends Component
     public function getAvailableCampaignOptionsProperty(): array
     {
         $orgOwnerIds = $this->billingClients()->pluck('id')->all();
+        if (empty($orgOwnerIds)) {
+            $orgOwnerIds = User::where('organization_id', $this->organization->id)->pluck('id')->all();
+        }
 
         $camps = MetaAdRecord::where('kind', 'campaign')
             ->when($this->mappingAccountId, fn($q) => $q->where('meta_ad_account_id', $this->mappingAccountId))
@@ -719,6 +724,9 @@ class OrganizationDetail extends Component
     public function getAvailableFormOptionsProperty(): array
     {
         $orgOwnerIds = $this->billingClients()->pluck('id')->all();
+        if (empty($orgOwnerIds)) {
+            $orgOwnerIds = User::where('organization_id', $this->organization->id)->pluck('id')->all();
+        }
 
         $forms = LeadFormMapping::query()
             ->where(function ($query) use ($orgOwnerIds) {
@@ -778,7 +786,25 @@ class OrganizationDetail extends Component
         $this->editingMappingRecordId = $recordId;
         $this->mappingSourceType = $sourceType;
 
-        if ($sourceType === 'campaign' || $sourceType === 'meta_campaign') {
+        if ($sourceType === 'crm_campaign') {
+            $campaign = Campaign::withoutGlobalScopes()->findOrFail($recordId);
+            $this->mappingProjectId = $campaign->project_id;
+            $this->mappingDailyLimit = $campaign->delivery_daily_limit;
+            $this->mappingDeliveryInterval = $campaign->delivery_interval_minutes;
+            $this->mappingInheritLimit = $campaign->delivery_daily_limit === null;
+            $this->mappingInheritInterval = $campaign->delivery_interval_minutes === null;
+
+            $matchedMeta = MetaAdRecord::where('kind', 'campaign')->where('name', $campaign->name)->first();
+            if ($matchedMeta) {
+                $this->mappingAccountId = $matchedMeta->meta_ad_account_id;
+                $this->mappingRemoteId = (string) $matchedMeta->remote_id;
+            } else {
+                $firstAcc = MetaAdAccount::whereIn('status', ['connected', 'active'])->first();
+                $this->mappingAccountId = $firstAcc?->id;
+                $this->mappingRemoteId = '';
+            }
+            $this->mappingSourceType = 'campaign';
+        } elseif ($sourceType === 'campaign' || $sourceType === 'meta_campaign') {
             $record = MetaAdRecord::findOrFail($recordId);
             $this->mappingAccountId = $record->meta_ad_account_id;
             $this->mappingRemoteId = (string) $record->remote_id;
@@ -840,17 +866,23 @@ class OrganizationDetail extends Component
         if ($this->mappingSourceType === 'campaign' || $this->mappingSourceType === 'meta_campaign') {
             $record = MetaAdRecord::where('kind', 'campaign')
                 ->where(function ($q) {
-                    if ($this->editingMappingRecordId) {
+                    if ($this->editingMappingRecordId && MetaAdRecord::where('id', $this->editingMappingRecordId)->exists()) {
                         $q->where('id', $this->editingMappingRecordId);
                     } else {
                         $q->where('remote_id', $this->mappingRemoteId);
                     }
                 })->firstOrFail();
 
-            $crmCampaign = Campaign::withoutGlobalScopes()
-                ->where('project_id', $project->id)
-                ->where('name', $record->name)
-                ->first();
+            $crmCampaign = null;
+            if ($this->editingMappingRecordId && Campaign::withoutGlobalScopes()->where('id', $this->editingMappingRecordId)->where('project_id', $project->id)->exists()) {
+                $crmCampaign = Campaign::withoutGlobalScopes()->find($this->editingMappingRecordId);
+            }
+            if (!$crmCampaign) {
+                $crmCampaign = Campaign::withoutGlobalScopes()
+                    ->where('project_id', $project->id)
+                    ->where('name', $record->name)
+                    ->first();
+            }
             if (!$crmCampaign) {
                 $crmCampaign = Campaign::create([
                     'project_id' => $project->id,

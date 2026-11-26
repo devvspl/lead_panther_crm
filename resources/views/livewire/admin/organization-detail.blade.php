@@ -1325,7 +1325,7 @@
                                     <h3 id="account-email-recipients-label" class="text-sm font-bold text-ink">Recipients</h3>
                                     <span class="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold">{{ count(array_unique($selectedTeamUserIds)) }} selected</span>
                                 </div>
-                                <p class="text-xs text-muted leading-relaxed">Each person receives their own account and associated team details.</p>
+                                <p class="text-xs text-muted leading-relaxed">Builders receive all organization accounts, team leaders their own team accounts, and executives their own account and leader details.</p>
                                 <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                     @foreach($this->accountEmailSelectedRecipients as $recipient)
                                         <div class="inline-flex items-center gap-2 min-w-0 max-w-full rounded-lg border border-border bg-canvas pl-3 pr-1.5 py-2" wire:key="account-email-to-{{ $recipient->id }}">
@@ -1374,7 +1374,7 @@
                                 <details class="rounded-lg bg-canvas px-3 py-2.5">
                                     <summary class="text-xs text-ink font-medium cursor-pointer">Personalization fields</summary>
                                     <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted">@verbatim
-                                        <code>{{user_name}}</code><code>{{account_details}}</code><code>{{role_name}}</code><code>{{role_introduction}}</code><code>{{organization_name}}</code><code>{{team_name}}</code><code>{{team_leader_name}}</code><code>{{user_code}}</code><code>{{email}}</code><code>{{login_url}}</code><code>{{password_setup_link}}</code>
+                                        <code>{{user_name}}</code><code>{{account_details}}</code><code>{{associated_accounts}}</code><code>{{role_name}}</code><code>{{role_introduction}}</code><code>{{organization_name}}</code><code>{{team_name}}</code><code>{{team_leader_name}}</code><code>{{user_code}}</code><code>{{email}}</code><code>{{login_url}}</code><code>{{password_setup_link}}</code>
                                     @endverbatim</div>
                                     <p class="text-[11px] text-muted mt-2">Keep the password setup field so every recipient gets their own secure link.</p>
                                 </details>

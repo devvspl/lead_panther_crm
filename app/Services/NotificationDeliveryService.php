@@ -296,6 +296,41 @@ class NotificationDeliveryService
             })->when($roleKey === 'sales-executive', fn ($query) => $query->whereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('is_active', true)))
                 ->with(['leader' => fn ($q) => $q->where('organization_id', $user->organization_id)->where('status', 'active')])->orderBy('name')->get();
         }
+        $associated = collect();
+        if ($user->organization_id && in_array($roleKey, ['builder', 'team-leader', 'sales-executive'])) {
+            $teams->load(['members' => fn ($query) => $query->where('is_active', true)->whereHas('user', fn ($q) => $q->where('organization_id', $user->organization_id)), 'members.user.roles']);
+            if ($roleKey === 'builder') {
+                // Include organization accounts that have not been assigned a team yet.
+                $associated = User::where('organization_id', $user->organization_id)->with('roles')->orderBy('name')->get();
+            } elseif ($roleKey === 'team-leader') {
+                $associated = $teams->flatMap(fn ($team) => $team->members->pluck('user'))->filter()->unique('id')->sortBy('name');
+            } else {
+                $associated = $teams->pluck('leader')->filter()->unique('id');
+            }
+            $associated = $associated->filter(fn ($account) => $account->id !== $user->id
+                && (int) $account->organization_id === (int) $user->organization_id
+                && \App\Support\NavigationConfig::getRoleKey($account) !== 'super-admin');
+        }
+        $associatedLines = [];
+        if ($associated->isNotEmpty()) {
+            $associatedLines[] = match ($roleKey) {
+                'builder' => 'Associated Organization Accounts',
+                'team-leader' => 'Your Team Accounts',
+                default => 'Your Team Leader Account',
+            };
+            foreach ($associated as $account) {
+                $accountTeams = $teams->filter(fn ($team) => $team->leader_id === $account->id || $team->members->contains('user_id', $account->id))->pluck('name');
+                $associatedLines[] = '';
+                $associatedLines[] = 'Name: '.$account->name;
+                $associatedLines[] = 'Role: '.($account->getRoleNames()->implode(', ') ?: 'Team Member');
+                $associatedLines[] = 'UserCode: '.$account->user_code;
+                $associatedLines[] = 'Email: '.$account->email;
+                if (preg_match('/^\+?[0-9 ()-]{7,20}$/', (string) $account->phone)) $associatedLines[] = 'Mobile: '.$account->phone;
+                $associatedLines[] = 'Account Status: '.ucfirst($account->status ?: 'Unknown');
+                $associatedLines[] = 'Team: '.($accountTeams->isNotEmpty() ? $accountTeams->implode(', ') : 'Not assigned');
+            }
+        }
+        $associatedDetails = implode("\n", $associatedLines);
         $organization = \App\Models\Organization::find($user->organization_id)?->name ?? '';
         $details = ['Organization: '.$organization, 'Account Name: '.$user->name, 'Role: '.$roleName, 'UserCode: '.$user->user_code, 'Email: '.$user->email];
         if (preg_match('/^\+?[0-9 ()-]{7,20}$/', (string) $user->phone)) $details[] = 'Mobile: '.$user->phone;
@@ -306,6 +341,7 @@ class NotificationDeliveryService
             }
         }
         if ($teams->isEmpty() && in_array($roleKey, ['team-leader', 'sales-executive'])) $details[] = 'Team: Not assigned yet';
+        if ($associatedDetails !== '') $details[] = "\n".$associatedDetails;
         $introduction = match ($roleKey) {
             'builder' => 'Your Builder / Developer account for '.$organization.' is ready. Your organization account details are below.',
             'team-leader' => 'Your Team Leader account is ready. Below are your personal account details and your assigned teams.',
@@ -316,6 +352,7 @@ class NotificationDeliveryService
             'role_name' => $roleName, 'role_introduction' => $introduction, 'account_details' => implode("\n", $details),
             'organization_name' => $organization, 'team_name' => $teams->pluck('name')->implode(', '),
             'team_leader_name' => $teams->pluck('leader.name')->filter()->unique()->implode(', '),
+            'associated_accounts' => $associatedDetails,
         ];
     }
 

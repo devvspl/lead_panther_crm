@@ -27,7 +27,7 @@ class LeadFilteringRulesTest extends TestCase
         parent::setUp();
         $this->seed(RoleSeeder::class);
 
-        $this->admin = User::factory()->create(['status' => 'active']);
+        $this->admin = User::factory()->create(['name' => 'Super Admin', 'status' => 'active']);
         $this->admin->assignRole('Super Admin');
         $this->actingAs($this->admin);
 
@@ -104,15 +104,15 @@ class LeadFilteringRulesTest extends TestCase
 
         // Edit Rule
         $component->call('openEditRuleModal', $rule->id)
-            ->set('ruleName', 'Studio Buyers & Investors Only')
+            ->set('ruleName', 'Studio Buyers and Investors Only')
             ->call('saveRule')
             ->assertHasNoErrors();
 
         $rule->refresh();
-        $this->assertEquals('Studio Buyers & Investors Only', $rule->name);
+        $this->assertEquals('Studio Buyers and Investors Only', $rule->name);
 
         // Verify table renders CRM columns
-        $component->assertSee('Studio Buyers & Investors Only')
+        $component->assertSee('Studio Buyers and Investors Only')
             ->assertSee('All Campaigns')
             ->assertSee('Include Lead')
             ->assertSee('Super Admin');

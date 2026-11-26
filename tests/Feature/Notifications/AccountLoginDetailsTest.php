@@ -280,10 +280,17 @@ class AccountLoginDetailsTest extends TestCase
                 $this->assertStringContainsString('UserCode: '.$recipient->user_code, $mail->messageBody);
                 $this->assertStringContainsString('Bob Sales Team', $mail->messageBody);
                 $this->assertStringNotContainsString('Foreign Secret Team', $mail->messageBody);
+                $allowed = $recipient->id === $builder->id ? [$leader->id, $executive->id, $otherLeader->id]
+                    : ($recipient->id === $leader->id ? [$executive->id] : [$leader->id]);
                 foreach ([$builder, $leader, $executive, $otherLeader] as $other) {
                     if ($other->id === $recipient->id) continue;
-                    $this->assertStringNotContainsString($other->email, $mail->messageBody);
-                    $this->assertStringNotContainsString($other->user_code, $mail->messageBody);
+                    if (in_array($other->id, $allowed)) {
+                        $this->assertStringContainsString('Email: '.$other->email, $mail->messageBody);
+                        $this->assertStringContainsString('UserCode: '.$other->user_code, $mail->messageBody);
+                    } else {
+                        $this->assertStringNotContainsString($other->email, $mail->messageBody);
+                        $this->assertStringNotContainsString($other->user_code, $mail->messageBody);
+                    }
                 }
                 if ($recipient->id === $builder->id) {
                     $this->assertStringContainsString('Role: Builder / Developer', $mail->messageBody);
@@ -343,6 +350,42 @@ class AccountLoginDetailsTest extends TestCase
         $this->assertStringContainsString('<textarea', $html);
         $this->assertStringContainsString('rows="6"', $html);
         $this->assertStringContainsString('Hello</textarea>', $html);
+    }
+
+    public function test_builder_roster_includes_unassigned_and_inactive_accounts_without_passwords_or_other_orgs(): void
+    {
+        Role::firstOrCreate(['name' => 'Builder/Developer', 'guard_name' => 'web']);
+        $builder = $this->member(); $builder->assignRole('Builder/Developer');
+        $unassigned = $this->member(['name' => 'Unassigned Executive', 'phone' => '919123456789']);
+        $inactive = $this->member(['name' => 'Inactive Executive', 'status' => 'inactive']);
+        $foreign = User::factory()->create(['organization_id' => Organization::create(['name' => 'Foreign'])->id]);
+        $privileged = $this->member(); $privileged->assignRole('Super Admin');
+        $component = $this->teamComponent()->set('selectedTeamUserIds', [$builder->id])->call('openAccountEmailComposer');
+        $preview = $component->get('accountEmailPreview');
+        $this->assertStringContainsString('Associated Organization Accounts', $preview);
+        foreach ([$unassigned, $inactive] as $account) {
+            $this->assertStringContainsString($account->name, $preview);
+            $this->assertStringContainsString($account->email, $preview);
+            $this->assertStringContainsString($account->user_code, $preview);
+            $this->assertStringNotContainsString($account->password, $preview);
+        }
+        $this->assertStringContainsString('Account Status: Inactive', $preview);
+        $this->assertStringContainsString('Team: Not assigned', $preview);
+        $this->assertStringContainsString('Mobile: 919123456789', $preview);
+        $this->assertStringNotContainsString($foreign->email, $preview);
+        $this->assertStringNotContainsString($privileged->email, $preview);
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+        $component->call('sendSelectedLoginDetails')->assertHasNoErrors();
+        $this->deliver();
+        Mail::assertSentCount(1);
+        Mail::assertSent(BrandedNotificationMail::class, function ($mail) use ($builder, $unassigned, $inactive) {
+            $this->assertStringContainsString($unassigned->email, $mail->messageBody);
+            $this->assertStringContainsString($inactive->email, $mail->messageBody);
+            $this->assertSame(1, substr_count($mail->messageBody, '/reset-password/'));
+            return $mail->hasTo($builder->email);
+        });
+        $this->assertDatabaseCount('password_reset_tokens', 1);
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => $builder->email]);
     }
 
 }

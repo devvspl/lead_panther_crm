@@ -77,7 +77,8 @@ class LeadFilterRule extends Model
     public function scopeSummary(): string
     {
         if ($this->campaign) {
-            return "Campaign: {$this->campaign->name}";
+            $name = $this->campaign->name;
+            return str_contains($name, '(') ? $name : "{$name} (FB)";
         }
 
         if ($this->project) {

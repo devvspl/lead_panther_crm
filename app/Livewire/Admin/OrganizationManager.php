@@ -19,6 +19,9 @@ use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Locked;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -47,6 +50,66 @@ class OrganizationManager extends Component
     public string $teamLeaderPhone = '';
     public string $teamLeaderPassword = '';
     public array $salesExecutives = [];
+    #[Locked] public int $registrationStep = 1;
+    #[Locked] public bool $mainAccountNameEdited = false;
+    #[Locked] public bool $mainAccountEmailEdited = false;
+    #[Locked] public bool $registrationComplete = false;
+    #[Locked] public string $registrationToken = '';
+
+    private function resetRegistrationWizard(): void
+    {
+        $this->registrationStep = 1;
+        $this->mainAccountNameEdited = false;
+        $this->mainAccountEmailEdited = false;
+        $this->registrationComplete = false;
+        $this->registrationToken = (string) Str::uuid();
+        $this->resetValidation();
+    }
+
+    public function updatedName(): void { if ($this->autoSetup) $this->prefillMainAccount(); }
+    public function updatedBillingEmail(): void { if ($this->autoSetup) $this->prefillMainAccount(); }
+    public function updatedMainAccountName(): void { $this->mainAccountNameEdited = true; }
+    public function updatedMainAccountEmail(): void { $this->mainAccountEmailEdited = true; }
+
+    private function prefillMainAccount(): void
+    {
+        if (!$this->mainAccountNameEdited) $this->mainAccountName = $this->name;
+        if (!$this->mainAccountEmailEdited) $this->mainAccountEmail = $this->billingEmail;
+        // Organization details have no phone field. Keep phone blank unless explicitly supplied.
+        // Passwords remain blank here and use the existing generation at final creation.
+    }
+
+    public function nextRegistrationStep(): void
+    {
+        $rules = $this->registrationRules();
+        $fields = match ($this->registrationStep) {
+            1 => ['name', 'billingEmail', 'status'],
+            2 => ['mainAccountName', 'mainAccountEmail', 'mainAccountPhone', 'mainAccountPassword'],
+            3 => ['teamName', 'teamLeaderName', 'teamLeaderEmail', 'teamLeaderPhone', 'teamLeaderPassword'],
+            4 => array_values(array_filter(array_keys($rules), fn ($key) => str_starts_with($key, 'salesExecutives.'))),
+            default => [],
+        };
+        $this->validate(array_intersect_key($rules, array_flip($fields)));
+        if ($this->registrationStep === 1 && $this->autoSetup) $this->prefillMainAccount();
+        $this->registrationStep = $this->autoSetup ? min(5, $this->registrationStep + 1) : 5;
+        $this->dispatch('registration-step-changed');
+    }
+
+    public function previousRegistrationStep(): void
+    {
+        $this->registrationStep = $this->autoSetup ? max(1, $this->registrationStep - 1) : 1;
+        $this->resetValidation();
+        $this->dispatch('registration-step-changed');
+    }
+
+    public function editRegistrationStep(int $step): void
+    {
+        abort_unless(in_array($step, $this->autoSetup ? [1,2,3,4] : [1], true) && $step < $this->registrationStep, 422);
+        $this->registrationStep = $step;
+        $this->resetValidation();
+        $this->dispatch('registration-step-changed');
+    }
+
 
     public ?int $editingOrganizationId = null;
 
@@ -90,6 +153,7 @@ class OrganizationManager extends Component
     public function mount(): void
     {
         $this->loadColumnPreferences();
+        $this->resetRegistrationWizard();
     }
 
     private function directoryColumns(): array
@@ -210,6 +274,7 @@ class OrganizationManager extends Component
 
     public function openRegisterOrgModal(string $tab = 'create'): void
     {
+        $this->resetRegistrationWizard();
         $this->reset([
             'name', 'status', 'billingEmail',
             'autoSetup', 'mainAccountName', 'mainAccountEmail', 'mainAccountPhone', 'mainAccountPassword',
@@ -225,6 +290,7 @@ class OrganizationManager extends Component
 
     public function closeRegisterOrgModal(): void
     {
+        $this->resetRegistrationWizard();
         $this->showCreateOrgModal = false;
         $this->reset([
             'name', 'status', 'billingEmail',
@@ -238,6 +304,7 @@ class OrganizationManager extends Component
 
     public function updatedAutoSetup(): void
     {
+        $this->registrationStep = 1;
         if ($this->autoSetup) {
             if (empty($this->teamName)) {
                 $this->teamName = 'Primary Sales Team';
@@ -247,9 +314,7 @@ class OrganizationManager extends Component
                     ['name' => '', 'email' => '', 'phone' => '', 'password' => ''],
                 ];
             }
-            if (empty($this->mainAccountEmail) && !empty($this->billingEmail)) {
-                $this->mainAccountEmail = $this->billingEmail;
-            }
+            $this->prefillMainAccount();
         }
     }
 
@@ -274,12 +339,12 @@ class OrganizationManager extends Component
         $this->reset(['importFile', 'importRows', 'importErrors', 'totalImportRows']);
     }
 
-    public function createOrganization(): void
+    protected function registrationRules(): array
     {
         $rules = [
             'name' => 'required|string|max:255',
             'status' => 'nullable|in:active,suspended',
-            'billingEmail' => 'nullable|email|max:255',
+            'billingEmail' => 'nullable|email|max:255|unique:users,email',
         ];
 
         if ($this->autoSetup) {
@@ -291,21 +356,48 @@ class OrganizationManager extends Component
             $rules['teamName'] = 'required|string|max:255';
 
             $rules['teamLeaderName'] = 'required|string|max:255';
-            $rules['teamLeaderEmail'] = 'required|email|max:255|unique:users,email|different:mainAccountEmail';
+            $rules['teamLeaderEmail'] = 'required|email|max:255|unique:users,email|different:mainAccountEmail|different:billingEmail';
             $rules['teamLeaderPhone'] = 'nullable|string|max:25';
             $rules['teamLeaderPassword'] = 'nullable|string|min:6';
 
             foreach ($this->salesExecutives as $idx => $exec) {
                 if (!empty($exec['name']) || !empty($exec['email']) || !empty($exec['phone']) || count($this->salesExecutives) === 1) {
                     $rules["salesExecutives.{$idx}.name"] = 'required|string|max:255';
-                    $rules["salesExecutives.{$idx}.email"] = 'required|email|max:255|unique:users,email|different:mainAccountEmail|different:teamLeaderEmail';
+                    $rules["salesExecutives.{$idx}.email"] = 'required|email|max:255|unique:users,email|different:mainAccountEmail|different:teamLeaderEmail|different:billingEmail';
                     $rules["salesExecutives.{$idx}.phone"] = 'nullable|string|max:25';
                     $rules["salesExecutives.{$idx}.password"] = 'nullable|string|min:6';
                 }
             }
         }
 
-        $this->validate($rules);
+        if ($this->autoSetup) $rules['salesExecutives.*.email'] = 'nullable|email|distinct:ignore_case';
+        return $rules;
+    }
+
+    public function createOrganization(): void
+    {
+        if ($this->registrationComplete) return;
+        $key = 'register-client:'.auth()->id().':'.$this->registrationToken;
+        $lock = Cache::lock($key, 120);
+        if (!$lock->get()) return;
+        try {
+            if (Cache::has($key.':complete')) { $this->registrationComplete = true; return; }
+            try { $this->validate($this->registrationRules()); }
+            catch (ValidationException $e) {
+                $field = array_key_first($e->errors());
+                $this->registrationStep = str_starts_with($field, 'mainAccount') ? 2
+                    : ((str_starts_with($field, 'teamLeader') || $field === 'teamName') ? 3
+                    : (str_starts_with($field, 'salesExecutives') ? 4 : 1));
+                throw $e;
+            }
+            $this->persistOrganization($key);
+        } finally { $lock->release(); }
+    }
+
+    private function persistOrganization(string $submissionKey): void
+    {
+        $wasAutoSetup = $this->autoSetup;
+
 
         DB::beginTransaction();
         try {
@@ -334,14 +426,15 @@ class OrganizationManager extends Component
 
                 // 1. Organization Main Account
                 $mainUserPassword = !empty($this->mainAccountPassword) ? $this->mainAccountPassword : Str::random(12);
-                $mainUser = User::create([
+                $mainUser = strcasecmp($client->email, $this->mainAccountEmail) === 0 ? User::findOrFail($client->id) : new User();
+                $mainUser->fill([
                     'organization_id' => $org->id,
                     'name' => !empty($this->mainAccountName) ? $this->mainAccountName : $this->name,
                     'email' => $this->mainAccountEmail,
                     'phone' => !empty($this->mainAccountPhone) ? $this->mainAccountPhone : null,
                     'password' => bcrypt($mainUserPassword),
                     'status' => $org->status ?: 'active',
-                ]);
+                ])->save();
                 $mainUser->assignRole($builderRole);
 
                 // 2. Team Leader
@@ -398,6 +491,9 @@ class OrganizationManager extends Component
             }
 
             DB::commit();
+            $this->registrationComplete = true;
+            try { Cache::put($submissionKey.':complete', $org->id, now()->addHour()); } catch (Throwable $cacheError) { report($cacheError); }
+            $this->registrationStep = 1;
 
             $this->reset([
                 'name', 'status', 'billingEmail',
@@ -407,7 +503,7 @@ class OrganizationManager extends Component
             ]);
             $this->showCreateOrgModal = false;
             $this->dispatch('close-modal', 'register-organization-modal');
-            $this->dispatch('toast', type: 'success', message: $this->autoSetup ? 'Organization, main account, team, and users created successfully.' : 'Organization created successfully with primary client.');
+            $this->dispatch('toast', type: 'success', message: $wasAutoSetup ? 'Organization, main account, team, and users created successfully.' : 'Organization created successfully with primary client.');
 
         } catch (Throwable $e) {
             DB::rollBack();

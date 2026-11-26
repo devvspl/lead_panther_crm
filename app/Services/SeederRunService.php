@@ -40,16 +40,32 @@ class SeederRunService
         return $class;
     }
     private function schema(): void {
-        $this->tables=collect(Schema::getTables())->pluck('name')->filter(fn($t)=>! str_starts_with($t,'sqlite_'))->values()->all();
-        $this->foreignKeys=[];
-        $this->morphs=[];
-        foreach($this->tables as $table) {
-            $this->foreignKeys[$table]=Schema::getForeignKeys($table);
-            if (in_array($table,self::RETAIN)) continue;
-            $columns=collect(Schema::getColumns($table))->pluck('name')->all();
-            foreach($columns as $column) if (str_ends_with($column,'_type') && in_array(substr($column,0,-5).'_id',$columns)) $this->morphs[]=[$table,$column,substr($column,0,-5).'_id'];
-        }
+        $currentDb = DB::connection()->getDatabaseName();
+        $this->tables = collect(Schema::getTables())
+            ->filter(function($t) use ($currentDb) {
+                $schema = is_array($t) ? ($t['schema'] ?? null) : ($t->schema ?? null);
+                return empty($schema) || $schema === $currentDb;
+            })
+            ->pluck('name')
+            ->filter(fn($t) => ! str_starts_with($t, 'sqlite_'))
+            ->values()
+            ->all();
+        $this->foreignKeys = [];
+        $this->morphs = [];
     }
+
+    private function loadForeignKeys(): void {
+        $currentDb = DB::connection()->getDatabaseName();
+        $cacheKey = 'seeder_run_fks_' . $currentDb;
+        $this->foreignKeys = Cache::remember($cacheKey, 3600, function() {
+            $fks = [];
+            foreach($this->tables as $table) {
+                $fks[$table] = Schema::getForeignKeys($table);
+            }
+            return $fks;
+        });
+    }
+
     private function keyColumns(string $table): array {
         if (isset($this->keys[$table])) return $this->keys[$table];
         $indexes=Schema::getIndexes($table);
@@ -73,6 +89,9 @@ class SeederRunService
     private function snapshot(string $table,bool $dependents): void {
         if (! array_key_exists($table,$this->before)) $this->before[$table]=$this->rows($table);
         if (! $dependents) return;
+        if (empty($this->foreignKeys)) {
+            $this->loadForeignKeys();
+        }
         foreach($this->foreignKeys as $child=>$keys) foreach($keys as $key) {
             if ($key['foreign_table']===$table && ! in_array($child,self::RETAIN) && ! array_key_exists($child,$this->before)) $this->snapshot($child,true);
         }
@@ -94,14 +113,25 @@ class SeederRunService
                 return;
             }
             if (! in_array($table,$this->tables)) throw new \DomainException('Seeder wrote to an unsupported table.');
-            $this->snapshot($table,! str_starts_with(strtolower($m[1]),'insert') || preg_match('/\breplace\b|on\s+(duplicate|conflict)/i',$sql));
+            $isDelete = str_starts_with(strtolower($m[1]), 'delete');
+            $this->snapshot($table, $isDelete || preg_match('/\breplace\b/i', $sql));
         } finally { $this->inside=false; }
     }
     public function run(string $class,?User $actor=null): SeederRun {
         $this->guard($actor); $class=$this->canonical($class);
         if (! Schema::hasTable('seeder_runs')) throw new \DomainException('Apply the seeder tracking migration before running seeders.');
         if ($this->recording) throw new \DomainException('Use Seeder::call for nested seeders within the current tracked run.');
-        return Cache::lock('seeder-database-operation',600)->block(1,function() use($class,$actor) {
+
+        // Auto-heal abandoned running runs older than 5 minutes
+        SeederRun::where('status', 'running')
+            ->where('started_at', '<', now()->subMinutes(5))
+            ->update([
+                'status' => 'failed',
+                'error' => 'Seeder execution timed out or was interrupted.',
+                'completed_at' => now(),
+            ]);
+
+        $execute = function() use($class,$actor) {
             $run=SeederRun::create(['seeder_class'=>$class,'status'=>'running','user_id'=>$actor?->id,'started_at'=>now()]);
             $this->before=[]; $this->keys=[]; $this->schema();
             $this->hook(DB::connection()); $this->activeConnection=DB::connection()->getName();
@@ -131,7 +161,14 @@ class SeederRunService
                 $this->audit($run,'failed',$actor);
                 throw $e;
             } finally { $this->recording=false; $this->before=[]; app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions(); }
-        });
+        };
+
+        try {
+            return Cache::lock('seeder-database-operation',600)->block(2, $execute);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            Cache::lock('seeder-database-operation')->forceRelease();
+            return Cache::lock('seeder-database-operation',600)->block(2, $execute);
+        }
     }
     private function audit(SeederRun $run,string $action,?User $actor): void {
         AuditLog::create(['user_id'=>$actor?->id,'action'=>'seeder.'.$action,'subject_type'=>SeederRun::class,'subject_id'=>$run->id,

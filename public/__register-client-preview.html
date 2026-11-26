@@ -1,0 +1,134 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="file:///C:/work/project/laravel/lead_panther_crm/public/build/assets/app-IJNf_snJ.css"></head><body><div x-data="{
+        show:  true ,
+        returnFocus: null,
+        destroy() { window.LeadPantherUI.lock(this.$el, false); },
+        focusables() {
+            // All focusable element types...
+            let selector = 'a, button, input:not([type=\'hidden\']), textarea, select, details, [tabindex]:not([tabindex=\'-1\'])'
+            return [...$el.querySelectorAll(selector)]
+                // All non-disabled elements...
+                .filter(function(el) { return !el.disabled &amp;&amp; el.tabIndex !== -1 &amp;&amp; el.getClientRects().length &gt; 0; })
+        },
+        firstFocusable() { return this.focusables()[0] },
+        lastFocusable() { return this.focusables().slice(-1)[0] },
+        nextFocusable() { return this.focusables()[this.nextFocusableIndex()] || this.firstFocusable() },
+        prevFocusable() { return this.focusables()[this.prevFocusableIndex()] || this.lastFocusable() },
+        nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
+        prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) -1 },
+    }" x-init="$watch('show', value =&gt; {
+        window.LeadPantherUI.lock($el, value);
+        if (value) { returnFocus = document.activeElement; $nextTick(() =&gt; firstFocusable()?.focus()); }
+        else if (returnFocus?.isConnected) returnFocus.focus();
+    }); window.LeadPantherUI.lock($el, show)" x-on:open-modal.window="$event.detail == 'register-organization-modal' ? show = true : null" x-on:close-modal.window="$event.detail == 'register-organization-modal' ? show = false : null" x-on:close.stop="show = false" x-on:keydown.escape.window="show = false" x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable()?.focus()" x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()" x-show="show" role="dialog" aria-modal="true" aria-label="register organization modal" tabindex="-1" class="fixed inset-0 overscroll-contain px-3 sm:px-4 py-4 z-50 flex items-center justify-center overflow-hidden" style="display: flex;">
+    <div x-show="show" class="fixed inset-0 transform transition-all" x-on:click="show = false" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"></div>
+    </div>
+
+    <div x-show="show" class="lp-modal-panel relative mx-auto w-full h-[90dvh] max-h-[calc(100dvh-2rem)] overflow-hidden overscroll-contain bg-surface rounded-card border border-border shadow-2xl transform transition-all sm:w-[90vw] sm:max-w-none sm:mx-auto" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+        <div class="flex h-full min-h-0 flex-col" data-registration-modal>
+            <!-- Modal Header -->
+            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-ink">Register Client</h3>
+                        <p class="text-xs text-muted">Register a client and optional accounts, or import a spreadsheet.</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeRegisterOrgModal" class="text-muted hover:text-ink transition p-1.5 rounded-lg hover:bg-canvas cursor-pointer" title="Close Modal">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Two Options: Create vs Import Tabs -->
+            <div class="grid shrink-0 grid-cols-2 gap-1 bg-canvas border-b border-border px-3 py-1.5 sm:px-4">
+                <button type="button" wire:click="$set('orgModalTab', 'create')" class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer bg-surface text-ink shadow-xs border border-border">
+                    <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span>Create Client</span>
+                </button>
+
+                <button type="button" wire:click="$set('orgModalTab', 'import')" class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer text-muted hover:text-ink">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    <span>Import Clients</span>
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5" data-registration-body x-on:registration-step-changed.window="$el.scrollTop = 0">
+            <!-- Organization registration wizard; all steps share the existing creation action. -->
+            <!--[if BLOCK]><![endif]-->                                <div class="mx-auto max-w-5xl space-y-4" wire:key="registration-step-2">
+                    <nav aria-label="Registration steps" class="flex gap-2 overflow-x-auto pb-1">
+                        <!--[if BLOCK]><![endif]-->                            <button type="button" wire:click="editRegistrationStep(1)" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs border-border bg-canvas text-muted">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-[11px]">1</span>
+                                <span class="hidden sm:block">Organization Details</span>
+                            </button>
+                                                    <button type="button" disabled aria-current="step" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs border-primary bg-primary/10 text-primary font-bold">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-[11px]">2</span>
+                                <span class="hidden sm:block">Main Account</span>
+                            </button>
+                                                    <button type="button" disabled class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs border-border bg-canvas text-muted">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-[11px]">3</span>
+                                <span class="hidden sm:block">Team &amp; Team Leader</span>
+                            </button>
+                                                    <button type="button" disabled class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs border-border bg-canvas text-muted">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-[11px]">4</span>
+                                <span class="hidden sm:block">Sales Executives</span>
+                            </button>
+                                                    <button type="button" disabled class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs border-border bg-canvas text-muted">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-[11px]">5</span>
+                                <span class="hidden sm:block">Review &amp; Create</span>
+                            </button>
+                        <!--[if ENDBLOCK]><![endif]-->                    </nav>
+                    <div><p class="text-[11px] font-semibold text-muted">Step 2 of 5</p><h4 class="text-base font-bold text-ink">Main Account</h4></div>
+                    <!--[if BLOCK]><![endif]-->                        <p class="text-xs text-muted">Role: Builder/Developer. Name and email are filled from organization details; you can edit them. Leave passwords blank to generate them when creating the accounts.</p>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <!--[if BLOCK]><![endif]-->                                <div>
+                                    <label for="register-mainAccountName" class="mb-1 block text-xs font-semibold">Account Name <!--[if BLOCK]><![endif]--><span class="font-normal text-muted">(Optional)</span><!--[if ENDBLOCK]><![endif]--></label>
+                                    <!--[if BLOCK]><![endif]--><input id="register-mainAccountName" name="mainAccountName" type="text" wire:model="mainAccountName" autocomplete="name" placeholder="Leave blank to use client name" class="h-9 w-full rounded-lg border border-border bg-canvas px-3 text-xs"><!--[if ENDBLOCK]><![endif]-->                                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                                </div>
+                                                            <div>
+                                    <label for="register-mainAccountEmail" class="mb-1 block text-xs font-semibold">Account Email <!--[if BLOCK]><![endif]--><span class="text-danger">*</span><!--[if ENDBLOCK]><![endif]--></label>
+                                    <!--[if BLOCK]><![endif]--><input id="register-mainAccountEmail" name="mainAccountEmail" type="email" wire:model="mainAccountEmail" autocomplete="email" placeholder="e.g. admin@organization.com" class="h-9 w-full rounded-lg border border-border bg-canvas px-3 text-xs"><!--[if ENDBLOCK]><![endif]-->                                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                                </div>
+                                                            <div>
+                                    <label for="register-mainAccountPhone" class="mb-1 block text-xs font-semibold">Mobile Number <!--[if BLOCK]><![endif]--><span class="font-normal text-muted">(Optional)</span><!--[if ENDBLOCK]><![endif]--></label>
+                                    <!--[if BLOCK]><![endif]--><input id="register-mainAccountPhone" name="mainAccountPhone" type="tel" wire:model="mainAccountPhone" autocomplete="tel" inputmode="tel" maxlength="25" placeholder="e.g. +91 9876543210" class="h-9 w-full rounded-lg border border-border bg-canvas px-3 text-xs"><!--[if ENDBLOCK]><![endif]-->                                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                                </div>
+                                                            <div>
+                                    <label for="register-mainAccountPassword" class="mb-1 block text-xs font-semibold">Password <!--[if BLOCK]><![endif]--><span class="font-normal text-muted">(Optional)</span><!--[if ENDBLOCK]><![endif]--></label>
+                                    <!--[if BLOCK]><![endif]--><div class="relative" x-data="{ visible: false }" x-on:profile-password-generated.window="if (false) visible = true" x-on:password-updated.window="visible = false">
+    <input type="password" x-bind:type="visible ? 'text' : 'password'" class="w-full h-9 pl-3.5 pr-16 rounded-lg border border-border bg-canvas text-ink text-xs focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition font-medium placeholder:text-muted" id="register-mainAccountPassword" wire:model="mainAccountPassword" autocomplete="new-password" placeholder="Auto-generated if blank">
+    <button type="button" x-on:click="visible = !visible" x-bind:aria-pressed="visible" x-bind:aria-label="visible ? 'Hide password' : 'Show password'" class="absolute right-1 top-1 bottom-1 px-2 rounded text-xs font-semibold text-muted hover:text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-primary">
+        <span x-text="visible ? 'Hide' : 'Show'">Show</span>
+    </button>
+</div>
+                                    <!--[if ENDBLOCK]><![endif]-->                                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                                </div>
+                            <!--[if ENDBLOCK]><![endif]-->                        </div>
+                    <!--[if ENDBLOCK]><![endif]-->                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                </div>
+            <!--[if ENDBLOCK]><![endif]-->
+            <!-- OPTION 2: IMPORT ORGANIZATIONS -->
+            <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->            </div>
+            <footer class="shrink-0 border-t border-border bg-surface px-4 py-2.5 sm:px-5" data-registration-footer>
+                <!--[if BLOCK]><![endif]-->                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button type="button" class="border border-border bg-surface hover:bg-canvas text-ink font-medium py-2 px-4 rounded-lg shadow-sm transition ease-in-out duration-150 text-sm text-xs" wire:click="closeRegisterOrgModal">
+    Cancel
+</button>
+                        <div class="flex items-center gap-2">
+                            <!--[if BLOCK]><![endif]--><button type="button" class="border border-border bg-surface hover:bg-canvas text-ink font-medium py-2 px-4 rounded-lg shadow-sm transition ease-in-out duration-150 text-sm text-xs" wire:click="previousRegistrationStep" wire:loading.attr="disabled">
+    Back
+</button>
+<!--[if ENDBLOCK]><![endif]-->                            <!--[if BLOCK]><![endif]-->                                <button type="button" class="bg-accent hover:opacity-90 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition ease-in-out duration-150 text-sm text-xs" wire:click="nextRegistrationStep" wire:loading.attr="disabled">
+    Next
+</button>
+                            <!--[if ENDBLOCK]><![endif]-->                        </div>
+                    </div>
+                <!--[if ENDBLOCK]><![endif]-->            </footer>
+        </div>
+    </div>
+</div></body></html>

@@ -105,6 +105,16 @@ class Organization extends Model
         return $this->hasMany(User::class);
     }
 
+    public function leadFilterRules(): HasMany
+    {
+        return $this->hasMany(LeadFilterRule::class);
+    }
+
+    public function leadFilterLogs(): HasMany
+    {
+        return $this->hasMany(LeadFilterLog::class);
+    }
+
     public function getIsActiveAttribute(): bool
     {
         return ($this->attributes['status'] ?? 'active') === 'active';

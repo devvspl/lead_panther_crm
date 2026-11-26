@@ -197,10 +197,39 @@ class ProcessInboundLeadJob implements ShouldQueue
                     $campaignId = $campaign->id;
                 }
 
+                // 2. Custom Lead Filtering Rules Check (Builder / Developer Campaign Filters)
+                $clientUser = \App\Models\User::find($clientId);
+                $organizationId = $clientUser?->organization_id;
+                if ($organizationId) {
+                    $ruleEngine = app(\App\Services\LeadFilterRuleEngine::class);
+                    $filterEval = $ruleEngine->evaluateLead($mapped, $organizationId, $campaignId);
+
+                    if (!$filterEval->passed) {
+                        $mobile = $mapped['mobile'] ?? '';
+                        $leadIdentifier = $mapped['name'] ?? ($mobile ?: ($mapped['leadgen_id'] ?? 'Inbound Lead'));
+                        $ruleEngine->recordLog(
+                            organizationId: $organizationId,
+                            campaignId: $campaignId,
+                            ruleId: $filterEval->matchedRule?->id,
+                            leadIdentifier: (string) $leadIdentifier,
+                            action: 'skipped',
+                            reason: $filterEval->reason,
+                            matchedConditions: $filterEval->matchedConditions,
+                            payload: $mapped
+                        );
+
+                        $this->webhookLog->update([
+                            'processed' => true,
+                            'error_message' => 'Lead skipped by custom filter rule: ' . $filterEval->reason,
+                        ]);
+                        return;
+                    }
+                }
+
                 $mobile = $mapped['mobile'] ?? '';
                 $email = !empty($mapped['email']) && $mapped['email'] !== 'unknown@example.com' ? $mapped['email'] : null;
 
-                // 2. 90-Day Duplicate Check
+                // 3. 90-Day Duplicate Check
                 $existingLead = Lead::where('client_id', $clientId)
                     ->where('created_at', '>=', now()->subDays(90))
                     ->where(function ($q) use ($mobile, $email) {

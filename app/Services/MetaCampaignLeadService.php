@@ -180,8 +180,15 @@ class MetaCampaignLeadService
                         DB::transaction(fn () => (new ProcessInboundLeadJob($log))->handle());
                         $log->refresh();
                         if (!$log->processed) throw new \RuntimeException('Lead ingestion did not finish.');
-                        if ($log->error_message) $state['duplicates']++;
-                        else $state['created']++;
+                        if ($log->error_message) {
+                            if (str_contains($log->error_message, 'skipped by custom filter rule') || str_contains($log->error_message, 'skipped by filter rule')) {
+                                $state['skipped']++;
+                            } else {
+                                $state['duplicates']++;
+                            }
+                        } else {
+                            $state['created']++;
+                        }
                         $state['fetched']++;
                         $state['batch_processed'][] = (string) $raw['id'];
                         $record->update(['lead_fetch_state' => $state]);

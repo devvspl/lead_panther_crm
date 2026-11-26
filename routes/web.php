@@ -38,6 +38,7 @@ use App\Livewire\Team\BuilderTeamManager;
 use App\Livewire\Settings\OrganizationProfile;
 use App\Livewire\Settings\IntegrationsManager;
 use App\Livewire\Settings\UserInvite;
+use App\Livewire\Settings\LeadFilteringRules;
 
 // Signed Public Proposal Viewer Route
 Route::get('/proposals/view/{proposal}', [ProposalViewerController::class, 'view'])->name('proposals.public_view')->middleware('signed');
@@ -155,7 +156,7 @@ Route::get('/reports', ReportsContainer::class)->middleware(['auth'])->name('rep
 
 // Settings Routes
 Route::get('/settings/organization', OrganizationProfile::class)->middleware(['auth'])->name('settings.organization');
-
+Route::get('/settings/lead-filters', LeadFilteringRules::class)->middleware(['auth'])->name('settings.lead-filters');
 Route::get('/settings/integrations', IntegrationsManager::class)->middleware(['auth', 'role:Super Admin|super-admin'])->name('settings.integrations');
 
 Route::get('/settings/users', UserInvite::class)->middleware(['auth'])->name('settings.users');

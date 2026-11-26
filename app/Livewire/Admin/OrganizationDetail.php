@@ -37,6 +37,7 @@ use Throwable;
 class OrganizationDetail extends Component
 {
     use WithPagination;
+    use \Livewire\WithFileUploads;
 
     public Organization $organization;
 
@@ -1282,6 +1283,213 @@ class OrganizationDetail extends Component
     }
 
     // Team Management & Filters
+    public array $selectedTeamUserIds = [];
+    #[\Livewire\Attributes\Locked]
+    public array $loginDetailsLogIds = [];
+    #[\Livewire\Attributes\Locked]
+    public string $loginDetailsBatch = '';
+
+    public bool $showAccountEmailComposer = false;
+    public string $accountEmailSubject = '';
+    public string $accountEmailBody = '';
+    public string $accountEmailCc = '';
+    public string $accountEmailBcc = '';
+    public bool $accountEmailCopyToMe = false;
+    public array $accountEmailAttachments = [];
+    public string $accountEmailRecipientSearch = '';
+    public string $accountEmailPreviewUserId = '';
+
+    public function openAccountEmailComposer(): void
+    {
+        $this->authorizeLoginDetails();
+        $this->validate(['selectedTeamUserIds' => ['required', 'array', 'min:1', 'max:100'], 'selectedTeamUserIds.*' => ['integer']]);
+        $ids = array_unique(array_map('intval', $this->selectedTeamUserIds));
+        abort_unless(User::where('organization_id', $this->organization->id)->whereIn('id', $ids)->count() === count($ids), 403);
+        $this->resetValidation();
+        $this->reset(['accountEmailCc', 'accountEmailBcc', 'accountEmailCopyToMe', 'accountEmailAttachments', 'accountEmailRecipientSearch']);
+        $content = app(\App\Services\NotificationDeliveryService::class)->accountLoginEmailDefaults();
+        $this->accountEmailSubject = $content['subject'];
+        $this->accountEmailBody = $content['body'];
+        $this->accountEmailPreviewUserId = (string) reset($ids);
+        $this->loginDetailsBatch = '';
+        $this->showAccountEmailComposer = true;
+    }
+
+    public function getAccountEmailRecipientOptionsProperty()
+    {
+        if (! $this->showAccountEmailComposer) return collect();
+        $this->authorizeLoginDetails();
+        return User::where('organization_id', $this->organization->id)
+            ->when(trim($this->accountEmailRecipientSearch) !== '', function ($query) {
+                $search = '%'.trim($this->accountEmailRecipientSearch).'%';
+                $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
+            })->orderBy('name')->limit(100)->get(['id', 'name', 'email', 'status']);
+    }
+
+    public function getAccountEmailSelectedRecipientsProperty()
+    {
+        if (! $this->showAccountEmailComposer) return collect();
+        $this->authorizeLoginDetails();
+        return User::where('organization_id', $this->organization->id)->whereIn('id', $this->selectedTeamUserIds)->orderBy('name')->get(['id', 'name', 'email', 'organization_id', 'user_code']);
+    }
+
+    public function getAccountEmailPreviewProperty(): string
+    {
+        if (! $this->showAccountEmailComposer) return '';
+        $this->authorizeLoginDetails();
+        $user = $this->accountEmailSelectedRecipients->firstWhere('id', (int) $this->accountEmailPreviewUserId) ?? $this->accountEmailSelectedRecipients->first();
+        if (! $user) return '';
+        $message = app(\App\Services\NotificationDeliveryService::class)->renderAccountLoginEmail(
+            ['subject' => $this->accountEmailSubject, 'body' => $this->accountEmailBody], $user,
+            '[Secure password setup link generated separately when sending]'
+        );
+        return (new \App\Mail\BrandedNotificationMail($message['subject'], $message['body']))->render();
+    }
+
+    public function removeAccountEmailAttachment(int $index): void
+    {
+        $this->authorizeLoginDetails();
+        unset($this->accountEmailAttachments[$index]);
+        $this->accountEmailAttachments = array_values($this->accountEmailAttachments);
+        $this->resetValidation('accountEmailAttachments');
+    }
+
+    protected function accountEmailCopyAddresses(string $value, string $field): array
+    {
+        $addresses = array_values(array_unique(array_filter(array_map(fn ($email) => strtolower(trim($email)), preg_split('/[,;\s]+/', $value)))));
+        $validator = \Illuminate\Support\Facades\Validator::make([$field => $addresses], [
+            $field => ['array', 'max:20'], $field.'.*' => ['email:rfc', 'max:254'],
+        ]);
+        if ($validator->fails()) throw \Illuminate\Validation\ValidationException::withMessages([$field => 'Enter up to 20 valid email addresses, separated by commas.']);
+        return $addresses;
+    }
+
+    protected function authorizeLoginDetails(): void
+    {
+        abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403);
+    }
+
+    protected function filteredTeamMembers()
+    {
+        $query = User::where('organization_id', $this->organization->id);
+        if (trim($this->userSearch) !== '') {
+            $search = '%'.trim($this->userSearch).'%';
+            $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search)->orWhere('phone', 'like', $search));
+        }
+        if ($this->userRoleFilter !== 'all') {
+            $role = $this->userRoleFilter;
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role)->orWhere('name', strtolower(str_replace(' ', '-', $role))));
+        }
+        return $query;
+    }
+
+    public function updatedSelectedTeamUserIds(): void { $this->loginDetailsBatch = ''; }
+
+    public function toggleAllTeamUsers(): void
+    {
+        $this->authorizeLoginDetails();
+        $ids = $this->filteredTeamMembers()->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $this->selectedTeamUserIds = count(array_diff($ids, $this->selectedTeamUserIds)) === 0 ? [] : $ids;
+        $this->loginDetailsBatch = '';
+    }
+
+    public function sendSelectedLoginDetails(): void
+    {
+        $this->authorizeLoginDetails();
+        $this->validate([
+            'selectedTeamUserIds' => ['required', 'array', 'min:1', 'max:100'], 'selectedTeamUserIds.*' => ['required', 'integer'],
+            'accountEmailSubject' => ['required', 'string', 'max:200', 'not_regex:/[\r\n]/'],
+            'accountEmailBody' => ['required', 'string', 'max:20000', function ($attribute, $value, $fail) {
+                if (! str_contains($value, '{{password_setup_link}}')) $fail('Keep the {{password_setup_link}} placeholder so each user receives their own secure setup link.');
+            }],
+            'accountEmailCc' => ['string', 'max:6000'], 'accountEmailBcc' => ['string', 'max:6000'],
+            'accountEmailAttachments' => ['array', 'max:5'], 'accountEmailAttachments.*' => ['file', 'max:10240'],
+        ]);
+        if (collect($this->accountEmailAttachments)->sum(fn ($file) => $file->getSize()) > 15 * 1024 * 1024) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['accountEmailAttachments' => 'Attachments must total 15 MB or less.']);
+        }
+        $ids = array_values(array_unique(array_map('intval', $this->selectedTeamUserIds)));
+        $members = User::where('organization_id', $this->organization->id)->whereIn('id', $ids)->get();
+        abort_unless($members->count() === count($ids), 403);
+        $cc = $this->accountEmailCopyAddresses($this->accountEmailCc, 'accountEmailCc');
+        $bcc = $this->accountEmailCopyAddresses($this->accountEmailBcc, 'accountEmailBcc');
+        if ($this->accountEmailCopyToMe) $bcc = array_unique(array_merge($bcc, $this->accountEmailCopyAddresses(auth()->user()->email, 'accountEmailBcc')));
+        $to = $members->map(fn ($user) => strtolower($user->email))->all();
+        if (array_intersect($to, array_merge($cc, $bcc))) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['accountEmailCc' => 'Selected team members already receive separate emails. Remove their addresses from CC/BCC.']);
+        }
+        $bcc = array_values(array_diff($bcc, $cc));
+        $this->loginDetailsBatch = $this->loginDetailsBatch ?: (string) Str::uuid();
+        $key = 'account-login-batch:'.auth()->id().':'.$this->organization->id.':'.$this->loginDetailsBatch;
+        $this->loginDetailsLogIds = \Illuminate\Support\Facades\Cache::lock($key.':lock', 120)->block(5, function () use ($members, $key, $cc, $bcc) {
+            if ($existing = \Illuminate\Support\Facades\Cache::get($key)) return $existing;
+            $attachments = [];
+            try {
+                foreach ($this->accountEmailAttachments as $file) {
+                    $path = $file->store('account-email-attachments/'.now()->format('Y-m-d').'/'.$this->loginDetailsBatch, 'local');
+                    if (! $path) throw new \RuntimeException('Attachment storage failed');
+                    $attachments[] = ['path' => $path, 'name' => substr(preg_replace('/[\x00-\x1f\x7f]/', '', basename(str_replace('\\', '/', $file->getClientOriginalName()))), 0, 200), 'mime' => $file->getMimeType() ?: 'application/octet-stream'];
+                }
+                $composer = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
+                    'subject' => $this->accountEmailSubject, 'body' => $this->accountEmailBody,
+                    'cc' => $cc, 'bcc' => $bcc, 'attachments' => $attachments,
+                ], JSON_THROW_ON_ERROR));
+                $logs = DB::transaction(function () use ($members, $composer) {
+                    $logs = [];
+                    foreach ($members as $member) {
+                        $log = \App\Models\NotificationLog::create([
+                            'notifiable_type' => User::class, 'notifiable_id' => $member->id,
+                            'channel' => 'email', 'status' => 'pending', 'retries' => 0,
+                            'payload' => json_encode(['template_key' => 'account_login_details', 'organization_id' => $this->organization->id, 'sender_id' => auth()->id(), 'batch_id' => $this->loginDetailsBatch, 'composer' => $composer]),
+                        ]);
+                        $logs[] = $log->id;
+                    }
+                    return $logs;
+                });
+            } catch (Throwable $exception) {
+                foreach ($attachments as $attachment) \Illuminate\Support\Facades\Storage::disk('local')->delete($attachment['path']);
+                throw \Illuminate\Validation\ValidationException::withMessages(['accountEmailAttachments' => 'Unable to prepare the email. Check attachment storage and try again.']);
+            }
+            \Illuminate\Support\Facades\Cache::put($key, $logs, now()->addDay());
+            foreach ($logs as $id) $this->dispatchAccountLoginDetails($id);
+            return $logs;
+        });
+        $this->showAccountEmailComposer = false;
+        $this->accountEmailAttachments = [];
+        $this->dispatch('toast', type: 'success', message: 'Account emails submitted. See recipient statuses below.');
+    }
+
+    public function retryLoginDetails(int $userId): void
+    {
+        $this->authorizeLoginDetails();
+        abort_unless(User::where('organization_id', $this->organization->id)->whereKey($userId)->exists(), 403);
+        $log = \App\Models\NotificationLog::whereIn('id', $this->loginDetailsLogIds)->where('notifiable_type', User::class)->where('notifiable_id', $userId)->where('status', 'failed')->first();
+        if ($log && \App\Models\NotificationLog::whereKey($log->id)->where('status', 'failed')->update(['status' => 'pending', 'last_error' => null])) {
+            $this->dispatchAccountLoginDetails($log->id);
+        }
+    }
+
+    protected function dispatchAccountLoginDetails(int $id): void
+    {
+        try {
+            \App\Jobs\SendAccountLoginDetails::dispatch($id);
+        } catch (Throwable $exception) {
+            \App\Models\NotificationLog::whereKey($id)->where('status', 'pending')->update([
+                'status' => 'failed', 'last_error' => 'Email could not be queued. Please retry.',
+            ]);
+        }
+    }
+
+    public function getLoginDetailsResultsProperty(): array
+    {
+        if (! $this->loginDetailsLogIds) return [];
+        $this->authorizeLoginDetails();
+        return \App\Models\NotificationLog::whereIn('id', $this->loginDetailsLogIds)
+            ->where('notifiable_type', User::class)
+            ->whereIn('notifiable_id', User::where('organization_id', $this->organization->id)->select('id'))
+            ->get()->mapWithKeys(fn ($log) => [$log->notifiable_id => ['status' => $log->status, 'error' => $log->last_error]])->all();
+    }
+
     public string $userSearch = '';
     public string $userRoleFilter = 'all';
     public bool $showAddMemberModal = false;
@@ -1412,11 +1620,15 @@ class OrganizationDetail extends Component
 
     public function updatedUserSearch(): void
     {
+        $this->selectedTeamUserIds = [];
+        $this->loginDetailsBatch = '';
         $this->resetPage();
     }
 
     public function updatedUserRoleFilter(): void
     {
+        $this->selectedTeamUserIds = [];
+        $this->loginDetailsBatch = '';
         $this->resetPage();
     }
 
@@ -1977,22 +2189,7 @@ class OrganizationDetail extends Component
         $userIds = User::where('organization_id', $orgId)->pluck('id')->toArray();
 
         // 1. Team Members Query
-        $usersQuery = User::where('organization_id', $orgId)->with('roles');
-        if (!empty($this->userSearch)) {
-            $search = '%' . trim($this->userSearch) . '%';
-            $usersQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', $search)
-                    ->orWhere('email', 'like', $search)
-                    ->orWhere('phone', 'like', $search);
-            });
-        }
-        if ($this->userRoleFilter !== 'all') {
-            $roleFilter = $this->userRoleFilter;
-            $usersQuery->whereHas('roles', function ($q) use ($roleFilter) {
-                $q->where('name', $roleFilter)
-                    ->orWhere('name', strtolower(str_replace(' ', '-', $roleFilter)));
-            });
-        }
+        $usersQuery = $this->filteredTeamMembers()->with('roles');
         $teamMembers = $usersQuery->orderBy('name')->get();
         $teamMembershipDetails = [];
         if ($this->activeTab === 'team') {

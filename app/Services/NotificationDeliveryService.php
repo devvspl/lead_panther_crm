@@ -268,6 +268,83 @@ class NotificationDeliveryService
         return $log;
     }
 
+    public function accountLoginEmailDefaults(): array
+    {
+        $template = NotificationTemplate::where('key', 'account_login_details')->where('channel', 'email')->first();
+        return [
+            'subject' => $template?->subject ?: 'Your Lead Panther Account Login Details',
+            'body' => $template?->body ?: "Hello {{user_name}},\n\nYour Lead Panther account has been created successfully.\n\nOrganization: {{organization_name}}\nUserCode: {{user_code}}\nEmail: {{email}}\nLogin URL: {{login_url}}\n\nPlease use the secure password setup link below to create your password and access your account.\n\n{{password_setup_link}}\n\nThis link expires in " . config('auth.passwords.users.expire', 60) . " minutes.\n\nRegards,\nLead Panther Team",
+        ];
+    }
+
+    public function renderAccountLoginEmail(array $content, User $user, string $setupLink): array
+    {
+        $tokens = [
+            'user_name' => $user->name, 'recipient_name' => $user->name,
+            'organization_name' => \App\Models\Organization::find($user->organization_id)?->name ?? '',
+            'user_code' => $user->user_code, 'email' => $user->email,
+            'login_url' => route('login'), 'password_setup_link' => $setupLink,
+        ];
+        // One pass prevents token-looking characters in names from becoming template instructions.
+        $replacements = [];
+        foreach ($tokens as $key => $value) $replacements['{{'.$key.'}}'] = (string) $value;
+        return ['subject' => strtr($content['subject'], $replacements), 'body' => strtr($content['body'], $replacements)];
+    }
+
+    /** Deliver one account invitation without persisting the password-reset secret. */
+    public function sendAccountLoginDetails(NotificationLog $log): void
+    {
+        $metadata = json_decode($log->payload ?? '{}', true);
+        $user = User::where('organization_id', $metadata['organization_id'] ?? null)->find($log->notifiable_id);
+        $sender = User::find($metadata['sender_id'] ?? null);
+        if (! $sender || $sender->status !== 'active' || ! $sender->hasAnyRole(['Super Admin', 'super-admin'])) {
+            $log->update(['status' => self::STATUS_FAILED, 'last_error' => 'Sender is no longer authorized.']);
+            return;
+        }
+        if (! $user || $user->status !== 'active' || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+            $log->update(['status' => self::STATUS_FAILED, 'last_error' => 'Recipient must have an active account and valid email address.']);
+            return;
+        }
+        if (! app(EmailDesignService::class)->enabled() || in_array(config('mail.default'), ['log', 'array'])) {
+            $log->update(['status' => self::STATUS_FAILED, 'last_error' => 'Enable email notifications and configure a real mail transport before retrying.']);
+            return;
+        }
+        try {
+            $content = isset($metadata['composer'])
+                ? json_decode(\Illuminate\Support\Facades\Crypt::decryptString($metadata['composer']), true, flags: JSON_THROW_ON_ERROR)
+                : $this->accountLoginEmailDefaults();
+            foreach ($content['attachments'] ?? [] as $attachment) {
+                if (! str_starts_with($attachment['path'], 'account-email-attachments/') || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($attachment['path'])) {
+                    $log->update(['status' => self::STATUS_FAILED, 'last_error' => 'An attachment has expired or is unavailable. Open the composer and attach it again.']);
+                    return;
+                }
+            }
+            $result = \Illuminate\Support\Facades\Password::broker()->sendResetLink(
+                ['email' => $user->email],
+                function ($recipient, string $token) use ($user, $log, $content) {
+                    if ($recipient->id !== $user->id) throw new \RuntimeException('Recipient mismatch');
+                    $message = $this->renderAccountLoginEmail($content, $user, route('password.reset', ['token' => $token, 'email' => $user->email]));
+                    $delivery = $this->dispatchToChannel('email', $user->email, $message['subject'], $message['body'], [
+                        '_sensitive_account_email' => true,
+                        '_account_cc' => $content['cc'] ?? [], '_account_bcc' => $content['bcc'] ?? [],
+                        '_account_attachments' => $content['attachments'] ?? [],
+                    ]);
+                    $log->update([
+                        'status' => $delivery['success'] ? self::STATUS_SENT : self::STATUS_FAILED,
+                        'sent_at' => $delivery['success'] ? now() : null,
+                        // Transport errors may contain message contents; keep secrets out of logs and UI.
+                        'last_error' => $delivery['success'] ? null : 'Email delivery failed. Check email configuration and retry.',
+                    ]);
+                }
+            );
+            if ($result !== \Illuminate\Support\Facades\Password::RESET_LINK_SENT) {
+                $log->update(['status' => self::STATUS_FAILED, 'last_error' => $result === \Illuminate\Support\Facades\Password::RESET_THROTTLED ? 'A reset link was recently requested. Wait one minute before retrying.' : 'Password setup link could not be generated.']);
+            }
+        } catch (\Throwable $exception) {
+            $log->update(['status' => self::STATUS_FAILED, 'last_error' => 'Account email could not be sent. Please retry.']);
+        }
+    }
+
     /**
      * Retry a failed notification log.
      */
@@ -279,6 +356,14 @@ class NotificationDeliveryService
             return $log->fresh();
         }
         $payload = json_decode($log->payload ?? '{}', true);
+
+        if (($payload['template_key'] ?? null) === 'account_login_details') {
+            if ($log->status === self::STATUS_FAILED) {
+                $log->update(['status' => self::STATUS_PENDING, 'last_error' => null]);
+                \App\Jobs\SendAccountLoginDetails::dispatch($log->id);
+            }
+            return $log->fresh();
+        }
 
         $recipient = $payload['recipient'] ?? 'unknown';
         $subject = $payload['subject'] ?? 'Retry Notification';
@@ -334,7 +419,15 @@ class NotificationDeliveryService
                     if (! app(EmailDesignService::class)->enabled()) return ['success' => false, 'error' => 'Email notifications are disabled.'];
                     if (! filter_var($recipient, FILTER_VALIDATE_EMAIL)) return ['success' => false, 'error' => 'Invalid email address.'];
                     if (in_array(config('mail.default'), ['log', 'array'])) return ['success' => false, 'error' => 'A real mail transport is not configured.'];
-                    \Illuminate\Support\Facades\Mail::to($recipient)->send(new \App\Mail\BrandedNotificationMail($subject, $body));
+                    $mail = new \App\Mail\BrandedNotificationMail($subject, $body);
+                    if (! empty($tokens['_sensitive_account_email'])) {
+                        if (! empty($tokens['_account_cc'])) $mail->cc($tokens['_account_cc']);
+                        if (! empty($tokens['_account_bcc'])) $mail->bcc($tokens['_account_bcc']);
+                        foreach ($tokens['_account_attachments'] ?? [] as $attachment) {
+                            $mail->attachFromStorageDisk('local', $attachment['path'], $attachment['name'], ['mime' => $attachment['mime']]);
+                        }
+                    }
+                    \Illuminate\Support\Facades\Mail::to($recipient)->send($mail);
                     return ['success' => true];
 
                 case self::CHANNEL_CRM:
@@ -348,6 +441,7 @@ class NotificationDeliveryService
                     return ['success' => false, 'error' => "Unsupported channel [{$channel}]"];
             }
         } catch (\Throwable $e) {
+            if ($channel === self::CHANNEL_EMAIL && ! empty($tokens['_sensitive_account_email'])) return ['success' => false, 'error' => 'Email transport failed.'];
             if ($channel === self::CHANNEL_EMAIL) report($e);
             return ['success' => false, 'error' => $e->getMessage()];
         }

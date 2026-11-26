@@ -83,6 +83,9 @@ app(\App\Services\ScheduledTaskService::class)->command('meta-ad-accounts-sync',
 // Schedule 6: Daily Backup of Database + Documents Disk
 app(\App\Services\ScheduledTaskService::class)->command('database-backup','backup:run')->daily();
 
+// Keep private account-email uploads available for retries for seven days.
+Schedule::command('account-emails:prune-attachments')->daily()->withoutOverlapping();
+
 // Schedule 7: Weekly Cleanup of Old Backups
 app(\App\Services\ScheduledTaskService::class)->command('backup-cleanup','backup:clean')->weekly();
 

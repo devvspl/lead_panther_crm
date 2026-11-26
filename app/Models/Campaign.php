@@ -26,4 +26,14 @@ class Campaign extends Model
     {
         return $this->hasOneThrough(User::class, Project::class, 'id', 'id', 'project_id', 'client_id');
     }
+
+    public function leadFilterRules(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeadFilterRule::class);
+    }
+
+    public function leadFilterLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeadFilterLog::class);
+    }
 }

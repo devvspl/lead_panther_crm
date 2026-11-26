@@ -1515,10 +1515,15 @@ class LeadKanban extends Component
             $tableLeads = $tableQuery->paginate($this->perPage);
         } else {
             $allStages = array_merge($this->mainStages, $this->otherStages);
+            // Count the same scoped result once, rather than scanning it once per stage.
+            $countsByStage = (clone $baseQuery)->reorder()->select('leads.current_stage')
+                ->selectRaw('COUNT(*) as stage_total')->groupBy('leads.current_stage')->toBase()->pluck('stage_total', 'current_stage');
 
             foreach ($allStages as $stageKey => $stageLabel) {
-                $stageQuery = (clone $baseQuery)->whereIn('current_stage', Lead::usesSalesPanel() ? Lead::stageValues($stageKey) : [$stageKey]);
-                $stageCounts[$stageKey] = $stageQuery->count();
+                $values = Lead::usesSalesPanel() ? Lead::stageValues($stageKey) : [$stageKey];
+                $stageCounts[$stageKey] = collect($values)->unique()->sum(fn ($value) => (int) ($countsByStage[$value] ?? 0));
+                if ($stageCounts[$stageKey] === 0) { $stageLeads[$stageKey] = collect(); continue; }
+                $stageQuery = (clone $baseQuery)->whereIn('current_stage', $values);
                 $limit = $this->stageLimits[$stageKey] ?? 20;
 
                 if ($this->sort_by === 'created_asc') {

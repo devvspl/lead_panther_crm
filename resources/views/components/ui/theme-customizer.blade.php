@@ -1,5 +1,6 @@
+@props(['theme' => null])
 @php
-    $theme = \App\Support\ThemeService::getUserTheme();
+    $theme = $theme ?? \App\Support\ThemeService::getUserTheme();
     $themeJson = json_encode($theme);
     $defaultsJson = json_encode(\App\Support\ThemeService::DEFAULTS);
 @endphp

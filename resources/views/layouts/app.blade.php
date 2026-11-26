@@ -314,7 +314,7 @@
         <x-ui.toast />
 
         <!-- Theme Settings Offcanvas Customizer -->
-        <x-ui.theme-customizer />
+        <x-ui.theme-customizer :theme="$currentTheme" />
 
         <!-- Global Reusable Confirmation Modal -->
         <x-ui.confirmation-modal />

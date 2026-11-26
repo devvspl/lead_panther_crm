@@ -1833,19 +1833,20 @@ class DashboardShell extends Component
         ->get();
 
         // 4. Team Performance Table (7 Required Operational Metrics)
-        $teamPerformance = $orgUsers->where('status', 'active')->map(function ($member) {
-            $memberLeads = Lead::panelQuery()->where('assigned_to', $member->id);
-
-            return [
-                'name' => $member->name,
-                'email' => $member->email,
-                'assigned_leads' => (clone $memberLeads)->count(),
-                'contacted_leads' => (clone $memberLeads)->whereIn('current_stage', ['contacted', 'connected'])->count(),
-                'interested_leads' => (clone $memberLeads)->where(fn($q) => $q->whereIn('current_stage', ['interested', 'qualified'])->orWhere('lead_score', '>=', 60))->count(),
-                'site_visits' => (clone $memberLeads)->where('current_stage', 'site_visit')->count(),
-                'bookings' => (clone $memberLeads)->where('current_stage', 'booking')->count(),
-                'closed_won' => (clone $memberLeads)->whereIn('current_stage', ['closed_won', 'won'])->count(),
-            ];
+        $activeMembers = $orgUsers->where('status', 'active');
+        $memberStats = Lead::panelQuery()->whereIn('assigned_to', $activeMembers->pluck('id'))
+            ->select('assigned_to')->selectRaw("COUNT(*) as assigned_leads,
+                SUM(CASE WHEN current_stage IN ('contacted','connected') THEN 1 ELSE 0 END) as contacted_leads,
+                SUM(CASE WHEN current_stage IN ('interested','qualified') OR lead_score >= 60 THEN 1 ELSE 0 END) as interested_leads,
+                SUM(CASE WHEN current_stage = 'site_visit' THEN 1 ELSE 0 END) as site_visits,
+                SUM(CASE WHEN current_stage = 'booking' THEN 1 ELSE 0 END) as bookings,
+                SUM(CASE WHEN current_stage IN ('closed_won','won') THEN 1 ELSE 0 END) as closed_won")
+            ->groupBy('assigned_to')->get()->keyBy('assigned_to');
+        $teamPerformance = $activeMembers->map(function ($member) use ($memberStats) {
+            $stats = $memberStats->get($member->id);
+            $row = ['name' => $member->name, 'email' => $member->email];
+            foreach (['assigned_leads','contacted_leads','interested_leads','site_visits','bookings','closed_won'] as $metric) $row[$metric] = (int) ($stats?->$metric ?? 0);
+            return $row;
         })->sortByDesc('assigned_leads')->values();
 
         // 5. Monthly Trend Chart Data (6 Months)

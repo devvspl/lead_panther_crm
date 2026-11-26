@@ -79,6 +79,10 @@ class MetaAdAccount extends Model
 
     public function getSyncCountsAttribute(): array
     {
+        $relations = ['campaigns', 'adsets', 'ads', 'insights', 'pages'];
+        if (collect($relations)->every(fn ($relation) => array_key_exists($relation.'_count', $this->attributes))) {
+            return collect($relations)->mapWithKeys(fn ($relation) => [$relation => (int) $this->attributes[$relation.'_count']])->all();
+        }
         $counts = $this->records()
             ->selectRaw('kind, COUNT(*) as total')
             ->groupBy('kind')

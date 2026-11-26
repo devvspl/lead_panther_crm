@@ -277,7 +277,7 @@ class MetaAdAccounts extends Component
                 : (['' => 'Select CRM project'] + $projectsList));
 
         return view('livewire.settings.meta-ad-accounts', [
-            'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages'])->orderBy('name')->get(),
+            'accounts' => MetaAdAccount::where('portal_account_id', $this->integrationId)->withCount(['records', 'pages', 'campaigns', 'adsets', 'ads', 'insights'])->orderBy('name')->get(),
             'selected' => $account,
             'records' => $records ?: collect(),
             'projectsList' => $projectsList,

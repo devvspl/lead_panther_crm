@@ -34,10 +34,10 @@
     </div>
 
     <!-- Register Clients Modal (Create & Import) -->
-    <x-modal name="register-organization-modal" :show="$showCreateOrgModal" maxWidth="3xl">
-        <div class="p-5 sm:p-6 space-y-5">
+    <x-modal name="register-organization-modal" :show="$showCreateOrgModal" maxWidth="viewport">
+        <div class="flex h-full min-h-0 flex-col" data-registration-modal>
             <!-- Modal Header -->
-            <div class="flex items-center justify-between pb-3.5 border-b border-border">
+            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5">
                 <div class="flex items-center gap-3">
                     <div class="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,8 +47,7 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-ink">Register Client</h3>
-                        <p class="text-xs text-muted">Create a single client manually or batch import clients via
-                            spreadsheet.</p>
+                        <p class="text-xs text-muted">Register a client and optional accounts, or import a spreadsheet.</p>
                     </div>
                 </div>
                 <button type="button" wire:click="closeRegisterOrgModal"
@@ -62,7 +61,7 @@
             </div>
 
             <!-- Two Options: Create vs Import Tabs -->
-            <div class="grid grid-cols-2 gap-1.5 p-1 bg-canvas rounded-xl border border-border">
+            <div class="grid shrink-0 grid-cols-2 gap-1 bg-canvas border-b border-border px-3 py-1.5 sm:px-4">
                 <button type="button" wire:click="$set('orgModalTab', 'create')"
                     class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer {{ $orgModalTab === 'create' ? 'bg-surface text-ink shadow-xs border border-border' : 'text-muted hover:text-ink' }}">
                     <svg class="w-4 h-4 {{ $orgModalTab === 'create' ? 'text-primary' : 'text-muted' }}" fill="none"
@@ -84,45 +83,262 @@
                 </button>
             </div>
 
+            <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5" data-registration-body>
             <!-- OPTION 1: CREATE ORGANIZATION -->
             @if($orgModalTab === 'create')
-                <div class="space-y-4 pt-1">
-                    <div class="space-y-3.5 text-xs">
+                <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 text-xs">
+                    <section class="min-w-0 rounded-xl border border-border bg-surface p-3 space-y-2.5" aria-labelledby="registration-details-heading">
+                        <h4 id="registration-details-heading" class="font-bold text-ink">Client Details</h4>
                         <div>
-                            <label class="font-bold text-ink">Client Name <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="name" placeholder="e.g. Prestige Developers Ltd"
-                                class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
-                            @error('name') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
+                            <label for="register-client-name" class="block font-semibold text-ink mb-1">Client Name <span class="text-danger">*</span></label>
+                            <input id="register-client-name" type="text" wire:model="name" autocomplete="organization" placeholder="e.g. Prestige Developers Ltd" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                            @error('name')<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
                         </div>
-
                         <div>
-                            <label class="font-bold text-ink">Main User / Billing Email <span class="text-muted font-normal">(Optional)</span></label>
-                            <input type="email" wire:model="billingEmail" placeholder="e.g. billing@prestige.com (auto-generated if blank)"
-                                class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
-                            @error('billingEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
+                            <label for="register-billing-email" class="block font-semibold text-ink mb-1">Main User / Billing Email <span class="text-muted font-normal">(Optional)</span></label>
+                            <input id="register-billing-email" type="email" wire:model="billingEmail" autocomplete="email" placeholder="Auto-generated if blank" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                            @error('billingEmail')<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
                             <p class="text-[11px] text-muted mt-1">A primary billing owner client will automatically be provisioned for this organization.</p>
                         </div>
-
-                        <div>
-                            <label class="font-bold text-ink">Initial Status</label>
-                            <x-ui.themed-select wire:model="status" :options="['active' => 'Active', 'suspended' => 'Suspended']" placeholder="Initial Status" class="w-full mt-1" />
-                            @error('status') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span>
-                            @enderror
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                                <label for="register-client-status" class="block font-semibold text-ink mb-1">Initial Status</label>
+                                <x-ui.themed-select id="register-client-status" wire:model="status" :options="['active' => 'Active', 'suspended' => 'Suspended']" placeholder="Initial Status" />
+                                @error('status')<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
-                        <button type="button" wire:click="closeRegisterOrgModal"
-                            class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
-                            Cancel
-                        </button>
-                        <x-ui.button wire:click="createOrganization" variant="primary" class="text-xs">
-                            Save Client
-                        </x-ui.button>
-                    </div>
+                        <!-- Optional Automatic Account & Team Setup Checkbox -->
+                        <div class="pt-3 border-t border-border">
+                            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" wire:model.live="autoSetup"
+                                    class="rounded border-border text-primary focus:ring-primary/20 mt-0.5">
+                                <div>
+                                    <span class="font-bold text-ink text-xs block">Create organization account and team automatically</span>
+                                    <span class="text-[11px] text-muted block">Automatically provision the primary login account, sales team, team leader, and sales executive accounts.</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        @if($autoSetup)
+                            <div class="space-y-4 p-4 rounded-xl bg-canvas border border-border">
+                                <!-- 1. Main Organization Login Account -->
+                                <div class="space-y-2.5">
+                                    <div class="flex items-center gap-1.5 pb-1 border-b border-border text-xs font-bold text-ink">
+                                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <span>1. Organization Main Account (Role: Builder/Developer)</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Account Name <span class="text-muted font-normal">(Leave blank to use client name)</span></label>
+                                            <input type="text" wire:model="mainAccountName" placeholder="e.g. {{ $name ?: 'Organization Admin' }}"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('mainAccountName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Account Email <span class="text-red-500">*</span></label>
+                                            <input type="email" wire:model="mainAccountEmail" placeholder="e.g. admin@organization.com"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('mainAccountEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Mobile Number</label>
+                                            <input type="text" wire:model="mainAccountPhone" placeholder="e.g. +91 9876543210"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('mainAccountPhone') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Password <span class="text-muted font-normal">(Auto-generated if blank)</span></label>
+                                            <input type="password" wire:model="mainAccountPassword" placeholder="••••••••"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('mainAccountPassword') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Team & Team Leader -->
+                                <div class="space-y-2.5 pt-2 border-t border-border">
+                                    <div class="flex items-center gap-1.5 pb-1 border-b border-border text-xs font-bold text-ink">
+                                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        <span>2. Sales Team & Team Leader</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div class="sm:col-span-2">
+                                            <label class="font-semibold text-ink text-[11px]">Team Name <span class="text-red-500">*</span></label>
+                                            <input type="text" wire:model="teamName" placeholder="e.g. Primary Sales Team"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('teamName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Team Leader Name <span class="text-red-500">*</span></label>
+                                            <input type="text" wire:model="teamLeaderName" placeholder="e.g. Rajesh Sharma"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('teamLeaderName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Team Leader Email <span class="text-red-500">*</span></label>
+                                            <input type="email" wire:model="teamLeaderEmail" placeholder="e.g. leader@organization.com"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('teamLeaderEmail') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Team Leader Mobile</label>
+                                            <input type="text" wire:model="teamLeaderPhone" placeholder="e.g. +91 9876543211"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('teamLeaderPhone') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div>
+                                            <label class="font-semibold text-ink text-[11px]">Team Leader Password <span class="text-muted font-normal">(Auto-generated if blank)</span></label>
+                                            <input type="password" wire:model="teamLeaderPassword" placeholder="••••••••"
+                                                class="w-full h-8 px-3 rounded-lg border border-border bg-surface text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
+                                            @error('teamLeaderPassword') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Sales Executives -->
+                                <div class="space-y-2.5 pt-2 border-t border-border">
+                                    <div class="flex items-center justify-between pb-1 border-b border-border">
+                                        <div class="flex items-center gap-1.5 text-xs font-bold text-ink">
+                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                            </svg>
+                                            <span>3. Sales Executive Account(s) (Role: Executive)</span>
+                                        </div>
+                                        <button type="button" wire:click="addSalesExecutiveRow"
+                                            class="text-[11px] font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span>Add Executive</span>
+                                        </button>
+                                    </div>
+
+                                    @foreach($salesExecutives as $index => $exec)
+                                        <div class="p-3 rounded-lg border border-border bg-surface space-y-2 relative">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-[11px] font-bold text-ink">Executive #{{ $index + 1 }}</span>
+                                                @if(count($salesExecutives) > 1)
+                                                    <button type="button" wire:click="removeSalesExecutiveRow({{ $index }})"
+                                                        class="text-red-500 hover:text-red-700 text-[11px] cursor-pointer">
+                                                        Remove
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <div>
+                                                    <input type="text" wire:model="salesExecutives.{{ $index }}.name" placeholder="Executive Name *"
+                                                        class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                                                    @error("salesExecutives.{$index}.name") <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                                </div>
+                                                <div>
+                                                    <input type="email" wire:model="salesExecutives.{{ $index }}.email" placeholder="Executive Email *"
+                                                        class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                                                    @error("salesExecutives.{$index}.email") <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                                </div>
+                                                <div>
+                                                    <input type="text" wire:model="salesExecutives.{{ $index }}.phone" placeholder="Mobile Number"
+                                                        class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                                                    @error("salesExecutives.{$index}.phone") <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                                </div>
+                                                <div>
+                                                    <input type="password" wire:model="salesExecutives.{{ $index }}.password" placeholder="Password (Optional)"
+                                                        class="w-full h-8 px-2.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                                                    @error("salesExecutives.{$index}.password") <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                        <label class="flex items-start gap-2 border-t border-border pt-2.5 cursor-pointer">
+                            <input type="checkbox" wire:model.live="autoSetup" class="mt-0.5 rounded border-border text-primary focus:ring-primary/20" aria-controls="registration-main-account">
+                            <span><span class="block font-bold text-ink">Create organization account and team automatically</span><span class="block text-[11px] text-muted mt-0.5">Automatically provision the primary login account, sales team, team leader, and sales executive accounts.</span></span>
+                        </label>
+                    </section>
+
+                    @if($autoSetup)
+                        <section id="registration-main-account" class="min-w-0 rounded-xl border border-border bg-canvas/50 p-3 space-y-2.5" aria-labelledby="registration-main-heading">
+                            <div><h4 id="registration-main-heading" class="font-bold text-ink">1. Organization Main Account</h4><p class="text-[11px] text-muted">Role: Builder/Developer</p></div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                                @foreach([
+                                    ['mainAccountName', 'Account Name', 'text', false, 'Leave blank to use client name'],
+                                    ['mainAccountEmail', 'Account Email', 'email', true, 'e.g. admin@organization.com'],
+                                    ['mainAccountPhone', 'Mobile Number', 'tel', false, 'e.g. +91 9876543210'],
+                                    ['mainAccountPassword', 'Password', 'password', false, 'Auto-generated if blank'],
+                                ] as [$field, $label, $type, $required, $hint])
+                                    <div class="min-w-0">
+                                        <label for="register-{{ $field }}" class="block font-semibold text-ink mb-1">{{ $label }} @if($required)<span class="text-danger">*</span>@else<span class="text-muted font-normal">(Optional)</span>@endif</label>
+                                        @if($type === 'password')
+                                            <x-ui.password-input id="register-{{ $field }}" wire:model="{{ $field }}" autocomplete="new-password" :placeholder="$hint" />
+                                        @else
+                                            <input id="register-{{ $field }}" name="{{ $field }}" type="{{ $type }}" wire:model="{{ $field }}" autocomplete="{{ $type === 'tel' ? 'tel' : ($type === 'email' ? 'email' : 'name') }}" @if($type === 'tel') inputmode="tel" maxlength="25" @endif placeholder="{{ $hint }}" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                                        @endif
+                                        @error($field)<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
+                                    </div>
+                                @endforeach
+                            </div>
+                            <p class="text-[11px] text-muted">Leave account name blank to use the client name. Passwords are auto-generated if left blank.</p>
+                        </section>
+
+                        <section class="min-w-0 rounded-xl border border-border bg-canvas/50 p-3 space-y-2.5" aria-labelledby="registration-team-heading">
+                            <h4 id="registration-team-heading" class="font-bold text-ink">2. Sales Team &amp; Team Leader</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2.5">
+                                @foreach([
+                                    ['teamName', 'Team Name', 'text', true, 'e.g. Primary Sales Team'],
+                                    ['teamLeaderName', 'Team Leader Name', 'text', true, 'e.g. Sales Manager'],
+                                    ['teamLeaderEmail', 'Team Leader Email', 'email', true, 'e.g. manager@organization.com'],
+                                    ['teamLeaderPhone', 'Team Leader Mobile', 'tel', false, 'e.g. +91 9876543210'],
+                                    ['teamLeaderPassword', 'Team Leader Password', 'password', false, 'Auto-generated if blank'],
+                                ] as [$field, $label, $type, $required, $hint])
+                                    <div class="min-w-0">
+                                        <label for="register-{{ $field }}" class="block font-semibold text-ink mb-1">{{ $label }} @if($required)<span class="text-danger">*</span>@else<span class="text-muted font-normal">(Optional)</span>@endif</label>
+                                        @if($type === 'password')
+                                            <x-ui.password-input id="register-{{ $field }}" wire:model="{{ $field }}" autocomplete="new-password" :placeholder="$hint" />
+                                        @else
+                                            <input id="register-{{ $field }}" name="{{ $field }}" type="{{ $type }}" wire:model="{{ $field }}" autocomplete="{{ $type === 'tel' ? 'tel' : ($type === 'email' ? 'email' : 'off') }}" @if($type === 'tel') inputmode="tel" maxlength="25" @endif placeholder="{{ $hint }}" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                                        @endif
+                                        @error($field)<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
+                                    </div>
+                                @endforeach
+                            </div>
+                        </section>
+
+                        <section class="min-w-0 rounded-xl border border-border bg-surface p-3 space-y-2.5" aria-labelledby="registration-executives-heading">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <h4 id="registration-executives-heading" class="font-bold text-ink">3. Sales Executive Accounts</h4>
+                                <button type="button" wire:click="addSalesExecutiveRow" class="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold text-primary hover:bg-canvas">+ Add Executive</button>
+                            </div>
+                            @foreach($salesExecutives as $index => $exec)
+                                <div wire:key="register-executive-{{ $index }}" class="rounded-lg border border-border bg-canvas/50 p-2.5 space-y-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-semibold text-ink text-[11px]">Executive {{ $index + 1 }}</span>
+                                        <button type="button" wire:click="removeSalesExecutiveRow({{ $index }})" aria-label="Remove executive {{ $index + 1 }}" class="text-[11px] font-semibold text-danger hover:underline">Remove</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
+                                        @foreach([['name', 'Executive Name', 'text'], ['email', 'Executive Email', 'email'], ['phone', 'Executive Mobile', 'tel'], ['password', 'Executive Password', 'password']] as [$field, $label, $type])
+                                            <div class="min-w-0">
+                                                <label for="register-executive-{{ $index }}-{{ $field }}" class="block font-semibold text-ink text-[11px] mb-1">{{ $label }} @if(in_array($field, ['name', 'email']))<span class="text-danger">*</span>@else<span class="text-muted font-normal">(Optional)</span>@endif</label>
+                                                @if($type === 'password')
+                                                    <x-ui.password-input id="register-executive-{{ $index }}-{{ $field }}" wire:model="salesExecutives.{{ $index }}.{{ $field }}" autocomplete="new-password" placeholder="Auto-generated if blank" />
+                                                @else
+                                                    <input id="register-executive-{{ $index }}-{{ $field }}" name="executive_{{ $index }}_{{ $field }}" type="{{ $type }}" wire:model="salesExecutives.{{ $index }}.{{ $field }}" autocomplete="{{ $type === 'tel' ? 'tel' : ($type === 'email' ? 'email' : 'off') }}" @if($type === 'tel') inputmode="tel" maxlength="25" @endif class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
+                                                @endif
+                                                @error("salesExecutives.{$index}.{$field}")<p class="text-danger text-[11px] mt-1">{{ $message }}</p>@enderror
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </section>
+                    @endif
                 </div>
+                @error('general')<p role="alert" class="mt-3 rounded-lg border border-danger p-3 text-xs text-danger">{{ $message }}</p>@enderror
             @endif
 
             <!-- OPTION 2: IMPORT ORGANIZATIONS -->
@@ -414,8 +630,22 @@
                         </div>
                     @endif
 
+
+                </div>
+            @endif
+            </div>
+            <footer class="shrink-0 border-t border-border bg-surface px-4 py-2.5 sm:px-5" data-registration-footer>
+                @if($orgModalTab === 'create')
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-[11px] text-muted"><span class="text-danger">*</span> Required fields</p>
+                        <div class="flex items-center gap-2">
+                            <x-ui.button type="button" wire:click="closeRegisterOrgModal" variant="secondary" class="text-xs">Cancel</x-ui.button>
+                            <x-ui.button type="button" wire:click="createOrganization" wire:loading.attr="disabled" wire:target="createOrganization" variant="primary" class="text-xs">Save Client</x-ui.button>
+                        </div>
+                    </div>
+                @else
                     <!-- Import Actions Footer -->
-                    <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+                    <div class="flex items-center justify-end gap-2.5 ">
                         <button type="button" wire:click="closeRegisterOrgModal"
                             class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
                             Cancel
@@ -441,8 +671,8 @@
                             <span wire:loading wire:target="processImport">Importing...</span>
                         </button>
                     </div>
-                </div>
-            @endif
+                @endif
+            </footer>
         </div>
     </x-modal>
 

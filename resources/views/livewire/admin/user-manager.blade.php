@@ -133,6 +133,9 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="font-bold text-sm text-ink truncate">{{ $selectedUser->name }}</div>
+                                    @if($selectedUser->user_code)
+                                        <div class="text-xs font-mono font-bold text-primary">{{ $selectedUser->user_code }}</div>
+                                    @endif
                                     <div class="text-xs text-muted font-mono truncate">{{ $selectedUser->email }}</div>
                                     @if($selectedUser->phone)
                                         <div class="text-[11px] text-muted flex items-center gap-1 mt-0.5">
@@ -157,9 +160,11 @@
                         <!-- User Metadata Grid -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">
-                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User ID</span>
-                                <div class="text-sm font-mono font-bold text-ink">
-                                    #USR-{{ str_pad($selectedUser->id, 4, '0', STR_PAD_LEFT) }}</div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User ID / Code</span>
+                                <div class="text-sm font-mono font-bold text-ink flex items-center gap-1.5 flex-wrap">
+                                    <span>{{ $selectedUser->user_code ?: ('#USR-' . str_pad($selectedUser->id, 4, '0', STR_PAD_LEFT)) }}</span>
+                                    <span class="text-[11px] text-muted font-normal">(#USR-{{ str_pad($selectedUser->id, 4, '0', STR_PAD_LEFT) }})</span>
+                                </div>
                             </div>
 
                             <div class="p-3.5 rounded-xl bg-canvas/50 border border-border space-y-1">

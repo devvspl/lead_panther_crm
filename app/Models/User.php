@@ -28,6 +28,50 @@ class User extends Authenticatable
 
     protected $guarded = [];
     public array $auditAccessBefore = [];
+    public bool $allowUserCodeChange = false;
+
+    public static function generateUniqueUserCode(string $prefix = 'LP'): string
+    {
+        $existingCodes = static::withoutGlobalScopes()
+            ->whereNotNull('user_code')
+            ->where('user_code', '!=', '')
+            ->where('user_code', 'like', "{$prefix}%")
+            ->pluck('user_code');
+
+        $maxNumber = 0;
+        foreach ($existingCodes as $code) {
+            if (preg_match('/^' . preg_quote($prefix, '/') . '-?(\d+)$/i', $code, $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNumber) {
+                    $maxNumber = $num;
+                }
+            }
+        }
+
+        $nextNumber = max(1, $maxNumber + 1);
+
+        do {
+            $candidate = sprintf('%s%05d', $prefix, $nextNumber);
+            $nextNumber++;
+        } while (static::withoutGlobalScopes()->where('user_code', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user) {
+            if (empty($user->user_code)) {
+                $user->user_code = static::generateUniqueUserCode();
+            }
+        });
+
+        static::updating(function (User $user) {
+            if ($user->isDirty('user_code') && !empty($user->getOriginal('user_code')) && !$user->allowUserCodeChange) {
+                $user->user_code = $user->getOriginal('user_code');
+            }
+        });
+    }
 
     private function captureAccessChange(string $relation, callable $change)
     {

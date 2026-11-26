@@ -2089,7 +2089,8 @@ class DashboardShell extends Component
 
             $builderTeamMembers = User::where('organization_id', $orgId)
                 ->where('status', 'active')
-                ->pluck('name', 'id')
+                ->get(['id', 'name', 'user_code'])
+                ->mapWithKeys(fn($u) => [$u->id => $u->user_code ? "{$u->name} ({$u->user_code})" : $u->name])
                 ->toArray();
         }
 

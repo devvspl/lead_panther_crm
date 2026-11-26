@@ -6,6 +6,7 @@
 
 @php
 $wireModel = $attributes->wire('model')->value();
+$viewport = $maxWidth === 'viewport';
 $maxWidth = [
     'sm' => 'sm:max-w-sm',
     'md' => 'sm:max-w-md',
@@ -17,6 +18,7 @@ $maxWidth = [
     '5xl' => 'sm:max-w-5xl',
     '6xl' => 'sm:max-w-6xl',
     '7xl' => 'sm:max-w-7xl',
+    'viewport' => 'sm:w-[90vw] sm:max-w-none',
 ][$maxWidth] ?? 'sm:max-w-2xl';
 @endphp
 
@@ -52,8 +54,8 @@ $maxWidth = [
     x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()"
     x-show="show"
     role="dialog" aria-modal="true" aria-label="{{ str_replace('-', ' ', $name) }}" tabindex="-1"
-    class="fixed inset-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-4 z-50"
-    style="display: {{ $show ? 'block' : 'none' }};"
+    class="fixed inset-0 overscroll-contain px-3 sm:px-4 py-4 z-50 {{ $viewport ? 'flex items-center justify-center overflow-hidden' : 'overflow-y-auto' }}"
+    style="display: {{ $show ? ($viewport ? 'flex' : 'block') : 'none' }};"
 >
     <div
         x-show="show"
@@ -71,7 +73,7 @@ $maxWidth = [
 
     <div
         x-show="show"
-        class="lp-modal-panel relative mx-auto w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-surface rounded-card border border-border shadow-2xl transform transition-all {{ $maxWidth }} sm:mx-auto"
+        class="lp-modal-panel relative mx-auto w-full {{ $viewport ? 'h-[90dvh] max-h-[calc(100dvh-2rem)] overflow-hidden' : 'max-h-[calc(100dvh-2rem)] overflow-y-auto' }} overscroll-contain bg-surface rounded-card border border-border shadow-2xl transform transition-all {{ $maxWidth }} sm:mx-auto"
         x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"

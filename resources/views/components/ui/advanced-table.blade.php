@@ -497,17 +497,23 @@
                                             @elseif($type === 'user_name')
                                                 @php
                                                     $userRowId = is_object($row) ? $row->id : $row['id'];
+                                                    $userCode = is_object($row) ? ($row->user_code ?? null) : ($row['user_code'] ?? null);
                                                 @endphp
-                                                <button type="button" wire:click="openUserDetailsModal({{ $userRowId }})"
-                                                    class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1.5 group"
-                                                    title="View &amp; Edit User Details">
-                                                    <span>{{ $val }}</span>
-                                                    <svg class="w-3.5 h-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                    </svg>
-                                                </button>
+                                                <div>
+                                                    <button type="button" wire:click="openUserDetailsModal({{ $userRowId }})"
+                                                        class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1.5 group"
+                                                        title="View &amp; Edit User Details">
+                                                        <span>{{ $val }}</span>
+                                                        <svg class="w-3.5 h-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
+                                                    @if($userCode)
+                                                        <div class="text-[11px] font-mono text-muted leading-tight mt-0.5">{{ $userCode }}</div>
+                                                    @endif
+                                                </div>
                                             @elseif($type === 'user_actions')
                                                 @php
                                                     $userRowId = is_object($row) ? $row->id : $row['id'];
@@ -997,15 +1003,21 @@
                                             @elseif($type === 'user_name')
                                                 @php
                                                     $userRowIdMobile = is_object($row) ? $row->id : $row['id'];
+                                                    $userCodeMob = is_object($row) ? ($row->user_code ?? null) : ($row['user_code'] ?? null);
                                                 @endphp
-                                                <button type="button" wire:click="openUserDetailsModal({{ $userRowIdMobile }})"
-                                                    class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1">
-                                                    <span>{{ $val }}</span>
-                                                    <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                    </svg>
-                                                </button>
+                                                <div>
+                                                    <button type="button" wire:click="openUserDetailsModal({{ $userRowIdMobile }})"
+                                                        class="font-bold text-ink hover:text-primary hover:underline text-left cursor-pointer inline-flex items-center gap-1">
+                                                        <span>{{ $val }}</span>
+                                                        <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
+                                                    @if($userCodeMob)
+                                                        <div class="text-[11px] font-mono text-muted leading-tight mt-0.5">{{ $userCodeMob }}</div>
+                                                    @endif
+                                                </div>
                                             @elseif($type === 'user_actions')
                                                 @php
                                                     $userRowIdMobile = is_object($row) ? $row->id : $row['id'];

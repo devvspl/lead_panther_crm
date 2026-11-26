@@ -12,7 +12,7 @@ use Livewire\Form;
 
 class LoginForm extends Form
 {
-    #[Validate('required|string|email')]
+    #[Validate('required|string')]
     public string $email = '';
 
     #[Validate('required|string')]
@@ -20,6 +20,66 @@ class LoginForm extends Form
 
     #[Validate('boolean')]
     public bool $remember = false;
+
+    /**
+     * Resolve user by email, mobile number or UserCode.
+     */
+    public function resolveUserForLogin(string $login): ?\App\Models\User
+    {
+        $login = trim($login);
+        if ($login === '') {
+            return null;
+        }
+
+        // 1. Direct Email check
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            return \App\Models\User::withoutGlobalScopes()->where('email', $login)->first();
+        }
+
+        // 2. UserCode check (e.g. LP00001, LP-00001, case-insensitive)
+        if (preg_match('/^[a-zA-Z]+-?\d+$/', $login)) {
+            $cleanLogin = str_replace('-', '', $login);
+            $userByCode = \App\Models\User::withoutGlobalScopes()
+                ->where(function ($q) use ($login, $cleanLogin) {
+                    $q->whereRaw('LOWER(user_code) = ?', [strtolower($login)])
+                      ->orWhereRaw('REPLACE(LOWER(user_code), "-", "") = ?', [strtolower($cleanLogin)]);
+                })
+                ->first();
+            if ($userByCode) {
+                return $userByCode;
+            }
+        }
+
+        // 3. Mobile number check with normalization
+        $digits = preg_replace('/[^0-9]/', '', $login);
+        if (!empty($digits) && strlen($digits) >= 7) {
+            $query = \App\Models\User::withoutGlobalScopes()->where(function ($q) use ($login, $digits) {
+                $q->where('phone', $login)
+                    ->orWhere('phone', $digits)
+                    ->orWhere('phone', '+' . $digits);
+                if (strlen($digits) >= 10) {
+                    $last10 = substr($digits, -10);
+                    $q->orWhere('phone', 'like', "%{$last10}");
+                }
+            });
+
+            $matches = $query->get();
+            if ($matches->count() === 1) {
+                return $matches->first();
+            } elseif ($matches->count() > 1) {
+                throw ValidationException::withMessages([
+                    'form.email' => 'Multiple accounts found with this mobile number. Please log in using your Email or UserCode.',
+                ]);
+            }
+        }
+
+        // 4. Fallback search (exact match on email, user_code, or phone)
+        return \App\Models\User::withoutGlobalScopes()
+            ->where('email', $login)
+            ->orWhereRaw('LOWER(user_code) = ?', [strtolower($login)])
+            ->orWhere('phone', $login)
+            ->first();
+    }
 
     /**
      * Attempt to authenticate the request's credentials.
@@ -30,7 +90,14 @@ class LoginForm extends Form
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt([...$this->only(['email', 'password']), 'status' => 'active'], $this->remember)) {
+        $user = $this->resolveUserForLogin($this->email);
+        $credentials = [
+            'email' => $user ? $user->email : $this->email,
+            'password' => $this->password,
+            'status' => 'active',
+        ];
+
+        if (! Auth::attempt($credentials, $this->remember)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

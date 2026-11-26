@@ -8,6 +8,8 @@ use App\Livewire\Concerns\HasAdvancedTable;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Client;
+use App\Models\SalesTeam;
+use App\Models\SalesTeamMember;
 use App\Models\CreditWallet;
 use App\Models\CreditTransaction;
 use App\Models\AuditLog;
@@ -32,6 +34,19 @@ class OrganizationManager extends Component
     public string $name = '';
     public string $status = 'active';
     public string $billingEmail = '';
+
+    // Automatic Account & Team Setup
+    public bool $autoSetup = false;
+    public string $mainAccountName = '';
+    public string $mainAccountEmail = '';
+    public string $mainAccountPhone = '';
+    public string $mainAccountPassword = '';
+    public string $teamName = '';
+    public string $teamLeaderName = '';
+    public string $teamLeaderEmail = '';
+    public string $teamLeaderPhone = '';
+    public string $teamLeaderPassword = '';
+    public array $salesExecutives = [];
 
     public ?int $editingOrganizationId = null;
 
@@ -195,7 +210,12 @@ class OrganizationManager extends Component
 
     public function openRegisterOrgModal(string $tab = 'create'): void
     {
-        $this->reset(['name', 'status', 'billingEmail']);
+        $this->reset([
+            'name', 'status', 'billingEmail',
+            'autoSetup', 'mainAccountName', 'mainAccountEmail', 'mainAccountPhone', 'mainAccountPassword',
+            'teamName', 'teamLeaderName', 'teamLeaderEmail', 'teamLeaderPhone', 'teamLeaderPassword',
+            'salesExecutives'
+        ]);
         $this->status = 'active';
         $this->orgModalTab = in_array($tab, ['create', 'import']) ? $tab : 'create';
         $this->resetImportState();
@@ -206,9 +226,47 @@ class OrganizationManager extends Component
     public function closeRegisterOrgModal(): void
     {
         $this->showCreateOrgModal = false;
-        $this->reset(['name', 'status', 'billingEmail']);
+        $this->reset([
+            'name', 'status', 'billingEmail',
+            'autoSetup', 'mainAccountName', 'mainAccountEmail', 'mainAccountPhone', 'mainAccountPassword',
+            'teamName', 'teamLeaderName', 'teamLeaderEmail', 'teamLeaderPhone', 'teamLeaderPassword',
+            'salesExecutives'
+        ]);
         $this->resetImportState();
         $this->dispatch('close-modal', 'register-organization-modal');
+    }
+
+    public function updatedAutoSetup(): void
+    {
+        if ($this->autoSetup) {
+            if (empty($this->teamName)) {
+                $this->teamName = 'Primary Sales Team';
+            }
+            if (empty($this->salesExecutives)) {
+                $this->salesExecutives = [
+                    ['name' => '', 'email' => '', 'phone' => '', 'password' => ''],
+                ];
+            }
+            if (empty($this->mainAccountEmail) && !empty($this->billingEmail)) {
+                $this->mainAccountEmail = $this->billingEmail;
+            }
+        }
+    }
+
+    public function addSalesExecutiveRow(): void
+    {
+        $this->salesExecutives[] = [
+            'name' => '',
+            'email' => '',
+            'phone' => '',
+            'password' => '',
+        ];
+    }
+
+    public function removeSalesExecutiveRow(int $index): void
+    {
+        unset($this->salesExecutives[$index]);
+        $this->salesExecutives = array_values($this->salesExecutives);
     }
 
     public function resetImportState(): void
@@ -218,34 +276,145 @@ class OrganizationManager extends Component
 
     public function createOrganization(): void
     {
-        $this->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'status' => 'nullable|in:active,suspended',
             'billingEmail' => 'nullable|email|max:255',
-        ]);
+        ];
 
-        $org = Organization::create([
-            'name' => $this->name,
-            'status' => $this->status ?: 'active',
-        ]);
+        if ($this->autoSetup) {
+            $rules['mainAccountName'] = 'nullable|string|max:255';
+            $rules['mainAccountEmail'] = 'required|email|max:255|unique:users,email';
+            $rules['mainAccountPhone'] = 'nullable|string|max:25';
+            $rules['mainAccountPassword'] = 'nullable|string|min:6';
 
-        // Automatically create organization main user (primary billing owner / client)
-        $client = Client::create([
-            'organization_id' => $org->id,
-            'name' => $this->name,
-            'email' => !empty($this->billingEmail) ? $this->billingEmail : null,
-            'status' => $org->status ?: 'active',
-        ]);
+            $rules['teamName'] = 'required|string|max:255';
 
-        CreditWallet::firstOrCreate(
-            ['client_id' => $client->id],
-            ['balance' => 0]
-        );
+            $rules['teamLeaderName'] = 'required|string|max:255';
+            $rules['teamLeaderEmail'] = 'required|email|max:255|unique:users,email|different:mainAccountEmail';
+            $rules['teamLeaderPhone'] = 'nullable|string|max:25';
+            $rules['teamLeaderPassword'] = 'nullable|string|min:6';
 
-        $this->reset(['name', 'status', 'billingEmail']);
-        $this->showCreateOrgModal = false;
-        $this->dispatch('close-modal', 'register-organization-modal');
-        $this->dispatch('toast', type: 'success', message: 'Organization created successfully with primary client.');
+            foreach ($this->salesExecutives as $idx => $exec) {
+                if (!empty($exec['name']) || !empty($exec['email']) || !empty($exec['phone']) || count($this->salesExecutives) === 1) {
+                    $rules["salesExecutives.{$idx}.name"] = 'required|string|max:255';
+                    $rules["salesExecutives.{$idx}.email"] = 'required|email|max:255|unique:users,email|different:mainAccountEmail|different:teamLeaderEmail';
+                    $rules["salesExecutives.{$idx}.phone"] = 'nullable|string|max:25';
+                    $rules["salesExecutives.{$idx}.password"] = 'nullable|string|min:6';
+                }
+            }
+        }
+
+        $this->validate($rules);
+
+        DB::beginTransaction();
+        try {
+            $org = Organization::create([
+                'name' => $this->name,
+                'status' => $this->status ?: 'active',
+            ]);
+
+            // Automatically create organization primary billing owner / client
+            $client = Client::create([
+                'organization_id' => $org->id,
+                'name' => $this->name,
+                'email' => !empty($this->billingEmail) ? $this->billingEmail : ($this->autoSetup ? $this->mainAccountEmail : null),
+                'status' => $org->status ?: 'active',
+            ]);
+
+            CreditWallet::firstOrCreate(
+                ['client_id' => $client->id],
+                ['balance' => 0]
+            );
+
+            if ($this->autoSetup) {
+                $builderRole = Role::whereIn('name', ['Builder/Developer', 'Builder'])->first()?->name ?? 'Builder/Developer';
+                $leaderRole = Role::whereIn('name', ['Team Leader', 'team-leader'])->first()?->name ?? 'Team Leader';
+                $executiveRole = Role::whereIn('name', ['Executive', 'Sales Executive', 'sales-executive'])->first()?->name ?? 'Executive';
+
+                // 1. Organization Main Account
+                $mainUserPassword = !empty($this->mainAccountPassword) ? $this->mainAccountPassword : Str::random(12);
+                $mainUser = User::create([
+                    'organization_id' => $org->id,
+                    'name' => !empty($this->mainAccountName) ? $this->mainAccountName : $this->name,
+                    'email' => $this->mainAccountEmail,
+                    'phone' => !empty($this->mainAccountPhone) ? $this->mainAccountPhone : null,
+                    'password' => bcrypt($mainUserPassword),
+                    'status' => $org->status ?: 'active',
+                ]);
+                $mainUser->assignRole($builderRole);
+
+                // 2. Team Leader
+                $teamLeaderPassword = !empty($this->teamLeaderPassword) ? $this->teamLeaderPassword : Str::random(12);
+                $leaderUser = User::create([
+                    'organization_id' => $org->id,
+                    'name' => $this->teamLeaderName,
+                    'email' => $this->teamLeaderEmail,
+                    'phone' => !empty($this->teamLeaderPhone) ? $this->teamLeaderPhone : null,
+                    'password' => bcrypt($teamLeaderPassword),
+                    'status' => $org->status ?: 'active',
+                ]);
+                $leaderUser->assignRole($leaderRole);
+
+                // 3. Sales Team
+                $team = SalesTeam::create([
+                    'ownable_type' => Organization::class,
+                    'ownable_id' => $org->id,
+                    'name' => $this->teamName,
+                    'leader_id' => $leaderUser->id,
+                ]);
+
+                // Team Leader membership
+                SalesTeamMember::create([
+                    'sales_team_id' => $team->id,
+                    'user_id' => $leaderUser->id,
+                    'role' => 'Team Leader',
+                    'is_active' => true,
+                ]);
+
+                // 4. Sales Executives
+                foreach ($this->salesExecutives as $execData) {
+                    if (empty($execData['name']) && empty($execData['email'])) {
+                        continue;
+                    }
+                    $execPassword = !empty($execData['password']) ? $execData['password'] : Str::random(12);
+                    $execUser = User::create([
+                        'organization_id' => $org->id,
+                        'name' => $execData['name'],
+                        'email' => $execData['email'],
+                        'phone' => !empty($execData['phone']) ? $execData['phone'] : null,
+                        'password' => bcrypt($execPassword),
+                        'status' => $org->status ?: 'active',
+                    ]);
+                    $execUser->assignRole($executiveRole);
+
+                    SalesTeamMember::create([
+                        'sales_team_id' => $team->id,
+                        'user_id' => $execUser->id,
+                        'role' => 'Executive',
+                        'is_active' => true,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            $this->reset([
+                'name', 'status', 'billingEmail',
+                'autoSetup', 'mainAccountName', 'mainAccountEmail', 'mainAccountPhone', 'mainAccountPassword',
+                'teamName', 'teamLeaderName', 'teamLeaderEmail', 'teamLeaderPhone', 'teamLeaderPassword',
+                'salesExecutives'
+            ]);
+            $this->showCreateOrgModal = false;
+            $this->dispatch('close-modal', 'register-organization-modal');
+            $this->dispatch('toast', type: 'success', message: $this->autoSetup ? 'Organization, main account, team, and users created successfully.' : 'Organization created successfully with primary client.');
+
+        } catch (Throwable $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Organization creation failed: ' . $e->getMessage(), ['exception' => $e]);
+            $this->dispatch('toast', type: 'error', message: 'Failed to create organization: ' . $e->getMessage());
+            $this->addError('general', 'Failed to create organization: ' . $e->getMessage());
+        }
     }
 
     public function updatedImportFile(): void

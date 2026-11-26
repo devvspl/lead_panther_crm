@@ -1179,7 +1179,7 @@
                                             </div>
                                             <div>
                                                 <button type="button" wire:click="$dispatch('open-org-member', { memberId: {{ $member->id }} })" class="font-bold text-ink hover:text-primary hover:underline text-left">{{ $member->name }}</button>
-                                                <div class="text-[10px] text-muted font-mono">ID: #{{ $member->id }}</div>
+                                                <div class="text-[10px] text-muted font-mono">{{ $member->user_code ?: ('ID: #' . $member->id) }}</div>
                                             </div>
                                         </div>
                                     </td>

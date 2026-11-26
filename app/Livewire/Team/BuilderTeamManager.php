@@ -169,7 +169,10 @@ class BuilderTeamManager extends Component
     {
         return [
             ['key' => 'id', 'label' => 'Member ID', 'prefix' => '#', 'class' => 'font-mono font-bold text-ink', 'sortable' => true, 'priority' => 1],
-            ['key' => 'name', 'label' => 'Name', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1],
+            ['key' => 'name', 'label' => 'Name', 'type' => 'html', 'class' => 'font-bold text-ink', 'sortable' => true, 'priority' => 1, 'render' => function ($row) {
+                $code = $row->user_code ? '<div class="text-[11px] font-mono text-muted leading-tight mt-0.5">' . e($row->user_code) . '</div>' : '';
+                return '<div><div class="font-bold text-ink">' . e($row->name) . '</div>' . $code . '</div>';
+            }],
             ['key' => 'email', 'label' => 'Email', 'class' => 'font-mono text-muted text-xs', 'sortable' => true, 'priority' => 1],
             ['key'=>'status','label'=>'Account Status','type'=>'badge','sortable'=>false,'priority'=>1,'badgeStyle'=>fn ($value) => strtolower($value)==='active' ? 'bg-success/10 text-success border border-success/20' : 'bg-warning/10 text-warning border border-warning/20'],
             ['key'=>'membership_status','label'=>'Membership','type'=>'badge','sortable'=>false,'priority'=>1,'badgeStyle'=>fn ($value) => strtolower($value)==='active' ? 'bg-success/10 text-success border border-success/20' : 'bg-warning/10 text-warning border border-warning/20'],
@@ -320,8 +323,8 @@ class BuilderTeamManager extends Component
         return view('livewire.team.builder-team-manager', [
             'members' => $members,
             'teams'=>$accessibleTeams->pluck('name','id')->all(),
-            'leaders'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->where('status','active')->role('Team Leader')->pluck('name','id')->all(),
-            'organizationMembers'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->whereDoesntHave('roles',fn($q)=>$q->whereIn('name',['Super Admin','Builder/Developer','Builder','builder']))->pluck('name','id')->all(),
+            'leaders'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->where('status','active')->role('Team Leader')->get(['id','name','user_code'])->mapWithKeys(fn($u) => [$u->id => $u->user_code ? "{$u->name} ({$u->user_code})" : $u->name])->all(),
+            'organizationMembers'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? [] : User::where('organization_id',$orgId)->whereDoesntHave('roles',fn($q)=>$q->whereIn('name',['Super Admin','Builder/Developer','Builder','builder']))->get(['id','name','user_code'])->mapWithKeys(fn($u) => [$u->id => $u->user_code ? "{$u->name} ({$u->user_code})" : $u->name])->all(),
             'roleOptions'=>\App\Support\TeamAccess::isLeader(auth()->user()) ? ['Executive'=>'Sales Executive'] : ['Executive'=>'Sales Executive','Team Leader'=>'Team Leader','Channel Partner'=>'Channel Partner'],
         ])->layout('layouts.app');
     }

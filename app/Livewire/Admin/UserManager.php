@@ -397,12 +397,13 @@ class UserManager extends Component
         $data = $this->getFilteredQuery()->get();
         $filename = "users-and-roles-directory_" . now()->format('Y-m-d') . ".xlsx";
 
-        $headings = ['User ID', 'Full Name', 'Email Address', 'Organization', 'Current Role', 'Registered At'];
+        $headings = ['User ID', 'User Code', 'Full Name', 'Email Address', 'Organization', 'Current Role', 'Registered At'];
 
         $rows = [];
         foreach ($data as $u) {
             $rows[] = [
                 $u->id,
+                $u->user_code ?? '',
                 $u->name,
                 $u->email,
                 $u->organization ? $u->organization->name : 'Platform HQ',

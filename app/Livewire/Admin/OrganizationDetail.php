@@ -527,6 +527,8 @@ class OrganizationDetail extends Component
     public string $mappingSourceType = 'campaign'; // 'campaign' | 'form'
     public ?int $mappingAccountId = null;
     public string $mappingRemoteId = '';
+    public ?int $mappingOrganizationId = null;
+    public ?int $mappingClientId = null;
     public ?int $mappingProjectId = null;
     public ?int $mappingDailyLimit = null;
     public ?int $mappingDeliveryInterval = null;
@@ -1052,6 +1054,8 @@ class OrganizationDetail extends Component
         $this->mappingSourceType = 'campaign';
         $this->mappingInheritLimit = true;
         $this->mappingInheritInterval = true;
+        $this->mappingOrganizationId = $this->organization->id;
+        $this->mappingClientId = $this->ensureBillingOwner()?->id;
 
         $firstAcc = MetaAdAccount::whereIn('status', ['connected', 'active'])->first();
         $this->mappingAccountId = $firstAcc?->id;
@@ -1068,6 +1072,8 @@ class OrganizationDetail extends Component
         $this->resetValidation();
         $this->editingMappingRecordId = $recordId;
         $this->mappingSourceType = $sourceType;
+        $this->mappingOrganizationId = $this->organization->id;
+        $this->mappingClientId = $this->ensureBillingOwner()?->id;
 
         if ($sourceType === 'crm_campaign') {
             $campaign = Campaign::withoutGlobalScopes()->findOrFail($recordId);

@@ -325,7 +325,7 @@
                             </div>
                             <div>
                                 <h4 class="text-base font-bold text-ink">{{ $editingMappingRecordId ? 'Edit Campaign Mapping' : 'Add Campaign Mapping' }}</h4>
-                                <p class="text-xs text-muted">Route Facebook leads directly to {{ $organization->name }}.</p>
+                                <p class="text-xs text-muted">Route Facebook leads directly to CRM projects.</p>
                             </div>
                         </div>
                         <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
@@ -333,6 +333,10 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
+
+                    <!-- Hidden Organization & Client Values -->
+                    <input type="hidden" wire:model="mappingOrganizationId" value="{{ $organization->id }}" />
+                    <input type="hidden" wire:model="mappingClientId" value="{{ $this->ensureBillingOwner()?->id }}" />
 
                     <!-- Mapping Source Type Toggle -->
                     <div>
@@ -377,18 +381,6 @@
                         @error('mappingRemoteId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <!-- Target Organization (Preselected & Readonly) -->
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">Organization / Client</label>
-                        <div class="px-3.5 py-2.5 rounded-lg border border-border bg-canvas/70 text-xs text-ink flex items-center justify-between">
-                            <span class="font-semibold">{{ $organization->name }}</span>
-                            <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                Preselected
-                            </span>
-                        </div>
-                    </div>
-
                     <!-- Target CRM Project -->
                     <div>
                         <label class="block text-xs font-semibold text-ink mb-1">CRM Project <span class="text-red-500">*</span></label>
@@ -399,43 +391,6 @@
                             @endforeach
                         </select>
                         @error('mappingProjectId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <!-- Delivery Settings Override Section -->
-                    <div class="border-t border-border pt-3 space-y-3">
-                        <h5 class="text-xs font-bold text-ink uppercase tracking-wider">Delivery Configuration</h5>
-
-                        <!-- Daily Limit -->
-                        <div class="space-y-1.5">
-                            <div class="flex items-center justify-between">
-                                <label class="text-xs font-semibold text-ink">Daily Lead Limit</label>
-                                <label class="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer">
-                                    <input type="checkbox" wire:model.live="mappingInheritLimit" class="rounded border-border text-primary focus:ring-primary" />
-                                    <span>Use Project Default</span>
-                                </label>
-                            </div>
-                            @if(!$mappingInheritLimit)
-                                <input type="number" wire:model="mappingDailyLimit" min="0" max="100000" placeholder="0 = Unlimited"
-                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
-                            @endif
-                            @error('mappingDailyLimit') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                        </div>
-
-                        <!-- Delivery Interval -->
-                        <div class="space-y-1.5">
-                            <div class="flex items-center justify-between">
-                                <label class="text-xs font-semibold text-ink">Delivery Interval (Minutes)</label>
-                                <label class="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer">
-                                    <input type="checkbox" wire:model.live="mappingInheritInterval" class="rounded border-border text-primary focus:ring-primary" />
-                                    <span>Use Project Default</span>
-                                </label>
-                            </div>
-                            @if(!$mappingInheritInterval)
-                                <input type="number" wire:model="mappingDeliveryInterval" min="0" max="10080" placeholder="0 = Immediate"
-                                    class="w-full rounded-lg border border-border bg-canvas p-2 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
-                            @endif
-                            @error('mappingDeliveryInterval') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                        </div>
                     </div>
 
                     <!-- Action Buttons -->

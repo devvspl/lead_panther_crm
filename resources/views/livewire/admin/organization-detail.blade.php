@@ -1297,101 +1297,132 @@
 
     <!-- MODAL 1: ADD MEMBER TO THIS ORGANIZATION -->
     <livewire:admin.organization-member-details :organization-id="$organization->id" :key="'org-member-details-'.$organization->id" />
-    <x-modal name="account-login-email-composer" wire:model.live="showAccountEmailComposer" :show="$showAccountEmailComposer" maxWidth="5xl">
+    <x-modal name="account-login-email-composer" wire:model.live="showAccountEmailComposer" :show="$showAccountEmailComposer" maxWidth="6xl">
         @if($showAccountEmailComposer)
             <form wire:submit="sendSelectedLoginDetails" class="flex flex-col max-h-[calc(100dvh-4rem)]">
-                <div class="px-5 py-4 border-b border-border flex items-center justify-between gap-3 shrink-0">
-                    <div>
-                        <h2 class="text-base font-bold text-ink">Compose Account Email</h2>
-                        <p class="text-xs text-muted mt-1">{{ $organization->name }} &middot; {{ count(array_unique($selectedTeamUserIds)) }} recipients &middot; Separate personalized emails</p>
+                <header class="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-4 shrink-0">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-base font-bold text-ink">Compose Account Email</h2>
+                            <p class="text-xs text-muted mt-0.5 truncate">{{ $organization->name }} &middot; Personal login details for each recipient</p>
+                        </div>
                     </div>
-                    <button type="button" wire:click="$set('showAccountEmailComposer', false)" class="text-muted hover:text-ink text-xl" aria-label="Close email composer">&times;</button>
-                </div>
-                <div class="overflow-y-auto min-h-0 p-5 space-y-4">
+                    <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)" aria-label="Close email composer" class="!p-2 !shadow-none">&times;</x-ui.button>
+                </header>
+                <div class="overflow-y-auto min-h-0">
                     @if($errors->any())
-                        <div role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+                        <div role="alert" class="mx-5 mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
                             @foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach
                         </div>
                     @endif
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        <div class="space-y-4 min-w-0">
-                            <fieldset class="space-y-2">
-                                <legend class="text-xs font-bold text-ink">To &middot; Organization members</legend>
-                                <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-2">
+                        <div class="p-5 sm:p-6 space-y-5 min-w-0">
+                            <section class="space-y-3" aria-labelledby="account-email-recipients-label">
+                                <div class="flex items-center justify-between gap-2">
+                                    <h3 id="account-email-recipients-label" class="text-sm font-bold text-ink">Recipients</h3>
+                                    <span class="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold">{{ count(array_unique($selectedTeamUserIds)) }} selected</span>
+                                </div>
+                                <p class="text-xs text-muted leading-relaxed">Each person receives their own account and associated team details.</p>
+                                <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                     @foreach($this->accountEmailSelectedRecipients as $recipient)
-                                        <label class="inline-flex items-center gap-1.5 text-xs bg-primary/10 text-ink rounded-lg px-2 py-1" wire:key="account-email-to-{{ $recipient->id }}">
-                                            <input type="checkbox" wire:model.live="selectedTeamUserIds" value="{{ $recipient->id }}" aria-label="Include {{ $recipient->name }}">
-                                            <span>{{ $recipient->name }} <span class="text-muted">{{ $recipient->email }}</span></span>
-                                        </label>
+                                        <div class="inline-flex items-center gap-2 min-w-0 max-w-full rounded-lg border border-border bg-canvas pl-3 pr-1.5 py-2" wire:key="account-email-to-{{ $recipient->id }}">
+                                            <div class="min-w-0">
+                                                <p class="text-xs font-semibold text-ink truncate">{{ $recipient->name }}</p>
+                                                <p class="text-[11px] text-muted truncate">{{ $recipient->email }}</p>
+                                            </div>
+                                            <button type="button" wire:click="removeAccountEmailRecipient({{ $recipient->id }})" aria-label="Remove {{ $recipient->name }}" class="p-1 text-muted hover:text-danger rounded">&times;</button>
+                                        </div>
                                     @endforeach
                                 </div>
-                                <input type="search" wire:model.live.debounce.300ms="accountEmailRecipientSearch" placeholder="Find another organization member&hellip;" aria-label="Search email recipients" class="w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink text-xs">
-                                <details class="rounded-lg border border-border p-2">
-                                    <summary class="text-xs text-primary cursor-pointer">Add or remove recipients</summary>
-                                    <div class="max-h-36 overflow-y-auto mt-2 space-y-1">
-                                        @forelse($this->accountEmailRecipientOptions as $recipient)
-                                            <label class="flex items-start gap-2 p-1.5 text-xs text-ink" wire:key="account-email-option-{{ $recipient->id }}">
-                                                <input type="checkbox" wire:model.live="selectedTeamUserIds" value="{{ $recipient->id }}">
-                                                <span>{{ $recipient->name }} <span class="text-muted">{{ $recipient->email }}</span> @if($recipient->status !== 'active')<span class="text-red-600">(Inactive)</span>@endif</span>
-                                            </label>
-                                        @empty <p class="text-xs text-muted p-2">No organization members found.</p> @endforelse
+                                <div>
+                                    <x-input-label for="account-email-add-recipient" value="Add To recipient" class="!text-xs mb-1.5" />
+                                    <x-ui.themed-select id="account-email-add-recipient" wire:model.live="accountEmailAddRecipientId" searchable placeholder="Search organization members" aria-label="Add To recipient">
+                                        <option value="">Search organization members</option>
+                                        @foreach($this->accountEmailRecipientOptions as $recipient)
+                                            @if(!in_array($recipient->id, array_map('intval', $selectedTeamUserIds), true))
+                                                <option value="{{ $recipient->id }}" @disabled($recipient->status !== 'active')>{{ $recipient->name }} &middot; {{ $recipient->email }}{{ $recipient->status !== 'active' ? ' (Inactive)' : '' }}</option>
+                                            @endif
+                                        @endforeach
+                                    </x-ui.themed-select>
+                                </div>
+                                <details class="rounded-xl border border-border p-3">
+                                    <summary class="text-xs font-semibold text-ink cursor-pointer">CC, BCC &amp; send me a copy</summary>
+                                    <div class="mt-3 space-y-3">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div><x-input-label for="account-email-cc" value="CC" class="!text-xs mb-1.5" /><x-text-input id="account-email-cc" type="text" variant="compact" wire:model="accountEmailCc" placeholder="name@example.com" /></div>
+                                            <div><x-input-label for="account-email-bcc" value="BCC" class="!text-xs mb-1.5" /><x-text-input id="account-email-bcc" type="text" variant="compact" wire:model="accountEmailBcc" placeholder="name@example.com" /></div>
+                                        </div>
+                                        <label class="flex items-center gap-2 text-xs text-ink"><input type="checkbox" wire:model="accountEmailCopyToMe" class="rounded border-border text-primary focus:ring-primary">Send me a BCC copy of each email</label>
+                                        <p class="text-[11px] text-muted leading-relaxed">Separate addresses with commas. Copies include the recipient's password setup link.</p>
                                     </div>
                                 </details>
-                            </fieldset>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <label class="text-xs font-semibold text-ink">CC
-                                    <input type="text" wire:model="accountEmailCc" placeholder="name@example.com, ..." class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
-                                </label>
-                                <label class="text-xs font-semibold text-ink">BCC
-                                    <input type="text" wire:model="accountEmailBcc" placeholder="name@example.com, ..." class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
-                                </label>
-                            </div>
-                            <label class="flex items-center gap-2 text-xs text-ink"><input type="checkbox" wire:model="accountEmailCopyToMe">Send me a BCC copy of each email</label>
-                            <p class="text-xs text-muted">CC/BCC recipients receive each personalized message, including its password setup link. Other selected users are sent separate emails.</p>
-                            <label class="block text-xs font-semibold text-ink">Subject
-                                <input type="text" wire:model.live.debounce.500ms="accountEmailSubject" maxlength="200" class="mt-1 w-full h-9 px-3 rounded-lg border border-border bg-canvas text-ink font-normal">
-                            </label>
-                            <label class="block text-xs font-semibold text-ink">Message
-                                <textarea wire:model.live.debounce.500ms="accountEmailBody" rows="13" maxlength="20000" class="mt-1 w-full p-3 rounded-lg border border-border bg-canvas text-ink text-xs font-normal leading-relaxed"></textarea>
-                            </label>
-                            <p class="text-[11px] text-muted leading-relaxed">Personalization: @verbatim <code>{{user_name}}</code>, <code>{{organization_name}}</code>, <code>{{user_code}}</code>, <code>{{email}}</code>, <code>{{login_url}}</code>, <code>{{password_setup_link}}</code>. @endverbatim Keep the setup-link placeholder; a secure link is generated for each user when sent.</p>
-                            <div class="space-y-2">
-                                <label class="block text-xs font-bold text-ink">Attachments
-                                    <input type="file" wire:model="accountEmailAttachments" multiple class="mt-2 block w-full text-xs text-muted file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-border file:bg-canvas file:text-ink">
-                                </label>
-                                <p class="text-[11px] text-muted">Up to 5 files &middot; 10 MB per file &middot; 15 MB total. Invoices, documents and other files are supported. Files are kept privately for seven days for retries.</p>
+                            </section>
+                            <section class="space-y-4 border-t border-border pt-5" aria-labelledby="account-email-content-label">
+                                <h3 id="account-email-content-label" class="text-sm font-bold text-ink">Email content</h3>
+                                <div>
+                                    <x-input-label for="account-email-subject" value="Subject" class="!text-xs mb-1.5" />
+                                    <x-text-input id="account-email-subject" type="text" wire:model.live.debounce.500ms="accountEmailSubject" maxlength="200" class="w-full !text-xs" />
+                                </div>
+                                <div>
+                                    <x-input-label for="account-email-body" value="Message" class="!text-xs mb-1.5" />
+                                    <x-text-input as="textarea" id="account-email-body" wire:model.live.debounce.500ms="accountEmailBody" rows="11" maxlength="20000" class="!text-xs leading-relaxed resize-y" />
+                                    <p class="text-[11px] text-muted mt-2">Names, roles and team details fill in automatically. Check each person's preview before sending.</p>
+                                </div>
+                                <details class="rounded-lg bg-canvas px-3 py-2.5">
+                                    <summary class="text-xs text-ink font-medium cursor-pointer">Personalization fields</summary>
+                                    <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted">@verbatim
+                                        <code>{{user_name}}</code><code>{{account_details}}</code><code>{{role_name}}</code><code>{{role_introduction}}</code><code>{{organization_name}}</code><code>{{team_name}}</code><code>{{team_leader_name}}</code><code>{{user_code}}</code><code>{{email}}</code><code>{{login_url}}</code><code>{{password_setup_link}}</code>
+                                    @endverbatim</div>
+                                    <p class="text-[11px] text-muted mt-2">Keep the password setup field so every recipient gets their own secure link.</p>
+                                </details>
+                            </section>
+                            <section class="border-t border-border pt-5 space-y-2">
+                                <x-input-label for="account-email-files" value="Attachments" class="!text-xs !font-semibold" />
+                                <x-text-input id="account-email-files" type="file" wire:model="accountEmailAttachments" multiple class="w-full !text-xs p-2 file:mr-3 file:border-0 file:rounded-md file:bg-canvas file:text-ink file:px-3 file:py-1.5" />
+                                <p class="text-[11px] text-muted">Invoices and other files &middot; Up to 5 files, 10 MB each, 15 MB total.</p>
                                 <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary" role="status">Uploading attachments&hellip;</p>
                                 @foreach($accountEmailAttachments as $index => $attachment)
-                                    <div class="flex items-center justify-between gap-2 rounded-lg bg-canvas px-3 py-2 text-xs text-ink" wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">
-                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} &middot; {{ number_format($attachment->getSize() / 1024, 0) }} KB</span>
-                                        <button type="button" wire:click="removeAccountEmailAttachment({{ $index }})" class="text-primary">Remove</button>
+                                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs text-ink" wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">
+                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} <span class="text-muted">{{ number_format($attachment->getSize() / 1024, 0) }} KB</span></span>
+                                        <button type="button" wire:click="removeAccountEmailAttachment({{ $index }})" class="text-primary font-medium">Remove</button>
                                     </div>
                                 @endforeach
-                            </div>
+                            </section>
                         </div>
-                        <div class="space-y-3 min-w-0">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <h3 class="text-xs font-bold text-ink">Email Preview</h3>
-                                <select wire:model.live="accountEmailPreviewUserId" aria-label="Preview email for recipient" class="max-w-full h-8 px-2 text-xs border border-border rounded-lg bg-canvas text-ink">
-                                    @foreach($this->accountEmailSelectedRecipients as $recipient)<option value="{{ $recipient->id }}">{{ $recipient->name }}</option>@endforeach
-                                </select>
+                        <aside class="p-5 sm:p-6 bg-canvas/50 lg:border-l border-t lg:border-t-0 border-border min-w-0">
+                            <div class="lg:sticky lg:top-5 space-y-3">
+                                <div>
+                                    <h3 class="text-sm font-bold text-ink">Email Preview</h3>
+                                    <p class="text-xs text-muted mt-1">See exactly which personal details this recipient receives.</p>
+                                </div>
+                                <div>
+                                    <x-input-label for="account-email-preview-user" value="Preview for" class="!text-xs mb-1.5" />
+                                    <x-ui.themed-select id="account-email-preview-user" wire:model.live="accountEmailPreviewUserId" searchable placeholder="Choose a recipient" aria-label="Preview email for recipient" :disabled="$this->accountEmailSelectedRecipients->isEmpty()">
+                                        @foreach($this->accountEmailSelectedRecipients as $recipient)<option value="{{ $recipient->id }}">{{ $recipient->name }} &middot; {{ $recipient->roles->first()?->name ?: 'Team Member' }}</option>@endforeach
+                                    </x-ui.themed-select>
+                                </div>
+                                @if($this->accountEmailSelectedRecipients->isNotEmpty())
+                                    <iframe title="Personalized account email preview" sandbox="" referrerpolicy="no-referrer" srcdoc="{{ $this->accountEmailPreview }}" class="w-full h-[620px] max-h-[65dvh] rounded-xl border border-border bg-white shadow-sm"></iframe>
+                                @else
+                                    <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-xs text-muted">Add a To recipient to preview their email.</div>
+                                @endif
+                                <p class="text-[11px] text-muted">Your active email design is used. A unique setup link is created only when sending.</p>
                             </div>
-                            <p class="text-xs text-muted">Uses the current email design. Setup links appear only in the sent emails.</p>
-                            @if($this->accountEmailSelectedRecipients->isNotEmpty())
-                                <iframe title="Personalized account email preview" sandbox="" referrerpolicy="no-referrer" srcdoc="{{ $this->accountEmailPreview }}" class="w-full h-[600px] max-h-[65dvh] rounded-xl border border-border bg-white"></iframe>
-                            @else <p class="text-xs text-muted p-5 border border-border rounded-lg">Choose at least one To recipient to preview the message.</p> @endif
-                        </div>
+                        </aside>
                     </div>
                 </div>
-                <div class="px-5 py-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0 bg-surface">
-                    <p class="text-xs text-muted">Review the message and recipients before sending.</p>
+                <footer class="px-5 sm:px-6 py-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0 bg-surface">
+                    <p class="text-xs text-muted">{{ count(array_unique($selectedTeamUserIds)) }} separate personalized {{ count(array_unique($selectedTeamUserIds)) === 1 ? 'email' : 'emails' }}</p>
                     <div class="flex gap-2">
-                        <button type="button" wire:click="$set('showAccountEmailComposer', false)" class="px-4 py-2 rounded-lg border border-border text-ink text-xs font-semibold">Cancel</button>
-                        <button type="submit" wire:loading.attr="disabled" wire:target="sendSelectedLoginDetails,accountEmailAttachments" @disabled(count($selectedTeamUserIds) === 0) class="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-50">
+                        <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)" class="!text-xs">Cancel</x-ui.button>
+                        <x-ui.button type="submit" wire:loading.attr="disabled" wire:target="sendSelectedLoginDetails,accountEmailAttachments" :disabled="count($selectedTeamUserIds) === 0" class="!text-xs disabled:opacity-50">
                             <span wire:loading.remove wire:target="sendSelectedLoginDetails">Send Emails</span><span wire:loading wire:target="sendSelectedLoginDetails">Sending&hellip;</span>
-                        </button>
+                        </x-ui.button>
                     </div>
-                </div>
+                </footer>
             </form>
         @endif
     </x-modal>

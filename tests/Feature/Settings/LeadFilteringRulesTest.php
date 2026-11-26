@@ -111,6 +111,12 @@ class LeadFilteringRulesTest extends TestCase
         $rule->refresh();
         $this->assertEquals('Studio Buyers & Investors Only', $rule->name);
 
+        // Verify table renders CRM columns
+        $component->assertSee('Studio Buyers & Investors Only')
+            ->assertSee('All Campaigns')
+            ->assertSee('Include Lead')
+            ->assertSee('Super Admin');
+
         // Toggle Active
         $component->call('toggleRuleActive', $rule->id);
         $rule->refresh();
@@ -123,6 +129,55 @@ class LeadFilteringRulesTest extends TestCase
         // Delete Rule
         $component->call('deleteRule', $rule->id);
         $this->assertDatabaseMissing('lead_filter_rules', ['id' => $rule->id]);
+    }
+
+    public function test_builder_can_create_project_and_campaign_scoped_rules(): void
+    {
+        // 1. Create Project-scoped rule
+        Livewire::test(LeadFilteringRules::class, ['organizationId' => $this->org->id])
+            ->call('openCreateRuleModal')
+            ->set('ruleName', 'Studio Heights Project Only')
+            ->set('ruleScopeType', 'project')
+            ->set('ruleProjectId', $this->project->id)
+            ->set('ruleAction', 'include')
+            ->set('conditionGroups', [
+                [
+                    'logic' => 'AND',
+                    'conditions' => [
+                        ['field' => 'city', 'operator' => 'equals', 'value' => 'Noida'],
+                    ],
+                ],
+            ])
+            ->call('saveRule')
+            ->assertHasNoErrors();
+
+        $projectRule = LeadFilterRule::where('name', 'Studio Heights Project Only')->firstOrFail();
+        $this->assertEquals($this->project->id, $projectRule->project_id);
+        $this->assertNull($projectRule->campaign_id);
+        $this->assertEquals('Project: Studio Heights', $projectRule->scopeSummary());
+
+        // 2. Create Campaign-scoped rule
+        Livewire::test(LeadFilteringRules::class, ['organizationId' => $this->org->id])
+            ->call('openCreateRuleModal')
+            ->set('ruleName', 'Studio Buy Campaign Only')
+            ->set('ruleScopeType', 'campaign')
+            ->set('ruleCampaignId', $this->campaign->id)
+            ->set('ruleAction', 'exclude')
+            ->set('conditionGroups', [
+                [
+                    'logic' => 'AND',
+                    'conditions' => [
+                        ['field' => 'want_to_buy_studio', 'operator' => 'equals', 'value' => 'rent'],
+                    ],
+                ],
+            ])
+            ->call('saveRule')
+            ->assertHasNoErrors();
+
+        $campaignRule = LeadFilterRule::where('name', 'Studio Buy Campaign Only')->firstOrFail();
+        $this->assertEquals($this->campaign->id, $campaignRule->campaign_id);
+        $this->assertNull($campaignRule->project_id);
+        $this->assertEquals('Campaign: Studio Buy Campaign', $campaignRule->scopeSummary());
     }
 
     public function test_rule_engine_evaluates_all_supported_operators_correctly(): void

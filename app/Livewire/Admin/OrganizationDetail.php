@@ -1296,7 +1296,7 @@ class OrganizationDetail extends Component
     public string $accountEmailBcc = '';
     public bool $accountEmailCopyToMe = false;
     public array $accountEmailAttachments = [];
-    public string $accountEmailRecipientSearch = '';
+    public string $accountEmailAddRecipientId = '';
     public string $accountEmailPreviewUserId = '';
 
     public function openAccountEmailComposer(): void
@@ -1306,7 +1306,7 @@ class OrganizationDetail extends Component
         $ids = array_unique(array_map('intval', $this->selectedTeamUserIds));
         abort_unless(User::where('organization_id', $this->organization->id)->whereIn('id', $ids)->count() === count($ids), 403);
         $this->resetValidation();
-        $this->reset(['accountEmailCc', 'accountEmailBcc', 'accountEmailCopyToMe', 'accountEmailAttachments', 'accountEmailRecipientSearch']);
+        $this->reset(['accountEmailCc', 'accountEmailBcc', 'accountEmailCopyToMe', 'accountEmailAttachments', 'accountEmailAddRecipientId']);
         $content = app(\App\Services\NotificationDeliveryService::class)->accountLoginEmailDefaults();
         $this->accountEmailSubject = $content['subject'];
         $this->accountEmailBody = $content['body'];
@@ -1319,18 +1319,37 @@ class OrganizationDetail extends Component
     {
         if (! $this->showAccountEmailComposer) return collect();
         $this->authorizeLoginDetails();
-        return User::where('organization_id', $this->organization->id)
-            ->when(trim($this->accountEmailRecipientSearch) !== '', function ($query) {
-                $search = '%'.trim($this->accountEmailRecipientSearch).'%';
-                $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhere('email', 'like', $search));
-            })->orderBy('name')->limit(100)->get(['id', 'name', 'email', 'status']);
+        return User::where('organization_id', $this->organization->id)->with('roles')->orderBy('name')->get(['id', 'name', 'email', 'status']);
+    }
+
+    public function updatedAccountEmailAddRecipientId(): void
+    {
+        $this->authorizeLoginDetails();
+        if ($this->accountEmailAddRecipientId === '') return;
+        $user = User::where('organization_id', $this->organization->id)->where('status', 'active')->find($this->accountEmailAddRecipientId);
+        abort_unless($user, 403);
+        $ids = array_values(array_unique(array_merge(array_map('intval', $this->selectedTeamUserIds), [$user->id])));
+        if (count($ids) > 100) {
+            $this->addError('selectedTeamUserIds', 'Select up to 100 recipients at a time.');
+        } else {
+            $this->selectedTeamUserIds = $ids;
+            $this->updatedSelectedTeamUserIds();
+        }
+        $this->accountEmailAddRecipientId = '';
+    }
+
+    public function removeAccountEmailRecipient(int $userId): void
+    {
+        $this->authorizeLoginDetails();
+        $this->selectedTeamUserIds = array_values(array_filter($this->selectedTeamUserIds, fn ($id) => (int) $id !== $userId));
+        $this->updatedSelectedTeamUserIds();
     }
 
     public function getAccountEmailSelectedRecipientsProperty()
     {
         if (! $this->showAccountEmailComposer) return collect();
         $this->authorizeLoginDetails();
-        return User::where('organization_id', $this->organization->id)->whereIn('id', $this->selectedTeamUserIds)->orderBy('name')->get(['id', 'name', 'email', 'organization_id', 'user_code']);
+        return User::where('organization_id', $this->organization->id)->whereIn('id', $this->selectedTeamUserIds)->with('roles')->orderBy('name')->get(['id', 'name', 'email', 'phone', 'organization_id', 'user_code']);
     }
 
     public function getAccountEmailPreviewProperty(): string

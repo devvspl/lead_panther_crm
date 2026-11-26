@@ -202,7 +202,7 @@ class ProcessInboundLeadJob implements ShouldQueue
                 $organizationId = $clientUser?->organization_id;
                 if ($organizationId) {
                     $ruleEngine = app(\App\Services\LeadFilterRuleEngine::class);
-                    $filterEval = $ruleEngine->evaluateLead($mapped, $organizationId, $campaignId);
+                    $filterEval = $ruleEngine->evaluateLead($mapped, $organizationId, $campaignId, $project?->id);
 
                     if (!$filterEval->passed) {
                         $mobile = $mapped['mobile'] ?? '';

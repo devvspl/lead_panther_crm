@@ -271,20 +271,61 @@ class NotificationDeliveryService
     public function accountLoginEmailDefaults(): array
     {
         $template = NotificationTemplate::where('key', 'account_login_details')->where('channel', 'email')->first();
+        $body = $template?->body ?: "Hello {{user_name}},\n\n{{role_introduction}}\n\n{{account_details}}\n\nLogin URL: {{login_url}}\n\nPlease use your secure password setup link to create your password and access your account:\n{{password_setup_link}}\n\nThis link expires in " . config('auth.passwords.users.expire', 60) . " minutes.\n\nRegards,\nLead Panther Team";
+        if (! str_contains($body, '{{account_details}}')) $body .= "\n\n{{account_details}}";
+        return ['subject' => $template?->subject ?: 'Your Lead Panther Account Login Details', 'body' => $body];
+    }
+
+    /** Resolve context from this user's organization and current assignments only. */
+    public function accountLoginContext(User $user): array
+    {
+        $roleKey = \App\Support\NavigationConfig::getRoleKey($user);
+        $roleName = match ($roleKey) {
+            'builder' => 'Builder / Developer', 'team-leader' => 'Team Leader',
+            'sales-executive' => 'Sales Executive', 'super-admin' => 'Super Admin',
+            'client' => 'Client', 'broker' => 'Broker', 'channel-partner' => 'Channel Partner',
+            default => $user->getRoleNames()->first() ?: 'Team Member',
+        };
+        $teams = collect();
+        if ($user->organization_id && in_array($roleKey, ['builder', 'team-leader', 'sales-executive'])) {
+            $teams = \App\Models\SalesTeam::where(function ($query) use ($user) {
+                $query->where(fn ($q) => $q->where('ownable_type', \App\Models\Organization::class)->where('ownable_id', $user->organization_id))
+                    ->orWhere(fn ($q) => $q->where('ownable_type', User::class)->whereIn('ownable_id', User::where('organization_id', $user->organization_id)->select('id')));
+            })->when($roleKey === 'team-leader', function ($query) use ($user) {
+                $query->where('leader_id', $user->id)->whereDoesntHave('members', fn ($q) => $q->where('user_id', $user->id)->where('is_active', false));
+            })->when($roleKey === 'sales-executive', fn ($query) => $query->whereHas('members', fn ($q) => $q->where('user_id', $user->id)->where('is_active', true)))
+                ->with(['leader' => fn ($q) => $q->where('organization_id', $user->organization_id)->where('status', 'active')])->orderBy('name')->get();
+        }
+        $organization = \App\Models\Organization::find($user->organization_id)?->name ?? '';
+        $details = ['Organization: '.$organization, 'Account Name: '.$user->name, 'Role: '.$roleName, 'UserCode: '.$user->user_code, 'Email: '.$user->email];
+        if (preg_match('/^\+?[0-9 ()-]{7,20}$/', (string) $user->phone)) $details[] = 'Mobile: '.$user->phone;
+        if ($teams->isNotEmpty()) {
+            $details[] = ($roleKey === 'builder' ? 'Organization Teams: ' : 'Your Team'.($teams->count() > 1 ? 's: ' : ': ')).$teams->pluck('name')->implode(', ');
+            if ($roleKey === 'sales-executive') {
+                foreach ($teams as $team) if ($team->leader) $details[] = 'Team Leader ('.$team->name.'): '.$team->leader->name;
+            }
+        }
+        if ($teams->isEmpty() && in_array($roleKey, ['team-leader', 'sales-executive'])) $details[] = 'Team: Not assigned yet';
+        $introduction = match ($roleKey) {
+            'builder' => 'Your Builder / Developer account for '.$organization.' is ready. Your organization account details are below.',
+            'team-leader' => 'Your Team Leader account is ready. Below are your personal account details and your assigned teams.',
+            'sales-executive' => 'Your Sales Executive account is ready. Below are your personal account details and current team assignment.',
+            default => 'Your Lead Panther account is ready. Your personal account details are below.',
+        };
         return [
-            'subject' => $template?->subject ?: 'Your Lead Panther Account Login Details',
-            'body' => $template?->body ?: "Hello {{user_name}},\n\nYour Lead Panther account has been created successfully.\n\nOrganization: {{organization_name}}\nUserCode: {{user_code}}\nEmail: {{email}}\nLogin URL: {{login_url}}\n\nPlease use the secure password setup link below to create your password and access your account.\n\n{{password_setup_link}}\n\nThis link expires in " . config('auth.passwords.users.expire', 60) . " minutes.\n\nRegards,\nLead Panther Team",
+            'role_name' => $roleName, 'role_introduction' => $introduction, 'account_details' => implode("\n", $details),
+            'organization_name' => $organization, 'team_name' => $teams->pluck('name')->implode(', '),
+            'team_leader_name' => $teams->pluck('leader.name')->filter()->unique()->implode(', '),
         ];
     }
 
     public function renderAccountLoginEmail(array $content, User $user, string $setupLink): array
     {
-        $tokens = [
+        $tokens = array_merge($this->accountLoginContext($user), [
             'user_name' => $user->name, 'recipient_name' => $user->name,
-            'organization_name' => \App\Models\Organization::find($user->organization_id)?->name ?? '',
             'user_code' => $user->user_code, 'email' => $user->email,
             'login_url' => route('login'), 'password_setup_link' => $setupLink,
-        ];
+        ]);
         // One pass prevents token-looking characters in names from becoming template instructions.
         $replacements = [];
         foreach ($tokens as $key => $value) $replacements['{{'.$key.'}}'] = (string) $value;

@@ -257,5 +257,93 @@ class AccountLoginDetailsTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_builder_leader_and_executive_receive_only_their_role_and_associated_team_context(): void
+    {
+        foreach (['Builder/Developer', 'Team Leader', 'Executive'] as $role) Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        $builder = $this->member(['name' => 'Builder Alice']); $builder->assignRole('Builder/Developer');
+        $leader = $this->member(['name' => 'Leader Bob']); $leader->assignRole('Team Leader');
+        $executive = $this->member(['name' => 'Executive Carol']); $executive->assignRole('Executive');
+        $otherLeader = $this->member(['name' => 'Other Leader']); $otherLeader->assignRole('Team Leader');
+        $team = \App\Models\SalesTeam::create(['name' => 'Bob Sales Team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id, 'leader_id' => $leader->id]);
+        $otherTeam = \App\Models\SalesTeam::create(['name' => 'Other Sales Team', 'ownable_type' => User::class, 'ownable_id' => $builder->id, 'leader_id' => $otherLeader->id]);
+        \App\Models\SalesTeamMember::create(['sales_team_id' => $team->id, 'user_id' => $executive->id, 'role' => 'Executive', 'is_active' => true]);
+        $foreignOrg = Organization::create(['name' => 'Private foreign organization']);
+        $foreignTeam = \App\Models\SalesTeam::create(['name' => 'Foreign Secret Team', 'ownable_type' => Organization::class, 'ownable_id' => $foreignOrg->id, 'leader_id' => $leader->id]);
+        \App\Models\SalesTeamMember::create(['sales_team_id' => $foreignTeam->id, 'user_id' => $executive->id, 'role' => 'Executive', 'is_active' => true]);
+        $this->teamComponent()->set('selectedTeamUserIds', [$builder->id, $leader->id, $executive->id])
+            ->call('openAccountEmailComposer')->call('sendSelectedLoginDetails')->assertHasNoErrors();
+        $this->deliver();
+        Mail::assertSentCount(3);
+        foreach ([$builder, $leader, $executive] as $recipient) {
+            Mail::assertSent(BrandedNotificationMail::class, function ($mail) use ($recipient, $builder, $leader, $executive, $otherLeader) {
+                if (! $mail->hasTo($recipient->email)) return false;
+                $this->assertStringContainsString('UserCode: '.$recipient->user_code, $mail->messageBody);
+                $this->assertStringContainsString('Bob Sales Team', $mail->messageBody);
+                $this->assertStringNotContainsString('Foreign Secret Team', $mail->messageBody);
+                foreach ([$builder, $leader, $executive, $otherLeader] as $other) {
+                    if ($other->id === $recipient->id) continue;
+                    $this->assertStringNotContainsString($other->email, $mail->messageBody);
+                    $this->assertStringNotContainsString($other->user_code, $mail->messageBody);
+                }
+                if ($recipient->id === $builder->id) {
+                    $this->assertStringContainsString('Role: Builder / Developer', $mail->messageBody);
+                    $this->assertStringContainsString('Other Sales Team', $mail->messageBody);
+                } else {
+                    $this->assertStringNotContainsString('Other Sales Team', $mail->messageBody);
+                    if ($recipient->id === $leader->id) $this->assertStringContainsString('Role: Team Leader', $mail->messageBody);
+                    else {
+                        $this->assertStringContainsString('Role: Sales Executive', $mail->messageBody);
+                        $this->assertStringContainsString('Team Leader (Bob Sales Team): Leader Bob', $mail->messageBody);
+                    }
+                }
+                return true;
+            });
+        }
+    }
+
+    public function test_recipient_picker_uses_existing_components_and_add_remove_updates_preview(): void
+    {
+        $a = $this->member(['name' => 'Alice']); $b = $this->member(['name' => 'Bob']);
+        $component = $this->teamComponent()->set('selectedTeamUserIds', [$a->id])->call('openAccountEmailComposer')
+            ->assertSeeHtml('account-email-add-recipient')->assertSeeHtml('leadPantherSelect')
+            ->assertSeeHtml('account-email-body')->assertSee('Personalization fields')
+            ->set('accountEmailAddRecipientId', (string) $b->id)->assertSet('accountEmailAddRecipientId', '')
+            ->assertSet('selectedTeamUserIds', [$a->id, $b->id])->call('removeAccountEmailRecipient', $a->id)
+            ->assertSet('selectedTeamUserIds', [$b->id])->assertSet('accountEmailPreviewUserId', (string) $b->id);
+        $this->assertStringContainsString('Hello Bob', $component->get('accountEmailPreview'));
+        $this->assertStringNotContainsString('Hello Alice', $component->get('accountEmailPreview'));
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+        $foreign = User::factory()->create(['organization_id' => Organization::create(['name' => 'Foreign'])->id]);
+        $component->set('accountEmailAddRecipientId', (string) $foreign->id)->assertForbidden();
+        Mail::assertNothingSent();
+    }
+
+    public function test_inactive_assignments_and_foreign_leaders_do_not_leak_into_context(): void
+    {
+        Role::firstOrCreate(['name' => 'Executive', 'guard_name' => 'web']);
+        $user = $this->member(); $user->assignRole('Executive');
+        $foreignLeader = User::factory()->create(['organization_id' => Organization::create(['name' => 'Other'])->id, 'status' => 'active']);
+        $activeTeam = \App\Models\SalesTeam::create(['name' => 'Current Team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id, 'leader_id' => $foreignLeader->id]);
+        $inactiveTeam = \App\Models\SalesTeam::create(['name' => 'Old Team', 'ownable_type' => Organization::class, 'ownable_id' => $this->org->id]);
+        foreach ([[$activeTeam, true], [$inactiveTeam, false]] as [$team, $active]) {
+            \App\Models\SalesTeamMember::create(['sales_team_id' => $team->id, 'user_id' => $user->id, 'role' => 'Executive', 'is_active' => $active]);
+        }
+        $context = app(NotificationDeliveryService::class)->accountLoginContext($user);
+        $this->assertSame('Current Team', $context['team_name']);
+        $this->assertSame('', $context['team_leader_name']);
+        $this->assertStringNotContainsString('Old Team', $context['account_details']);
+        $this->assertStringNotContainsString($foreignLeader->name, $context['account_details']);
+    }
+
+    public function test_shared_text_input_keeps_regular_inputs_and_supports_message_textareas(): void
+    {
+        $html = \Illuminate\Support\Facades\Blade::render('<x-text-input id="normal-input" type="email" /><x-text-input as="textarea" id="message-input" rows="6">Hello</x-text-input>');
+        $this->assertStringContainsString('<input', $html);
+        $this->assertStringContainsString('type="email"', $html);
+        $this->assertStringContainsString('<textarea', $html);
+        $this->assertStringContainsString('rows="6"', $html);
+        $this->assertStringContainsString('Hello</textarea>', $html);
+    }
+
 }
 

@@ -15,6 +15,8 @@ class LeadFilterRule extends Model
     protected $fillable = [
         'organization_id',
         'campaign_id',
+        'project_id',
+        'created_by',
         'name',
         'description',
         'action', // 'include' or 'exclude'
@@ -28,6 +30,10 @@ class LeadFilterRule extends Model
         'is_active' => 'boolean',
         'conditions' => 'array',
         'priority' => 'integer',
+        'organization_id' => 'integer',
+        'campaign_id' => 'integer',
+        'project_id' => 'integer',
+        'created_by' => 'integer',
     ];
 
     public function organization(): BelongsTo
@@ -38,6 +44,16 @@ class LeadFilterRule extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function logs(): HasMany
@@ -53,6 +69,22 @@ class LeadFilterRule extends Model
     public function scopeForOrganization(Builder $query, int $orgId): Builder
     {
         return $query->where('organization_id', $orgId);
+    }
+
+    /**
+     * Scope summary description for table and UI badges.
+     */
+    public function scopeSummary(): string
+    {
+        if ($this->campaign) {
+            return "Campaign: {$this->campaign->name}";
+        }
+
+        if ($this->project) {
+            return "Project: {$this->project->name}";
+        }
+
+        return 'All Campaigns';
     }
 
     /**

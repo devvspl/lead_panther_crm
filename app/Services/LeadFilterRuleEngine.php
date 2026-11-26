@@ -39,7 +39,7 @@ class LeadFilterRuleEngine
      *    if none match -> Lead is SKIPPED.
      * 4. Otherwise -> Lead is INCLUDED.
      */
-    public function evaluateLead(array $leadData, ?int $organizationId, ?int $campaignId = null): LeadFilterEvaluationResult
+    public function evaluateLead(array $leadData, ?int $organizationId, ?int $campaignId = null, ?int $projectId = null): LeadFilterEvaluationResult
     {
         if (!$organizationId) {
             return new LeadFilterEvaluationResult(
@@ -55,6 +55,12 @@ class LeadFilterRuleEngine
                 $q->whereNull('campaign_id');
                 if ($campaignId) {
                     $q->orWhere('campaign_id', $campaignId);
+                }
+            })
+            ->where(function ($q) use ($projectId) {
+                $q->whereNull('project_id');
+                if ($projectId) {
+                    $q->orWhere('project_id', $projectId);
                 }
             })
             ->orderByDesc('priority')

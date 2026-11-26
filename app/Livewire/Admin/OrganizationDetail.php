@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Carbon\Carbon;
 use Throwable;
 
@@ -531,6 +532,288 @@ class OrganizationDetail extends Component
     public ?int $mappingDeliveryInterval = null;
     public bool $mappingInheritLimit = true;
     public bool $mappingInheritInterval = true;
+
+    public string $campaignSearch = '';
+    public string $campaignStatusFilter = 'all';
+    public string $campaignSortField = 'campaign_name';
+    public string $campaignSortDirection = 'asc';
+
+    public function updatedCampaignSearch(): void
+    {
+        $this->resetPage('campaignsPage');
+    }
+
+    public function setStatusFilter(string $status): void
+    {
+        if ($this->activeTab === 'campaigns') {
+            $this->campaignStatusFilter = $status;
+            $this->resetPage('campaignsPage');
+        }
+    }
+
+    public function setCampaignStatusFilter(string $status): void
+    {
+        $this->campaignStatusFilter = $status;
+        $this->resetPage('campaignsPage');
+    }
+
+    public function sortCampaignsBy(string $field): void
+    {
+        if ($this->campaignSortField === $field) {
+            $this->campaignSortDirection = $this->campaignSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->campaignSortField = $field;
+            $this->campaignSortDirection = 'asc';
+        }
+        $this->resetPage('campaignsPage');
+    }
+
+    public function campaignTableColumns(): array
+    {
+        return [
+            ['key' => 'campaign_name', 'label' => 'Campaign Name', 'type' => 'campaign_name', 'sortable' => true, 'priority' => 1],
+            ['key' => 'campaign_id_formatted', 'label' => 'Campaign ID', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
+                'active' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'paused' => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'inactive' => 'bg-slate-100 text-slate-600 border border-slate-200',
+            ]],
+            ['key' => 'facebook_page', 'label' => 'Facebook Page', 'sortable' => false, 'priority' => 2, 'class' => 'text-muted text-xs'],
+            ['key' => 'organization_name', 'label' => 'Organization / Client', 'sortable' => false, 'priority' => 1, 'class' => 'font-semibold text-ink text-xs'],
+            ['key' => 'project_name', 'label' => 'CRM Project', 'type' => 'campaign_project', 'sortable' => true, 'priority' => 1],
+            ['key' => 'daily_limit_formatted', 'label' => 'Daily Limit', 'sortable' => true, 'priority' => 2, 'class' => 'font-mono text-ink text-xs'],
+            ['key' => 'delivery_interval', 'label' => 'Delivery Interval', 'type' => 'delivery_interval_badge', 'sortable' => true, 'priority' => 2],
+            ['key' => 'delivered_today', 'label' => 'Delivered Today', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-emerald-600 text-xs text-right', 'align' => 'right'],
+            ['key' => 'pending_leads', 'label' => 'Pending Leads', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink text-xs text-right', 'align' => 'right'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'campaign_actions', 'priority' => 1, 'align' => 'right'],
+        ];
+    }
+
+    public function campaignQuickFilters(): array
+    {
+        $all = $this->allCampaignRows;
+        return [
+            ['key' => 'all', 'label' => 'All Campaigns', 'count' => $all->count()],
+            ['key' => 'mapped', 'label' => 'Mapped', 'count' => $all->where('is_mapped', true)->count()],
+            ['key' => 'unmapped', 'label' => 'Not Mapped', 'count' => $all->where('is_mapped', false)->count()],
+            ['key' => 'active', 'label' => 'Active', 'count' => $all->where('status', 'active')->count()],
+        ];
+    }
+
+    public function getCampaignSummaryStatsProperty(): array
+    {
+        $all = $this->allCampaignRows;
+        return [
+            'total' => $all->count(),
+            'mapped' => $all->where('is_mapped', true)->count(),
+            'unmapped' => $all->where('is_mapped', false)->count(),
+            'delivered_today' => (int) $all->sum('delivered_today'),
+            'pending' => (int) $all->sum('pending_leads'),
+        ];
+    }
+
+    public function getAllCampaignRowsProperty(): \Illuminate\Support\Collection
+    {
+        $service = app(\App\Services\LeadDistributionService::class);
+        $ownerIds = User::where('organization_id', $this->organization->id)->pluck('id')->all();
+
+        $projects = $this->mappedDeliveryProjects()->orderBy('name')->get();
+        $projectIds = $projects->pluck('id')->all();
+        $projectsById = $projects->keyBy('id');
+
+        // Ensure any MetaAdRecords mapped to these projects or organization have their CRM campaign linked
+        $metaMappedRecords = MetaAdRecord::where('kind', 'campaign')
+            ->where(function ($q) use ($ownerIds, $projectIds) {
+                $q->whereIn('project_id', $projectIds)
+                  ->orWhere(function ($sub) use ($ownerIds) {
+                      $sub->whereIn('client_id', $ownerIds);
+                  });
+            })->get();
+
+        foreach ($metaMappedRecords as $meta) {
+            if ($meta->project_id && (!$meta->crm_campaign_id || !Campaign::withoutGlobalScopes()->where('id', $meta->crm_campaign_id)->where('project_id', $meta->project_id)->exists())) {
+                $crmCamp = Campaign::withoutGlobalScopes()
+                    ->where('project_id', $meta->project_id)
+                    ->where('name', $meta->name)
+                    ->first();
+                if (!$crmCamp) {
+                    $crmCamp = Campaign::create([
+                        'project_id' => $meta->project_id,
+                        'name' => $meta->name,
+                        'utm_campaign' => Str::slug($meta->name),
+                        'status' => 'active',
+                    ]);
+                }
+                $meta->update(['crm_campaign_id' => $crmCamp->id]);
+            }
+        }
+
+        $campaigns = Campaign::withoutGlobalScopes()
+            ->whereIn('project_id', $projectIds)
+            ->with('leadSource')
+            ->orderBy('name')
+            ->get();
+
+        $metaByCampaignId = MetaAdRecord::where('kind', 'campaign')
+            ->whereIn('crm_campaign_id', $campaigns->pluck('id'))
+            ->with(['account', 'leadForm'])
+            ->get()
+            ->keyBy('crm_campaign_id');
+
+        $metaByName = MetaAdRecord::where('kind', 'campaign')
+            ->where(function ($q) use ($ownerIds, $projectIds) {
+                $q->whereIn('client_id', $ownerIds)->orWhereIn('project_id', $projectIds);
+            })
+            ->with(['account', 'leadForm'])
+            ->get()
+            ->keyBy('name');
+
+        $formsByCampaignId = LeadFormMapping::whereIn('campaign_id', $campaigns->pluck('id'))
+            ->orWhereIn('project_id', $projectIds)
+            ->with('portalAccount')
+            ->get()
+            ->keyBy('campaign_id');
+
+        $rows = collect();
+        $seenMetaIds = [];
+
+        foreach ($campaigns as $campaign) {
+            $project = $projectsById->get($campaign->project_id);
+            $metaRecord = $metaByCampaignId->get($campaign->id) ?? $metaByName->get($campaign->name);
+            if ($metaRecord) {
+                $seenMetaIds[] = $metaRecord->id;
+            }
+            $formMapping = $formsByCampaignId->get($campaign->id);
+            $isMapped = ($metaRecord !== null || $formMapping !== null);
+
+            $fbPageName = $metaRecord?->account?->name;
+            if (!$fbPageName && $formMapping?->portalAccount) {
+                $fbPageName = $formMapping->portalAccount->account_name ?: "Page #{$formMapping->portalAccount->account_id}";
+            }
+            $leadFormName = $metaRecord?->leadForm?->form_name ?: $formMapping?->form_name;
+
+            $effective = $project ? $service->effectiveDeliveryConfig($campaign, $project) : [
+                'limit' => $campaign->delivery_daily_limit ?? 0,
+                'interval' => $campaign->delivery_interval_minutes ?? 0,
+                'limit_source' => $campaign->delivery_daily_limit !== null ? 'Campaign override' : 'Default',
+                'interval_source' => $campaign->delivery_interval_minutes !== null ? 'Campaign override' : 'Default',
+            ];
+
+            $stats = $project ? $service->deliveryStatistics($project, $campaign) : ['today' => 0, 'pending' => 0, 'total' => 0];
+            $remoteId = $metaRecord?->remote_id ?? ($formMapping?->form_id ?? null);
+
+            $rows->push([
+                'id' => $campaign->id,
+                'campaign_id' => (string) ($remoteId ?? ''),
+                'campaign_id_formatted' => $remoteId ? "Meta ID: {$remoteId}" : '—',
+                'campaign_name' => $campaign->name,
+                'status' => $campaign->status ?: 'active',
+                'facebook_page' => $fbPageName ?: '—',
+                'organization_name' => $this->organization->name,
+                'project_name' => $project?->name ?? 'Not Mapped',
+                'is_mapped' => $isMapped,
+                'daily_limit' => $effective['limit'],
+                'daily_limit_formatted' => $effective['limit'] === 0 ? 'Unlimited' : number_format($effective['limit']),
+                'daily_limit_source' => $effective['limit_source'],
+                'delivery_interval' => $effective['interval'],
+                'delivery_interval_formatted' => $effective['interval'] === 0 ? 'Immediate' : $effective['interval'] . ' min',
+                'delivery_interval_source' => $effective['interval_source'],
+                'delivered_today' => $stats['today'] ?? 0,
+                'pending_leads' => $stats['pending'] ?? 0,
+                'total_delivered' => $stats['total'] ?? 0,
+                'meta_record_id' => $metaRecord?->id,
+                'lead_form' => $leadFormName,
+                'lead_source' => $campaign->leadSource?->name,
+                'source_type' => $metaRecord ? 'meta_campaign' : ($formMapping ? 'lead_form' : 'crm_campaign'),
+                'mapping_id' => $metaRecord?->id ?: ($formMapping?->id ?: $campaign->id),
+            ]);
+        }
+
+        $unlinkedMetas = MetaAdRecord::where('kind', 'campaign')
+            ->whereIn('client_id', $ownerIds)
+            ->whereNotIn('id', $seenMetaIds)
+            ->with(['account', 'leadForm', 'project'])
+            ->get();
+
+        foreach ($unlinkedMetas as $meta) {
+            $project = $meta->project_id ? $projectsById->get($meta->project_id) : null;
+            $fbPageName = $meta->account?->name;
+            $leadFormName = $meta->leadForm?->form_name;
+
+            $rows->push([
+                'id' => 'meta_' . $meta->id,
+                'campaign_id' => (string) $meta->remote_id,
+                'campaign_id_formatted' => $meta->remote_id ? "Meta ID: {$meta->remote_id}" : '—',
+                'campaign_name' => $meta->name,
+                'status' => strtolower($meta->status ?: 'active'),
+                'facebook_page' => $fbPageName ?: '—',
+                'organization_name' => $this->organization->name,
+                'project_name' => $project?->name ?? 'Not Mapped',
+                'is_mapped' => (bool) $project,
+                'daily_limit' => $project?->delivery_daily_limit ?? 0,
+                'daily_limit_formatted' => ($project?->delivery_daily_limit ? number_format($project->delivery_daily_limit) : 'Unlimited'),
+                'daily_limit_source' => 'Project default',
+                'delivery_interval' => $project?->delivery_interval_minutes ?? 0,
+                'delivery_interval_formatted' => ($project?->delivery_interval_minutes ? $project->delivery_interval_minutes . ' min' : 'Immediate'),
+                'delivery_interval_source' => 'Project default',
+                'delivered_today' => 0,
+                'pending_leads' => 0,
+                'total_delivered' => 0,
+                'meta_record_id' => $meta->id,
+                'lead_form' => $leadFormName,
+                'lead_source' => 'Meta Ads',
+                'source_type' => 'meta_campaign',
+                'mapping_id' => $meta->id,
+            ]);
+        }
+
+        return $rows;
+    }
+
+    public function getPaginatedCampaignsProperty(): LengthAwarePaginator
+    {
+        $rows = $this->allCampaignRows;
+
+        // Filter by Status Pill
+        if ($this->campaignStatusFilter === 'mapped') {
+            $rows = $rows->where('is_mapped', true);
+        } elseif ($this->campaignStatusFilter === 'unmapped') {
+            $rows = $rows->where('is_mapped', false);
+        } elseif ($this->campaignStatusFilter === 'active') {
+            $rows = $rows->where('status', 'active');
+        } elseif ($this->campaignStatusFilter === 'inactive') {
+            $rows = $rows->where('status', '!=', 'active');
+        }
+
+        // Search query
+        if (!empty($this->campaignSearch)) {
+            $q = strtolower(trim($this->campaignSearch));
+            $rows = $rows->filter(function ($row) use ($q) {
+                return str_contains(strtolower($row['campaign_name'] ?? ''), $q)
+                    || str_contains(strtolower($row['campaign_id'] ?? ''), $q)
+                    || str_contains(strtolower($row['project_name'] ?? ''), $q)
+                    || str_contains(strtolower($row['facebook_page'] ?? ''), $q);
+            });
+        }
+
+        // Sorting
+        $field = $this->campaignSortField;
+        $sortKey = match ($field) {
+            'campaign_id_formatted' => 'campaign_id',
+            'daily_limit_formatted' => 'daily_limit',
+            default => $field,
+        };
+        $descending = $this->campaignSortDirection === 'desc';
+        $rows = $rows->sortBy($sortKey, SORT_REGULAR, $descending)->values();
+
+        $page = LengthAwarePaginator::resolveCurrentPage('campaignsPage');
+        $perPage = 15;
+        $currentItems = $rows->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator($currentItems, $rows->count(), $perPage, $page, [
+            'pageName' => 'campaignsPage',
+        ]);
+    }
 
     protected function mappedDeliveryProjects()
     {

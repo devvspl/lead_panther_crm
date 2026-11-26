@@ -77,20 +77,20 @@ class OrganizationCampaignDeliveryModalTest extends TestCase
         ]);
     }
 
-    public function test_compact_project_card_and_campaign_card_render_lead_project_mapping_and_edit_mapping(): void
+    public function test_advanced_table_and_summary_stats_render_with_campaign_details(): void
     {
         Livewire::test(OrganizationDetail::class, ['organization' => $this->org])
             ->call('setTab', 'campaigns')
+            ->assertSee('Total Campaigns')
+            ->assertSee('Mapped Campaigns')
+            ->assertSee('Delivered Today')
+            ->assertSee('Pending Leads')
             ->assertSee('Brigade Meadows')
-            ->assertSee('Delivery Active')
-            ->assertSee('Configure Settings')
             ->assertSee('Meadows Phase 2 Launch')
-            ->assertSee('Project default')
-            ->assertSee('Lead Project Mapping:')
             ->assertSee('Brigade Enterprises')
             ->assertSee('Edit Mapping')
-            ->assertDontSee('Configure Delivery')
-            ->assertDontSee('Live Delivery Statistics · Project totals');
+            ->assertDontSee('Configure Settings')
+            ->assertDontSee('Configure Delivery');
     }
 
     public function test_unmapped_campaign_displays_not_mapped_and_allows_editing_mapping(): void
@@ -105,7 +105,6 @@ class OrganizationCampaignDeliveryModalTest extends TestCase
             ->call('setTab', 'campaigns')
             ->assertSee('Unmapped Local Banner Campaign')
             ->assertSee('Not Mapped')
-            ->assertSee('Not mapped to Meta campaign or lead form')
             ->call('editCampaignMapping', $unmappedCampaign->id, 'crm_campaign')
             ->assertSet('mappingProjectId', $this->project->id)
             ->assertDispatched('open-modal', 'organization-campaign-mapping');

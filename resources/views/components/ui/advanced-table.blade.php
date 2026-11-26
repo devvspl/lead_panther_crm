@@ -374,6 +374,73 @@
                                                         wire:confirm="Record that the client has accepted this lead?"
                                                         class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark
                                                     Accepted</button>@else<span class="text-xs text-muted">—</span>@endif
+                                            @elseif($type === 'campaign_name')
+                                                @php
+                                                    $campName = is_object($row) ? ($row->campaign_name ?? $val) : ($row['campaign_name'] ?? $val);
+                                                    $leadForm = is_object($row) ? ($row->lead_form ?? null) : ($row['lead_form'] ?? null);
+                                                    $leadSource = is_object($row) ? ($row->lead_source ?? null) : ($row['lead_source'] ?? null);
+                                                @endphp
+                                                <div class="space-y-0.5 min-w-[140px]">
+                                                    <div class="font-bold text-xs text-ink">{{ $campName }}</div>
+                                                    @if(!empty($leadForm) || !empty($leadSource))
+                                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                                            @if(!empty($leadForm))
+                                                                <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                                                    Form: {{ $leadForm }}
+                                                                </span>
+                                                            @endif
+                                                            @if(!empty($leadSource))
+                                                                <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-canvas text-muted border border-border">
+                                                                    {{ $leadSource }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @elseif($type === 'campaign_project')
+                                                @php
+                                                    $isMapped = is_object($row) ? ($row->is_mapped ?? false) : ($row['is_mapped'] ?? false);
+                                                    $projectName = is_object($row) ? ($row->project_name ?? $val) : ($row['project_name'] ?? $val);
+                                                @endphp
+                                                @if($isMapped && $projectName && $projectName !== 'Not Mapped')
+                                                    <span class="font-semibold text-ink text-xs">{{ $projectName }}</span>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>Not Mapped
+                                                    </span>
+                                                @endif
+                                            @elseif($type === 'delivery_interval_badge')
+                                                @php
+                                                    $intervalVal = is_object($row) ? ($row->delivery_interval ?? $val) : ($row['delivery_interval'] ?? $val);
+                                                @endphp
+                                                @if(empty($intervalVal) || (int)$intervalVal === 0)
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Immediate</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{{ $intervalVal }} min</span>
+                                                @endif
+                                            @elseif($type === 'campaign_actions')
+                                                @php
+                                                    $mappingId = is_object($row) ? ($row->mapping_id ?? $row->id) : ($row['mapping_id'] ?? $row['id']);
+                                                    $sourceType = is_object($row) ? ($row->source_type ?? 'campaign') : ($row['source_type'] ?? 'campaign');
+                                                    $metaRecId = is_object($row) ? ($row->meta_record_id ?? null) : ($row['meta_record_id'] ?? null);
+                                                @endphp
+                                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                                                    <button type="button"
+                                                        wire:click="editCampaignMapping({{ $mappingId }}, '{{ $sourceType }}')"
+                                                        class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-primary/50 transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
+                                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        <span>Edit Mapping</span>
+                                                    </button>
+                                                    @if(!empty($metaRecId))
+                                                        <button type="button"
+                                                            wire:click="fetchMetaCampaignLeads({{ $metaRecId }})"
+                                                            wire:loading.attr="disabled"
+                                                            class="px-2.5 py-1 text-xs font-bold rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer">
+                                                            <span wire:loading.remove wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetch Leads</span>
+                                                            <span wire:loading wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetching...</span>
+                                                        </button>
+                                                    @endif
+                                                </div>
                                             @elseif($type === 'lead_id')
                                                 <button type="button"
                                                     @click.stop="$dispatch('open-lead-detail', { id: {{ is_object($row) ? $row->id : $row['id'] }} })"
@@ -805,7 +872,7 @@
                                                 <div class="h-2 flex-1 bg-slate-200 rounded-full"></div>
                                                 <div class="h-2.5 w-6 bg-slate-200 rounded"></div>
                                             </div>
-                                        @elseif(in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions', 'audit_actions']))
+                                        @elseif(in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions', 'audit_actions', 'campaign_actions']))
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <div class="w-6 h-6 rounded-lg bg-slate-200"></div>
                                                 <div class="w-6 h-6 rounded-lg bg-slate-200"></div>
@@ -883,8 +950,8 @@
                                         $val = is_object($row) ? data_get($row, $colKey) : ($row[$colKey] ?? null);
                                     @endphp
                                     <div
-                                        class="min-w-0 break-words space-y-0.5 {{ $col['mobileClass'] ?? '' }} {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
-                                        @if(!in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions']))
+                                        class="min-w-0 break-words space-y-0.5 {{ $col['mobileClass'] ?? '' }} {{ in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions', 'audit_actions', 'campaign_actions']) ? 'col-span-2 pt-2 border-t border-border flex justify-end' : '' }}">
+                                        @if(!in_array($type, ['lead_actions', 'user_actions', 'org_actions', 'replacement_actions', 'recharge_actions', 'webhook_actions', 'upload_actions', 'audit_actions', 'campaign_actions']))
                                             <span
                                                 class="text-[10px] uppercase font-bold text-muted tracking-wider block">{{ $colLabel }}</span>
                                         @endif
@@ -917,6 +984,73 @@
                                                             wire:confirm="Record client acceptance?"
                                                             class="px-2.5 py-1 rounded-lg border border-border text-xs font-semibold">Mark
                                                         Accepted</button>@endif</div>
+                                            @elseif($type === 'campaign_name')
+                                                @php
+                                                    $campName = is_object($row) ? ($row->campaign_name ?? $val) : ($row['campaign_name'] ?? $val);
+                                                    $leadForm = is_object($row) ? ($row->lead_form ?? null) : ($row['lead_form'] ?? null);
+                                                    $leadSource = is_object($row) ? ($row->lead_source ?? null) : ($row['lead_source'] ?? null);
+                                                @endphp
+                                                <div class="space-y-0.5 min-w-[140px]">
+                                                    <div class="font-bold text-xs text-ink">{{ $campName }}</div>
+                                                    @if(!empty($leadForm) || !empty($leadSource))
+                                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                                            @if(!empty($leadForm))
+                                                                <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                                                    Form: {{ $leadForm }}
+                                                                </span>
+                                                            @endif
+                                                            @if(!empty($leadSource))
+                                                                <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-canvas text-muted border border-border">
+                                                                    {{ $leadSource }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @elseif($type === 'campaign_project')
+                                                @php
+                                                    $isMapped = is_object($row) ? ($row->is_mapped ?? false) : ($row['is_mapped'] ?? false);
+                                                    $projectName = is_object($row) ? ($row->project_name ?? $val) : ($row['project_name'] ?? $val);
+                                                @endphp
+                                                @if($isMapped && $projectName && $projectName !== 'Not Mapped')
+                                                    <span class="font-semibold text-ink text-xs">{{ $projectName }}</span>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>Not Mapped
+                                                    </span>
+                                                @endif
+                                            @elseif($type === 'delivery_interval_badge')
+                                                @php
+                                                    $intervalVal = is_object($row) ? ($row->delivery_interval ?? $val) : ($row['delivery_interval'] ?? $val);
+                                                @endphp
+                                                @if(empty($intervalVal) || (int)$intervalVal === 0)
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Immediate</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{{ $intervalVal }} min</span>
+                                                @endif
+                                            @elseif($type === 'campaign_actions')
+                                                @php
+                                                    $mappingId = is_object($row) ? ($row->mapping_id ?? $row->id) : ($row['mapping_id'] ?? $row['id']);
+                                                    $sourceType = is_object($row) ? ($row->source_type ?? 'campaign') : ($row['source_type'] ?? 'campaign');
+                                                    $metaRecId = is_object($row) ? ($row->meta_record_id ?? null) : ($row['meta_record_id'] ?? null);
+                                                @endphp
+                                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                                                    <button type="button"
+                                                        wire:click="editCampaignMapping({{ $mappingId }}, '{{ $sourceType }}')"
+                                                        class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-canvas text-ink hover:border-primary/50 transition shadow-2xs inline-flex items-center gap-1 cursor-pointer">
+                                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        <span>Edit Mapping</span>
+                                                    </button>
+                                                    @if(!empty($metaRecId))
+                                                        <button type="button"
+                                                            wire:click="fetchMetaCampaignLeads({{ $metaRecId }})"
+                                                            wire:loading.attr="disabled"
+                                                            class="px-2.5 py-1 text-xs font-bold rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer">
+                                                            <span wire:loading.remove wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetch Leads</span>
+                                                            <span wire:loading wire:target="fetchMetaCampaignLeads({{ $metaRecId }})">Fetching...</span>
+                                                        </button>
+                                                    @endif
+                                                </div>
                                             @elseif($type === 'lead_id')
                                                 <button type="button" @click.stop="$dispatch('open-lead-detail', { id: {{ $rowId }} })"
                                                     class="font-mono font-bold text-ink hover:text-primary hover:underline text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 cursor-pointer"

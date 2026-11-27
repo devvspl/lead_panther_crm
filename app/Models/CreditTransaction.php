@@ -62,35 +62,46 @@ class CreditTransaction extends Model
      * Compatibility entry point for charging a successful delivery under a pessimistic row lock.
      * Prevents duplicate deductions and strictly validates organization status and balance.
      */
-    public static function reserveForLead(Lead $lead): bool
+    public static function reserveForLead(Lead $lead, ?int $targetClientId = null, ?int $customCost = null): bool
     {
-        return DB::transaction(function () use ($lead) {
+        return DB::transaction(function () use ($lead, $targetClientId, $customCost) {
             $lead = Lead::withoutGlobalScopes()->whereKey($lead->id)->lockForUpdate()->firstOrFail();
+            $clientId = $targetClientId ?: $lead->client_id;
             if (!$lead->delivered_at || $lead->delivery_pending || !$lead->credit_delivery_confirmed || in_array($lead->status, ['duplicate', 'rejected', 'invalid'])) return false;
-            // 1. Prevent duplicate deduction for the same lead
-            $alreadyCharged = static::withoutGlobalScopes()->where('lead_id', $lead->id)
+
+            // 1. Prevent duplicate deduction for the same lead for this specific client
+            $consumedCount = static::withoutGlobalScopes()->where('lead_id', $lead->id)
+                ->where('client_id', $clientId)
                 ->where('is_legacy', false)
                 ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
-                ->exists();
+                ->count();
 
-            if ($alreadyCharged) {
+            $refundedCount = static::withoutGlobalScopes()->where('lead_id', $lead->id)
+                ->where('client_id', $clientId)
+                ->where('is_legacy', false)
+                ->whereIn('transaction_type', ['lead_refund', 'refund'])
+                ->count();
+
+            if ($consumedCount > $refundedCount) {
                 return true;
             }
 
             // 2. Validate Client & Organization Status
-            $client = $lead->client ?: ($lead->client_id ? Client::with('organization')->find($lead->client_id) : null);
+            $client = User::with('organization')->find($clientId);
             if (!$client || $client->status !== 'active') return false;
             $organization = $client?->organization;
 
             if ($organization && !$organization->is_active) {
-                $lead->update([
-                    'current_stage' => 'pending_credit',
-                    'status' => 'pending_credit',
-                ]);
+                if ($clientId === $lead->client_id) {
+                    $lead->update([
+                        'current_stage' => 'pending_credit',
+                        'status' => 'pending_credit',
+                    ]);
+                }
 
                 NotificationLog::create([
                     'notifiable_type' => User::class,
-                    'notifiable_id' => $lead->client_id,
+                    'notifiable_id' => $clientId,
                     'channel' => 'crm',
                     'status' => 'sent',
                     'payload' => json_encode([
@@ -104,21 +115,26 @@ class CreditTransaction extends Model
             }
 
             // 3. Acquire pessimistic row lock on the client's wallet
-            $wallet = CreditWallet::withoutGlobalScopes()->where('client_id', $lead->client_id)->lockForUpdate()->first();
+            $wallet = CreditWallet::withoutGlobalScopes()->where('client_id', $clientId)->lockForUpdate()->first();
 
             if (!$wallet) {
                 $wallet = CreditWallet::create([
-                    'client_id' => $lead->client_id,
+                    'client_id' => $clientId,
                     'balance' => 0.00,
                     'opening_balance' => 0.00,
                 ]);
             }
             if (!$wallet->reconciled_at) return false;
 
-            // 4. Calculate effective per-lead pricing following the hierarchy
-            $pricingService = app(\App\Services\LeadPricingService::class);
-            $resolution = $pricingService->resolveForLead($lead);
-            $cost = (int) $resolution['cost'];
+            // 4. Calculate effective per-lead pricing
+            if ($customCost !== null && $customCost >= 0) {
+                $cost = (int) $customCost;
+            } else {
+                $pricingService = app(\App\Services\LeadPricingService::class);
+                $project = $lead->project_id ? Project::withoutGlobalScopes()->find($lead->project_id) : null;
+                $resolution = $pricingService->resolveCost($project, null, $organization);
+                $cost = (int) $resolution['cost'];
+            }
 
             // 5. Check if wallet has sufficient available credits
             if ($wallet->balance >= $cost) {
@@ -126,10 +142,12 @@ class CreditTransaction extends Model
                 $after = $before - $cost;
 
                 $wallet->update(['balance' => $after]);
-                $lead->update(array_merge(['lead_cost' => $cost], $lead->current_stage === 'pending_credit' ? ['status' => 'new', 'current_stage' => 'new'] : []));
+                if ($clientId === $lead->client_id) {
+                    $lead->update(array_merge(['lead_cost' => $cost], $lead->current_stage === 'pending_credit' ? ['status' => 'new', 'current_stage' => 'new'] : []));
+                }
 
                 $tx = static::create([
-                    'client_id' => $lead->client_id,
+                    'client_id' => $clientId,
                     'lead_id' => $lead->id,
                     'package_id' => null,
                     'credit_before' => $before,
@@ -137,25 +155,26 @@ class CreditTransaction extends Model
                     'credit_after' => $after,
                     'transaction_type' => 'lead_consumption',
                     'description' => "Lead credits consumed for {$lead->lead_code} ({$lead->name})",
-                    'created_by' => auth()->id() ?? $lead->client_id,
+                    'created_by' => auth()->id() ?? $clientId,
                     'created_at' => now(),
                 ]);
 
                 event(new CreditReserved($lead, $tx));
                 return true;
             } else {
-                // Insufficient credits: do NOT deduct credits, keep lead pending
-                $lead->update([
-                    'current_stage' => 'pending_credit',
-                    'status' => 'pending_credit',
-                ]);
+                // Insufficient credits
+                if ($clientId === $lead->client_id) {
+                    $lead->update([
+                        'current_stage' => 'pending_credit',
+                        'status' => 'pending_credit',
+                    ]);
+                    event(new CampaignPaused($lead, 'Credit balance insufficient'));
+                }
 
-                event(new CampaignPaused($lead, 'Credit balance insufficient'));
-
-                // Warning notification for Builder/Developer
+                // Warning notification for Client
                 NotificationLog::create([
                     'notifiable_type' => User::class,
-                    'notifiable_id' => $lead->client_id,
+                    'notifiable_id' => $clientId,
                     'channel' => 'crm',
                     'status' => 'sent',
                     'payload' => json_encode([

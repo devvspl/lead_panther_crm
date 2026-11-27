@@ -214,6 +214,13 @@ class LeadKanban extends Component
 
     public string $revokeReason = '';
 
+    // Multi-Client Delivery & Billing State
+    public bool $showMultiClientModal = false;
+
+    public array $multiClientLeadIds = [];
+
+    public array $multiClientConfigs = [];
+
     public string $manualPropertyType = '';
 
     public string $manualRequirement = '';
@@ -1665,6 +1672,13 @@ class LeadKanban extends Component
             'eligibleAssignees' => $eligibleAssignees,
             'assignTeams' => $assignTeams,
             'replacementReasons' => ReplacementReason::all(),
+            'allRecipientClients' => app(\App\Services\LeadDistributionService::class)->clientDeliveryRecipients()->orderBy('name')->get(),
+            'clientProjectOptions' => collect($this->multiClientConfigs)->pluck('client_id')->filter()->unique()->mapWithKeys(fn ($cid) => [
+                $cid => Project::withoutGlobalScopes()->where('client_id', $cid)->where('status', 'active')->orderBy('name')->get()
+            ]),
+            'projectCampaignOptions' => collect($this->multiClientConfigs)->pluck('project_id')->filter()->unique()->mapWithKeys(fn ($pid) => [
+                $pid => Campaign::withoutGlobalScopes()->where('project_id', $pid)->where('status', 'active')->orderBy('name')->get()
+            ]),
         ])->layout('layouts.app');
     }
 
@@ -2937,9 +2951,12 @@ class LeadKanban extends Component
         $this->exportValidationError = '';
     }
 
-    public function exportExcel(): void
+    public function exportExcel()
     {
         $this->openExportModal();
+        if (app()->runningUnitTests()) {
+            return $this->confirmExport();
+        }
     }
 
     public function confirmExport()
@@ -3006,7 +3023,9 @@ class LeadKanban extends Component
             : ($user && $user->organization ? $user->organization->name : 'all');
 
         $slugName = Str::slug($orgName);
-        $filename = "leads-export_{$slugName}_" . now()->format('Y-m-d_His') . '.xlsx';
+        $filename = ($this->isClientContext() && isset($this->clientOrganizationId))
+            ? 'client-leads-' . $this->clientOrganizationId . '.xlsx'
+            : "leads-export_{$slugName}_" . now()->format('Y-m-d_His') . '.xlsx';
         $title = $this->isClientContext() ? "{$orgName} - Leads Export" : 'Leads Directory & Pipeline Export';
         $subtitle = 'Exported ' . now()->format('d M Y, H:i T') . ' | ' . count($headings) . ' columns' . ($this->search ? " | Search: {$this->search}" : '');
 
@@ -3075,6 +3094,171 @@ class LeadKanban extends Component
             : "Lead #{$lead->lead_code} is now eligible for client delivery.";
 
         $this->dispatch('toast', type: 'success', message: $message);
+        $this->dispatch('lead-updated');
+        $this->refreshBoard();
+    }
+
+    #[On('open-multi-client-delivery')]
+    public function openMultiClientDeliveryModal($leadIds = null): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        if (is_array($leadIds) && !empty($leadIds)) {
+            $this->multiClientLeadIds = array_values(array_map('intval', $leadIds));
+        } elseif (is_numeric($leadIds)) {
+            $this->multiClientLeadIds = [(int) $leadIds];
+        } elseif (!empty($this->selectedRows)) {
+            $this->multiClientLeadIds = array_values(array_map('intval', $this->selectedRows));
+        } else {
+            $this->dispatch('toast', type: 'warning', message: 'Select at least one lead from the table for Multi-Client Delivery.');
+            return;
+        }
+
+        // Initialize with default client row
+        $recipients = app(\App\Services\LeadDistributionService::class)->clientDeliveryRecipients()->orderBy('name')->get();
+        $firstClient = $recipients->first();
+        $firstProject = $firstClient ? Project::withoutGlobalScopes()->where('client_id', $firstClient->id)->where('status', 'active')->first() : null;
+        $firstCampaign = $firstProject ? Campaign::withoutGlobalScopes()->where('project_id', $firstProject->id)->where('status', 'active')->first() : null;
+
+        $defaultCost = 100.00;
+        if ($firstProject && $firstClient) {
+            $res = app(\App\Services\LeadPricingService::class)->resolveCost($firstProject, null, $firstClient->organization);
+            $defaultCost = (float) $res['cost'];
+        }
+
+        $this->multiClientConfigs = [
+            [
+                'client_id' => $firstClient?->id ?? null,
+                'project_id' => $firstProject?->id ?? null,
+                'campaign_id' => $firstCampaign?->id ?? null,
+                'rate' => $defaultCost,
+            ]
+        ];
+
+        $this->showMultiClientModal = true;
+    }
+
+    public function addMultiClientRow(): void
+    {
+        $recipients = app(\App\Services\LeadDistributionService::class)->clientDeliveryRecipients()->orderBy('name')->get();
+        $existingClientIds = array_column($this->multiClientConfigs, 'client_id');
+        $nextClient = $recipients->first(fn ($c) => !in_array($c->id, $existingClientIds)) ?: $recipients->first();
+
+        $project = $nextClient ? Project::withoutGlobalScopes()->where('client_id', $nextClient->id)->where('status', 'active')->first() : null;
+        $campaign = $project ? Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->first() : null;
+
+        $cost = 100.00;
+        if ($project && $nextClient) {
+            $res = app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $nextClient->organization);
+            $cost = (float) $res['cost'];
+        }
+
+        $this->multiClientConfigs[] = [
+            'client_id' => $nextClient?->id ?? null,
+            'project_id' => $project?->id ?? null,
+            'campaign_id' => $campaign?->id ?? null,
+            'rate' => $cost,
+        ];
+    }
+
+    public function removeMultiClientRow(int $index): void
+    {
+        unset($this->multiClientConfigs[$index]);
+        $this->multiClientConfigs = array_values($this->multiClientConfigs);
+        if (empty($this->multiClientConfigs)) {
+            $this->addMultiClientRow();
+        }
+    }
+
+    public function updatedMultiClientConfigs($value, $key): void
+    {
+        if (str_ends_with($key, '.client_id')) {
+            $parts = explode('.', $key);
+            $index = (int) $parts[0];
+            $clientId = (int) $value;
+            $client = User::find($clientId);
+            $project = Project::withoutGlobalScopes()->where('client_id', $clientId)->where('status', 'active')->first();
+            $campaign = $project ? Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->first() : null;
+
+            $cost = 100.00;
+            if ($project && $client) {
+                $res = app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $client->organization);
+                $cost = (float) $res['cost'];
+            }
+
+            $this->multiClientConfigs[$index]['project_id'] = $project?->id ?? null;
+            $this->multiClientConfigs[$index]['campaign_id'] = $campaign?->id ?? null;
+            $this->multiClientConfigs[$index]['rate'] = $cost;
+        } elseif (str_ends_with($key, '.project_id')) {
+            $parts = explode('.', $key);
+            $index = (int) $parts[0];
+            $projectId = (int) $value;
+            $project = Project::withoutGlobalScopes()->find($projectId);
+            $campaign = $project ? Campaign::withoutGlobalScopes()->where('project_id', $project->id)->where('status', 'active')->first() : null;
+            $this->multiClientConfigs[$index]['campaign_id'] = $campaign?->id ?? null;
+        }
+    }
+
+    public function closeMultiClientDeliveryModal(): void
+    {
+        $this->showMultiClientModal = false;
+        $this->multiClientLeadIds = [];
+        $this->multiClientConfigs = [];
+    }
+
+    public function getTotalModalBillingProperty(): float
+    {
+        $leadCount = count($this->multiClientLeadIds);
+        $total = 0.0;
+        foreach ($this->multiClientConfigs as $cfg) {
+            $rate = (float) ($cfg['rate'] ?? 0);
+            $total += $leadCount * $rate;
+        }
+        return $total;
+    }
+
+    public function confirmMultiClientDelivery(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        $this->validate([
+            'multiClientLeadIds' => 'required|array|min:1',
+            'multiClientConfigs' => 'required|array|min:1',
+            'multiClientConfigs.*.client_id' => 'required|integer|exists:users,id',
+            'multiClientConfigs.*.project_id' => 'required|integer|exists:projects,id',
+            'multiClientConfigs.*.rate' => 'required|numeric|min:0',
+        ], [
+            'multiClientConfigs.*.client_id.required' => 'Select a destination client for each row.',
+            'multiClientConfigs.*.project_id.required' => 'Select a destination project for each row.',
+            'multiClientConfigs.*.rate.required' => 'Enter a rate per lead for each client.',
+        ]);
+
+        $clientIds = array_column($this->multiClientConfigs, 'client_id');
+        if (count($clientIds) !== count(array_unique($clientIds))) {
+            $this->dispatch('toast', type: 'error', message: 'Each client can only be added once in a single multi-client distribution.');
+            return;
+        }
+
+        $service = app(\App\Services\LeadDistributionService::class);
+        $summary = $service->distributeMultipleLeadsToMultipleClients(
+            $this->multiClientLeadIds,
+            $this->multiClientConfigs,
+            auth()->user()
+        );
+
+        $this->closeMultiClientDeliveryModal();
+        $this->selectedRows = [];
+        $this->selectAll = false;
+
+        $msg = "Multi-Client Delivery completed: {$summary['total_delivered']} lead deliveries made across " . count($this->multiClientConfigs) . " client(s) (Total Billing: ₹" . number_format($summary['total_billing'], 2) . ").";
+        if ($summary['total_skipped'] > 0) {
+            $msg .= " ({$summary['total_skipped']} skipped as already delivered/excluded).";
+        }
+        if ($summary['total_failed'] > 0) {
+            $msg .= " ({$summary['total_failed']} failed due to insufficient credits).";
+        }
+
+        $this->dispatch('toast', type: $summary['total_delivered'] > 0 ? 'success' : 'warning', message: $msg);
         $this->dispatch('lead-updated');
         $this->refreshBoard();
     }

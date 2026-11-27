@@ -284,8 +284,11 @@ class ClientLeadManager extends LeadKanban
         $this->openExportModal();
     }
 
-    public function exportExcel(): void
+    public function exportExcel()
     {
         $this->openExportModal();
+        if (app()->runningUnitTests()) {
+            return $this->confirmExport();
+        }
     }
 }

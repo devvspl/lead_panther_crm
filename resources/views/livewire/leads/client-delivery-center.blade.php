@@ -49,19 +49,23 @@
                 <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
                 </svg>
-                <span>Revoke Delivered Leads</span>
+                <span>Revoke Delivered Leads & Multi-Client Distribution History</span>
             </div>
-            <span class="text-xs font-normal text-muted">Filter delivered leads by date, client or project to return them to the CRM</span>
+            <span class="text-xs font-normal text-muted">Date-wise lead delivery, per-client billing tracking, revocation, and re-delivery management</span>
         </summary>
         <div class="mt-4 space-y-4">
             <!-- Filter toolbar -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                 <div>
-                    <label class="block text-muted mb-1 font-medium">Delivered From</label>
+                    <label class="block text-muted mb-1 font-medium">Date Type</label>
+                    <x-ui.themed-select wire:model.live="historyDateType" :options="['delivery_date' => 'Delivery Date', 'created_date' => 'Lead Created Date']" class="w-full" />
+                </div>
+                <div>
+                    <label class="block text-muted mb-1 font-medium">From Date</label>
                     <x-text-input variant="compact" type="date" wire:model.live="revokeFrom" class="w-full" />
                 </div>
                 <div>
-                    <label class="block text-muted mb-1 font-medium">Delivered To</label>
+                    <label class="block text-muted mb-1 font-medium">To Date</label>
                     <x-text-input variant="compact" type="date" wire:model.live="revokeTo" class="w-full" />
                 </div>
                 <div>
@@ -74,13 +78,13 @@
                 </div>
                 <div>
                     <label class="block text-muted mb-1 font-medium">Delivery Status</label>
-                    <x-ui.themed-select wire:model.live="revokeStatus" :options="['delivered' => 'Delivered (Sent/Accepted)', 'sent' => 'Sent', 'accepted' => 'Accepted', 'revoked' => 'Revoked', '' => 'All Statuses']" :searchable="true" class="w-full" />
+                    <x-ui.themed-select wire:model.live="revokeStatus" :options="['delivered' => 'Delivered (Sent/Accepted)', 'sent' => 'Sent', 'accepted' => 'Accepted', 'pending' => 'Pending', 'revoked' => 'Revoked', 'do_not_send' => 'Do Not Send', 'failed' => 'Failed', '' => 'All Statuses']" :searchable="true" class="w-full" />
                 </div>
             </div>
 
             <!-- Selection Banner & Action Bar -->
             <div class="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     @if(count($selectedRevokeIds) > 0)
                         <button type="button"
                                 wire:click="openRevokeBatch"
@@ -89,6 +93,24 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
                             </svg>
                             <span>Revoke Selected ({{ count($selectedRevokeIds) }})</span>
+                        </button>
+                        <button type="button"
+                                wire:click="bulkDeliverSelected"
+                                class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span>Deliver Selected ({{ count($selectedRevokeIds) }})</span>
+                        </button>
+                        <button type="button"
+                                wire:click="bulkExcludeSelected"
+                                class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                            <span>Do Not Send ({{ count($selectedRevokeIds) }})</span>
+                        </button>
+                        <button type="button"
+                                wire:click="bulkRedeliverSelected"
+                                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span>Re-deliver ({{ count($selectedRevokeIds) }})</span>
                         </button>
                         <button type="button"
                                 wire:click="clearSelection"
@@ -116,7 +138,7 @@
 
             <!-- Advanced Table with checkboxes -->
             <x-ui.advanced-table
-                :columns="$this->revokeColumns()"
+                :columns="$this->historyColumns()"
                 :rows="$revokeLeads"
                 :show-checkboxes="true"
                 :selected-rows="$selectedRevokeIds"

@@ -85,13 +85,15 @@ class Lead extends Model
         if ($role === 'builder') {
             return $query->where(function ($q) use ($user) {
                 $q->where('client_id', $user->id)
-                  ->orWhere('assigned_to', $user->id);
+                  ->orWhere('assigned_to', $user->id)
+                  ->orWhereHas('deliveryItems', fn ($di) => $di->where('client_id', $user->id)->whereIn('status', ['sent', 'accepted']));
                 if ($user->organization_id) {
                     $orgId = $user->organization_id;
                     $q->orWhereHas('client', fn ($owner) => $owner->where('organization_id', $orgId))
                       ->orWhereHas('assignedTo', fn ($assignee) => $assignee->where('organization_id', $orgId))
                       ->orWhereIn('client_id', User::where('organization_id', $orgId)->select('id'))
-                      ->orWhereIn('assigned_to', User::where('organization_id', $orgId)->select('id'));
+                      ->orWhereIn('assigned_to', User::where('organization_id', $orgId)->select('id'))
+                      ->orWhereHas('deliveryItems', fn ($di) => $di->whereIn('client_id', User::where('organization_id', $orgId)->select('id'))->whereIn('status', ['sent', 'accepted']));
                 }
             });
         }
@@ -289,9 +291,14 @@ class Lead extends Model
         return $this->hasMany(LeadDeliveryRevocation::class);
     }
 
+    public function deliveryItems(): HasMany
+    {
+        return $this->hasMany(LeadDeliveryItem::class, 'lead_id');
+    }
+
     public function leadDeliveryItem()
     {
-        return $this->hasOne(LeadDeliveryItem::class, 'lead_id');
+        return $this->hasOne(LeadDeliveryItem::class, 'lead_id')->latestOfMany();
     }
 
     public function getMetaAttribute(string $key, mixed $default = null): mixed

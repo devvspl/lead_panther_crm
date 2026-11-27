@@ -18,12 +18,17 @@ class ClientDeliveryCenter extends Component
     public bool $consentConfirmed = false;
     public bool $showAttempts = false;
     public ?int $inspectedItemId = null;
+    public string $historyDateType = 'delivery_date';
     public string $historyStatus = '';
     public string $historyClient = '';
     public string $historyProject = '';
     public string $historyCampaign = '';
     public string $historyFrom = '';
     public string $historyTo = '';
+    public string $historySearch = '';
+    public array $selectedHistoryIds = [];
+    public bool $selectAllHistory = false;
+    public bool $historySelectAllMatching = false;
 
     // Revoke Delivered Leads state
     public string $revokeStatus = 'delivered';
@@ -207,62 +212,139 @@ class ClientDeliveryCenter extends Component
         $this->showAttempts = true;
     }
 
-    protected function historyQuery(bool $filtered = true)
+    public function historyQuery(bool $filtered = true)
     {
-        $query = LeadDeliveryItem::whereHas('lead')->whereHas('plan', fn ($q) => $q->where('organization_id', $this->organizationId))->with(['lead', 'client', 'project', 'campaign']);
-        if (!$filtered) return $query;
-        $this->validate(['historyFrom' => 'nullable|date_format:Y-m-d', 'historyTo' => 'nullable|date_format:Y-m-d']);
-        return $query->when($this->historyStatus, fn ($q) => $q->where('status', $this->historyStatus))
-            ->when($this->historyClient, fn ($q) => $q->where('client_id', $this->historyClient))
-            ->when($this->historyProject, fn ($q) => $q->where('project_id', $this->historyProject))
-            ->when($this->historyCampaign, fn ($q) => $q->where('campaign_id', $this->historyCampaign))
-            ->when($this->historyFrom, fn ($q) => $q->whereDate('created_at', '>=', $this->historyFrom))
-            ->when($this->historyTo, fn ($q) => $q->whereDate('created_at', '<=', $this->historyTo));
-    }
-
-    public function historyColumns(): array
-    {
-        return [
-            ['key' => 'lead.lead_code', 'label' => 'Lead ID'], ['key' => 'lead.name', 'label' => 'Customer'],
-            ['key' => 'client.name', 'label' => 'Destination Client'], ['key' => 'project.name', 'label' => 'Project'], ['key' => 'campaign.name', 'label' => 'Campaign'],
-            ['key' => 'run_id', 'label' => 'Batch #'], ['key' => 'status', 'label' => 'Status'],
-            ['key' => 'sent_at', 'label' => 'Delivered At'], ['key' => 'failure_reason', 'label' => 'Failure Reason'],
-            ['key' => 'id', 'label' => 'Actions', 'type' => 'delivery_item_actions'],
-        ];
-    }
-    public function exportHistory()
-    {
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(
-            data: $this->historyQuery()->latest('id')->get(), title: 'Client Delivery History', subtitle: Organization::findOrFail($this->organizationId)->name,
-            headings: ['Lead ID', 'Customer', 'Destination Client', 'Project', 'Campaign', 'Batch #', 'Status', 'Delivered At', 'Accepted At', 'Failure Reason', 'Attempts'],
-            columns: [fn ($i) => $i->lead?->lead_code, fn ($i) => $i->lead?->name, fn ($i) => $i->client?->name, fn ($i) => $i->project?->name, fn ($i) => $i->campaign?->name, 'run_id', 'status', 'sent_at', 'accepted_at', 'failure_reason', 'attempts']
-        ), 'client-delivery-history-'.$this->organizationId.'.xlsx');
-    }
-
-    public function revokeQuery(bool $filtered = true)
-    {
+        $orgUserIds = User::where('organization_id', $this->organizationId)->select('id');
         $query = LeadDeliveryItem::whereHas('lead')
-            ->whereHas('plan', fn ($q) => $q->where('organization_id', $this->organizationId))
+            ->where(function ($q) use ($orgUserIds) {
+                $q->whereHas('plan', fn ($p) => $p->where('organization_id', $this->organizationId))
+                  ->orWhereIn('source_client_id', $orgUserIds);
+            })
             ->with(['lead.assignedTo', 'client.organization', 'project', 'campaign']);
 
         if (!$filtered) return $query;
 
         $this->validate([
+            'historyFrom' => 'nullable|date_format:Y-m-d',
+            'historyTo' => 'nullable|date_format:Y-m-d',
             'revokeFrom' => 'nullable|date_format:Y-m-d',
             'revokeTo' => 'nullable|date_format:Y-m-d',
         ]);
 
+        $status = $this->revokeStatus !== '' ? $this->revokeStatus : $this->historyStatus;
+        if ($status === 'delivered') {
+            $query->whereIn('status', ['sent', 'accepted']);
+        } elseif ($status === 'pending') {
+            $query->whereIn('status', ['pending', 'queued']);
+        } elseif ($status) {
+            $query->where('status', $status);
+        }
+
+        $from = $this->revokeFrom ?: $this->historyFrom;
+        $to = $this->revokeTo ?: $this->historyTo;
+
+        if ($this->historyDateType === 'created_date') {
+            $query->when($from, fn ($q) => $q->whereHas('lead', fn ($l) => $l->whereDate('created_at', '>=', $from)))
+                  ->when($to, fn ($q) => $q->whereHas('lead', fn ($l) => $l->whereDate('created_at', '<=', $to)));
+        } else {
+            $query->when($from, fn ($q) => $q->whereDate('sent_at', '>=', $from))
+                  ->when($to, fn ($q) => $q->whereDate('sent_at', '<=', $to));
+        }
+
+        $client = $this->revokeClient ?: $this->historyClient;
+        $project = $this->revokeProject ?: $this->historyProject;
+        $search = trim($this->revokeSearch ?: $this->historySearch);
+
         return $query
-            ->when($this->revokeStatus === 'delivered', fn ($q) => $q->whereIn('status', ['sent', 'accepted']))
-            ->when($this->revokeStatus && $this->revokeStatus !== 'delivered', fn ($q) => $q->where('status', $this->revokeStatus))
-            ->when($this->revokeClient, fn ($q) => $q->where('client_id', $this->revokeClient))
-            ->when($this->revokeProject, fn ($q) => $q->where('project_id', $this->revokeProject))
-            ->when($this->revokeFrom, fn ($q) => $q->whereDate('sent_at', '>=', $this->revokeFrom))
-            ->when($this->revokeTo, fn ($q) => $q->whereDate('sent_at', '<=', $this->revokeTo))
-            ->when(trim($this->revokeSearch) !== '', function ($q) {
-                $search = '%' . trim($this->revokeSearch) . '%';
-                $q->whereHas('lead', fn ($l) => $l->where('lead_code', 'like', $search)->orWhere('name', 'like', $search)->orWhere('mobile', 'like', $search));
+            ->when($client, fn ($q) => $q->where('client_id', $client))
+            ->when($project, fn ($q) => $q->where('project_id', $project))
+            ->when($this->historyCampaign, fn ($q) => $q->where('campaign_id', $this->historyCampaign))
+            ->when($search !== '', function ($q) use ($search) {
+                $term = '%' . $search . '%';
+                $q->whereHas('lead', fn ($l) => $l->where('lead_code', 'like', $term)->orWhere('name', 'like', $term)->orWhere('mobile', 'like', $term));
             });
+    }
+
+    public function revokeQuery(bool $filtered = true)
+    {
+        return $this->historyQuery($filtered);
+    }
+
+    public function historyColumns(): array
+    {
+        return [
+            ['key' => 'lead.lead_code', 'label' => 'Lead ID & Name', 'type' => 'html', 'render' => function($item) {
+                $code = e($item->lead?->lead_code ?? '#'.$item->lead_id);
+                $name = e($item->lead?->name ?? 'Customer');
+                return '<div class="space-y-0.5"><div class="font-mono font-bold text-xs text-ink">'.$code.'</div><div class="text-[11px] text-muted truncate max-w-[140px]">'.$name.'</div></div>';
+            }],
+            ['key' => 'client.name', 'label' => 'Destination Client', 'type' => 'html', 'render' => function($item) {
+                $clientName = e($item->client?->name ?? 'N/A');
+                $orgName = e($item->client?->organization?->name ?? '');
+                return '<div class="space-y-0.5"><div class="font-semibold text-xs text-ink">'.$clientName.'</div>'.($orgName ? '<div class="text-[10px] text-muted truncate max-w-[130px]">'.$orgName.'</div>' : '').'</div>';
+            }],
+            ['key' => 'project.name', 'label' => 'Project', 'formatter' => fn($val) => $val ?: 'N/A'],
+            ['key' => 'campaign.name', 'label' => 'Campaign', 'formatter' => fn($val) => $val ?: 'Project Default'],
+            ['key' => 'lead.created_at', 'label' => 'Lead Created Date', 'formatter' => fn($val) => $val ? \Carbon\Carbon::parse($val)->format('d M Y, h:i A') : 'N/A'],
+            ['key' => 'sent_at', 'label' => 'Delivery Date & Time', 'formatter' => fn($val) => $val ? \Carbon\Carbon::parse($val)->format('d M Y, h:i A') : 'Pending'],
+            ['key' => 'status', 'label' => 'Delivery Status', 'type' => 'html', 'render' => function($item) {
+                $status = (string)$item->status;
+                return match($status) {
+                    'sent', 'accepted' => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Delivered</span>',
+                    'pending', 'queued' => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>',
+                    'revoked' => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Revoked</span>',
+                    'do_not_send' => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Do Not Send</span>',
+                    'failed' => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">Failed</span>',
+                    default => '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-canvas text-muted border border-border">'.e(ucfirst($status)).'</span>',
+                };
+            }],
+            ['key' => 'rate_per_lead', 'label' => 'Rate / Lead', 'formatter' => fn($val) => $val !== null ? '₹'.number_format((float)$val, 2) : '-'],
+            ['key' => 'billing_amount', 'label' => 'Billing Amount', 'formatter' => fn($val) => $val !== null ? '₹'.number_format((float)$val, 2) : '-'],
+            ['key' => 'revoked_at', 'label' => 'Revoked Date', 'formatter' => fn($val) => $val ? \Carbon\Carbon::parse($val)->format('d M Y, h:i A') : '-'],
+            ['key' => 'id', 'label' => 'Actions', 'type' => 'html', 'render' => function($item) {
+                $status = (string)$item->status;
+                $buttons = [];
+                if (in_array($status, ['pending', 'queued', 'failed'])) {
+                    $buttons[] = '<button type="button" wire:click="deliverLeadItem('.$item->id.')" class="px-2 py-0.5 text-[11px] font-semibold rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer">Deliver</button>';
+                }
+                if (in_array($status, ['sent', 'accepted'])) {
+                    $buttons[] = '<button type="button" wire:click="openRevokeSingle('.$item->id.')" class="px-2 py-0.5 text-[11px] font-semibold rounded bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 cursor-pointer">Revoke</button>';
+                }
+                if ($status === 'revoked' || $status === 'failed') {
+                    $buttons[] = '<button type="button" wire:click="redeliverLeadItem('.$item->id.')" class="px-2 py-0.5 text-[11px] font-semibold rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer">Re-deliver</button>';
+                }
+                if ($status !== 'do_not_send') {
+                    $buttons[] = '<button type="button" wire:click="excludeLeadItem('.$item->id.')" class="px-2 py-0.5 text-[11px] font-semibold rounded bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 cursor-pointer" title="Exclude from delivery to this client">Do Not Send</button>';
+                } else {
+                    $buttons[] = '<button type="button" wire:click="includeLeadItem('.$item->id.')" class="px-2 py-0.5 text-[11px] font-semibold rounded bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 cursor-pointer" title="Allow delivery to this client">Allow</button>';
+                }
+                return '<div class="flex items-center gap-1.5 flex-wrap">'.implode('', $buttons).'</div>';
+            }],
+        ];
+    }
+
+    public function exportHistory()
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(
+            data: $this->historyQuery()->latest('id')->get(),
+            title: 'Lead Distribution & Delivery History',
+            subtitle: Organization::findOrFail($this->organizationId)->name . ' - Delivery & Billing Records',
+            headings: ['Lead ID', 'Customer Name', 'Destination Client', 'Project', 'Campaign', 'Lead Created Date', 'Delivery Date & Time', 'Delivery Status', 'Rate Per Lead', 'Billing Amount', 'Revoked Date', 'Failure/Return Reason'],
+            columns: [
+                fn ($i) => $i->lead?->lead_code ?? '#'.$i->lead_id,
+                fn ($i) => $i->lead?->name,
+                fn ($i) => $i->client?->name,
+                fn ($i) => $i->project?->name,
+                fn ($i) => $i->campaign?->name,
+                fn ($i) => $i->lead?->created_at ? $i->lead->created_at->format('d M Y H:i') : 'N/A',
+                fn ($i) => $i->sent_at ? $i->sent_at->format('d M Y H:i') : 'Pending',
+                fn ($i) => ucfirst((string)$i->status),
+                fn ($i) => $i->rate_per_lead !== null ? '₹'.number_format((float)$i->rate_per_lead, 2) : '-',
+                fn ($i) => $i->billing_amount !== null ? '₹'.number_format((float)$i->billing_amount, 2) : '-',
+                fn ($i) => $i->revoked_at ? $i->revoked_at->format('d M Y H:i') : '-',
+                fn ($i) => $i->failure_reason ?? $i->revocation_reason ?? '-'
+            ]
+        ), 'client-delivery-history-'.$this->organizationId.'.xlsx');
     }
 
     public function revokeColumns(): array
@@ -323,29 +405,171 @@ class ClientDeliveryCenter extends Component
     public function clearSelection(): void
     {
         $this->selectedRevokeIds = [];
+        $this->selectedHistoryIds = [];
         $this->selectAll = false;
+        $this->selectAllHistory = false;
         $this->revokeSelectAllMatching = false;
+        $this->historySelectAllMatching = false;
+    }
+
+    public function toggleSelectHistoryRow($id): void
+    {
+        $idStr = (string) $id;
+        if (in_array($idStr, $this->selectedHistoryIds)) {
+            $this->selectedHistoryIds = array_values(array_diff($this->selectedHistoryIds, [$idStr]));
+        } else {
+            $this->selectedHistoryIds[] = $idStr;
+        }
+        $this->historySelectAllMatching = false;
+    }
+
+    public function updatedSelectAllHistory($value): void
+    {
+        if ($value) {
+            $this->selectedHistoryIds = $this->historyQuery()
+                ->paginate(10, ['*'], 'deliveryPage')
+                ->pluck('id')
+                ->map(fn($id) => (string)$id)
+                ->all();
+        } else {
+            $this->selectedHistoryIds = [];
+            $this->historySelectAllMatching = false;
+        }
+    }
+
+    public function selectAllMatchingHistory(): void
+    {
+        $this->historySelectAllMatching = true;
+        $this->selectedHistoryIds = $this->historyQuery()
+            ->pluck('id')
+            ->map(fn($id) => (string)$id)
+            ->all();
+    }
+
+    public function clearHistorySelection(): void
+    {
+        $this->selectedHistoryIds = [];
+        $this->selectAllHistory = false;
+        $this->historySelectAllMatching = false;
+    }
+
+    public function deliverLeadItem(int $itemId): void
+    {
+        $item = LeadDeliveryItem::findOrFail($itemId);
+        $ok = app(LeadDistributionService::class)->deliverItemToClient($item, auth()->user());
+        if ($ok) {
+            $this->dispatch('toast', type: 'success', message: 'Lead delivered and billed successfully.');
+        } else {
+            $this->dispatch('toast', type: 'error', message: 'Delivery failed: insufficient client wallet credits.');
+        }
+        $this->dispatch('lead-updated');
+    }
+
+    public function redeliverLeadItem(int $itemId): void
+    {
+        $item = LeadDeliveryItem::findOrFail($itemId);
+        $ok = app(LeadDistributionService::class)->redeliverToClient($item, auth()->user());
+        if ($ok) {
+            $this->dispatch('toast', type: 'success', message: 'Lead re-delivered and billed successfully.');
+        } else {
+            $this->dispatch('toast', type: 'error', message: 'Re-delivery failed: insufficient client wallet credits.');
+        }
+        $this->dispatch('lead-updated');
+    }
+
+    public function excludeLeadItem(int $itemId): void
+    {
+        $item = LeadDeliveryItem::findOrFail($itemId);
+        app(LeadDistributionService::class)->excludeClientDelivery($item, auth()->user());
+        $this->dispatch('toast', type: 'info', message: 'Lead excluded from delivery to this client (Do Not Send).');
+        $this->dispatch('lead-updated');
+    }
+
+    public function includeLeadItem(int $itemId): void
+    {
+        $item = LeadDeliveryItem::findOrFail($itemId);
+        app(LeadDistributionService::class)->includeClientDelivery($item, auth()->user());
+        $this->dispatch('toast', type: 'success', message: 'Delivery exclusion removed for this client.');
+        $this->dispatch('lead-updated');
+    }
+
+    public function bulkDeliverSelected(): void
+    {
+        $service = app(LeadDistributionService::class);
+        $count = 0;
+        $ids = !empty($this->selectedHistoryIds) ? $this->selectedHistoryIds : $this->selectedRevokeIds;
+        foreach ($ids as $itemId) {
+            $item = LeadDeliveryItem::find($itemId);
+            if ($item && in_array($item->status, ['pending', 'queued', 'failed'])) {
+                if ($service->deliverItemToClient($item, auth()->user())) {
+                    $count++;
+                }
+            }
+        }
+        $this->clearSelection();
+        $this->dispatch('toast', type: 'success', message: "{$count} lead(s) delivered to client(s).");
+        $this->dispatch('lead-updated');
+    }
+
+    public function bulkExcludeSelected(): void
+    {
+        $service = app(LeadDistributionService::class);
+        $count = 0;
+        $ids = !empty($this->selectedHistoryIds) ? $this->selectedHistoryIds : $this->selectedRevokeIds;
+        foreach ($ids as $itemId) {
+            $item = LeadDeliveryItem::find($itemId);
+            if ($item && $item->status !== 'do_not_send') {
+                $service->excludeClientDelivery($item, auth()->user());
+                $count++;
+            }
+        }
+        $this->clearSelection();
+        $this->dispatch('toast', type: 'info', message: "{$count} lead(s) marked as Do Not Send for selected client(s).");
+        $this->dispatch('lead-updated');
+    }
+
+    public function bulkRedeliverSelected(): void
+    {
+        $service = app(LeadDistributionService::class);
+        $count = 0;
+        $ids = !empty($this->selectedHistoryIds) ? $this->selectedHistoryIds : $this->selectedRevokeIds;
+        foreach ($ids as $itemId) {
+            $item = LeadDeliveryItem::find($itemId);
+            if ($item && in_array($item->status, ['revoked', 'failed'])) {
+                if ($service->redeliverToClient($item, auth()->user())) {
+                    $count++;
+                }
+            }
+        }
+        $this->clearSelection();
+        $this->dispatch('toast', type: 'success', message: "{$count} lead(s) re-delivered to client(s).");
+        $this->dispatch('lead-updated');
     }
 
     public function openRevokeSingle(int $itemId): void
     {
-        $item = $this->revokeQuery(false)->findOrFail($itemId);
+        $item = LeadDeliveryItem::whereKey($itemId)->firstOrFail();
         abort_unless(in_array($item->status, ['sent', 'accepted']), 422);
         $this->revokeTargetItemIds = [$item->id];
         $this->revokeBatchReason = '';
         $this->revokeSelectAllMatching = false;
+        $this->historySelectAllMatching = false;
         $this->showRevokeConfirmModal = true;
     }
 
     public function openRevokeBatch(): void
     {
-        if ($this->revokeSelectAllMatching) {
-            $this->revokeTargetItemIds = $this->revokeQuery()
+        $ids = !empty($this->selectedHistoryIds) ? $this->selectedHistoryIds : $this->selectedRevokeIds;
+        if ($this->historySelectAllMatching || $this->revokeSelectAllMatching) {
+            $this->revokeTargetItemIds = $this->historyQuery()
                 ->whereIn('status', ['sent', 'accepted'])
                 ->pluck('id')
                 ->all();
         } else {
-            $this->revokeTargetItemIds = array_values(array_map('intval', $this->selectedRevokeIds));
+            $this->revokeTargetItemIds = LeadDeliveryItem::whereIn('id', array_map('intval', $ids))
+                ->whereIn('status', ['sent', 'accepted'])
+                ->pluck('id')
+                ->all();
         }
 
         if (empty($this->revokeTargetItemIds)) {
@@ -385,9 +609,7 @@ class ClientDeliveryCenter extends Component
             }
         }
 
-        $this->selectedRevokeIds = [];
-        $this->selectAll = false;
-        $this->revokeSelectAllMatching = false;
+        $this->clearSelection();
         $this->closeRevokeConfirmModal();
 
         $this->dispatch('toast', type: 'success', message: "{$revokedCount} delivered lead(s) successfully revoked and returned to CRM.");

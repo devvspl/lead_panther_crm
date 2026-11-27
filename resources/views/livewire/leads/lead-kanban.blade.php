@@ -920,6 +920,16 @@
                 emptyMessage="No leads matched your search and filter criteria.">
                 <x-slot:action>
                     <div class="flex items-center gap-2">
+                        @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']))
+                            <button type="button" wire:click="openMultiClientDeliveryModal" @disabled(empty($selectedRows)) wire:loading.attr="disabled"
+                                class="px-3 h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg whitespace-nowrap disabled:opacity-50 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                title="Distribute selected leads to multiple clients with individual project and rate billing">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                <span>Multi-Client Delivery ({{ count($selectedRows) }})</span>
+                            </button>
+                        @endif
                         @if($this->isClientContext())
                             <button type="button" wire:click="pushSelectedToClient" @disabled(empty($selectedRows)) wire:loading.attr="disabled"
                                 class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg whitespace-nowrap disabled:opacity-50">
@@ -1757,6 +1767,9 @@
 
     <!-- Revoke Delivered Lead Modal -->
     @include('livewire.leads.lead-revoke-modal')
+
+    <!-- Multi-Client Lead Distribution & Billing Modal -->
+    @include('livewire.leads.multi-client-delivery-modal')
 
     <!-- CDN Script for SortableJS (Kanban drag-and-drop) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>

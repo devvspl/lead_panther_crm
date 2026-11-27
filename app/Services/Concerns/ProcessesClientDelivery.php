@@ -633,51 +633,51 @@ trait ProcessesClientDelivery
             $sourceCampaignId = $item?->source_campaign_id ?: $lead->campaign_id;
             $organizationId = $item?->plan?->organization_id ?: (User::find($sourceClientId)?->organization_id ?: $lead->organization_id);
 
-            // Refund credits to client wallet if previously deducted
+            // Refund credits to client wallet if previously deducted for this specific client
             $wallet = CreditWallet::where('client_id', $destinationClient)->lockForUpdate()->first();
-            if ($wallet && $wallet->reconciled_at && !CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->where('is_legacy', false)->where('transaction_type', 'refund')->exists()) {
-                $cost = (int) CreditTransaction::where('lead_id', $lead->id)
-                    ->where('is_legacy', false)->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
-                    ->value('credit_used');
+            if ($wallet && $wallet->reconciled_at) {
+                $alreadyRefunded = CreditTransaction::withoutGlobalScopes()
+                    ->where('client_id', $destinationClient)
+                    ->where('lead_id', $lead->id)
+                    ->where('is_legacy', false)
+                    ->where('transaction_type', 'refund')
+                    ->exists();
 
-                if ($cost > 0) {
-                    $before = (int) $wallet->balance;
-                    $after = $before + $cost;
-                    $wallet->update(['balance' => $after]);
+                if (!$alreadyRefunded) {
+                    $cost = (int) CreditTransaction::withoutGlobalScopes()
+                        ->where('client_id', $destinationClient)
+                        ->where('lead_id', $lead->id)
+                        ->where('is_legacy', false)
+                        ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                        ->value('credit_used');
 
-                    CreditTransaction::create([
-                        'client_id' => $destinationClient,
-                        'lead_id' => $lead->id,
-                        'package_id' => null,
-                        'credit_before' => $before,
-                        'credit_used' => $cost,
-                        'credit_after' => $after,
-                        'transaction_type' => 'refund',
-                        'description' => "Delivery revoked for lead {$lead->lead_code}: {$reason}",
-                        'created_by' => $actor->id,
-                        'created_at' => now(),
-                    ]);
+                    if ($cost > 0) {
+                        $before = (int) $wallet->balance;
+                        $after = $before + $cost;
+                        $wallet->update(['balance' => $after]);
+
+                        CreditTransaction::create([
+                            'client_id' => $destinationClient,
+                            'lead_id' => $lead->id,
+                            'package_id' => null,
+                            'credit_before' => $before,
+                            'credit_used' => $cost,
+                            'credit_after' => $after,
+                            'transaction_type' => 'refund',
+                            'description' => "Delivery revoked for lead {$lead->lead_code}: {$reason}",
+                            'created_by' => $actor->id,
+                            'created_at' => now(),
+                        ]);
+                    }
                 }
             }
-
-            // Restore lead to CRM pool
-            $lead->update([
-                'client_id' => $sourceClientId,
-                'campaign_id' => $sourceCampaignId,
-                'delivered_at' => null,
-                'delivery_pending' => false,
-                'delivery_plan_id' => null,
-                'assigned_to' => null,
-                'credit_delivery_confirmed' => false,
-                'do_not_send_to_client' => true,
-                'delivery_revoked_at' => now(),
-                'delivery_revoke_reason' => $reason,
-            ]);
 
             // Update delivery item
             if ($item) {
                 $item->update([
                     'status' => 'revoked',
+                    'revoked_at' => now(),
+                    'revocation_reason' => $reason,
                     'failure_reason' => 'Revoked: ' . $reason,
                 ]);
                 if ($item->run_id) {
@@ -687,6 +687,33 @@ trait ProcessesClientDelivery
                         'failure_reason' => $reason,
                     ]);
                 }
+            }
+
+            // Check if any other client still has an active delivery for this lead
+            $otherActiveDeliveries = LeadDeliveryItem::where('lead_id', $lead->id)
+                ->where('id', '!=', $item?->id)
+                ->whereIn('status', ['sent', 'accepted'])
+                ->exists();
+
+            // Restore lead to CRM pool only when no other client has an active delivery
+            if (!$otherActiveDeliveries) {
+                $lead->update([
+                    'client_id' => $sourceClientId,
+                    'campaign_id' => $sourceCampaignId,
+                    'delivered_at' => null,
+                    'delivery_pending' => false,
+                    'delivery_plan_id' => null,
+                    'assigned_to' => null,
+                    'credit_delivery_confirmed' => false,
+                    'do_not_send_to_client' => true,
+                    'delivery_revoked_at' => now(),
+                    'delivery_revoke_reason' => $reason,
+                ]);
+            } else {
+                $lead->update([
+                    'delivery_revoked_at' => now(),
+                    'delivery_revoke_reason' => $reason,
+                ]);
             }
 
             // Record complete history in lead_delivery_revocations
@@ -745,6 +772,394 @@ trait ProcessesClientDelivery
                 'to_value' => json_encode($after),
                 'created_at' => now(),
             ]);
+        });
+    }
+
+    /**
+     * Distribute a single lead to multiple clients with individual project, campaign, and rate configurations.
+     * Each client gets a separate LeadDeliveryItem and independent credit deduction.
+     */
+    public function distributeLeadToMultipleClients(Lead $lead, array $clientConfigs, User $actor): array
+    {
+        $this->deliveryAdmin($actor);
+        return DB::transaction(function () use ($lead, $clientConfigs, $actor) {
+            $lead = Lead::withoutGlobalScopes()->whereKey($lead->id)->lockForUpdate()->firstOrFail();
+            $results = [];
+
+            // Mark the lead as delivered if not already
+            if (!$lead->delivered_at) {
+                $lead->update([
+                    'delivered_at' => now(),
+                    'delivery_pending' => false,
+                    'credit_delivery_confirmed' => true,
+                    'delivery_failed_at' => null,
+                    'delivery_error' => null,
+                ]);
+            }
+
+            foreach ($clientConfigs as $config) {
+                $clientId = (int) ($config['client_id'] ?? 0);
+                $projectId = (int) ($config['project_id'] ?? 0);
+                $campaignId = !empty($config['campaign_id']) ? (int) $config['campaign_id'] : null;
+                $customRate = isset($config['rate']) && is_numeric($config['rate']) ? (float) $config['rate'] : null;
+
+                $client = User::with('organization')->find($clientId);
+                if (!$client || $client->status !== 'active') {
+                    $results[$clientId] = [
+                        'status' => 'failed',
+                        'reason' => 'Client is invalid or inactive.',
+                        'rate' => 0,
+                        'billed' => false,
+                    ];
+                    continue;
+                }
+
+                $project = Project::withoutGlobalScopes()->find($projectId);
+                if (!$project || $project->status !== 'active') {
+                    $results[$clientId] = [
+                        'status' => 'failed',
+                        'reason' => 'Project is invalid or inactive.',
+                        'rate' => 0,
+                        'billed' => false,
+                    ];
+                    continue;
+                }
+
+                // Check existing delivery record for this lead and client
+                $existingItem = LeadDeliveryItem::where('lead_id', $lead->id)
+                    ->where('client_id', $clientId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existingItem && in_array($existingItem->status, ['sent', 'accepted'])) {
+                    $results[$clientId] = [
+                        'status' => 'skipped',
+                        'reason' => 'Lead already delivered to this client.',
+                        'item_id' => $existingItem->id,
+                        'rate' => (float) $existingItem->rate_per_lead,
+                        'billed' => false,
+                    ];
+                    continue;
+                }
+
+                if ($existingItem && $existingItem->status === 'do_not_send' && empty($config['force_redeliver'])) {
+                    $results[$clientId] = [
+                        'status' => 'skipped',
+                        'reason' => 'Client is marked as Do Not Send for this lead.',
+                        'item_id' => $existingItem->id,
+                        'rate' => 0,
+                        'billed' => false,
+                    ];
+                    continue;
+                }
+
+                // Determine rate per lead
+                if ($customRate !== null && $customRate >= 0) {
+                    $rate = $customRate;
+                } else {
+                    $pricingService = app(\App\Services\LeadPricingService::class);
+                    $resolution = $pricingService->resolveCost($project, null, $client->organization);
+                    $rate = (float) $resolution['cost'];
+                }
+
+                // Determine attempts count
+                $itemAttempts = ($existingItem?->attempts ?? 0) + 1;
+
+                // Resolve a valid delivery plan for this client / organization
+                $planId = $config['plan_id'] ?? null;
+                if (!$planId) {
+                    $sourceOrgId = $lead->client?->organization_id ?? $client->organization_id;
+                    $plan = LeadDeliveryPlan::where('organization_id', $sourceOrgId)->first();
+                    if (!$plan) {
+                        $plan = LeadDeliveryPlan::create([
+                            'organization_id' => $sourceOrgId,
+                            'client_id' => $clientId,
+                            'project_id' => $projectId,
+                            'state' => 'active',
+                            'created_by' => $actor->id,
+                            'settings' => [
+                                'frequency' => 'manual',
+                                'quantity_mode' => 'fixed',
+                                'quantity' => 1,
+                                'automatic' => false,
+                                'timezone' => 'Asia/Kolkata',
+                                'window_start' => '00:00',
+                                'window_end' => '23:59',
+                                'daily_enabled' => false,
+                                'working_days' => range(0, 6),
+                            ],
+                        ]);
+                    }
+                    $planId = $plan->id;
+                }
+
+                // Reserve credit / bill client
+                $charged = CreditTransaction::reserveForLead($lead, $clientId, (int) $rate);
+
+                if (!$charged) {
+                    $item = LeadDeliveryItem::updateOrCreate([
+                        'lead_id' => $lead->id,
+                        'client_id' => $clientId,
+                    ], [
+                        'plan_id' => $planId,
+                        'source_client_id' => $lead->client_id,
+                        'source_campaign_id' => $lead->campaign_id,
+                        'project_id' => $projectId,
+                        'campaign_id' => $campaignId ?: $project->campaigns()->value('id'),
+                        'rate_per_lead' => $rate,
+                        'billing_amount' => 0.00,
+                        'requested_by' => $actor->id,
+                        'status' => 'failed',
+                        'failure_reason' => 'Insufficient credits in client wallet or organization inactive.',
+                        'attempts' => $itemAttempts,
+                    ]);
+
+                    $results[$clientId] = [
+                        'status' => 'failed',
+                        'reason' => 'Insufficient credits in client wallet.',
+                        'item_id' => $item->id,
+                        'rate' => $rate,
+                        'billed' => false,
+                    ];
+                    continue;
+                }
+
+                // Delivery item record
+                $item = LeadDeliveryItem::updateOrCreate([
+                    'lead_id' => $lead->id,
+                    'client_id' => $clientId,
+                ], [
+                    'plan_id' => $planId,
+                    'source_client_id' => $lead->client_id,
+                    'source_campaign_id' => $lead->campaign_id,
+                    'project_id' => $projectId,
+                    'campaign_id' => $campaignId ?: $project->campaigns()->value('id'),
+                    'rate_per_lead' => $rate,
+                    'billing_amount' => $rate,
+                    'requested_by' => $actor->id,
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'accepted_at' => now(),
+                    'revoked_at' => null,
+                    'revocation_reason' => null,
+                    'failure_reason' => null,
+                    'attempts' => $itemAttempts,
+                ]);
+
+                AuditLog::create([
+                    'user_id' => $actor->id,
+                    'organization_id' => $client->organization_id,
+                    'action' => 'delivery.sent',
+                    'subject_type' => LeadDeliveryItem::class,
+                    'subject_id' => $item->id,
+                    'context' => [
+                        'category' => 'lead_delivery',
+                        'lead_id' => $lead->id,
+                        'client_id' => $clientId,
+                        'rate' => $rate,
+                        'project_id' => $projectId,
+                    ],
+                    'from_value' => null,
+                    'to_value' => json_encode(['status' => 'sent', 'rate' => $rate, 'billed' => $rate]),
+                    'created_at' => now(),
+                ]);
+
+                $results[$clientId] = [
+                    'status' => 'sent',
+                    'item_id' => $item->id,
+                    'rate' => $rate,
+                    'billed' => true,
+                    'amount' => $rate,
+                ];
+            }
+
+            return $results;
+        }, 3);
+    }
+
+    /**
+     * Distribute multiple leads to multiple clients with individual configurations.
+     */
+    public function distributeMultipleLeadsToMultipleClients(array $leadIds, array $clientConfigs, User $actor): array
+    {
+        $this->deliveryAdmin($actor);
+        $summary = [
+            'total_leads' => count($leadIds),
+            'total_delivered' => 0,
+            'total_failed' => 0,
+            'total_skipped' => 0,
+            'total_billing' => 0.00,
+            'client_summaries' => [],
+        ];
+
+        foreach ($clientConfigs as $cfg) {
+            $cid = (int)$cfg['client_id'];
+            $client = User::find($cid);
+            $summary['client_summaries'][$cid] = [
+                'client_name' => $client?->name ?? "Client #{$cid}",
+                'delivered' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'rate' => (float)($cfg['rate'] ?? 0),
+                'total_amount' => 0.00,
+            ];
+        }
+
+        foreach ($leadIds as $leadId) {
+            $lead = Lead::withoutGlobalScopes()->find($leadId);
+            if (!$lead) continue;
+
+            $leadResults = $this->distributeLeadToMultipleClients($lead, $clientConfigs, $actor);
+            foreach ($leadResults as $cid => $res) {
+                if ($res['status'] === 'sent') {
+                    $summary['total_delivered']++;
+                    $summary['client_summaries'][$cid]['delivered']++;
+                    $amount = (float)($res['amount'] ?? $res['rate'] ?? 0);
+                    $summary['client_summaries'][$cid]['total_amount'] += $amount;
+                    $summary['total_billing'] += $amount;
+                } elseif ($res['status'] === 'failed') {
+                    $summary['total_failed']++;
+                    $summary['client_summaries'][$cid]['failed']++;
+                } else {
+                    $summary['total_skipped']++;
+                    $summary['client_summaries'][$cid]['skipped']++;
+                }
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Re-deliver a previously revoked or failed delivery item to its client.
+     */
+    public function redeliverToClient(LeadDeliveryItem $item, User $actor, ?float $customRate = null): bool
+    {
+        $this->deliveryAdmin($actor);
+        return DB::transaction(function () use ($item, $actor, $customRate) {
+            $item = LeadDeliveryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->firstOrFail();
+            $client = User::with('organization')->whereKey($item->client_id)->lockForUpdate()->firstOrFail();
+
+            if (in_array($item->status, ['sent', 'accepted'])) {
+                throw ValidationException::withMessages(['delivery' => 'Lead is already delivered to this client.']);
+            }
+
+            $rate = $customRate !== null ? (float)$customRate : ((float)($item->rate_per_lead ?: 0.00));
+            if ($rate <= 0) {
+                $project = Project::withoutGlobalScopes()->find($item->project_id);
+                $resolution = app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $client->organization);
+                $rate = (float) $resolution['cost'];
+            }
+
+            $lead->update([
+                'delivered_at' => $lead->delivered_at ?: now(),
+                'delivery_pending' => false,
+                'credit_delivery_confirmed' => true,
+                'do_not_send_to_client' => false,
+            ]);
+
+            $charged = CreditTransaction::reserveForLead($lead, $client->id, (int)$rate);
+            if (!$charged) {
+                $item->update([
+                    'status' => 'failed',
+                    'failure_reason' => 'Insufficient credits in client wallet for re-delivery.',
+                ]);
+                return false;
+            }
+
+            $item->update([
+                'status' => 'sent',
+                'sent_at' => now(),
+                'rate_per_lead' => $rate,
+                'billing_amount' => $rate,
+                'revoked_at' => null,
+                'revocation_reason' => null,
+                'failure_reason' => null,
+                'attempts' => ($item->attempts ?? 0) + 1,
+            ]);
+
+            $this->deliveryAudit('delivery.redelivered', $item, ['status' => 'revoked'], $item->getAttributes(), $actor->id);
+            return true;
+        }, 3);
+    }
+
+    /**
+     * Deliver a pending or queued item directly to the client.
+     */
+    public function deliverItemToClient(LeadDeliveryItem $item, User $actor): bool
+    {
+        $this->deliveryAdmin($actor);
+        return DB::transaction(function () use ($item, $actor) {
+            $item = LeadDeliveryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->firstOrFail();
+            $client = User::with('organization')->whereKey($item->client_id)->lockForUpdate()->firstOrFail();
+
+            $rate = (float) ($item->rate_per_lead ?: 0.00);
+            if ($rate <= 0) {
+                $project = Project::withoutGlobalScopes()->find($item->project_id);
+                $resolution = app(\App\Services\LeadPricingService::class)->resolveCost($project, null, $client->organization);
+                $rate = (float) $resolution['cost'];
+            }
+
+            $lead->update([
+                'delivered_at' => $lead->delivered_at ?: now(),
+                'delivery_pending' => false,
+                'credit_delivery_confirmed' => true,
+            ]);
+
+            $charged = CreditTransaction::reserveForLead($lead, $client->id, (int)$rate);
+            if (!$charged) {
+                $item->update([
+                    'status' => 'failed',
+                    'failure_reason' => 'Insufficient credits in client wallet.',
+                ]);
+                return false;
+            }
+
+            $item->update([
+                'status' => 'sent',
+                'sent_at' => now(),
+                'rate_per_lead' => $rate,
+                'billing_amount' => $rate,
+                'failure_reason' => null,
+                'attempts' => ($item->attempts ?? 0) + 1,
+            ]);
+
+            $this->deliveryAudit('delivery.sent', $item, [], $item->getAttributes(), $actor->id);
+            return true;
+        }, 3);
+    }
+
+    /**
+     * Exclude a specific client delivery item (Do Not Send to this client).
+     */
+    public function excludeClientDelivery(LeadDeliveryItem $item, User $actor): void
+    {
+        $this->deliveryAdmin($actor);
+        DB::transaction(function () use ($item, $actor) {
+            $item = LeadDeliveryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $item->update([
+                'status' => 'do_not_send',
+                'failure_reason' => 'Excluded from delivery to this client (Do Not Send).',
+            ]);
+            $this->deliveryAudit('delivery.item_excluded', $item, [], ['status' => 'do_not_send'], $actor->id);
+        });
+    }
+
+    /**
+     * Remove Do Not Send exclusion for a specific client delivery item.
+     */
+    public function includeClientDelivery(LeadDeliveryItem $item, User $actor): void
+    {
+        $this->deliveryAdmin($actor);
+        DB::transaction(function () use ($item, $actor) {
+            $item = LeadDeliveryItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $item->update([
+                'status' => 'pending',
+                'failure_reason' => null,
+            ]);
+            $this->deliveryAudit('delivery.item_included', $item, [], ['status' => 'pending'], $actor->id);
         });
     }
 }

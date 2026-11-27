@@ -8,20 +8,22 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::table('lead_delivery_items', function (Blueprint $table) {
-            if (!Schema::hasColumn('lead_delivery_items', 'rate_per_lead')) {
-                $table->decimal('rate_per_lead', 10, 2)->default(0)->after('attempts');
+        foreach ([
+            'rate_per_lead' => fn(Blueprint $table) => $table->decimal('rate_per_lead', 10, 2)->default(0)->after('attempts'),
+            'billing_amount' => fn(Blueprint $table) => $table->decimal('billing_amount', 10, 2)->default(0)->after('rate_per_lead'),
+            'revoked_at' => fn(Blueprint $table) => $table->timestamp('revoked_at')->nullable()->after('accepted_at'),
+            'revocation_reason' => fn(Blueprint $table) => $table->text('revocation_reason')->nullable()->after('revoked_at'),
+        ] as $col => $definition) {
+            try {
+                if (!Schema::hasColumn('lead_delivery_items', $col)) {
+                    Schema::table('lead_delivery_items', function (Blueprint $table) use ($definition) {
+                        $definition($table);
+                    });
+                }
+            } catch (\Throwable $e) {
+                // Column may already exist
             }
-            if (!Schema::hasColumn('lead_delivery_items', 'billing_amount')) {
-                $table->decimal('billing_amount', 10, 2)->default(0)->after('rate_per_lead');
-            }
-            if (!Schema::hasColumn('lead_delivery_items', 'revoked_at')) {
-                $table->timestamp('revoked_at')->nullable()->after('accepted_at');
-            }
-            if (!Schema::hasColumn('lead_delivery_items', 'revocation_reason')) {
-                $table->text('revocation_reason')->nullable()->after('revoked_at');
-            }
-        });
+        }
 
         // Drop single lead_id unique constraint to permit multi-client delivery
         $driver = DB::getDriverName();

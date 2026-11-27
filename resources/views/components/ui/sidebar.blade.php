@@ -1,8 +1,7 @@
 @php
     $user = auth()->user();
-    $navSections = \App\Support\NavigationConfig::getNavItemsForUser($user);
-    $primaryItems = $navSections['primary'] ?? [];
-    $databaseItems = $navSections['database'] ?? [];
+    $navData = \App\Support\NavigationConfig::getNavItemsForUser($user);
+    $sections = $navData['sections'] ?? [];
 @endphp
 
 {{-- Rebuild with the layout: persisted nodes retain the previous body's Alpine scope. --}}
@@ -50,76 +49,51 @@
     <!-- Scrollable Nav Container -->
     <div class="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll no-scrollbar min-h-0 space-y-4 py-1" x-on:scroll.passive="hideSidebarTooltip()">
         <nav class="space-y-4">
-            <!-- Primary Nav -->
-            <div class="space-y-1">
-                @foreach($primaryItems as $item)
-                    <a href="{{ $item['url'] }}" wire:navigate.hover
-                       data-nav-route="{{ $item['data_nav_route'] }}"
-                       data-nav-exact="{{ $item['data_nav_exact'] }}"
-                       @if(isset($item['data_nav_root'])) data-nav-root="true" @endif
-                       x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
-                       x-on:mouseleave="hideSidebarTooltip()"
-                       x-on:click="closeMobileSidebar(); hideSidebarTooltip()"
-                       :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
-                       class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
-                    >
-                        <div class="flex-shrink-0 flex items-center justify-center">
-                            {!! $item['icon'] !!}
-                        </div>
-                        <span 
+            @foreach($sections as $sectionKey => $section)
+                @if(!empty($section['items']))
+                    <div class="space-y-1 {{ !$loop->first ? 'pt-2' : '' }}">
+                        <div 
                             x-show="!sidebarCollapsed"
-                            x-transition:enter="transition ease-out duration-200"
-                            x-transition:enter-start="opacity-0 -translate-x-2"
-                            x-transition:enter-end="opacity-100 translate-x-0"
-                            class="whitespace-nowrap overflow-hidden truncate"
+                            class="px-3 mb-2 text-[10px] font-bold tracking-wider text-muted uppercase select-none"
                         >
-                            {{ $item['label'] }}
-                        </span>
-                    </a>
-                @endforeach
-            </div>
-
-            <!-- Secondary Nav (DATABASE) -->
-            @if(!empty($databaseItems))
-                <div class="pt-1">
-                    <div 
-                        x-show="!sidebarCollapsed"
-                        class="px-3 mb-2 text-[10px] font-bold tracking-wider text-muted uppercase"
-                    >
-                        Database
-                    </div>
-                    <div 
-                        x-show="sidebarCollapsed"
-                        class="my-2 border-t border-border mx-2"
-                    ></div>
-                    <div class="space-y-1">
-                        @foreach($databaseItems as $item)
-                            <a href="{{ $item['url'] }}" wire:navigate
-                               data-nav-route="{{ $item['data_nav_route'] }}"
-                               data-nav-exact="{{ $item['data_nav_exact'] }}"
-                               x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
-                               x-on:mouseleave="hideSidebarTooltip()"
-                               x-on:click="closeMobileSidebar(); hideSidebarTooltip()"
-                               :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
-                               class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
-                            >
-                                <div class="flex-shrink-0 flex items-center justify-center">
-                                    {!! $item['icon'] !!}
-                                </div>
-                                <span 
-                                    x-show="!sidebarCollapsed"
-                                    x-transition:enter="transition ease-out duration-200"
-                                    x-transition:enter-start="opacity-0 -translate-x-2"
-                                    x-transition:enter-end="opacity-100 translate-x-0"
-                                    class="whitespace-nowrap overflow-hidden truncate"
+                            {{ $section['label'] }}
+                        </div>
+                        @if(!$loop->first)
+                            <div 
+                                x-show="sidebarCollapsed"
+                                class="my-2 border-t border-border mx-2"
+                            ></div>
+                        @endif
+                        <div class="space-y-1">
+                            @foreach($section['items'] as $item)
+                                <a href="{{ $item['url'] }}" wire:navigate.hover
+                                   data-nav-route="{{ $item['data_nav_route'] }}"
+                                   data-nav-exact="{{ $item['data_nav_exact'] }}"
+                                   @if(isset($item['data_nav_root'])) data-nav-root="true" @endif
+                                   x-on:mouseenter="showSidebarTooltip($event, '{{ addslashes($item['label']) }}')"
+                                   x-on:mouseleave="hideSidebarTooltip()"
+                                   x-on:click="closeMobileSidebar(); hideSidebarTooltip()"
+                                   :class="sidebarCollapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2 space-x-3 w-full'"
+                                   class="group relative flex items-center text-sm font-medium rounded-lg text-muted hover:text-ink hover:bg-canvas transition"
                                 >
-                                    {{ $item['label'] }}
-                                </span>
-                            </a>
-                        @endforeach
+                                    <div class="flex-shrink-0 flex items-center justify-center">
+                                        {!! $item['icon'] !!}
+                                    </div>
+                                    <span 
+                                        x-show="!sidebarCollapsed"
+                                        x-transition:enter="transition ease-out duration-200"
+                                        x-transition:enter-start="opacity-0 -translate-x-2"
+                                        x-transition:enter-end="opacity-100 translate-x-0"
+                                        class="whitespace-nowrap overflow-hidden truncate"
+                                    >
+                                        {{ $item['label'] }}
+                                    </span>
+                                </a>
+                            @endforeach
+                        </div>
                     </div>
-                </div>
-            @endif
+                @endif
+            @endforeach
         </nav>
     </div>
 

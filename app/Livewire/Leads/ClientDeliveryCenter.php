@@ -25,6 +25,20 @@ class ClientDeliveryCenter extends Component
     public string $historyFrom = '';
     public string $historyTo = '';
 
+    // Revoke Delivered Leads state
+    public string $revokeStatus = 'delivered';
+    public string $revokeClient = '';
+    public string $revokeProject = '';
+    public string $revokeFrom = '';
+    public string $revokeTo = '';
+    public string $revokeSearch = '';
+    public array $selectedRevokeIds = [];
+    public bool $selectAll = false;
+    public bool $revokeSelectAllMatching = false;
+    public bool $showRevokeConfirmModal = false;
+    public array $revokeTargetItemIds = [];
+    public string $revokeBatchReason = '';
+
     public function boot(): void { abort_unless(auth()->user()?->status === 'active' && auth()->user()->hasAnyRole(['Super Admin', 'super-admin']), 403); }
     public function mount(int $organizationId): void
     {
@@ -61,7 +75,16 @@ class ClientDeliveryCenter extends Component
             $this->settings['interval_minutes'] = 20;
         }
     }
-    public function updated($property): void { if (str_starts_with($property, 'history')) $this->resetPage('deliveryPage'); }
+    public function updated($property): void
+    {
+        if (str_starts_with($property, 'history')) $this->resetPage('deliveryPage');
+        if (str_starts_with($property, 'revoke')) {
+            $this->resetPage('revokePage');
+            $this->selectedRevokeIds = [];
+            $this->selectAll = false;
+            $this->revokeSelectAllMatching = false;
+        }
+    }
 
     #[On('client-push-selected')]
     public function openPush(int $organizationId, array $leadIds, bool $sendNow = false): void
@@ -216,6 +239,181 @@ class ClientDeliveryCenter extends Component
         ), 'client-delivery-history-'.$this->organizationId.'.xlsx');
     }
 
+    public function revokeQuery(bool $filtered = true)
+    {
+        $query = LeadDeliveryItem::whereHas('lead')
+            ->whereHas('plan', fn ($q) => $q->where('organization_id', $this->organizationId))
+            ->with(['lead.assignedTo', 'client.organization', 'project', 'campaign']);
+
+        if (!$filtered) return $query;
+
+        $this->validate([
+            'revokeFrom' => 'nullable|date_format:Y-m-d',
+            'revokeTo' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        return $query
+            ->when($this->revokeStatus === 'delivered', fn ($q) => $q->whereIn('status', ['sent', 'accepted']))
+            ->when($this->revokeStatus && $this->revokeStatus !== 'delivered', fn ($q) => $q->where('status', $this->revokeStatus))
+            ->when($this->revokeClient, fn ($q) => $q->where('client_id', $this->revokeClient))
+            ->when($this->revokeProject, fn ($q) => $q->where('project_id', $this->revokeProject))
+            ->when($this->revokeFrom, fn ($q) => $q->whereDate('sent_at', '>=', $this->revokeFrom))
+            ->when($this->revokeTo, fn ($q) => $q->whereDate('sent_at', '<=', $this->revokeTo))
+            ->when(trim($this->revokeSearch) !== '', function ($q) {
+                $search = '%' . trim($this->revokeSearch) . '%';
+                $q->whereHas('lead', fn ($l) => $l->where('lead_code', 'like', $search)->orWhere('name', 'like', $search)->orWhere('mobile', 'like', $search));
+            });
+    }
+
+    public function revokeColumns(): array
+    {
+        return [
+            ['key' => 'lead.lead_code', 'label' => 'Lead ID'],
+            ['key' => 'lead.name', 'label' => 'Customer Name'],
+            ['key' => 'client.name', 'label' => 'Destination Client'],
+            ['key' => 'project.name', 'label' => 'Project'],
+            ['key' => 'campaign.name', 'label' => 'Campaign'],
+            ['key' => 'sent_at', 'label' => 'Delivered Date', 'formatter' => fn($val) => $val ? \Carbon\Carbon::parse($val)->format('d M Y, h:i A') : 'N/A'],
+            ['key' => 'status', 'label' => 'Status', 'formatter' => fn($val) => ucfirst((string)$val)],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'html', 'render' => function($item) {
+                if (in_array($item->status, ['sent', 'accepted'])) {
+                    return '<button type="button" wire:click="openRevokeSingle(' . $item->id . ')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer">Revoke</button>';
+                }
+                return '<span class="text-xs text-muted font-medium capitalize">' . e($item->status) . '</span>';
+            }],
+        ];
+    }
+
+    public function toggleSelectRow($id): void
+    {
+        $idStr = (string) $id;
+        if (in_array($idStr, $this->selectedRevokeIds)) {
+            $this->selectedRevokeIds = array_values(array_diff($this->selectedRevokeIds, [$idStr]));
+        } else {
+            $this->selectedRevokeIds[] = $idStr;
+        }
+        $this->revokeSelectAllMatching = false;
+    }
+
+    public function updatedSelectAll($value): void
+    {
+        if ($value) {
+            $this->selectedRevokeIds = $this->revokeQuery()
+                ->whereIn('status', ['sent', 'accepted'])
+                ->paginate(10, ['*'], 'revokePage')
+                ->pluck('id')
+                ->map(fn($id) => (string)$id)
+                ->all();
+        } else {
+            $this->selectedRevokeIds = [];
+            $this->revokeSelectAllMatching = false;
+        }
+    }
+
+    public function selectAllMatching(): void
+    {
+        $this->revokeSelectAllMatching = true;
+        $this->selectedRevokeIds = $this->revokeQuery()
+            ->whereIn('status', ['sent', 'accepted'])
+            ->pluck('id')
+            ->map(fn($id) => (string)$id)
+            ->all();
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selectedRevokeIds = [];
+        $this->selectAll = false;
+        $this->revokeSelectAllMatching = false;
+    }
+
+    public function openRevokeSingle(int $itemId): void
+    {
+        $item = $this->revokeQuery(false)->findOrFail($itemId);
+        abort_unless(in_array($item->status, ['sent', 'accepted']), 422);
+        $this->revokeTargetItemIds = [$item->id];
+        $this->revokeBatchReason = '';
+        $this->revokeSelectAllMatching = false;
+        $this->showRevokeConfirmModal = true;
+    }
+
+    public function openRevokeBatch(): void
+    {
+        if ($this->revokeSelectAllMatching) {
+            $this->revokeTargetItemIds = $this->revokeQuery()
+                ->whereIn('status', ['sent', 'accepted'])
+                ->pluck('id')
+                ->all();
+        } else {
+            $this->revokeTargetItemIds = array_values(array_map('intval', $this->selectedRevokeIds));
+        }
+
+        if (empty($this->revokeTargetItemIds)) {
+            $this->dispatch('toast', type: 'warning', message: 'Select at least one delivered lead to revoke.');
+            return;
+        }
+
+        $this->revokeBatchReason = '';
+        $this->showRevokeConfirmModal = true;
+    }
+
+    public function closeRevokeConfirmModal(): void
+    {
+        $this->showRevokeConfirmModal = false;
+        $this->revokeTargetItemIds = [];
+        $this->revokeBatchReason = '';
+        $this->resetValidation('revokeBatchReason');
+    }
+
+    public function confirmRevokeDelivered(): void
+    {
+        $this->validate([
+            'revokeBatchReason' => 'required|string|min:3|max:1000',
+        ], [
+            'revokeBatchReason.required' => 'Please provide a reason for revoking the delivered lead(s).',
+            'revokeBatchReason.min' => 'The return reason must be at least 3 characters.',
+        ]);
+
+        $service = app(LeadDistributionService::class);
+        $revokedCount = 0;
+
+        foreach ($this->revokeTargetItemIds as $itemId) {
+            $item = LeadDeliveryItem::find($itemId);
+            if ($item && in_array($item->status, ['sent', 'accepted'])) {
+                $service->revokeClientDelivery($item, $this->revokeBatchReason, auth()->user());
+                $revokedCount++;
+            }
+        }
+
+        $this->selectedRevokeIds = [];
+        $this->selectAll = false;
+        $this->revokeSelectAllMatching = false;
+        $this->closeRevokeConfirmModal();
+
+        $this->dispatch('toast', type: 'success', message: "{$revokedCount} delivered lead(s) successfully revoked and returned to CRM.");
+        $this->dispatch('lead-updated');
+    }
+
+    public function exportRevokeList()
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(
+            data: $this->revokeQuery()->latest('sent_at')->get(),
+            title: 'Delivered & Revoked Leads',
+            subtitle: Organization::findOrFail($this->organizationId)->name . ' - Delivery & Revocation Records',
+            headings: ['Lead ID', 'Customer Name', 'Destination Client', 'Project', 'Campaign', 'Delivered Date', 'Delivery Status', 'Return Reason'],
+            columns: [
+                fn ($i) => $i->lead?->lead_code,
+                fn ($i) => $i->lead?->name,
+                fn ($i) => $i->client?->name,
+                fn ($i) => $i->project?->name,
+                fn ($i) => $i->campaign?->name,
+                fn ($i) => $i->sent_at ? $i->sent_at->format('d M Y H:i') : 'N/A',
+                fn ($i) => ucfirst((string)$i->status),
+                fn ($i) => $i->failure_reason ?? 'N/A'
+            ]
+        ), 'delivered-leads-revoke-' . $this->organizationId . '.xlsx');
+    }
+
     public function render()
     {
         $plan = $this->plan();
@@ -245,7 +443,11 @@ class ClientDeliveryCenter extends Component
             'historyCampaigns' => Campaign::withoutGlobalScopes()->whereIn('id', (clone $items)->select('campaign_id'))->get(),
             'history' => $this->historyQuery()->latest('id')->paginate(10, ['*'], 'deliveryPage'),
             'inspectedItem' => $this->inspectedItemId ? $this->historyQuery(false)->with(['attemptHistory.run'])->find($this->inspectedItemId) : null,
-            'deliveryHealth'=>$deliveryHealth,
+            'deliveryHealth' => $deliveryHealth,
+            'revokeLeads' => $this->revokeQuery()->latest('sent_at')->paginate(10, ['*'], 'revokePage'),
+            'totalRevokeMatching' => $this->revokeQuery()->whereIn('status', ['sent', 'accepted'])->count(),
+            'revokeClients' => User::whereIn('id', (clone $items)->select('client_id'))->get(),
+            'revokeProjects' => Project::withoutGlobalScopes()->whereIn('id', (clone $items)->select('project_id'))->get(),
         ]);
     }
 }

@@ -14,4 +14,5 @@ class LeadDeliveryItem extends Model
     public function plan() { return $this->belongsTo(LeadDeliveryPlan::class, 'plan_id'); }
     public function run() { return $this->belongsTo(LeadDeliveryRun::class, 'run_id'); }
     public function attemptHistory() { return $this->hasMany(LeadDeliveryAttempt::class, 'item_id'); }
+    public function revocations() { return $this->hasMany(LeadDeliveryRevocation::class, 'delivery_item_id'); }
 }

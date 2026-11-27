@@ -39,6 +39,9 @@
 
     // Push to client check
     $canPush = $actionUser && ($isSuperAdmin || $actionUser->hasRole(['Admin', 'admin', 'Account Manager', 'account-manager', 'super-admin']));
+    $canManageDelivery = $isSuperAdmin || $isAdmin;
+    $isDelivered = !empty($actionLead?->delivered_at);
+    $isExcludedFromDelivery = !empty($actionLead?->do_not_send_to_client);
 @endphp
 
 <div class="inline-flex" x-id="['lead-actions']" x-data="{
@@ -200,6 +203,42 @@
                     </svg>
                     <span>Push to Client</span>
                 </button>
+                @endif
+
+                @if($canManageDelivery && $isDelivered)
+                <button type="button" role="menuitem"
+                    @click.stop="open=false; $dispatch('open-revoke-delivery-modal', { leadId: {{ $leadId }} }); if (window.Livewire) Livewire.dispatch('open-revoke-delivery-modal', { leadId: {{ $leadId }} });"
+                    class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 transition cursor-pointer"
+                    title="Return this delivered lead to the CRM">
+                    <svg class="w-4 h-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                    </svg>
+                    <span>Revoke Delivered Lead</span>
+                </button>
+                @endif
+
+                @if($canManageDelivery)
+                    @if(!$isExcludedFromDelivery)
+                    <button type="button" role="menuitem"
+                        @click.stop="open=false; $dispatch('toggle-do-not-send-to-client', { leadId: {{ $leadId }}, exclude: true }); if (window.Livewire) Livewire.dispatch('toggle-do-not-send-to-client', { leadId: {{ $leadId }}, exclude: true });"
+                        class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 hover:text-amber-900 transition cursor-pointer"
+                        title="Mark as excluded from future client delivery">
+                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                        <span>Do Not Send to Client</span>
+                    </button>
+                    @else
+                    <button type="button" role="menuitem"
+                        @click.stop="open=false; $dispatch('toggle-do-not-send-to-client', { leadId: {{ $leadId }}, exclude: false }); if (window.Livewire) Livewire.dispatch('toggle-do-not-send-to-client', { leadId: {{ $leadId }}, exclude: false });"
+                        class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 transition cursor-pointer"
+                        title="Remove delivery exclusion">
+                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Allow Client Delivery</span>
+                    </button>
+                    @endif
                 @endif
 
                 @if($canReplace)

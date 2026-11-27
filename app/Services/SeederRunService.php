@@ -44,7 +44,7 @@ class SeederRunService
         $this->tables = collect(Schema::getTables())
             ->filter(function($t) use ($currentDb) {
                 $schema = is_array($t) ? ($t['schema'] ?? null) : ($t->schema ?? null);
-                return empty($schema) || $schema === $currentDb;
+                return empty($schema) || $schema === $currentDb || $schema === 'main';
             })
             ->pluck('name')
             ->filter(fn($t) => ! str_starts_with($t, 'sqlite_'))

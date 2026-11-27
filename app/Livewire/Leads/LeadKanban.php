@@ -207,6 +207,13 @@ class LeadKanban extends Component
 
     public string $exportValidationError = '';
 
+    // Revoke Delivery State
+    public bool $showRevokeDeliveryModal = false;
+
+    public ?int $revokeLeadId = null;
+
+    public string $revokeReason = '';
+
     public string $manualPropertyType = '';
 
     public string $manualRequirement = '';
@@ -3017,5 +3024,58 @@ class LeadKanban extends Component
             ),
             $filename
         );
+    }
+
+    #[On('open-revoke-delivery-modal')]
+    public function openRevokeDeliveryModal(int $leadId): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']), 403);
+        $lead = Lead::withoutGlobalScopes()->findOrFail($leadId);
+        $this->revokeLeadId = $lead->id;
+        $this->revokeReason = '';
+        $this->showRevokeDeliveryModal = true;
+    }
+
+    public function closeRevokeDeliveryModal(): void
+    {
+        $this->showRevokeDeliveryModal = false;
+        $this->revokeLeadId = null;
+        $this->revokeReason = '';
+        $this->resetValidation('revokeReason');
+    }
+
+    public function confirmRevokeDelivery(): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']), 403);
+        $this->validate([
+            'revokeReason' => 'required|string|min:3|max:1000',
+        ], [
+            'revokeReason.required' => 'Please provide a reason for revoking this delivered lead.',
+            'revokeReason.min' => 'The reason must be at least 3 characters.',
+        ]);
+
+        $lead = Lead::withoutGlobalScopes()->findOrFail($this->revokeLeadId);
+        app(\App\Services\LeadDistributionService::class)->revokeClientDelivery($lead, $this->revokeReason, auth()->user());
+
+        $this->closeRevokeDeliveryModal();
+        $this->dispatch('toast', type: 'success', message: "Lead #{$lead->lead_code} delivery revoked and returned to CRM.");
+        $this->dispatch('lead-updated');
+        $this->refreshBoard();
+    }
+
+    #[On('toggle-do-not-send-to-client')]
+    public function toggleDoNotSendToClient(int $leadId, bool $exclude): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']), 403);
+        $lead = Lead::withoutGlobalScopes()->findOrFail($leadId);
+        app(\App\Services\LeadDistributionService::class)->setDoNotSendToClient($lead, $exclude, auth()->user());
+
+        $message = $exclude
+            ? "Lead #{$lead->lead_code} marked as excluded from future client delivery."
+            : "Lead #{$lead->lead_code} is now eligible for client delivery.";
+
+        $this->dispatch('toast', type: 'success', message: $message);
+        $this->dispatch('lead-updated');
+        $this->refreshBoard();
     }
 }

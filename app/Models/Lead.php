@@ -47,6 +47,8 @@ class Lead extends Model
         'internal_processing_pending' => 'boolean',
         'delivery_config' => 'array',
         'delivery_failed_at' => 'datetime',
+        'do_not_send_to_client' => 'boolean',
+        'delivery_revoked_at' => 'datetime',
     ];
 
     public static function usesSalesPanel(): bool
@@ -280,6 +282,16 @@ class Lead extends Model
     public function metadata(): HasMany
     {
         return $this->hasMany(LeadMetadata::class);
+    }
+
+    public function deliveryRevocations(): HasMany
+    {
+        return $this->hasMany(LeadDeliveryRevocation::class);
+    }
+
+    public function leadDeliveryItem()
+    {
+        return $this->hasOne(LeadDeliveryItem::class, 'lead_id');
     }
 
     public function getMetaAttribute(string $key, mixed $default = null): mixed

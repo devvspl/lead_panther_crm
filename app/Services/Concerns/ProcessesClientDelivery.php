@@ -2,7 +2,7 @@
 
 namespace App\Services\Concerns;
 
-use App\Models\{AuditLog, Campaign, CreditTransaction, Lead, LeadDeliveryPlan, LeadDeliveryRun, LeadDeliveryItem, Organization, Project, User};
+use App\Models\{AuditLog, Campaign, CreditTransaction, CreditWallet, Lead, LeadDeliveryPlan, LeadDeliveryRun, LeadDeliveryItem, LeadDeliveryRevocation, Organization, Project, User};
 use Carbon\Carbon;
 use Illuminate\Support\Facades\{DB, Validator};
 use Illuminate\Validation\Rule;
@@ -164,6 +164,7 @@ trait ProcessesClientDelivery
     {
         return Lead::withoutGlobalScopes()->whereIn('client_id', User::where('organization_id', $sourceOrganizationId)->select('id'))
             ->whereNull('delivered_at')
+            ->where('do_not_send_to_client', false)
             ->where(fn($q) => $q->whereNull('delivery_plan_id')->orWhereIn('delivery_plan_id', LeadDeliveryPlan::where('organization_id', $sourceOrganizationId)->select('id')))
             ->whereNotIn('id', CreditTransaction::withoutGlobalScopes()->where('is_legacy', false)->whereNotNull('lead_id')->select('lead_id'))
             ->whereNotIn('status', ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])
@@ -264,8 +265,31 @@ trait ProcessesClientDelivery
             abort_unless($owned === count($ids), 403);
             $eligibleIds = $this->eligibleClientDeliveryLeads($plan->organization_id)->whereIn('id', $ids)->pluck('id');
             $count = 0;
-            foreach (Lead::withoutGlobalScopes()->whereIn('id', $eligibleIds)->orderBy('id')->lockForUpdate()->get() as $lead) {
+            foreach (Lead::withoutGlobalScopes()->whereIn('id', array_merge($eligibleIds->all(), $ids))->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get() as $lead) {
                 if ($item = LeadDeliveryItem::where('lead_id', $lead->id)->first()) {
+                    if ($item->status === 'revoked') {
+                        $item->update([
+                            'plan_id' => $plan->id,
+                            'client_id' => $plan->client_id,
+                            'project_id' => $plan->project_id,
+                            'campaign_id' => $this->clientDeliveryCampaign($plan, $lead),
+                            'requested_by' => $actor->id,
+                            'status' => 'pending',
+                            'failure_reason' => null,
+                            'sent_at' => null,
+                            'accepted_at' => null,
+                        ]);
+                        $lead->update([
+                            'delivery_plan_id' => $plan->id,
+                            'delivery_pending' => true,
+                            'delivery_consent_at' => now(),
+                            'delivery_consent_by' => $actor->id,
+                            'do_not_send_to_client' => false,
+                        ]);
+                        $this->deliveryAudit('delivery.re_enqueued', $item, [], array_merge($item->getAttributes(), ['consent_confirmed_by' => $actor->id, 'consent_confirmed_at' => now()->toIso8601String()]), $actor->id);
+                        $count++;
+                        continue;
+                    }
                     if ($item->plan_id === $plan->id && $item->status === 'pending' && !$lead->delivery_consent_at) {
                         $lead->update(['delivery_consent_at' => now(), 'delivery_consent_by' => $actor->id]);
                         $this->deliveryAudit('delivery.consent_confirmed', $item, [], ['lead_id' => $lead->id, 'confirmed_by' => $actor->id], $actor->id);
@@ -461,6 +485,7 @@ trait ProcessesClientDelivery
                 if (!$client || !$this->clientDeliveryRecipients()->whereKey($item->client_id)->exists()) $reason = 'Destination client is ineligible or its organization is inactive.';
                 elseif (!$project || $project->client_id !== $client->id || !Campaign::withoutGlobalScopes()->whereKey($item->campaign_id)->where('project_id', $project->id)->exists()) $reason = 'Destination project or campaign mapping is invalid.';
                 elseif (!$lead || $lead->delivered_at) $reason = 'Lead is unavailable or already delivered.';
+                elseif ($lead->do_not_send_to_client) $reason = 'Lead is excluded from client delivery (Do Not Send to Client).';
                 elseif (!$this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $plan->organization_id)->exists()) $reason = 'Lead awaits Internal Processing verification and handover approval.';
                 elseif (in_array($lead->status, ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced']) || in_array($lead->current_stage, ['duplicate', 'rejected', 'invalid', 'lost', 'closed_lost', 'closed_won', 'replaced'])) $reason = 'Lead is no longer eligible.';
                 elseif (Lead::withoutGlobalScopes()->where('client_id', $client->id)->whereNotNull('delivered_at')->where('id', '!=', $lead->id)->where(function ($q) use ($lead) {
@@ -565,6 +590,161 @@ trait ProcessesClientDelivery
             if ($item->status !== 'failed') throw ValidationException::withMessages(['delivery' => 'Only failed transfers can be retried.']);
             $item->update(['status' => 'pending', 'run_id' => null, 'failure_reason' => null]);
             $this->deliveryAudit('delivery.retry_requested', $item, ['status' => 'failed'], ['status' => 'pending'], $actor->id);
+        });
+    }
+
+    public function revokeClientDelivery($target, string $reason, User $actor): LeadDeliveryRevocation
+    {
+        $this->deliveryAdmin($actor);
+        return DB::transaction(function () use ($target, $reason, $actor) {
+            $item = null;
+            $lead = null;
+
+            if ($target instanceof LeadDeliveryItem) {
+                $item = LeadDeliveryItem::whereKey($target->id)->lockForUpdate()->firstOrFail();
+                $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->firstOrFail();
+            } elseif ($target instanceof Lead) {
+                $lead = Lead::withoutGlobalScopes()->whereKey($target->id)->lockForUpdate()->firstOrFail();
+                $item = LeadDeliveryItem::where('lead_id', $lead->id)->lockForUpdate()->first();
+            } elseif (is_numeric($target)) {
+                $item = LeadDeliveryItem::whereKey((int)$target)->lockForUpdate()->first();
+                if ($item) {
+                    $lead = Lead::withoutGlobalScopes()->whereKey($item->lead_id)->lockForUpdate()->firstOrFail();
+                } else {
+                    $lead = Lead::withoutGlobalScopes()->whereKey((int)$target)->lockForUpdate()->firstOrFail();
+                    $item = LeadDeliveryItem::where('lead_id', $lead->id)->lockForUpdate()->first();
+                }
+            }
+
+            if (!$lead) {
+                throw ValidationException::withMessages(['lead' => 'Lead not found.']);
+            }
+
+            if (!$lead->delivered_at && (!$item || !in_array($item->status, ['sent', 'accepted']))) {
+                throw ValidationException::withMessages(['lead' => 'This lead has not been delivered or is already revoked.']);
+            }
+
+            $previousStatus = $item?->status ?: 'sent';
+            $originalDeliveredAt = $item?->sent_at ?: ($lead->delivered_at ?: now());
+            $destinationClient = $item?->client_id ?: $lead->client_id;
+            $destinationProject = $item?->project_id ?: $lead->project_id;
+            $destinationCampaign = $item?->campaign_id ?: $lead->campaign_id;
+            $sourceClientId = $item?->source_client_id ?: $lead->client_id;
+            $sourceCampaignId = $item?->source_campaign_id ?: $lead->campaign_id;
+            $organizationId = $item?->plan?->organization_id ?: (User::find($sourceClientId)?->organization_id ?: $lead->organization_id);
+
+            // Refund credits to client wallet if previously deducted
+            $wallet = CreditWallet::where('client_id', $destinationClient)->lockForUpdate()->first();
+            if ($wallet && $wallet->reconciled_at && !CreditTransaction::withoutGlobalScopes()->where('lead_id', $lead->id)->where('is_legacy', false)->where('transaction_type', 'refund')->exists()) {
+                $cost = (int) CreditTransaction::where('lead_id', $lead->id)
+                    ->where('is_legacy', false)->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->value('credit_used');
+
+                if ($cost > 0) {
+                    $before = (int) $wallet->balance;
+                    $after = $before + $cost;
+                    $wallet->update(['balance' => $after]);
+
+                    CreditTransaction::create([
+                        'client_id' => $destinationClient,
+                        'lead_id' => $lead->id,
+                        'package_id' => null,
+                        'credit_before' => $before,
+                        'credit_used' => $cost,
+                        'credit_after' => $after,
+                        'transaction_type' => 'refund',
+                        'description' => "Delivery revoked for lead {$lead->lead_code}: {$reason}",
+                        'created_by' => $actor->id,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            // Restore lead to CRM pool
+            $lead->update([
+                'client_id' => $sourceClientId,
+                'campaign_id' => $sourceCampaignId,
+                'delivered_at' => null,
+                'delivery_pending' => false,
+                'delivery_plan_id' => null,
+                'assigned_to' => null,
+                'credit_delivery_confirmed' => false,
+                'do_not_send_to_client' => true,
+                'delivery_revoked_at' => now(),
+                'delivery_revoke_reason' => $reason,
+            ]);
+
+            // Update delivery item
+            if ($item) {
+                $item->update([
+                    'status' => 'revoked',
+                    'failure_reason' => 'Revoked: ' . $reason,
+                ]);
+                if ($item->run_id) {
+                    $item->attemptHistory()->create([
+                        'run_id' => $item->run_id,
+                        'status' => 'revoked',
+                        'failure_reason' => $reason,
+                    ]);
+                }
+            }
+
+            // Record complete history in lead_delivery_revocations
+            $revocation = LeadDeliveryRevocation::create([
+                'lead_id' => $lead->id,
+                'delivery_item_id' => $item?->id,
+                'organization_id' => $organizationId,
+                'client_id' => $destinationClient,
+                'project_id' => $destinationProject,
+                'campaign_id' => $destinationCampaign,
+                'original_delivered_at' => $originalDeliveredAt,
+                'revoked_at' => now(),
+                'revoked_by' => $actor->id,
+                'return_reason' => $reason,
+                'previous_status' => $previousStatus,
+                'new_status' => 'revoked',
+            ]);
+
+            // Record audit log
+            AuditLog::create([
+                'user_id' => $actor->id,
+                'organization_id' => $organizationId,
+                'action' => 'delivery.revoked',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'context' => ['category' => 'lead_delivery', 'reason' => $reason, 'revocation_id' => $revocation->id],
+                'from_value' => json_encode(['status' => $previousStatus, 'client_id' => $destinationClient, 'delivered_at' => (string)$originalDeliveredAt]),
+                'to_value' => json_encode(['status' => 'revoked', 'client_id' => $sourceClientId, 'revoked_at' => (string)now()]),
+                'created_at' => now(),
+            ]);
+
+            return $revocation;
+        }, 3);
+    }
+
+    public function setDoNotSendToClient(Lead $lead, bool $exclude, User $actor): void
+    {
+        $this->deliveryAdmin($actor);
+        DB::transaction(function () use ($lead, $exclude, $actor) {
+            $lead = Lead::withoutGlobalScopes()->whereKey($lead->id)->lockForUpdate()->firstOrFail();
+            $before = ['do_not_send_to_client' => (bool)$lead->do_not_send_to_client];
+            $lead->update(['do_not_send_to_client' => $exclude]);
+            if ($exclude && $item = LeadDeliveryItem::where('lead_id', $lead->id)->whereIn('status', ['pending', 'queued'])->first()) {
+                $item->update(['status' => 'cancelled', 'failure_reason' => 'Excluded by user: Do Not Send to Client']);
+                $lead->update(['delivery_pending' => false]);
+            }
+            $after = ['do_not_send_to_client' => $exclude];
+            AuditLog::create([
+                'user_id' => $actor->id,
+                'action' => $exclude ? 'delivery.excluded' : 'delivery.included',
+                'subject_type' => Lead::class,
+                'subject_id' => $lead->id,
+                'organization_id' => User::find($lead->client_id)?->organization_id,
+                'context' => ['category' => 'lead_delivery'],
+                'from_value' => json_encode($before),
+                'to_value' => json_encode($after),
+                'created_at' => now(),
+            ]);
         });
     }
 }

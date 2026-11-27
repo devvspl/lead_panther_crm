@@ -1755,6 +1755,9 @@
     <!-- Leads Categorized Export Modal -->
     @include('livewire.leads.leads-export-modal')
 
+    <!-- Revoke Delivered Lead Modal -->
+    @include('livewire.leads.lead-revoke-modal')
+
     <!-- CDN Script for SortableJS (Kanban drag-and-drop) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     @endif

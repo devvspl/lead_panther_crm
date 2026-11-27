@@ -66,7 +66,8 @@ class OrganizationMemberDetails extends Component
         $this->phone = (string) ($member->phone ?? '');
         $this->status = (string) ($member->status ?? 'active');
         $this->userCode = (string) ($member->user_code ?: ('LP' . str_pad($member->id, 5, '0', STR_PAD_LEFT)));
-        $this->role = (string) ($member->roles->first()?->name ?? 'Executive');
+        $rawRole = (string) ($member->roles->first()?->name ?? 'Executive');
+        $this->role = in_array(strtolower(trim(str_replace(['_', '-'], ' ', $rawRole))), ['sales executive']) ? 'Executive' : $rawRole;
         $this->joinedDate = $member->created_at ? $member->created_at->format('M d, Y') : '—';
 
         // Find active team membership or leadership
@@ -389,7 +390,8 @@ class OrganizationMemberDetails extends Component
         $dbRoles = \Spatie\Permission\Models\Role::orderBy('name')->pluck('name');
         $roles = [];
         foreach ($dbRoles as $roleName) {
-            if (in_array(strtolower(trim($roleName)), ['account manager', 'account-manager'])) {
+            $normalized = strtolower(trim(str_replace(['-', '_'], ' ', $roleName)));
+            if (in_array($normalized, ['account manager', 'sales executive'])) {
                 continue;
             }
             $label = ucwords(str_replace(['-', '_'], ' ', $roleName));
@@ -404,7 +406,10 @@ class OrganizationMemberDetails extends Component
             ];
         }
         if ($this->role && !isset($roles[$this->role])) {
-            $roles[$this->role] = ucwords(str_replace(['-', '_'], ' ', $this->role));
+            $normalizedRole = strtolower(trim(str_replace(['-', '_'], ' ', $this->role)));
+            if (!in_array($normalizedRole, ['account manager', 'sales executive'])) {
+                $roles[$this->role] = ucwords(str_replace(['-', '_'], ' ', $this->role));
+            }
         }
         return $roles;
     }

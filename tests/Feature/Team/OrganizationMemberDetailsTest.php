@@ -288,4 +288,23 @@ class OrganizationMemberDetailsTest extends TestCase
             ->call('open', $executive->id)
             ->assertSee('Choose Team Leader');
     }
+
+    public function test_sales_executive_is_not_in_roles_list(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Roles Test Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $executive = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $executive->assignRole('Executive');
+
+        $component = Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $executive->id);
+
+        $roles = $component->get('availableRoles');
+        $this->assertArrayNotHasKey('Sales Executive', $roles);
+        $this->assertArrayNotHasKey('sales-executive', $roles);
+        $this->assertArrayHasKey('Executive', $roles);
+    }
 }

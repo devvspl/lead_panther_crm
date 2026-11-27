@@ -33,62 +33,67 @@
                 @if($member)
                     <form id="org-member-details-form" wire:submit="saveDetails">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <!-- Left Column -->
-                            <div class="space-y-4">
-                                <!-- Full Name -->
-                                <div>
-                                    <x-input-label for="member-name" value="Full Name" class="text-xs font-semibold text-ink mb-1.5" />
-                                    <x-text-input id="member-name" variant="compact" wire:model="name" class="w-full h-9" placeholder="Enter member name" />
-                                    <x-input-error :messages="$errors->get('name')" class="mt-1" />
-                                </div>
-
-                                <!-- Phone Number -->
-                                <div>
-                                    <x-input-label for="member-phone" value="Phone Number" class="text-xs font-semibold text-ink mb-1.5" />
-                                    <x-text-input id="member-phone" variant="compact" wire:model="phone" class="w-full h-9" placeholder="e.g. +91 98765 43210" />
-                                    <x-input-error :messages="$errors->get('phone')" class="mt-1" />
-                                </div>
-
-                                <!-- Role -->
-                                <div>
-                                    <x-input-label for="member-role" value="Role" class="text-xs font-semibold text-ink mb-1.5" />
-                                    <x-ui.themed-select id="member-role" wire:model.live="role" :options="$this->availableRoles" class="w-full" triggerClass="h-9" />
-                                    <x-input-error :messages="$errors->get('role')" class="mt-1" />
-                                </div>
+                            <!-- Full Name -->
+                            <div>
+                                <x-input-label for="member-name" value="Full Name" class="text-xs font-semibold text-ink mb-1.5" />
+                                <x-text-input id="member-name" variant="compact" wire:model="name" class="w-full h-9" placeholder="Enter member name" />
+                                <x-input-error :messages="$errors->get('name')" class="mt-1" />
                             </div>
 
-                            <!-- Right Column -->
-                            <div class="space-y-4">
-                                <!-- Email Address -->
-                                <div>
-                                    <x-input-label for="member-email" value="Email Address" class="text-xs font-semibold text-ink mb-1.5" />
-                                    <x-text-input id="member-email" type="email" variant="compact" wire:model="email" class="w-full h-9" placeholder="email@example.com" />
-                                    <x-input-error :messages="$errors->get('email')" class="mt-1" />
-                                </div>
+                            <!-- Email Address -->
+                            <div>
+                                <x-input-label for="member-email" value="Email Address" class="text-xs font-semibold text-ink mb-1.5" />
+                                <x-text-input id="member-email" type="email" variant="compact" wire:model="email" class="w-full h-9" placeholder="email@example.com" />
+                                <x-input-error :messages="$errors->get('email')" class="mt-1" />
+                            </div>
 
-                                <!-- Team Leader (Only for Executives) or Team Name (Only for Team Leaders) -->
-                                @if($this->isExecutive)
-                                    <div>
-                                        <x-input-label for="member-team-leader" value="Team Leader" class="text-xs font-semibold text-ink mb-1.5" />
-                                        <x-ui.themed-select id="member-team-leader" wire:model.live="teamLeaderId" :options="$this->availableLeaders" placeholder="Choose Team Leader" class="w-full" triggerClass="h-9" />
-                                        <x-input-error :messages="$errors->get('teamLeaderId')" class="mt-1" />
-                                    </div>
-                                @elseif($this->isTeamLeader)
-                                    <div>
-                                        <x-input-label for="member-team-name" value="Team Name" class="text-xs font-semibold text-ink mb-1.5" />
-                                        <x-text-input id="member-team-name" variant="compact" wire:model="teamName" class="w-full h-9" placeholder="Enter team name" />
-                                        <x-input-error :messages="$errors->get('teamName')" class="mt-1" />
-                                    </div>
-                                @endif
+                            <!-- Phone Number -->
+                            <div>
+                                <x-input-label for="member-phone" value="Phone Number" class="text-xs font-semibold text-ink mb-1.5" />
+                                <x-text-input id="member-phone" variant="compact" wire:model="phone" class="w-full h-9" placeholder="e.g. +91 98765 43210" />
+                                <x-input-error :messages="$errors->get('phone')" class="mt-1" />
+                            </div>
 
-                                <!-- Account Status -->
+                            <!-- Role (After Phone Number) -->
+                            <div>
+                                <x-input-label for="member-role" value="Role" class="text-xs font-semibold text-ink mb-1.5" />
+                                <x-ui.themed-select id="member-role" wire:model.live="role" :options="$this->availableRoles" class="w-full" triggerClass="h-9" />
+                                <x-input-error :messages="$errors->get('role')" class="mt-1" />
+                            </div>
+
+                            <!-- Team Leader (Only for Executives) or Team Name (Only for Team Leaders) -->
+                            @if($this->isExecutive)
                                 <div>
-                                    <div class="flex items-center justify-between mb-1.5">
-                                        <x-input-label for="member-status" value="Account Status" class="text-xs font-semibold text-ink" />
-                                    </div>
-                                    <x-ui.themed-select id="member-status" wire:model.live="status" :options="['active' => 'Active', 'inactive' => 'Inactive']" class="w-full" triggerClass="h-9" />
-                                    <x-input-error :messages="$errors->get('status')" class="mt-1" />
+                                    <x-input-label for="member-team-leader" value="Team Leader" class="text-xs font-semibold text-ink mb-1.5" />
+                                    <x-ui.themed-select id="member-team-leader" wire:model.live="teamLeaderId" :options="$this->availableLeaders" placeholder="Choose Team Leader" class="w-full" triggerClass="h-9" />
+                                    <x-input-error :messages="$errors->get('teamLeaderId')" class="mt-1" />
                                 </div>
+                            @elseif($this->isTeamLeader)
+                                <div>
+                                    <x-input-label for="member-team-name" value="Team Name" class="text-xs font-semibold text-ink mb-1.5" />
+                                    <x-text-input id="member-team-name" variant="compact" wire:model="teamName" class="w-full h-9" placeholder="Enter team name" />
+                                    <x-input-error :messages="$errors->get('teamName')" class="mt-1" />
+                                </div>
+                            @endif
+
+                            <!-- Account Status -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <x-input-label for="member-status" value="Account Status" class="text-xs font-semibold text-ink" />
+                                    @if($status === 'active')
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+                                            Active
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-danger/10 text-danger border border-danger/20">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-danger"></span>
+                                            Inactive
+                                        </span>
+                                    @endif
+                                </div>
+                                <x-ui.themed-select id="member-status" wire:model.live="status" :options="['active' => 'Active', 'inactive' => 'Inactive']" class="w-full" triggerClass="h-9" />
+                                <x-input-error :messages="$errors->get('status')" class="mt-1" />
                             </div>
                         </div>
 

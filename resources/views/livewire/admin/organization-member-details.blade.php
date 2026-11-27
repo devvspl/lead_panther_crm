@@ -131,39 +131,48 @@
                     <!-- Left: Member Utilities (Suspend, Send Login, Password) -->
                     <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                         <button type="button" wire:click="toggleStatus" wire:loading.attr="disabled"
-                            class="h-9 px-3 text-xs font-semibold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs {{ $status === 'active' ? 'bg-red-50 hover:bg-red-100/80 text-red-700 border border-red-200' : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200' }}">
+                            class="px-3.5 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
                             @if($status === 'active')
-                                <svg class="w-3.5 h-3.5 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                                 <span>Suspend Account</span>
                             @else
-                                <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                                 <span>Activate Account</span>
                             @endif
                         </button>
 
                         <button type="button" wire:click="sendLoginDetails" wire:loading.attr="disabled" wire:target="sendLoginDetails"
-                            class="h-9 px-3 text-xs font-medium rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer flex items-center gap-1.5 shadow-2xs">
-                            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            class="px-3.5 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
                             <span wire:loading.remove wire:target="sendLoginDetails">Send Login Details</span>
                             <span wire:loading wire:target="sendLoginDetails">Sending...</span>
                         </button>
 
                         <button type="button" wire:click="$toggle('changingPassword')"
-                            class="h-9 px-3 text-xs font-medium rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer flex items-center gap-1.5 shadow-2xs {{ $changingPassword ? 'bg-canvas ring-1 ring-primary/40' : '' }}">
-                            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                            class="px-3.5 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer {{ $changingPassword ? 'bg-canvas ring-1 ring-primary/40' : '' }}">
+                            <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
                             <span>{{ $changingPassword ? 'Hide Password' : 'Change Password' }}</span>
                         </button>
                     </div>
 
                     <!-- Right: Confirmation Actions (Cancel, Save) -->
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-2.5 shrink-0">
                         <button type="button" wire:click="close"
-                            class="h-9 px-3.5 text-xs font-semibold text-muted hover:text-ink hover:bg-canvas rounded-lg transition cursor-pointer">
+                            class="px-4 py-2 border border-border bg-surface text-ink text-xs font-semibold rounded-lg hover:bg-canvas transition cursor-pointer">
                             Cancel
                         </button>
 
                         <button type="submit" form="org-member-details-form" wire:loading.attr="disabled"
-                            class="h-9 px-4.5 bg-ink text-white rounded-lg hover:bg-neutral-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50">
+                            class="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50">
                             <span wire:loading.remove wire:target="saveDetails">Save Changes</span>
                             <span wire:loading wire:target="saveDetails">Saving...</span>
                         </button>

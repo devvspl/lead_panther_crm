@@ -3,9 +3,11 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
             <div class="flex items-center space-x-1.5 sm:space-x-2 text-[11px] sm:text-xs text-muted mb-1 truncate">
-                <a href="{{ route('admin.dashboard') }}" class="hover:text-ink transition shrink-0" wire:navigate>Admin</a>
+                <a href="{{ route('admin.dashboard') }}" class="hover:text-ink transition shrink-0"
+                    wire:navigate>Admin</a>
                 <span>/</span>
-                <a href="{{ route('admin.organizations') }}" class="hover:text-ink transition shrink-0" wire:navigate>Clients</a>
+                <a href="{{ route('admin.organizations') }}" class="hover:text-ink transition shrink-0"
+                    wire:navigate>Clients</a>
                 <span>/</span>
                 <span class="text-ink font-semibold truncate">{{ $organization->name }}</span>
             </div>
@@ -254,166 +256,9 @@
     </div>
 
     @if($activeTab === 'leads')
-        <livewire:leads.client-lead-manager :organization-id="$organization->id" :key="'client-leads-'.$organization->id" />
+        <livewire:leads.client-lead-manager :organization-id="$organization->id" :key="'client-leads-' . $organization->id" />
     @endif
 
-    <!-- TAB 6: CAMPAIGN DETAILS & DELIVERY -->
-    @if($activeTab === 'campaigns')
-        <section class="space-y-6" wire:poll.30s>
-            <!-- Tab Header & Quick Actions -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-4 sm:p-5 rounded-2xl border border-border shadow-2xs">
-                <div>
-                    <h3 class="text-base font-bold text-ink">Campaign Details &amp; Delivery</h3>
-                    <p class="text-xs text-muted">Manage Facebook campaigns, lead forms, CRM project mappings, and automated lead delivery rules for {{ $organization->name }}.</p>
-                </div>
-                <button type="button" wire:click="openAddCampaignMapping" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                    <span>Add Campaign Mapping</span>
-                </button>
-            </div>
-
-            <!-- Single Compact Summary Statistics Section -->
-            @php
-                $campStats = $this->campaignSummaryStats;
-            @endphp
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Total Campaigns</span>
-                    <div class="text-xl font-bold font-mono text-ink">{{ number_format($campStats['total']) }}</div>
-                    <span class="text-[11px] text-muted">All active records</span>
-                </div>
-                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Mapped Campaigns</span>
-                    <div class="text-xl font-bold font-mono text-primary">{{ number_format($campStats['mapped']) }}</div>
-                    <span class="text-[11px] text-muted">{{ $campStats['unmapped'] }} unmapped</span>
-                </div>
-                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Delivered Today</span>
-                    <div class="text-xl font-bold font-mono text-emerald-600">{{ number_format($campStats['delivered_today']) }}</div>
-                    <span class="text-[11px] text-muted">Action today</span>
-                </div>
-                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Pending Leads</span>
-                    <div class="text-xl font-bold font-mono text-amber-600">{{ number_format($campStats['pending']) }}</div>
-                    <span class="text-[11px] text-muted">In delivery queue</span>
-                </div>
-            </div>
-
-            <!-- Advanced Table: Campaigns & Delivery -->
-            <x-ui.advanced-table
-                :columns="$this->campaignTableColumns()"
-                :rows="$this->paginatedCampaigns"
-                :quickFilters="$this->campaignQuickFilters()"
-                :activeStatus="$campaignStatusFilter"
-                searchModel="campaignSearch"
-                sortAction="sortCampaignsBy"
-                :sortField="$campaignSortField"
-                :sortDirection="$campaignSortDirection"
-                tableName="organization-campaigns"
-                searchPlaceholder="Search campaign name, Facebook ID, project..."
-                emptyTitle="No Campaigns Found"
-                emptyMessage="No campaigns match your current search or filters. Click Add Campaign Mapping to link a new campaign."
-            />
-
-            <!-- Lead Filtering Rules -->
-            <div class="pt-2">
-                <livewire:settings.lead-filtering-rules :organization-id="$organization->id" :key="'org-lead-filtering-rules-'.$organization->id" />
-            </div>
-
-            <!-- Organization Campaign Mapping Modal -->
-            <x-ui.modal name="organization-campaign-mapping" maxWidth="lg" :centered="true">
-                <form wire:submit="saveCampaignMapping" class="p-5 sm:p-6 space-y-4">
-                    <div class="flex items-center justify-between pb-3.5 border-b border-border">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-xl bg-primary/10 text-primary">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-base font-bold text-ink">{{ $editingMappingRecordId ? 'Edit Campaign Mapping' : 'Add Campaign Mapping' }}</h4>
-                                <p class="text-xs text-muted">Route Facebook leads directly to CRM projects.</p>
-                            </div>
-                        </div>
-                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
-                            class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-
-                    <!-- Hidden Organization & Client Values -->
-                    <input type="hidden" wire:model="mappingOrganizationId" value="{{ $organization->id }}" />
-                    <input type="hidden" wire:model="mappingClientId" value="{{ $this->ensureBillingOwner()?->id }}" />
-
-                    <!-- Mapping Source Type Toggle -->
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1.5">Mapping Type</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button type="button" wire:click="$set('mappingSourceType', 'campaign')"
-                                @class([
-                                    'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                    'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'campaign',
-                                    'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'campaign',
-                                ])>
-                                Facebook Campaign
-                            </button>
-                            <button type="button" wire:click="$set('mappingSourceType', 'form')"
-                                @class([
-                                    'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
-                                    'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'form',
-                                    'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'form',
-                                ])>
-                                Facebook Lead Form
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Facebook Page / Ad Account -->
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">Facebook Page / Ad Account</label>
-                        <x-ui.themed-select wire:model.live="mappingAccountId" :options="$this->metaAccountOptions" />
-                        @error('mappingAccountId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <!-- Select Campaign or Form -->
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">
-                            {{ $mappingSourceType === 'campaign' ? 'Facebook Campaign' : 'Facebook Lead Form' }} <span class="text-red-500">*</span>
-                        </label>
-                        @if($mappingSourceType === 'campaign')
-                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableCampaignOptions" :searchable="true" />
-                        @else
-                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableFormOptions" :searchable="true" />
-                        @endif
-                        @error('mappingRemoteId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <!-- Target CRM Project -->
-                    <div>
-                        <label class="block text-xs font-semibold text-ink mb-1">CRM Project <span class="text-red-500">*</span></label>
-                        <select wire:model="mappingProjectId" class="w-full rounded-lg border border-border bg-canvas p-2.5 text-xs text-ink focus:ring-1 focus:ring-primary focus:outline-none">
-                            <option value="">Select CRM Project</option>
-                            @foreach($this->organizationProjectOptions as $pId => $pName)
-                                <option value="{{ $pId }}">{{ $pName }}</option>
-                            @endforeach
-                        </select>
-                        @error('mappingProjectId') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
-                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
-                            class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
-                            Cancel
-                        </button>
-                        <button type="submit" wire:loading.attr="disabled"
-                            class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
-                            <span wire:loading.remove wire:target="saveCampaignMapping">Save Mapping</span>
-                            <span wire:loading wire:target="saveCampaignMapping">Saving...</span>
-                        </button>
-                    </div>
-                </form>
-            </x-ui.modal>
-        </section>
-    @endif
     <!-- TAB 1: OVERVIEW -->
     @if($activeTab === 'overview')
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -576,16 +421,20 @@
                     </div>
                 </div>
 
-                <details wire:ignore.self wire:key="overview-assignment-{{ $organization->id }}" class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
+                <details wire:ignore.self wire:key="overview-assignment-{{ $organization->id }}"
+                    class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
                     <summary class="text-sm font-bold text-ink cursor-pointer">Lead Assignment Configuration</summary>
                     <div class="mt-4">
-                <livewire:settings.lead-assignment-configuration :organization-id="$organization->id" :key="'lead-assignment-'.$organization->id" />
+                        <livewire:settings.lead-assignment-configuration :organization-id="$organization->id"
+                            :key="'lead-assignment-' . $organization->id" />
                     </div>
                 </details>
-                <details wire:ignore.self wire:key="overview-internal-processing-{{ $organization->id }}" class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
+                <details wire:ignore.self wire:key="overview-internal-processing-{{ $organization->id }}"
+                    class="rounded-2xl bg-surface border border-border p-5 sm:p-6">
                     <summary class="text-sm font-bold text-ink cursor-pointer">Lead Panther Internal Processing</summary>
                     <div class="mt-4">
-                        <livewire:admin.internal-processing-settings :organization-id="$organization->id" :key="'internal-processing-settings-'.$organization->id" />
+                        <livewire:admin.internal-processing-settings :organization-id="$organization->id"
+                            :key="'internal-processing-settings-' . $organization->id" />
                     </div>
                 </details>
 
@@ -673,26 +522,36 @@
                         @endforelse
                     </div>
                 </div>
-                <section class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between gap-4">
+                <section
+                    class="p-5 sm:p-6 rounded-2xl bg-surface border border-border shadow-2xs flex items-center justify-between gap-4">
                     <div>
                         <h3 id="builder-credit-visibility-label" class="text-sm font-bold text-ink">Show Credit Balance</h3>
-                        <p class="text-xs text-muted mt-1">Show available credits and credits consumed on this client's Builder/Developer dashboard.</p>
+                        <p class="text-xs text-muted mt-1">Show available credits and credits consumed on this client's
+                            Builder/Developer dashboard.</p>
                     </div>
-                    <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label" aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
-                        wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})" wire:loading.attr="disabled"
+                    <button type="button" role="switch" aria-labelledby="builder-credit-visibility-label"
+                        aria-checked="{{ $organization->show_builder_credit_balance ? 'true' : 'false' }}"
+                        wire:click="setBuilderCreditBalanceVisibility({{ $organization->show_builder_credit_balance ? 'false' : 'true' }})"
+                        wire:loading.attr="disabled"
                         class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 {{ $organization->show_builder_credit_balance ? 'bg-primary' : 'bg-neutral-300' }}">
-                        <span class="inline-block h-4 w-4 rounded-full bg-surface shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                        <span
+                            class="inline-block h-4 w-4 rounded-full bg-surface shadow transition {{ $organization->show_builder_credit_balance ? 'translate-x-6' : 'translate-x-1' }}"></span>
                     </button>
                 </section>
 
-                <form wire:submit="saveExecutiveResponseTime" class="p-5 rounded-2xl bg-surface border border-border space-y-3">
-                    <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response Time</label>
+                <form wire:submit="saveExecutiveResponseTime"
+                    class="p-5 rounded-2xl bg-surface border border-border space-y-3">
+                    <label for="executive-response-minutes" class="block text-sm font-bold text-ink">Executive Response
+                        Time</label>
                     <div class="flex flex-wrap items-center gap-2">
-                        <x-text-input id="executive-response-minutes" type="number" min="1" max="10080" wire:model="executiveResponseMinutes" class="w-28" />
+                        <x-text-input id="executive-response-minutes" type="number" min="1" max="10080"
+                            wire:model="executiveResponseMinutes" class="w-28" />
                         <span class="text-xs text-muted">minutes</span>
-                        <button type="submit" wire:loading.attr="disabled" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-semibold">Save</button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-semibold">Save</button>
                     </div>
-                    @error('executiveResponseMinutes')<p role="alert" class="text-xs text-danger">{{ $message }}</p>@enderror
+                    @error('executiveResponseMinutes')
+                    <p role="alert" class="text-xs text-danger">{{ $message }}</p>@enderror
                     <p class="text-xs text-muted">First response deadline from assignment. Applies to new assignments.</p>
                 </form>
             </div>
@@ -720,7 +579,7 @@
 
                     <!-- Role Filter -->
                     <div class="w-44">
-                        <x-ui.themed-select class="w-full" searchable  wire:model.live="userRoleFilter"
+                        <x-ui.themed-select class="w-full" searchable wire:model.live="userRoleFilter"
                             trigger-class="w-full h-8 px-3 text-xs bg-canvas border border-border rounded-lg text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
                             <option value="all">All Roles</option>
                             @foreach($this->availableRoles as $roleKey => $roleLabel)
@@ -794,7 +653,8 @@
                         <thead
                             class="bg-canvas/60 text-muted uppercase tracking-wider text-[10px] font-bold border-b border-border">
                             <tr>
-                                <th class="py-3 px-4"><input type="checkbox" aria-label="Select all filtered team members" wire:click="toggleAllTeamUsers" @checked($teamMembers->isNotEmpty() && count(array_diff($teamMembers->pluck('id')->all(), $selectedTeamUserIds)) === 0)></th>
+                                <th class="py-3 px-4"><input type="checkbox" aria-label="Select all filtered team members"
+                                        wire:click="toggleAllTeamUsers" @checked($teamMembers->isNotEmpty() && count(array_diff($teamMembers->pluck('id')->all(), $selectedTeamUserIds)) === 0)></th>
                                 <th class="py-3 px-4">Member Name</th>
                                 <th class="py-3 px-4">Email Address</th>
                                 <th class="py-3 px-4">Phone</th>
@@ -809,7 +669,8 @@
                         <tbody class="divide-y divide-border">
                             @forelse($teamMembers as $member)
                                 <tr wire:key="team-member-{{ $member->id }}" class="hover:bg-canvas/30 transition">
-                                    <td class="py-3 px-4"><input type="checkbox" wire:model.live="selectedTeamUserIds" value="{{ $member->id }}" aria-label="Select {{ $member->name }}"></td>
+                                    <td class="py-3 px-4"><input type="checkbox" wire:model.live="selectedTeamUserIds"
+                                            value="{{ $member->id }}" aria-label="Select {{ $member->name }}"></td>
                                     <td class="py-3 px-4">
                                         <div class="flex items-center gap-3">
                                             <div
@@ -817,8 +678,12 @@
                                                 {{ strtoupper(substr($member->name, 0, 1)) }}
                                             </div>
                                             <div>
-                                                <button type="button" wire:click="$dispatch('open-org-member', { memberId: {{ $member->id }} })" class="font-bold text-ink hover:text-primary hover:underline text-left">{{ $member->name }}</button>
-                                                <div class="text-[10px] text-muted font-mono">{{ $member->user_code ?: ('ID: #' . $member->id) }}</div>
+                                                <button type="button"
+                                                    wire:click="$dispatch('open-org-member', { memberId: {{ $member->id }} })"
+                                                    class="font-bold text-ink hover:text-primary hover:underline text-left">{{ $member->name }}</button>
+                                                <div class="text-[10px] text-muted font-mono">
+                                                    {{ $member->user_code ?: ('ID: #' . $member->id) }}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -826,18 +691,26 @@
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ $member->email }}
                                         @if($result = $this->loginDetailsResults[$member->id] ?? null)
-                                            <div class="mt-1 text-xs {{ $result['status'] === 'failed' ? 'text-red-600' : 'text-primary' }}" role="status">
+                                            <div class="mt-1 text-xs {{ $result['status'] === 'failed' ? 'text-red-600' : 'text-primary' }}"
+                                                role="status">
                                                 Email: {{ ucfirst($result['status']) }}
                                                 @if($result['error']) <span class="block">{{ $result['error'] }}</span> @endif
-                                                @if($result['status'] === 'failed') <button type="button" wire:click="retryLoginDetails({{ $member->id }})" wire:loading.attr="disabled" class="text-primary underline">Retry email</button> @endif
+                                                @if($result['status'] === 'failed') <button type="button"
+                                                    wire:click="retryLoginDetails({{ $member->id }})" wire:loading.attr="disabled"
+                                                class="text-primary underline">Retry email</button> @endif
                                             </div>
                                         @endif
 
                                     </td>
 
-                                    <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">{{ $member->phone ?: '—' }}</td>
-                                    <td class="py-3 px-4 text-ink min-w-[140px]">{{ $teamMembershipDetails[$member->id]['teams'] ?: 'Not assigned' }}</td>
-                                    <td class="py-3 px-4 text-ink min-w-[120px]">{{ $teamMembershipDetails[$member->id]['leaders'] ?: 'Not assigned' }}</td>
+                                    <td class="py-3 px-4 font-mono text-muted whitespace-nowrap">{{ $member->phone ?: '—' }}
+                                    </td>
+                                    <td class="py-3 px-4 text-ink min-w-[140px]">
+                                        {{ $teamMembershipDetails[$member->id]['teams'] ?: 'Not assigned' }}
+                                    </td>
+                                    <td class="py-3 px-4 text-ink min-w-[120px]">
+                                        {{ $teamMembershipDetails[$member->id]['leaders'] ?: 'Not assigned' }}
+                                    </td>
 
                                     <td class="py-3 px-4">
                                         @php
@@ -896,21 +769,28 @@
     @if($activeTab === 'clients')
         <div class="space-y-6">
             @if($clients->isEmpty())
-                <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div
+                    class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div class="flex items-center gap-2.5">
-                        <svg class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg class="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div>
                             <span class="font-bold">No Billing Owner Registered Yet</span>
-                            <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">Saving a project mapping will automatically provision a main user for {{ $organization->name }}, or you can set one up now.</p>
+                            <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">Saving a project mapping will
+                                automatically provision a main user for {{ $organization->name }}, or you can set one up now.
+                            </p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <button type="button" wire:click="autoCreateMainUser" wire:loading.attr="disabled" class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs cursor-pointer transition shadow-2xs">
+                        <button type="button" wire:click="autoCreateMainUser" wire:loading.attr="disabled"
+                            class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs cursor-pointer transition shadow-2xs">
                             Auto-Create Main User
                         </button>
-                        <button type="button" wire:click="openCreateClientModal" class="px-3.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-surface/50 hover:bg-surface text-amber-900 dark:text-amber-200 font-semibold text-xs cursor-pointer transition">
+                        <button type="button" wire:click="openCreateClientModal"
+                            class="px-3.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-surface/50 hover:bg-surface text-amber-900 dark:text-amber-200 font-semibold text-xs cursor-pointer transition">
                             + Custom Client Details
                         </button>
                     </div>
@@ -921,83 +801,121 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="min-w-0">
                         <h3 class="text-sm font-bold text-ink">Project Mapping ({{ $totalProjectsCount }})</h3>
-                        <p class="text-xs text-muted mt-1">Projects are automatically assigned to {{ $organization->name }}'s billing owner.</p>
+                        <p class="text-xs text-muted mt-1">Projects are automatically assigned to
+                            {{ $organization->name }}'s billing owner.
+                        </p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <x-ui.export-button target="exportTabExcel('clients')" label="Export Project" class="justify-center" />
+                        <x-ui.export-button target="exportTabExcel('clients')" label="Export Project"
+                            class="justify-center" />
                     </div>
                 </div>
                 <form wire:submit="saveProjectMapping" class="flex flex-col sm:flex-row sm:items-end gap-3">
-                    <div class="flex-1 min-w-0"><label for="mapping-project-name" class="block text-xs mb-2">Project name</label><input id="mapping-project-name" wire:model="mappingProjectName" class="w-full h-9 rounded-lg border border-border bg-canvas px-3 text-xs" required /></div>
-                    <button type="submit" wire:loading.attr="disabled" wire:target="saveProjectMapping" class="h-9 shrink-0 rounded-lg bg-ink text-white px-5 text-xs font-semibold disabled:opacity-50">Save Project Mapping</button>
+                    <div class="flex-1 min-w-0"><label for="mapping-project-name" class="block text-xs mb-2">Project
+                            name</label><input id="mapping-project-name" wire:model="mappingProjectName"
+                            class="w-full h-9 rounded-lg border border-border bg-canvas px-3 text-xs" required /></div>
+                    <button type="submit" wire:loading.attr="disabled" wire:target="saveProjectMapping"
+                        class="h-9 shrink-0 rounded-lg bg-ink text-white px-5 text-xs font-semibold disabled:opacity-50">Save
+                        Project Mapping</button>
                 </form>
-                @error('mappingProjectName')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                @error('mappingProjectName')
+                <p class="text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             <div class="bg-surface rounded-2xl border border-border overflow-x-auto">
-                <table class="w-full text-left text-xs"><thead class="bg-canvas text-muted"><tr><th class="p-4">Project</th><th class="p-4">Mapped Client</th><th class="p-4">Status</th><th class="p-4">Lead Cost</th><th class="p-4 text-right">Actions</th></tr></thead><tbody class="divide-y divide-border">
-                    @forelse($projects as $project)
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-canvas text-muted">
                         <tr>
-                            <td class="p-4 font-bold">
-                                <div class="flex items-center gap-2">
-                                    <button type="button" wire:click="openEditProjectModal({{ $project->id }})" class="font-bold text-ink hover:text-primary transition-colors cursor-pointer text-left inline-flex items-center gap-1.5 group" title="Click to edit project">
-                                        <span class="group-hover:underline underline-offset-2">{{ $project->name }}</span>
-                                        <svg class="w-3.5 h-3.5 text-muted group-hover:text-primary transition-colors opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                    </button>
-                                    @if(isset($project->leads_count) && $project->leads_count > 0)
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
-                                            {{ $project->leads_count }} {{ Str::plural('lead', $project->leads_count) }}
-                                        </span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="p-4">{{ $project->client_name }}</td>
-                            <td class="p-4">{{ ucfirst($project->status) }}</td>
-                            <td class="p-4">
-                                <form wire:submit="saveProjectRate({{ $project->id }})" class="flex items-center gap-1.5">
-                                    <input type="number" step="1" min="1"
-                                        wire:model="projectRates.{{ $project->id }}"
-                                        aria-label="Lead cost for {{ $project->name }}"
-                                        placeholder="{{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }}"
-                                        class="w-24 h-8 rounded-lg border border-border bg-canvas px-2.5 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:border-primary" />
-                                    <button type="submit"
-                                        title="Save Lead Cost"
-                                        class="h-8 px-2.5 rounded-lg bg-ink hover:bg-ink/90 text-white text-[11px] font-semibold transition cursor-pointer shrink-0">
-                                        Save
-                                    </button>
-                                </form>
-                                <div class="text-[10px] text-muted mt-1">
-                                    @if($project->lead_cost !== null)
-                                        <span class="text-primary font-medium">Override: {{ number_format($project->lead_cost, 0) }} cr</span>
-                                    @else
-                                        <span>Inherited: {{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }} cr</span>
-                                    @endif
-                                </div>
-                                @error('projectRates.'.$project->id)
-                                    <p class="text-[10px] text-red-600 mt-0.5">{{ $message }}</p>
-                                @enderror
-                            </td>
-                            <td class="p-4 text-right">
-                                <div class="inline-flex items-center gap-2 justify-end">
-                                    <button type="button" wire:click="openEditProjectModal({{ $project->id }})" title="Edit Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer text-xs font-semibold">
-                                        <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                        <span>Edit</span>
-                                    </button>
-                                    <button type="button" wire:click="openRemoveProjectModal({{ $project->id }})" title="Remove Project" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer text-xs font-semibold">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                        <span>Remove</span>
-                                    </button>
-                                </div>
-                            </td>
+                            <th class="p-4">Project</th>
+                            <th class="p-4">Mapped Client</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4">Lead Cost</th>
+                            <th class="p-4 text-right">Actions</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="5" class="p-8 text-center text-muted">No projects mapped to this organization.</td></tr>
-                    @endforelse
-                </tbody></table>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @forelse($projects as $project)
+                            <tr>
+                                <td class="p-4 font-bold">
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" wire:click="openEditProjectModal({{ $project->id }})"
+                                            class="font-bold text-ink hover:text-primary transition-colors cursor-pointer text-left inline-flex items-center gap-1.5 group"
+                                            title="Click to edit project">
+                                            <span class="group-hover:underline underline-offset-2">{{ $project->name }}</span>
+                                            <svg class="w-3.5 h-3.5 text-muted group-hover:text-primary transition-colors opacity-60 group-hover:opacity-100"
+                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                        @if(isset($project->leads_count) && $project->leads_count > 0)
+                                            <span
+                                                class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">
+                                                {{ $project->leads_count }} {{ Str::plural('lead', $project->leads_count) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="p-4">{{ $project->client_name }}</td>
+                                <td class="p-4">{{ ucfirst($project->status) }}</td>
+                                <td class="p-4">
+                                    <form wire:submit="saveProjectRate({{ $project->id }})" class="flex items-center gap-1.5">
+                                        <input type="number" step="1" min="1" wire:model="projectRates.{{ $project->id }}"
+                                            aria-label="Lead cost for {{ $project->name }}"
+                                            placeholder="{{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }}"
+                                            class="w-24 h-8 rounded-lg border border-border bg-canvas px-2.5 text-xs text-ink font-mono focus:ring-1 focus:ring-primary focus:border-primary" />
+                                        <button type="submit" title="Save Lead Cost"
+                                            class="h-8 px-2.5 rounded-lg bg-ink hover:bg-ink/90 text-white text-[11px] font-semibold transition cursor-pointer shrink-0">
+                                            Save
+                                        </button>
+                                    </form>
+                                    <div class="text-[10px] text-muted mt-1">
+                                        @if($project->lead_cost !== null)
+                                            <span class="text-primary font-medium">Override:
+                                                {{ number_format($project->lead_cost, 0) }} cr</span>
+                                        @else
+                                            <span>Inherited:
+                                                {{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }} cr</span>
+                                        @endif
+                                    </div>
+                                    @error('projectRates.' . $project->id)
+                                        <p class="text-[10px] text-red-600 mt-0.5">{{ $message }}</p>
+                                    @enderror
+                                </td>
+                                <td class="p-4 text-right">
+                                    <div class="inline-flex items-center gap-2 justify-end">
+                                        <button type="button" wire:click="openEditProjectModal({{ $project->id }})"
+                                            title="Edit Project"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-canvas text-ink transition cursor-pointer text-xs font-semibold">
+                                            <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                            <span>Edit</span>
+                                        </button>
+                                        <button type="button" wire:click="openRemoveProjectModal({{ $project->id }})"
+                                            title="Remove Project"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer text-xs font-semibold">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            <span>Remove</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-muted">No projects mapped to this organization.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     @endif
+
     <!-- TAB 4: CREDITS & WALLET -->
     @if($activeTab === 'credits')
         <div class="space-y-6">
@@ -1005,10 +923,11 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-bold text-ink">Lead Credits Summary</h3>
-                    <p class="text-xs text-muted">Baseline allocation, purchases, deductions, and available spendable balance.</p>
+                    <p class="text-xs text-muted">Baseline allocation, purchases, deductions, and available spendable
+                        balance.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <livewire:credits.reconciliation :organization-id="$organization->id" :key="'credits-reconcile-'.$organization->id" />
+                    <livewire:credits.reconciliation :organization-id="$organization->id" :key="'credits-reconcile-' . $organization->id" />
                 </div>
             </div>
 
@@ -1016,25 +935,30 @@
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <!-- 1. Opening Credits -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div
+                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Opening Credits</span>
                         <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalOpeningBalance, 0) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
                         <span>Baseline allocation</span>
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
+                        <span
+                            class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-900 border border-sky-200">Opening</span>
                     </div>
                 </div>
 
                 <!-- 2. Total Recharged -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div
+                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Recharged</span>
                         <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5 10l7-7m0 0l7 7m-7-7v18" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-emerald-600">
@@ -1045,10 +969,12 @@
 
                 <!-- 3. Total Consumed -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div
+                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Consumed</span>
                         <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-ink">{{ number_format($totalCreditsDeducted, 0) }}</div>
@@ -1057,28 +983,34 @@
 
                 <!-- 4. Total Refunded -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1">
-                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div
+                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Total Refunded</span>
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
-                    <div class="text-2xl font-bold font-mono text-blue-600">{{ number_format($totalCreditsRefunded, 0) }}</div>
+                    <div class="text-2xl font-bold font-mono text-blue-600">{{ number_format($totalCreditsRefunded, 0) }}
+                    </div>
                     <div class="text-[10px] text-muted">Returned for claims/SLA</div>
                 </div>
 
                 <!-- 5. Available Lead Credits -->
                 <div class="p-4 rounded-2xl bg-surface border border-border shadow-2xs space-y-1 col-span-2 md:col-span-1">
-                    <div class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
+                    <div
+                        class="flex items-center justify-between text-muted text-[11px] font-semibold uppercase tracking-wider">
                         <span>Available Lead Credits</span>
                         <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                     <div class="text-2xl font-bold font-mono text-primary">{{ number_format($totalWalletBalance, 0) }}</div>
                     <div class="text-[10px] text-muted flex items-center justify-between">
                         <span>Live spendable</span>
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
+                        <span
+                            class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $totalWalletBalance >= 50 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-red-100 text-red-900 border border-red-300' }}">
                             {{ $totalWalletBalance >= 50 ? 'Sufficient' : 'Low Credits' }}
                         </span>
                     </div>
@@ -1176,13 +1108,15 @@
                                                 default => 'bg-slate-100 text-slate-900 border-slate-300',
                                             };
                                         @endphp
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $typeBadge }}">
+                                        <span
+                                            class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $typeBadge }}">
                                             {{ $tx->transaction_type_label }}
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         @if($tx->lead)
-                                            <a href="{{ route('leads.index') }}" class="font-bold text-primary hover:underline">{{ $tx->lead->lead_code }}</a>
+                                            <a href="{{ route('leads.index') }}"
+                                                class="font-bold text-primary hover:underline">{{ $tx->lead->lead_code }}</a>
                                         @else
                                             <span class="text-muted">Direct</span>
                                         @endif
@@ -1193,7 +1127,8 @@
                                     <td class="py-3 px-4 font-mono text-muted text-[11px]">
                                         {{ ($tx->credit_before === null ? 'Legacy entry' : number_format($tx->credit_before)) }}
                                     </td>
-                                    <td class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) || ($tx->transaction_type === 'manual_adjustment' && $tx->credit_after >= $tx->credit_before) ? 'text-emerald-600' : 'text-red-500' }}">
+                                    <td
+                                        class="py-3 px-4 font-mono text-xs font-bold {{ in_array($tx->transaction_type, ['recharge', 'refund', 'opening_credit']) || ($tx->transaction_type === 'manual_adjustment' && $tx->credit_after >= $tx->credit_before) ? 'text-emerald-600' : 'text-red-500' }}">
                                         {{ $tx->credit_used_formatted }}
                                     </td>
                                     <td class="py-3 px-4 font-mono text-xs font-bold text-primary">
@@ -1227,6 +1162,178 @@
         </div>
     @endif
 
+    <!-- TAB 5: CAMPAIGN DETAILS & DELIVERY -->
+    @if($activeTab === 'campaigns')
+        <section class="space-y-6" wire:poll.30s>
+            <!-- Tab Header & Quick Actions -->
+            <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface p-4 sm:p-5 rounded-2xl border border-border shadow-2xs">
+                <div>
+                    <h3 class="text-base font-bold text-ink">Campaign Details &amp; Delivery</h3>
+                    <p class="text-xs text-muted">Manage Facebook campaigns, lead forms, CRM project mappings, and automated
+                        lead delivery rules for {{ $organization->name }}.</p>
+                </div>
+                <button type="button" wire:click="openAddCampaignMapping"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Campaign Mapping</span>
+                </button>
+            </div>
+
+            <!-- Single Compact Summary Statistics Section -->
+            @php
+                $campStats = $this->campaignSummaryStats;
+            @endphp
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Total Campaigns</span>
+                    <div class="text-xl font-bold font-mono text-ink">{{ number_format($campStats['total']) }}</div>
+                    <span class="text-[11px] text-muted">All active records</span>
+                </div>
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Mapped Campaigns</span>
+                    <div class="text-xl font-bold font-mono text-primary">{{ number_format($campStats['mapped']) }}</div>
+                    <span class="text-[11px] text-muted">{{ $campStats['unmapped'] }} unmapped</span>
+                </div>
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Delivered Today</span>
+                    <div class="text-xl font-bold font-mono text-emerald-600">
+                        {{ number_format($campStats['delivered_today']) }}
+                    </div>
+                    <span class="text-[11px] text-muted">Action today</span>
+                </div>
+                <div class="p-4 rounded-xl bg-surface border border-border shadow-2xs space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Pending Leads</span>
+                    <div class="text-xl font-bold font-mono text-amber-600">{{ number_format($campStats['pending']) }}</div>
+                    <span class="text-[11px] text-muted">In delivery queue</span>
+                </div>
+            </div>
+
+            <!-- Advanced Table: Campaigns & Delivery -->
+            <x-ui.advanced-table :columns="$this->campaignTableColumns()" :rows="$this->paginatedCampaigns"
+                :quickFilters="$this->campaignQuickFilters()" :activeStatus="$campaignStatusFilter"
+                searchModel="campaignSearch" sortAction="sortCampaignsBy" :sortField="$campaignSortField"
+                :sortDirection="$campaignSortDirection" tableName="organization-campaigns"
+                searchPlaceholder="Search campaign name, Facebook ID, project..." emptyTitle="No Campaigns Found"
+                emptyMessage="No campaigns match your current search or filters. Click Add Campaign Mapping to link a new campaign." />
+
+            <!-- Lead Filtering Rules -->
+            <div class="pt-2">
+                <livewire:settings.lead-filtering-rules :organization-id="$organization->id"
+                    :key="'org-lead-filtering-rules-' . $organization->id" />
+            </div>
+
+            <!-- Organization Campaign Mapping Modal -->
+            <x-ui.modal name="organization-campaign-mapping" maxWidth="lg" :centered="true">
+                <form wire:submit="saveCampaignMapping" class="p-5 sm:p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-3.5 border-b border-border">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-xl bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="text-base font-bold text-ink">
+                                    {{ $editingMappingRecordId ? 'Edit Campaign Mapping' : 'Add Campaign Mapping' }}
+                                </h4>
+                                <p class="text-xs text-muted">Route Facebook leads directly to CRM projects.</p>
+                            </div>
+                        </div>
+                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
+                            class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Hidden Organization & Client Values -->
+                    <input type="hidden" wire:model="mappingOrganizationId" value="{{ $organization->id }}" />
+                    <input type="hidden" wire:model="mappingClientId" value="{{ $this->ensureBillingOwner()?->id }}" />
+
+                    <!-- Mapping Source Type Toggle -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1.5">Mapping Type</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" wire:click="$set('mappingSourceType', 'campaign')" @class([
+                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
+                                'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'campaign',
+                                'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'campaign',
+                            ])>
+                                Facebook Campaign
+                            </button>
+                            <button type="button" wire:click="$set('mappingSourceType', 'form')" @class([
+                                'px-3 py-2 text-xs font-semibold rounded-lg border text-center transition cursor-pointer',
+                                'bg-primary/10 border-primary text-primary font-bold' => $mappingSourceType === 'form',
+                                'bg-canvas border-border text-muted hover:text-ink' => $mappingSourceType !== 'form',
+                            ])>
+                                Facebook Lead Form
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Facebook Page / Ad Account -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">Facebook Page / Ad Account</label>
+                        <x-ui.themed-select wire:model.live="mappingAccountId" :options="$this->metaAccountOptions" />
+                        @error('mappingAccountId')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Select Campaign or Form -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">
+                            {{ $mappingSourceType === 'campaign' ? 'Facebook Campaign' : 'Facebook Lead Form' }} <span
+                                class="text-red-500">*</span>
+                        </label>
+                        @if($mappingSourceType === 'campaign')
+                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableCampaignOptions"
+                                :searchable="true" />
+                        @else
+                            <x-ui.themed-select wire:model.live="mappingRemoteId" :options="$this->availableFormOptions"
+                                :searchable="true" />
+                        @endif
+                        @error('mappingRemoteId')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Target CRM Project -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink mb-1">CRM Project <span
+                                class="text-red-500">*</span></label>
+                        <select wire:model="mappingProjectId"
+                            class="w-full rounded-lg border border-border bg-canvas p-2.5 text-xs text-ink focus:ring-1 focus:ring-primary focus:outline-none">
+                            <option value="">Select CRM Project</option>
+                            @foreach($this->organizationProjectOptions as $pId => $pName)
+                                <option value="{{ $pId }}">{{ $pName }}</option>
+                            @endforeach
+                        </select>
+                        @error('mappingProjectId')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                        <button type="button" x-on:click="$dispatch('close-modal', 'organization-campaign-mapping')"
+                            class="px-3.5 py-2 rounded-lg border border-border text-xs font-semibold text-muted hover:text-ink hover:bg-canvas transition cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                            <span wire:loading.remove wire:target="saveCampaignMapping">Save Mapping</span>
+                            <span wire:loading wire:target="saveCampaignMapping">Saving...</span>
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
+        </section>
+    @endif
+
     <!-- TAB 6: ACTIVITY & AUDIT -->
     @if($activeTab === 'activity')
         <div class="space-y-4">
@@ -1247,112 +1354,157 @@
                 </button>
             </div>
 
-            <x-ui.advanced-table
-                :columns="$this->auditTableColumns()"
-                :rows="$auditLogs"
-                :showSearch="false"
-                :showFilterDropdown="false"
-                :showConfigurations="false"
-                tableName="organization-audit"
-                emptyTitle="No Audit Events"
-                emptyMessage="No audit events recorded for this organization."
-            />
+            <x-ui.advanced-table :columns="$this->auditTableColumns()" :rows="$auditLogs" :showSearch="false"
+                :showFilterDropdown="false" :showConfigurations="false" tableName="organization-audit"
+                emptyTitle="No Audit Events" emptyMessage="No audit events recorded for this organization." />
         </div>
     @endif
 
     <!-- MODAL 1: ADD MEMBER TO THIS ORGANIZATION -->
-    <livewire:admin.organization-member-details :organization-id="$organization->id" :key="'org-member-details-'.$organization->id" />
-    <x-modal name="account-login-email-composer" wire:model.live="showAccountEmailComposer" :show="$showAccountEmailComposer" maxWidth="6xl">
+    <livewire:admin.organization-member-details :organization-id="$organization->id" :key="'org-member-details-' . $organization->id" />
+    <x-modal name="account-login-email-composer" wire:model.live="showAccountEmailComposer"
+        :show="$showAccountEmailComposer" maxWidth="6xl">
         @if($showAccountEmailComposer)
             <form wire:submit="sendSelectedLoginDetails" class="flex flex-col max-h-[calc(100dvh-4rem)]">
                 <header class="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-4 shrink-0">
                     <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+                        <div
+                            class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
+                            </svg>
                         </div>
                         <div class="min-w-0">
                             <h2 class="text-base font-bold text-ink">Compose Account Email</h2>
-                            <p class="text-xs text-muted mt-0.5 truncate">{{ $organization->name }} &middot; Personal login details for each recipient</p>
+                            <p class="text-xs text-muted mt-0.5 truncate">{{ $organization->name }} &middot; Personal login
+                                details for each recipient</p>
                         </div>
                     </div>
-                    <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)" aria-label="Close email composer" class="!p-2 !shadow-none">&times;</x-ui.button>
+                    <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)"
+                        aria-label="Close email composer" class="!p-2 !shadow-none">&times;</x-ui.button>
                 </header>
                 <div class="overflow-y-auto min-h-0">
                     @if($errors->any())
-                        <div role="alert" class="mx-5 mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
-                            @foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach
+                        <div role="alert"
+                            class="mx-5 mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                            @foreach($errors->all() as $error)
+                            <p>{{ $error }}</p>@endforeach
                         </div>
                     @endif
                     <div class="grid grid-cols-1 lg:grid-cols-2">
                         <div class="p-5 sm:p-6 space-y-5 min-w-0">
                             <section class="space-y-3" aria-labelledby="account-email-recipients-label">
                                 <div class="flex items-center justify-between gap-2">
-                                    <h3 id="account-email-recipients-label" class="text-sm font-bold text-ink">Recipients</h3>
-                                    <span class="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold">{{ count(array_unique($selectedTeamUserIds)) }} selected</span>
+                                    <h3 id="account-email-recipients-label" class="text-sm font-bold text-ink">Recipients
+                                    </h3>
+                                    <span
+                                        class="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold">{{ count(array_unique($selectedTeamUserIds)) }}
+                                        selected</span>
                                 </div>
-                                <p class="text-xs text-muted leading-relaxed">Builders receive all organization accounts, team leaders their own team accounts, and executives their own account and leader details.</p>
+                                <p class="text-xs text-muted leading-relaxed">Builders receive all organization accounts,
+                                    team leaders their own team accounts, and executives their own account and leader
+                                    details.</p>
                                 <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                     @foreach($this->accountEmailSelectedRecipients as $recipient)
-                                        <div class="inline-flex items-center gap-2 min-w-0 max-w-full rounded-lg border border-border bg-canvas pl-3 pr-1.5 py-2" wire:key="account-email-to-{{ $recipient->id }}">
+                                        <div class="inline-flex items-center gap-2 min-w-0 max-w-full rounded-lg border border-border bg-canvas pl-3 pr-1.5 py-2"
+                                            wire:key="account-email-to-{{ $recipient->id }}">
                                             <div class="min-w-0">
                                                 <p class="text-xs font-semibold text-ink truncate">{{ $recipient->name }}</p>
                                                 <p class="text-[11px] text-muted truncate">{{ $recipient->email }}</p>
                                             </div>
-                                            <button type="button" wire:click="removeAccountEmailRecipient({{ $recipient->id }})" aria-label="Remove {{ $recipient->name }}" class="p-1 text-muted hover:text-danger rounded">&times;</button>
+                                            <button type="button" wire:click="removeAccountEmailRecipient({{ $recipient->id }})"
+                                                aria-label="Remove {{ $recipient->name }}"
+                                                class="p-1 text-muted hover:text-danger rounded">&times;</button>
                                         </div>
                                     @endforeach
                                 </div>
                                 <div>
-                                    <x-input-label for="account-email-add-recipient" value="Add To recipient" class="!text-xs mb-1.5" />
-                                    <x-ui.themed-select id="account-email-add-recipient" wire:model.live="accountEmailAddRecipientId" searchable placeholder="Search organization members" aria-label="Add To recipient">
+                                    <x-input-label for="account-email-add-recipient" value="Add To recipient"
+                                        class="!text-xs mb-1.5" />
+                                    <x-ui.themed-select id="account-email-add-recipient"
+                                        wire:model.live="accountEmailAddRecipientId" searchable
+                                        placeholder="Search organization members" aria-label="Add To recipient">
                                         <option value="">Search organization members</option>
                                         @foreach($this->accountEmailRecipientOptions as $recipient)
                                             @if(!in_array($recipient->id, array_map('intval', $selectedTeamUserIds), true))
-                                                <option value="{{ $recipient->id }}" @disabled($recipient->status !== 'active')>{{ $recipient->name }} &middot; {{ $recipient->email }}{{ $recipient->status !== 'active' ? ' (Inactive)' : '' }}</option>
+                                                <option value="{{ $recipient->id }}" @disabled($recipient->status !== 'active')>
+                                                    {{ $recipient->name }} &middot;
+                                                    {{ $recipient->email }}{{ $recipient->status !== 'active' ? ' (Inactive)' : '' }}
+                                                </option>
                                             @endif
                                         @endforeach
                                     </x-ui.themed-select>
                                 </div>
                                 <details class="rounded-xl border border-border p-3">
-                                    <summary class="text-xs font-semibold text-ink cursor-pointer">CC, BCC &amp; send me a copy</summary>
+                                    <summary class="text-xs font-semibold text-ink cursor-pointer">CC, BCC &amp; send me a
+                                        copy</summary>
                                     <div class="mt-3 space-y-3">
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <div><x-input-label for="account-email-cc" value="CC" class="!text-xs mb-1.5" /><x-text-input id="account-email-cc" type="text" variant="compact" wire:model="accountEmailCc" placeholder="name@example.com" /></div>
-                                            <div><x-input-label for="account-email-bcc" value="BCC" class="!text-xs mb-1.5" /><x-text-input id="account-email-bcc" type="text" variant="compact" wire:model="accountEmailBcc" placeholder="name@example.com" /></div>
+                                            <div><x-input-label for="account-email-cc" value="CC"
+                                                    class="!text-xs mb-1.5" /><x-text-input id="account-email-cc"
+                                                    type="text" variant="compact" wire:model="accountEmailCc"
+                                                    placeholder="name@example.com" /></div>
+                                            <div><x-input-label for="account-email-bcc" value="BCC"
+                                                    class="!text-xs mb-1.5" /><x-text-input id="account-email-bcc"
+                                                    type="text" variant="compact" wire:model="accountEmailBcc"
+                                                    placeholder="name@example.com" /></div>
                                         </div>
-                                        <label class="flex items-center gap-2 text-xs text-ink"><input type="checkbox" wire:model="accountEmailCopyToMe" class="rounded border-border text-primary focus:ring-primary">Send me a BCC copy of each email</label>
-                                        <p class="text-[11px] text-muted leading-relaxed">Separate addresses with commas. Copies include the recipient's password setup link.</p>
+                                        <label class="flex items-center gap-2 text-xs text-ink"><input type="checkbox"
+                                                wire:model="accountEmailCopyToMe"
+                                                class="rounded border-border text-primary focus:ring-primary">Send me a BCC
+                                            copy of each email</label>
+                                        <p class="text-[11px] text-muted leading-relaxed">Separate addresses with commas.
+                                            Copies include the recipient's password setup link.</p>
                                     </div>
                                 </details>
                             </section>
-                            <section class="space-y-4 border-t border-border pt-5" aria-labelledby="account-email-content-label">
+                            <section class="space-y-4 border-t border-border pt-5"
+                                aria-labelledby="account-email-content-label">
                                 <h3 id="account-email-content-label" class="text-sm font-bold text-ink">Email content</h3>
                                 <div>
                                     <x-input-label for="account-email-subject" value="Subject" class="!text-xs mb-1.5" />
-                                    <x-text-input id="account-email-subject" type="text" wire:model.live.debounce.500ms="accountEmailSubject" maxlength="200" class="w-full !text-xs" />
+                                    <x-text-input id="account-email-subject" type="text"
+                                        wire:model.live.debounce.500ms="accountEmailSubject" maxlength="200"
+                                        class="w-full !text-xs" />
                                 </div>
                                 <div>
                                     <x-input-label for="account-email-body" value="Message" class="!text-xs mb-1.5" />
-                                    <x-text-input as="textarea" id="account-email-body" wire:model.live.debounce.500ms="accountEmailBody" rows="11" maxlength="20000" class="!text-xs leading-relaxed resize-y" />
-                                    <p class="text-[11px] text-muted mt-2">Names, roles and team details fill in automatically. Check each person's preview before sending.</p>
+                                    <x-text-input as="textarea" id="account-email-body"
+                                        wire:model.live.debounce.500ms="accountEmailBody" rows="11" maxlength="20000"
+                                        class="!text-xs leading-relaxed resize-y" />
+                                    <p class="text-[11px] text-muted mt-2">Names, roles and team details fill in
+                                        automatically. Check each person's preview before sending.</p>
                                 </div>
                                 <details class="rounded-lg bg-canvas px-3 py-2.5">
-                                    <summary class="text-xs text-ink font-medium cursor-pointer">Personalization fields</summary>
+                                    <summary class="text-xs text-ink font-medium cursor-pointer">Personalization fields
+                                    </summary>
                                     <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted">@verbatim
                                         <code>{{user_name}}</code><code>{{account_details}}</code><code>{{associated_accounts}}</code><code>{{role_name}}</code><code>{{role_introduction}}</code><code>{{organization_name}}</code><code>{{team_name}}</code><code>{{team_leader_name}}</code><code>{{user_code}}</code><code>{{email}}</code><code>{{login_url}}</code><code>{{password_setup_link}}</code>
-                                    @endverbatim</div>
-                                    <p class="text-[11px] text-muted mt-2">Keep the password setup field so every recipient gets their own secure link.</p>
+                                    @endverbatim
+                                    </div>
+                                    <p class="text-[11px] text-muted mt-2">Keep the password setup field so every recipient
+                                        gets their own secure link.</p>
                                 </details>
                             </section>
                             <section class="border-t border-border pt-5 space-y-2">
-                                <x-input-label for="account-email-files" value="Attachments" class="!text-xs !font-semibold" />
-                                <x-text-input id="account-email-files" type="file" wire:model="accountEmailAttachments" multiple class="w-full !text-xs p-2 file:mr-3 file:border-0 file:rounded-md file:bg-canvas file:text-ink file:px-3 file:py-1.5" />
-                                <p class="text-[11px] text-muted">Invoices and other files &middot; Up to 5 files, 10 MB each, 15 MB total.</p>
-                                <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary" role="status">Uploading attachments&hellip;</p>
+                                <x-input-label for="account-email-files" value="Attachments"
+                                    class="!text-xs !font-semibold" />
+                                <x-text-input id="account-email-files" type="file" wire:model="accountEmailAttachments"
+                                    multiple
+                                    class="w-full !text-xs p-2 file:mr-3 file:border-0 file:rounded-md file:bg-canvas file:text-ink file:px-3 file:py-1.5" />
+                                <p class="text-[11px] text-muted">Invoices and other files &middot; Up to 5 files, 10 MB
+                                    each, 15 MB total.</p>
+                                <p wire:loading wire:target="accountEmailAttachments" class="text-xs text-primary"
+                                    role="status">Uploading attachments&hellip;</p>
                                 @foreach($accountEmailAttachments as $index => $attachment)
-                                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs text-ink" wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">
-                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} <span class="text-muted">{{ number_format($attachment->getSize() / 1024, 0) }} KB</span></span>
-                                        <button type="button" wire:click="removeAccountEmailAttachment({{ $index }})" class="text-primary font-medium">Remove</button>
+                                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs text-ink"
+                                        wire:key="account-email-file-{{ $index }}-{{ $attachment->getFilename() }}">
+                                        <span class="truncate">{{ $attachment->getClientOriginalName() }} <span
+                                                class="text-muted">{{ number_format($attachment->getSize() / 1024, 0) }}
+                                                KB</span></span>
+                                        <button type="button" wire:click="removeAccountEmailAttachment({{ $index }})"
+                                            class="text-primary font-medium">Remove</button>
                                     </div>
                                 @endforeach
                             </section>
@@ -1361,30 +1513,50 @@
                             <div class="lg:sticky lg:top-5 space-y-3">
                                 <div>
                                     <h3 class="text-sm font-bold text-ink">Email Preview</h3>
-                                    <p class="text-xs text-muted mt-1">See exactly which personal details this recipient receives.</p>
+                                    <p class="text-xs text-muted mt-1">See exactly which personal details this recipient
+                                        receives.</p>
                                 </div>
                                 <div>
-                                    <x-input-label for="account-email-preview-user" value="Preview for" class="!text-xs mb-1.5" />
-                                    <x-ui.themed-select id="account-email-preview-user" wire:model.live="accountEmailPreviewUserId" searchable placeholder="Choose a recipient" aria-label="Preview email for recipient" :disabled="$this->accountEmailSelectedRecipients->isEmpty()">
-                                        @foreach($this->accountEmailSelectedRecipients as $recipient)<option value="{{ $recipient->id }}">{{ $recipient->name }} &middot; {{ $recipient->roles->first()?->name ?: 'Team Member' }}</option>@endforeach
+                                    <x-input-label for="account-email-preview-user" value="Preview for"
+                                        class="!text-xs mb-1.5" />
+                                    <x-ui.themed-select id="account-email-preview-user"
+                                        wire:model.live="accountEmailPreviewUserId" searchable
+                                        placeholder="Choose a recipient" aria-label="Preview email for recipient"
+                                        :disabled="$this->accountEmailSelectedRecipients->isEmpty()">
+                                        @foreach($this->accountEmailSelectedRecipients as $recipient)
+                                            <option value="{{ $recipient->id }}">{{ $recipient->name }} &middot;
+                                                {{ $recipient->roles->first()?->name ?: 'Team Member' }}
+                                        </option>@endforeach
                                     </x-ui.themed-select>
                                 </div>
                                 @if($this->accountEmailSelectedRecipients->isNotEmpty())
-                                    <iframe title="Personalized account email preview" sandbox="" referrerpolicy="no-referrer" srcdoc="{{ $this->accountEmailPreview }}" class="w-full h-[620px] max-h-[65dvh] rounded-xl border border-border bg-white shadow-sm"></iframe>
+                                    <iframe title="Personalized account email preview" sandbox="" referrerpolicy="no-referrer"
+                                        srcdoc="{{ $this->accountEmailPreview }}"
+                                        class="w-full h-[620px] max-h-[65dvh] rounded-xl border border-border bg-white shadow-sm"></iframe>
                                 @else
-                                    <div class="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-xs text-muted">Add a To recipient to preview their email.</div>
+                                    <div
+                                        class="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-xs text-muted">
+                                        Add a To recipient to preview their email.</div>
                                 @endif
-                                <p class="text-[11px] text-muted">Your active email design is used. A unique setup link is created only when sending.</p>
+                                <p class="text-[11px] text-muted">Your active email design is used. A unique setup link is
+                                    created only when sending.</p>
                             </div>
                         </aside>
                     </div>
                 </div>
-                <footer class="px-5 sm:px-6 py-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0 bg-surface">
-                    <p class="text-xs text-muted">{{ count(array_unique($selectedTeamUserIds)) }} separate personalized {{ count(array_unique($selectedTeamUserIds)) === 1 ? 'email' : 'emails' }}</p>
+                <footer
+                    class="px-5 sm:px-6 py-4 border-t border-border flex flex-wrap items-center justify-between gap-3 shrink-0 bg-surface">
+                    <p class="text-xs text-muted">{{ count(array_unique($selectedTeamUserIds)) }} separate personalized
+                        {{ count(array_unique($selectedTeamUserIds)) === 1 ? 'email' : 'emails' }}
+                    </p>
                     <div class="flex gap-2">
-                        <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)" class="!text-xs">Cancel</x-ui.button>
-                        <x-ui.button type="submit" wire:loading.attr="disabled" wire:target="sendSelectedLoginDetails,accountEmailAttachments" :disabled="count($selectedTeamUserIds) === 0" class="!text-xs disabled:opacity-50">
-                            <span wire:loading.remove wire:target="sendSelectedLoginDetails">Send Emails</span><span wire:loading wire:target="sendSelectedLoginDetails">Sending&hellip;</span>
+                        <x-ui.button variant="secondary" wire:click="$set('showAccountEmailComposer', false)"
+                            class="!text-xs">Cancel</x-ui.button>
+                        <x-ui.button type="submit" wire:loading.attr="disabled"
+                            wire:target="sendSelectedLoginDetails,accountEmailAttachments"
+                            :disabled="count($selectedTeamUserIds) === 0" class="!text-xs disabled:opacity-50">
+                            <span wire:loading.remove wire:target="sendSelectedLoginDetails">Send Emails</span><span
+                                wire:loading wire:target="sendSelectedLoginDetails">Sending&hellip;</span>
                         </x-ui.button>
                     </div>
                 </footer>
@@ -1589,7 +1761,7 @@
 
                     <div>
                         <label class="font-bold text-ink">Directly Assign To Agent</label>
-                        <x-ui.themed-select class="w-full" searchable  wire:model="newLeadAssignedTo"
+                        <x-ui.themed-select class="w-full" searchable wire:model="newLeadAssignedTo"
                             trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Unassigned Pool</option>
                             @foreach($teamMembers as $tm)
@@ -1605,7 +1777,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                         <label class="font-bold text-ink">Target Client <span class="text-red-500">*</span></label>
-                        <x-ui.themed-select class="w-full" searchable  wire:model.live="newLeadClientId"
+                        <x-ui.themed-select class="w-full" searchable wire:model.live="newLeadClientId"
                             trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Select Client</option>
                             @foreach($clients as $c)
@@ -1620,7 +1792,7 @@
 
                     <div>
                         <label class="font-bold text-ink">Associated Project</label>
-                        <x-ui.themed-select class="w-full" searchable  wire:model="newLeadProjectId"
+                        <x-ui.themed-select class="w-full" searchable wire:model="newLeadProjectId"
                             trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="">Auto-select or General Project</option>
                             @foreach($clientProjects as $proj)
@@ -1684,7 +1856,7 @@
             <form wire:submit.prevent="executeCreditAdjustment" class="space-y-4 text-xs">
                 <div>
                     <label class="font-bold text-ink">Select Target Client <span class="text-red-500">*</span></label>
-                    <x-ui.themed-select class="w-full" searchable  wire:model="selectedCreditClientId"
+                    <x-ui.themed-select class="w-full" searchable wire:model="selectedCreditClientId"
                         trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                         <option value="">Select Client</option>
                         @foreach($clients as $cl)
@@ -1700,7 +1872,7 @@
                 <div class="grid grid-cols-2 gap-3.5">
                     <div>
                         <label class="font-bold text-ink">Action Type <span class="text-red-500">*</span></label>
-                        <x-ui.themed-select class="w-full" searchable  wire:model="creditAdjustmentType"
+                        <x-ui.themed-select class="w-full" searchable wire:model="creditAdjustmentType"
                             trigger-class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1 cursor-pointer">
                             <option value="recharge">+ Recharge Credits</option>
                             <option value="opening_credit">+ Opening Credit (Baseline)</option>
@@ -1743,7 +1915,8 @@
     </x-modal>
 
     <!-- MODAL 4b: EDIT PROJECT -->
-    <x-modal name="edit-org-project-modal" wire:model="showEditProjectModal" :show="$showEditProjectModal" maxWidth="md">
+    <x-modal name="edit-org-project-modal" wire:model="showEditProjectModal" :show="$showEditProjectModal"
+        maxWidth="md">
         <div class="p-5 sm:p-6 space-y-5">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
                 <div class="flex items-center gap-3">
@@ -1755,7 +1928,8 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-ink">Edit Project</h3>
-                        <p class="text-xs text-muted">Update project details under <strong class="text-ink">{{ $organization->name }}</strong></p>
+                        <p class="text-xs text-muted">Update project details under <strong
+                                class="text-ink">{{ $organization->name }}</strong></p>
                     </div>
                 </div>
                 <button type="button" wire:click="closeEditProjectModal"
@@ -1772,11 +1946,13 @@
                     <label class="font-bold text-ink">Project Name <span class="text-red-500">*</span></label>
                     <input type="text" wire:model="editingProjectName" placeholder="e.g. Boulevard walk by H&S"
                         class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
-                    @error('editingProjectName') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    @error('editingProjectName') <span
+                    class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
 
                 <div>
-                    <label class="font-bold text-ink">Mapped Client / Billing Owner <span class="text-red-500">*</span></label>
+                    <label class="font-bold text-ink">Mapped Client / Billing Owner <span
+                            class="text-red-500">*</span></label>
                     <select wire:model="editingProjectClientId"
                         class="w-full h-8 px-3 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
                         @forelse($clients as $c)
@@ -1785,7 +1961,8 @@
                             <option value="">No billing clients available</option>
                         @endforelse
                     </select>
-                    @error('editingProjectClientId') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                    @error('editingProjectClientId') <span
+                    class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -1797,14 +1974,17 @@
                             <option value="inactive">Inactive</option>
                             <option value="suspended">Suspended</option>
                         </select>
-                        @error('editingProjectStatus') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                        @error('editingProjectStatus') <span
+                        class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="font-bold text-ink">Lead Cost (Credits)</label>
-                        <input type="number" min="1" step="1" wire:model="editingProjectLeadCost" placeholder="Inherit ({{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }})"
+                        <input type="number" min="1" step="1" wire:model="editingProjectLeadCost"
+                            placeholder="Inherit ({{ number_format($organization->lead_cost ?? $globalDefaultLeadCost, 0) }})"
                             class="w-full h-8 px-3.5 rounded-lg border border-border bg-canvas text-ink text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition mt-1">
-                        @error('editingProjectLeadCost') <span class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
+                        @error('editingProjectLeadCost') <span
+                        class="text-red-500 text-[10px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
                 </div>
 
@@ -1824,7 +2004,8 @@
     </x-modal>
 
     <!-- MODAL 5: REMOVE PROJECT & REASSIGN LEADS -->
-    <x-modal name="remove-org-project-modal" wire:model="showRemoveProjectModal" :show="$showRemoveProjectModal" maxWidth="md">
+    <x-modal name="remove-org-project-modal" wire:model="showRemoveProjectModal" :show="$showRemoveProjectModal"
+        maxWidth="md">
         <div class="p-5 sm:p-6 space-y-5">
             <div class="flex items-center justify-between pb-3.5 border-b border-border">
                 <div class="flex items-center gap-3">
@@ -1836,7 +2017,8 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-ink">Remove Project</h3>
-                        <p class="text-xs text-muted">Project: <strong class="text-ink">{{ $projectToRemoveName }}</strong></p>
+                        <p class="text-xs text-muted">Project: <strong
+                                class="text-ink">{{ $projectToRemoveName }}</strong></p>
                     </div>
                 </div>
                 <button type="button" wire:click="closeRemoveProjectModal"
@@ -1849,15 +2031,18 @@
             </div>
 
             @if($projectAssignedLeadsCount > 0)
-                <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 space-y-2">
+                <div
+                    class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 space-y-2">
                     <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-bold text-xs">
                         <svg class="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <span>{{ $projectAssignedLeadsCount }} Lead(s) Assigned</span>
                     </div>
                     <p class="text-xs text-amber-700 dark:text-amber-300">
-                        This project currently has <strong class="font-bold">{{ $projectAssignedLeadsCount }} assigned lead(s)</strong>.
+                        This project currently has <strong class="font-bold">{{ $projectAssignedLeadsCount }} assigned
+                            lead(s)</strong>.
                         Please select which project these leads should be moved to before removing this project.
                     </p>
                 </div>
@@ -1879,14 +2064,17 @@
                         @enderror
                     </div>
                 @else
-                    <div class="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
-                        There are no other projects mapped to this organization. Please create or map another project first so the assigned leads can be moved.
+                    <div
+                        class="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-xs text-red-700 dark:text-red-300">
+                        There are no other projects mapped to this organization. Please create or map another project first so
+                        the assigned leads can be moved.
                     </div>
                 @endif
             @else
                 <div class="p-4 rounded-xl bg-canvas border border-border text-xs text-muted space-y-1">
                     <p>Are you sure you want to remove <strong class="text-ink">{{ $projectToRemoveName }}</strong>?</p>
-                    <p class="text-[11px] text-muted">This project has <strong class="text-ink">0 leads</strong> assigned. Once removed, it will be unmapped from this organization.</p>
+                    <p class="text-[11px] text-muted">This project has <strong class="text-ink">0 leads</strong> assigned.
+                        Once removed, it will be unmapped from this organization.</p>
                 </div>
             @endif
 

@@ -821,9 +821,23 @@ class OrganizationDetail extends Component
     protected function mappedDeliveryProjects()
     {
         $owners = User::where('organization_id', $this->organization->id)->select('id');
-        return Project::withoutGlobalScopes()
+        $mappedProjectIds = MetaAdRecord::where('kind', 'campaign')
             ->where(function ($q) use ($owners) {
                 $q->whereIn('client_id', $owners);
+                if ($this->organization->id) {
+                    $q->orWhereHas('crmCampaign.leadFilterRules', fn($frq) => $frq->where('organization_id', $this->organization->id));
+                }
+            })
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->all();
+
+        return Project::withoutGlobalScopes()
+            ->where(function ($q) use ($owners, $mappedProjectIds) {
+                $q->whereIn('client_id', $owners);
+                if (!empty($mappedProjectIds)) {
+                    $q->orWhereIn('id', $mappedProjectIds);
+                }
                 if (Schema::hasColumn('projects', 'organization_id')) {
                     $q->orWhere('organization_id', $this->organization->id);
                 }
@@ -994,7 +1008,8 @@ class OrganizationDetail extends Component
             ->when($this->mappingAccountId, fn($q) => $q->where('meta_ad_account_id', $this->mappingAccountId))
             ->where(function ($query) use ($orgOwnerIds) {
                 $query->whereNull('client_id')
-                    ->orWhereIn('client_id', $orgOwnerIds);
+                    ->orWhereIn('client_id', $orgOwnerIds)
+                    ->orWhereNotNull('meta_ad_account_id');
             })
             ->orderBy('name')
             ->get();
@@ -1032,7 +1047,7 @@ class OrganizationDetail extends Component
     public function getOrganizationProjectOptionsProperty(): array
     {
         $owners = User::where('organization_id', $this->organization->id)->select('id');
-        return Project::withoutGlobalScopes()
+        $projects = Project::withoutGlobalScopes()
             ->where(function ($q) use ($owners) {
                 $q->whereIn('client_id', $owners);
                 if (Schema::hasColumn('projects', 'organization_id')) {
@@ -1042,6 +1057,23 @@ class OrganizationDetail extends Component
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+
+        // Include partner / target organization projects (e.g. Truegrowth Realty) for cross-organization routing
+        $otherProjects = Project::withoutGlobalScopes()
+            ->with(['client.organization'])
+            ->whereNotIn('id', array_keys($projects))
+            ->whereHas('client.organization')
+            ->orderBy('name')
+            ->get();
+
+        foreach ($otherProjects as $op) {
+            $orgName = $op->client?->organization?->name;
+            if ($orgName && $orgName !== $this->organization->name) {
+                $projects[$op->id] = "{$op->name} ({$orgName})";
+            }
+        }
+
+        return $projects;
     }
 
     public function openAddCampaignMapping(): void

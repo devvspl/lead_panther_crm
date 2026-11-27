@@ -230,8 +230,11 @@ class LeadFilterRuleEngine
             return $leadData[$fieldName];
         }
 
-        // 2. Custom fields dictionary (e.g. from MetaLeadMapper)
-        $customFields = $leadData['custom_fields'] ?? [];
+        // 2. Custom fields / form answers dictionary (e.g. from MetaLeadMapper, webhook payload, or metadata)
+        $customFields = $leadData['custom_fields'] ?? ($leadData['meta_form_answers'] ?? ($leadData['answers'] ?? []));
+        if (is_string($customFields)) {
+            $customFields = json_decode($customFields, true) ?: [];
+        }
         if (is_array($customFields) && array_key_exists($fieldName, $customFields)) {
             return $customFields[$fieldName];
         }

@@ -2,6 +2,14 @@
     $user = auth()->user();
     $navData = \App\Support\NavigationConfig::getNavItemsForUser($user);
     $sections = $navData['sections'] ?? [];
+
+    if (empty(array_filter($sections, fn($s) => !empty($s['items'])))) {
+        // Fallback to primary / database structure if sections array is empty
+        $sections = [
+            'main' => ['label' => 'Main', 'items' => $navData['primary'] ?? []],
+            'database' => ['label' => 'Database', 'items' => $navData['database'] ?? []],
+        ];
+    }
 @endphp
 
 {{-- Rebuild with the layout: persisted nodes retain the previous body's Alpine scope. --}}

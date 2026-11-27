@@ -119,7 +119,7 @@ class MultiIdentifierLoginTest extends TestCase
             ->assertHasErrors('form.email');
         $this->assertGuest();
 
-        // By UserCode
+        // By User Code
         Volt::test('pages.auth.login')
             ->set('form.email', 'LP-000888')
             ->set('form.password', 'Secret123!')

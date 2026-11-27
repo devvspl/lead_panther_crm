@@ -61,9 +61,9 @@ new #[Layout('layouts.guest')]
         <x-auth-session-status class="mb-4" :status="session('status')" />
 
         <form wire:submit="login" class="space-y-5">
-            <!-- Email / Mobile Number / UserCode Field -->
+            <!-- Email / Mobile Number / User Code Field -->
             <div>
-                <label for="email" class="block text-xs font-semibold text-ink uppercase tracking-wider mb-2">Email / Mobile Number / UserCode</label>
+                <label for="email" class="block text-xs font-semibold text-ink uppercase tracking-wider mb-2">Username</label>
                 <input wire:model="form.email" id="email" type="text" name="email" required autofocus
                     autocomplete="username" placeholder="name@company.com, +91..., or LP-000001"
                     class="w-full px-3.5 py-2.5 bg-surface text-ink text-sm rounded-lg border border-border focus:ring-2 focus:ring-ink focus:border-ink placeholder:text-muted transition">

@@ -22,7 +22,7 @@ class LoginForm extends Form
     public bool $remember = false;
 
     /**
-     * Resolve user by email, mobile number or UserCode.
+     * Resolve user by email, mobile number or User Code.
      */
     public function resolveUserForLogin(string $login): ?\App\Models\User
     {
@@ -36,13 +36,13 @@ class LoginForm extends Form
             return \App\Models\User::withoutGlobalScopes()->where('email', $login)->first();
         }
 
-        // 2. UserCode check (e.g. LP00001, LP-00001, case-insensitive)
+        // 2. User Code check (e.g. LP00001, LP-00001, case-insensitive)
         if (preg_match('/^[a-zA-Z]+-?\d+$/', $login)) {
             $cleanLogin = str_replace('-', '', $login);
             $userByCode = \App\Models\User::withoutGlobalScopes()
                 ->where(function ($q) use ($login, $cleanLogin) {
                     $q->whereRaw('LOWER(user_code) = ?', [strtolower($login)])
-                      ->orWhereRaw('REPLACE(LOWER(user_code), "-", "") = ?', [strtolower($cleanLogin)]);
+                        ->orWhereRaw('REPLACE(LOWER(user_code), "-", "") = ?', [strtolower($cleanLogin)]);
                 })
                 ->first();
             if ($userByCode) {
@@ -68,7 +68,7 @@ class LoginForm extends Form
                 return $matches->first();
             } elseif ($matches->count() > 1) {
                 throw ValidationException::withMessages([
-                    'form.email' => 'Multiple accounts found with this mobile number. Please log in using your Email or UserCode.',
+                    'form.email' => 'Multiple accounts found with this mobile number. Please log in using your Email or User Code.',
                 ]);
             }
         }
@@ -97,7 +97,7 @@ class LoginForm extends Form
             'status' => 'active',
         ];
 
-        if (! Auth::attempt($credentials, $this->remember)) {
+        if (!Auth::attempt($credentials, $this->remember)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -113,7 +113,7 @@ class LoginForm extends Form
      */
     protected function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        if (!RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
             return;
         }
 
@@ -134,6 +134,6 @@ class LoginForm extends Form
      */
     protected function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->email).'|'.request()->ip());
+        return Str::transliterate(Str::lower($this->email) . '|' . request()->ip());
     }
 }

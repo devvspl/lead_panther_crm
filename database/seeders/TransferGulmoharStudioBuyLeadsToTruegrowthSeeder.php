@@ -214,14 +214,45 @@ class TransferGulmoharStudioBuyLeadsToTruegrowthSeeder extends Seeder
 
         $eligibleCount = 0;
         $transferredCount = 0;
+        $revokedCount = 0;
         $skippedCount = 0;
         $failedCount = 0;
 
         foreach ($leadsToInspect as $lead) {
             try {
                 $isBuy = $this->isEligibleBuyLead($lead);
+                $isDateEligible = $this->isEligibleDate($lead);
+                $isCurrentlyOnTarget = (int)$lead->client_id === (int)$targetClient->id;
 
-                if (!$isBuy) {
+                // If currently on Truegrowth Realty but NOT eligible date (only 25, 26, 27) or NOT Buy, REVOKE it back to Gulmohar
+                if ($isCurrentlyOnTarget && (!$isBuy || !$isDateEligible)) {
+                    DB::transaction(function () use ($lead, $sourceClient, $sourceOrg, $targetOrg, $targetCampaign) {
+                        $origClientId = (int) ($lead->metadata->firstWhere('key', 'transferred_from_client_id')?->value ?: $sourceClient->id);
+                        $origCampaignId = (int) ($lead->metadata->firstWhere('key', 'transferred_from_campaign_id')?->value ?: $lead->campaign_id);
+
+                        $lead->update([
+                            'client_id' => $origClientId,
+                            'campaign_id' => $origCampaignId,
+                            'assigned_to' => null,
+                        ]);
+
+                        LeadMetadata::updateOrCreate(
+                            ['lead_id' => $lead->id, 'key' => 'delivery_revoked_at'],
+                            ['value' => now()->toIso8601String()]
+                        );
+                        LeadMetadata::updateOrCreate(
+                            ['lead_id' => $lead->id, 'key' => 'delivery_revoke_reason'],
+                            ['value' => 'Created at date not in [25, 26, 27] Nov 2026. Revoked to Gulmohar Studio 135.']
+                        );
+                        LeadMetadata::where('lead_id', $lead->id)->where('key', 'transferred_from_organization')->delete();
+                    });
+
+                    $revokedCount++;
+                    continue;
+                }
+
+                // If not eligible (wrong date or not buy), skip
+                if (!$isBuy || !$isDateEligible) {
                     $skippedCount++;
                     continue;
                 }
@@ -345,5 +376,25 @@ class TransferGulmoharStudioBuyLeadsToTruegrowthSeeder extends Seeder
         }
 
         return false;
+    }
+
+    /**
+     * Determine if a lead was created on 25, 26, or 27 of November 2026.
+     */
+    protected function isEligibleDate(Lead $lead): bool
+    {
+        if (!$lead->created_at) {
+            return false;
+        }
+
+        $tz = config('app.timezone', 'Asia/Kolkata');
+        $local = \Carbon\Carbon::parse($lead->created_at)->timezone($tz);
+        $utc = \Carbon\Carbon::parse($lead->created_at)->timezone('UTC');
+
+        $eligibleDates = ['2026-11-25', '2026-11-26', '2026-11-27'];
+
+        return in_array($local->format('Y-m-d'), $eligibleDates)
+            || in_array($utc->format('Y-m-d'), $eligibleDates)
+            || (in_array((int)$local->day, [25, 26, 27]) && (int)$local->month === 11 && (int)$local->year === 2026);
     }
 }

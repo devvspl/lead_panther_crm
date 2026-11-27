@@ -143,4 +143,123 @@ class OrganizationMemberDetailsTest extends TestCase
             ->assertSee('H&S Team Leader')
             ->assertSee('H&S Executive 01');
     }
+
+    public function test_modal_displays_all_member_fields_and_user_code_correctly(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Field Test Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $member = User::factory()->create([
+            'name' => 'Alice Walker',
+            'email' => 'alice.walker@example.com',
+            'phone' => '9876543210',
+            'user_code' => 'LP00123',
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
+        $member->assignRole('Executive');
+
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $member->id)
+            ->assertSee('Team Member Details')
+            ->assertSee('Alice Walker')
+            ->assertSee('LP00123')
+            ->assertSee('alice.walker@example.com')
+            ->assertSee('Active')
+            ->assertSee('Executive')
+            ->assertSee('Save Changes')
+            ->assertSee('Change Password')
+            ->assertSee('Send Login Details')
+            ->assertSee('Suspend Account')
+            ->assertSee('Cancel');
+    }
+
+    public function test_modal_saves_all_member_fields_and_syncs_role(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Save Test Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $member = User::factory()->create([
+            'name' => 'Bob Builder',
+            'email' => 'bob.orig@example.com',
+            'phone' => '1112223334',
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
+        $member->assignRole('Executive');
+
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $member->id)
+            ->set('name', 'Robert Builder')
+            ->set('email', 'bob.new@example.com')
+            ->set('phone', '9998887776')
+            ->set('role', 'Team Leader')
+            ->set('status', 'active')
+            ->call('saveChanges')
+            ->assertHasNoErrors()
+            ->assertDispatched('org-member-updated');
+
+        $fresh = $member->fresh();
+        $this->assertSame('Robert Builder', $fresh->name);
+        $this->assertSame('bob.new@example.com', $fresh->email);
+        $this->assertSame('9998887776', $fresh->phone);
+        $this->assertTrue($fresh->hasRole('Team Leader'));
+    }
+
+    public function test_modal_toggle_status_suspends_and_activates_account(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Toggle Status Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $member = User::factory()->create([
+            'organization_id' => $org->id,
+            'status' => 'active',
+        ]);
+        $member->assignRole('Executive');
+
+        $component = Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $member->id);
+
+        // Toggle to Inactive
+        $component->call('toggleStatus')
+            ->assertHasNoErrors()
+            ->assertDispatched('org-member-updated');
+        $this->assertSame('inactive', $member->fresh()->status);
+
+        // Toggle back to Active
+        $component->call('toggleStatus')
+            ->assertHasNoErrors()
+            ->assertDispatched('org-member-updated');
+        $this->assertSame('active', $member->fresh()->status);
+    }
+
+    public function test_modal_sends_login_details_email_job(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Send Login Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        $member = User::factory()->create([
+            'organization_id' => $org->id,
+            'status' => 'active',
+            'email' => 'login.test@example.com',
+        ]);
+        $member->assignRole('Executive');
+
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $member->id)
+            ->call('sendLoginDetails')
+            ->assertHasNoErrors();
+
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SendAccountLoginDetails::class);
+    }
 }

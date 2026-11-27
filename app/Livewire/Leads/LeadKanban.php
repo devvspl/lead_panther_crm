@@ -212,6 +212,8 @@ class LeadKanban extends Component
 
     public ?int $revokeLeadId = null;
 
+    public array $revokeLeadIds = [];
+
     public string $revokeReason = '';
 
     // Multi-Client Delivery & Billing State
@@ -967,6 +969,10 @@ class LeadKanban extends Component
                 $query->where(fn($q) => $q->where('replacement_status', 'eligible')->orWhereIn('id', LeadReplacement::pluck('lead_id')));
             } elseif ($sf === 'replaced') {
                 $query->where(fn($q) => $q->where('current_stage', 'replaced')->orWhereIn('id', LeadReplacement::where('status', 'approved')->pluck('lead_id')));
+            } elseif ($sf === 'delivered') {
+                $query->where(fn($q) => $q->whereNotNull('delivered_at')->orWhereHas('deliveryItems', fn($d) => $d->whereIn('status', ['sent', 'accepted'])));
+            } elseif ($sf === 'do_not_send') {
+                $query->where('do_not_send_to_client', true);
             } else {
                 $query->where(function ($q) use ($sf) {
                     $q->where('current_stage', $sf)->orWhere('status', $sf);
@@ -2447,6 +2453,7 @@ class LeadKanban extends Component
                 ['key' => 'all', 'label' => 'All Leads'],
                 ['key' => 'assigned', 'label' => 'Assigned'],
                 ['key' => 'unassigned', 'label' => 'Unassigned'],
+                ['key' => 'delivered', 'label' => 'Delivered'],
                 ['key' => 'in_progress', 'label' => 'In Progress'],
                 ['key' => 'contacted', 'label' => 'Contacted'],
                 ['key' => 'interested', 'label' => 'Interested'],
@@ -2461,6 +2468,7 @@ class LeadKanban extends Component
             ['key' => 'all', 'label' => 'All Leads'],
             ['key' => 'assigned', 'label' => 'Assigned'],
             ['key' => 'unassigned', 'label' => 'Unassigned'],
+            ['key' => 'delivered', 'label' => 'Delivered'],
             ['key' => 'contacted', 'label' => 'Contacted'],
             ['key' => 'interested', 'label' => 'Interested'],
             ['key' => 'site_visit', 'label' => 'Site Visit'],
@@ -3046,11 +3054,22 @@ class LeadKanban extends Component
     }
 
     #[On('open-revoke-delivery-modal')]
-    public function openRevokeDeliveryModal(int $leadId): void
+    public function openRevokeDeliveryModal($leadId = null): void
     {
         abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']), 403);
-        $lead = Lead::withoutGlobalScopes()->findOrFail($leadId);
-        $this->revokeLeadId = $lead->id;
+
+        if (is_numeric($leadId)) {
+            $lead = Lead::withoutGlobalScopes()->findOrFail($leadId);
+            $this->revokeLeadId = $lead->id;
+            $this->revokeLeadIds = [$lead->id];
+        } elseif (!empty($this->selectedRows)) {
+            $this->revokeLeadId = null;
+            $this->revokeLeadIds = array_values(array_map('intval', $this->selectedRows));
+        } else {
+            $this->dispatch('toast', type: 'warning', message: 'No leads selected to revoke.');
+            return;
+        }
+
         $this->revokeReason = '';
         $this->showRevokeDeliveryModal = true;
     }
@@ -3059,6 +3078,7 @@ class LeadKanban extends Component
     {
         $this->showRevokeDeliveryModal = false;
         $this->revokeLeadId = null;
+        $this->revokeLeadIds = [];
         $this->revokeReason = '';
         $this->resetValidation('revokeReason');
     }
@@ -3069,15 +3089,50 @@ class LeadKanban extends Component
         $this->validate([
             'revokeReason' => 'required|string|min:3|max:1000',
         ], [
-            'revokeReason.required' => 'Please provide a reason for revoking this delivered lead.',
+            'revokeReason.required' => 'Please provide a reason for revoking the delivered lead(s).',
             'revokeReason.min' => 'The reason must be at least 3 characters.',
         ]);
 
-        $lead = Lead::withoutGlobalScopes()->findOrFail($this->revokeLeadId);
-        app(\App\Services\LeadDistributionService::class)->revokeClientDelivery($lead, $this->revokeReason, auth()->user());
+        $service = app(\App\Services\LeadDistributionService::class);
+        $revokedCount = 0;
+        $targetIds = !empty($this->revokeLeadIds) ? $this->revokeLeadIds : ($this->revokeLeadId ? [$this->revokeLeadId] : []);
+
+        foreach ($targetIds as $id) {
+            $lead = Lead::withoutGlobalScopes()->find($id);
+            if ($lead && ($lead->delivered_at || $lead->leadDeliveryItem()->exists())) {
+                $service->revokeClientDelivery($lead, $this->revokeReason, auth()->user());
+                $revokedCount++;
+            }
+        }
 
         $this->closeRevokeDeliveryModal();
-        $this->dispatch('toast', type: 'success', message: "Lead #{$lead->lead_code} delivery revoked and returned to CRM.");
+        $this->dispatch('toast', type: 'success', message: $revokedCount === 1
+            ? "Lead delivery revoked and returned to CRM."
+            : "{$revokedCount} delivered lead(s) revoked and returned to CRM.");
+        $this->dispatch('lead-updated');
+        $this->refreshBoard();
+    }
+
+    public function bulkToggleDoNotSend(bool $exclude = true): void
+    {
+        abort_unless(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']), 403);
+        if (empty($this->selectedRows)) {
+            $this->dispatch('toast', type: 'warning', message: 'Select at least one lead from the table.');
+            return;
+        }
+
+        $service = app(\App\Services\LeadDistributionService::class);
+        $count = 0;
+        foreach ($this->selectedRows as $id) {
+            $lead = Lead::withoutGlobalScopes()->find($id);
+            if ($lead) {
+                $service->setDoNotSendToClient($lead, $exclude, auth()->user());
+                $count++;
+            }
+        }
+
+        $msg = $exclude ? "{$count} lead(s) marked as Do Not Send to Client." : "{$count} lead(s) marked as eligible for delivery.";
+        $this->dispatch('toast', type: 'success', message: $msg);
         $this->dispatch('lead-updated');
         $this->refreshBoard();
     }

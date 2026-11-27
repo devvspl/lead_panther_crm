@@ -1,6 +1,8 @@
 @if($showRevokeDeliveryModal)
     @php
-        $revokingLead = $revokeLeadId ? \App\Models\Lead::withoutGlobalScopes()->with(['client.organization', 'campaign.project', 'leadDeliveryItem.client.organization', 'leadDeliveryItem.project'])->find($revokeLeadId) : null;
+        $targetIds = !empty($revokeLeadIds) ? $revokeLeadIds : ($revokeLeadId ? [$revokeLeadId] : []);
+        $targetCount = count($targetIds);
+        $revokingLead = $targetCount === 1 ? \App\Models\Lead::withoutGlobalScopes()->with(['client.organization', 'campaign.project', 'leadDeliveryItem.client.organization', 'leadDeliveryItem.project'])->find($targetIds[0]) : null;
         $deliveryItem = $revokingLead?->leadDeliveryItem;
         $destClient = $deliveryItem?->client ?? $revokingLead?->client;
         $destProject = $deliveryItem?->project ?? $revokingLead?->campaign?->project;
@@ -19,13 +21,15 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <h3 class="text-base font-bold text-ink">Revoke Delivered Lead</h3>
+                            <h3 class="text-base font-bold text-ink">
+                                {{ $targetCount > 1 ? "Revoke {$targetCount} Delivered Leads" : 'Revoke Delivered Lead' }}
+                            </h3>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                Lead Return
+                                {{ $targetCount > 1 ? 'Batch Return' : 'Lead Return' }}
                             </span>
                         </div>
                         <p class="text-xs text-muted mt-0.5">
-                            Return this delivered lead to the CRM's available lead pool.
+                            Return {{ $targetCount > 1 ? 'the selected delivered leads' : 'this delivered lead' }} to the CRM's available lead pool.
                         </p>
                     </div>
                 </div>
@@ -37,35 +41,49 @@
             </div>
 
             <!-- Lead Information Details -->
-            <div class="bg-canvas rounded-xl border border-border p-3.5 space-y-2 text-xs">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <span class="text-muted block text-[11px] font-medium">Lead ID</span>
-                        <span class="font-mono font-bold text-ink text-sm">#{{ $revokingLead?->lead_code ?? $revokingLead?->id }}</span>
-                        @if($revokingLead?->name)
-                            <span class="text-muted block text-[11px] truncate">{{ $revokingLead->name }}</span>
-                        @endif
-                    </div>
-                    <div>
-                        <span class="text-muted block text-[11px] font-medium">Delivered Date</span>
-                        <span class="font-semibold text-ink">
-                            {{ $deliveredAtDate ? $deliveredAtDate->format('d M Y, h:i A') : 'N/A' }}
-                        </span>
-                    </div>
-                    <div>
-                        <span class="text-muted block text-[11px] font-medium">Client / Organization</span>
-                        <span class="font-semibold text-ink truncate block">
-                            {{ $destClient?->organization?->name ?? $destClient?->name ?? 'N/A' }}
-                        </span>
-                    </div>
-                    <div>
-                        <span class="text-muted block text-[11px] font-medium">Project</span>
-                        <span class="font-semibold text-ink truncate block">
-                            {{ $destProject?->name ?? 'N/A' }}
-                        </span>
+            @if($targetCount === 1 && $revokingLead)
+                <div class="bg-canvas rounded-xl border border-border p-3.5 space-y-2 text-xs">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-muted block text-[11px] font-medium">Lead ID</span>
+                            <span class="font-mono font-bold text-ink text-sm">#{{ $revokingLead->lead_code ?? $revokingLead->id }}</span>
+                            @if($revokingLead->name)
+                                <span class="text-muted block text-[11px] truncate">{{ $revokingLead->name }}</span>
+                            @endif
+                        </div>
+                        <div>
+                            <span class="text-muted block text-[11px] font-medium">Delivered Date</span>
+                            <span class="font-semibold text-ink">
+                                {{ $deliveredAtDate ? $deliveredAtDate->format('d M Y, h:i A') : 'N/A' }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-muted block text-[11px] font-medium">Client / Organization</span>
+                            <span class="font-semibold text-ink truncate block">
+                                {{ $destClient?->organization?->name ?? $destClient?->name ?? 'N/A' }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-muted block text-[11px] font-medium">Project</span>
+                            <span class="font-semibold text-ink truncate block">
+                                {{ $destProject?->name ?? 'N/A' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @else
+                <div class="bg-canvas rounded-xl border border-border p-3.5 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-ink">Selected Leads for Revocation</span>
+                        <span class="px-2 py-0.5 rounded font-bold bg-primary/10 text-primary text-xs">
+                            {{ $targetCount }} Leads Selected
+                        </span>
+                    </div>
+                    <p class="text-muted text-[11px]">
+                        All {{ $targetCount }} selected leads will be returned to the CRM pool, unassigned from client executives, and marked as excluded from automatic future client delivery.
+                    </p>
+                </div>
+            @endif
 
             <!-- Return Reason Input -->
             <div class="space-y-1.5">
@@ -75,7 +93,7 @@
                 <textarea id="revoke-reason-input"
                           wire:model="revokeReason"
                           rows="3"
-                          placeholder="Provide the reason for returning this lead to the CRM..."
+                          placeholder="Provide the reason for returning {{ $targetCount > 1 ? 'these leads' : 'this lead' }} to the CRM..."
                           class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition"></textarea>
                 @error('revokeReason')
                     <p class="text-xs text-rose-600 font-medium">{{ $message }}</p>
@@ -90,7 +108,7 @@
                     <span>Delivery Revocation Notice</span>
                 </div>
                 <p>
-                    Revoking will unassign client executives, restore the original source organization, and mark this lead as excluded from automatic client delivery until explicitly pushed.
+                    Revoking will unassign client executives, restore the original source organization, and mark {{ $targetCount > 1 ? 'these leads' : 'this lead' }} as excluded from automatic client delivery until explicitly pushed.
                 </p>
             </div>
 
@@ -105,7 +123,9 @@
                         wire:click="confirmRevokeDelivery"
                         wire:loading.attr="disabled"
                         class="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 transition cursor-pointer shadow-sm flex items-center gap-2">
-                    <span wire:loading.remove wire:target="confirmRevokeDelivery">Confirm Revoke</span>
+                    <span wire:loading.remove wire:target="confirmRevokeDelivery">
+                        {{ $targetCount > 1 ? "Confirm Revoke ({$targetCount})" : 'Confirm Revoke' }}
+                    </span>
                     <span wire:loading wire:target="confirmRevokeDelivery" class="inline-flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

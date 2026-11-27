@@ -87,6 +87,8 @@
                 'closed_lost' => 'Closed Lost',
                 'duplicate' => 'Duplicate',
                 'pending_credit' => 'Credit Check',
+                'delivered' => 'Delivered Leads',
+                'do_not_send' => 'Do Not Send (Excluded)',
                 'sla_breached' => 'SLA Breached',
             ];
 
@@ -928,6 +930,24 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                 </svg>
                                 <span>Multi-Client Delivery ({{ count($selectedRows) }})</span>
+                            </button>
+                        @endif
+                        @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']) && !empty($selectedRows))
+                            <button type="button" wire:click="openRevokeDeliveryModal" wire:loading.attr="disabled"
+                                class="px-3 h-8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                title="Revoke client delivery for selected leads and return them to CRM">
+                                <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                </svg>
+                                <span>Revoke Selected ({{ count($selectedRows) }})</span>
+                            </button>
+                            <button type="button" wire:click="bulkToggleDoNotSend(true)" wire:loading.attr="disabled"
+                                class="px-3 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-semibold rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                title="Exclude selected leads from future client delivery">
+                                <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                </svg>
+                                <span>Do Not Send ({{ count($selectedRows) }})</span>
                             </button>
                         @endif
                         @if($this->isClientContext())

@@ -240,24 +240,24 @@ class LeadDeliveryRevocationTest extends TestCase
         $this->assertTrue($service->eligibleClientDeliveryLeads($this->sourceOrg->id)->where('id', $lead->id)->exists());
     }
 
-    public function test_date_wise_filter_and_batch_revoke_in_client_delivery_center(): void
+    public function test_delivered_filter_and_batch_revoke_on_lead_table(): void
     {
         $this->actingAs($this->admin);
         [$lead1, $item1] = $this->createDeliveredLead('LP-BATCH-001');
         [$lead2, $item2] = $this->createDeliveredLead('LP-BATCH-002');
         [$lead3, $item3] = $this->createDeliveredLead('LP-BATCH-003');
 
-        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->sourceOrg->id])
-            ->assertSee('Revoke Delivered Leads')
+        $component = Livewire::test(LeadKanban::class)
+            ->set('statusFilter', 'delivered')
             ->assertSee('LP-BATCH-001')
             ->assertSee('LP-BATCH-002')
             ->assertSee('LP-BATCH-003')
-            ->set('selectedRevokeIds', [(string)$item1->id, (string)$item2->id])
-            ->call('openRevokeBatch')
-            ->assertSet('showRevokeConfirmModal', true)
-            ->set('revokeBatchReason', 'Batch return for review')
-            ->call('confirmRevokeDelivered')
-            ->assertSet('showRevokeConfirmModal', false)
+            ->set('selectedRows', [$lead1->id, $lead2->id])
+            ->call('openRevokeDeliveryModal')
+            ->assertSet('showRevokeDeliveryModal', true)
+            ->set('revokeReason', 'Batch return for review')
+            ->call('confirmRevokeDelivery')
+            ->assertSet('showRevokeDeliveryModal', false)
             ->assertDispatched('toast');
 
         $this->assertSame('revoked', $item1->fresh()->status);
@@ -271,19 +271,18 @@ class LeadDeliveryRevocationTest extends TestCase
         $this->assertSame(2, LeadDeliveryRevocation::whereIn('lead_id', [$lead1->id, $lead2->id])->count());
     }
 
-    public function test_select_all_matching_filters_revoke(): void
+    public function test_bulk_revoke_with_table_selection(): void
     {
         $this->actingAs($this->admin);
         [$lead1, $item1] = $this->createDeliveredLead('LP-ALL-001');
         [$lead2, $item2] = $this->createDeliveredLead('LP-ALL-002');
 
-        Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->sourceOrg->id])
-            ->call('selectAllMatching')
-            ->assertSet('revokeSelectAllMatching', true)
-            ->call('openRevokeBatch')
-            ->assertSet('showRevokeConfirmModal', true)
-            ->set('revokeBatchReason', 'Revoke all matching current filters')
-            ->call('confirmRevokeDelivered')
+        Livewire::test(LeadKanban::class)
+            ->set('selectedRows', [$lead1->id, $lead2->id])
+            ->call('openRevokeDeliveryModal')
+            ->assertSet('showRevokeDeliveryModal', true)
+            ->set('revokeReason', 'Revoke all selected leads')
+            ->call('confirmRevokeDelivery')
             ->assertDispatched('toast');
 
         $this->assertSame('revoked', $item1->fresh()->status);

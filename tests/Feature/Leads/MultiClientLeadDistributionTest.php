@@ -390,7 +390,7 @@ class MultiClientLeadDistributionTest extends TestCase
         $this->assertSame(450.00, $summary['client_summaries'][$this->clientB->id]['total_amount']);
     }
 
-    public function test_client_delivery_center_date_wise_filters_and_bulk_actions(): void
+    public function test_lead_table_delivered_filters_and_bulk_actions(): void
     {
         $this->actingAs($this->admin);
         $lead1 = $this->createSourceLead('LP-2026-UI01');
@@ -418,24 +418,26 @@ class MultiClientLeadDistributionTest extends TestCase
         $item1 = LeadDeliveryItem::where('lead_id', $lead1->id)->where('client_id', $this->clientA->id)->first();
         $item2 = LeadDeliveryItem::where('lead_id', $lead2->id)->where('client_id', $this->clientB->id)->first();
 
-        $component = Livewire::test(ClientDeliveryCenter::class, ['organizationId' => $this->sourceOrg->id])
+        $component = Livewire::test(LeadKanban::class)
+            ->set('statusFilter', 'delivered')
             ->assertSee('LP-2026-UI01')
             ->assertSee('LP-2026-UI02')
-            ->assertSee('₹100.00')
-            ->assertSee('₹150.00')
-            // Filter by Client A
-            ->set('revokeClient', (string)$this->clientA->id)
-            ->assertSee('LP-2026-UI01')
-            ->assertDontSee('LP-2026-UI02')
-            // Reset client filter
-            ->set('revokeClient', '')
-            ->assertSee('LP-2026-UI02')
-            // Test bulk Do Not Send
-            ->set('selectedRevokeIds', [(string)$item1->id])
-            ->call('bulkExcludeSelected')
+            // Test bulk Do Not Send on lead table
+            ->set('selectedRows', [$lead1->id])
+            ->call('bulkToggleDoNotSend', true)
             ->assertDispatched('toast');
 
-        $this->assertSame('do_not_send', $item1->fresh()->status);
+        $this->assertTrue($lead1->fresh()->do_not_send_to_client);
+
+        // Test bulk revoke on lead table
+        $component->set('selectedRows', [$lead2->id])
+            ->call('openRevokeDeliveryModal')
+            ->assertSet('showRevokeDeliveryModal', true)
+            ->set('revokeReason', 'Revoke via lead table bulk action')
+            ->call('confirmRevokeDelivery')
+            ->assertDispatched('toast');
+
+        $this->assertSame('revoked', $item2->fresh()->status);
     }
 
     public function test_livewire_multi_client_modal_delivery_workflow(): void

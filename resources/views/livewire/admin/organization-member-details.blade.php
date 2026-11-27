@@ -66,18 +66,20 @@
                                     <x-input-error :messages="$errors->get('email')" class="mt-1" />
                                 </div>
 
-                                <!-- Team Leader or Team Name -->
-                                <div>
-                                    @if(in_array($role, ['Team Leader', 'team-leader', 'team_leader', 'Team-Leader']))
-                                        <x-input-label for="member-team-name" value="Team Name" class="text-xs font-semibold text-ink mb-1.5" />
-                                        <x-text-input id="member-team-name" variant="compact" wire:model="teamName" class="w-full h-9" placeholder="Enter team name" />
-                                        <x-input-error :messages="$errors->get('teamName')" class="mt-1" />
-                                    @else
+                                <!-- Team Leader (Only for Executives) or Team Name (Only for Team Leaders) -->
+                                @if($this->isExecutive)
+                                    <div>
                                         <x-input-label for="member-team-leader" value="Team Leader" class="text-xs font-semibold text-ink mb-1.5" />
                                         <x-ui.themed-select id="member-team-leader" wire:model.live="teamLeaderId" :options="$this->availableLeaders" placeholder="Choose Team Leader" class="w-full" triggerClass="h-9" />
                                         <x-input-error :messages="$errors->get('teamLeaderId')" class="mt-1" />
-                                    @endif
-                                </div>
+                                    </div>
+                                @elseif($this->isTeamLeader)
+                                    <div>
+                                        <x-input-label for="member-team-name" value="Team Name" class="text-xs font-semibold text-ink mb-1.5" />
+                                        <x-text-input id="member-team-name" variant="compact" wire:model="teamName" class="w-full h-9" placeholder="Enter team name" />
+                                        <x-input-error :messages="$errors->get('teamName')" class="mt-1" />
+                                    </div>
+                                @endif
 
                                 <!-- Account Status -->
                                 <div>

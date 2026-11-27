@@ -262,4 +262,30 @@ class OrganizationMemberDetailsTest extends TestCase
 
         \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SendAccountLoginDetails::class);
     }
+
+    public function test_team_leader_option_only_shown_for_executive_role(): void
+    {
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $org = Organization::create(['name' => 'Role Visibility Org', 'status' => 'active']);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('Super Admin');
+
+        // Builder member
+        $builder = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $builder->assignRole('Builder/Developer');
+
+        // Executive member
+        $executive = User::factory()->create(['organization_id' => $org->id, 'status' => 'active']);
+        $executive->assignRole('Executive');
+
+        // For Builder: Team Leader is NOT shown
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $builder->id)
+            ->assertDontSee('Choose Team Leader');
+
+        // For Executive: Team Leader IS shown
+        Livewire::actingAs($admin)->test(OrganizationMemberDetails::class, ['organizationId' => $org->id])
+            ->call('open', $executive->id)
+            ->assertSee('Choose Team Leader');
+    }
 }

@@ -210,17 +210,14 @@ class OrganizationMemberDetails extends Component
             }
 
             // Handle Team Assignment for members
-            $targetTeamId = $this->teamId ?: $this->leadershipTeamId;
-            if ($targetTeamId) {
-                $team = $this->teams()->find($targetTeamId);
-                if ($team) {
-                    if ($member->hasAnyRole(['Team Leader', 'team-leader', 'team_leader', 'Team-Leader'])) {
-                        $team->update(['leader_id' => $member->id]);
-                        SalesTeamMember::updateOrCreate(
-                            ['sales_team_id' => $team->id, 'user_id' => $member->id],
-                            ['role' => 'Team Leader', 'is_active' => true]
-                        );
-                    } else {
+            if ($this->isExecutive) {
+                $targetLeaderId = $this->teamLeaderId;
+                if ($targetLeaderId) {
+                    $team = $this->teams()->where('leader_id', $targetLeaderId)->first();
+                    if (!$team && $this->teamId) {
+                        $team = $this->teams()->find($this->teamId);
+                    }
+                    if ($team) {
                         SalesTeamMember::whereIn('sales_team_id', $this->teams()->select('id'))
                             ->where('user_id', $member->id)
                             ->where('sales_team_id', '!=', $team->id)
@@ -231,7 +228,23 @@ class OrganizationMemberDetails extends Component
                             ['role' => $this->role ?: 'Executive', 'is_active' => true]
                         );
                     }
+                } else {
+                    SalesTeamMember::whereIn('sales_team_id', $this->teams()->select('id'))
+                        ->where('user_id', $member->id)
+                        ->update(['is_active' => false]);
                 }
+            } elseif ($this->isTeamLeader) {
+                \App\Support\TeamAccess::ensureLeaderTeams($this->organizationId);
+                if (!empty($this->teamName)) {
+                    $team = $this->teams()->where('leader_id', $member->id)->first();
+                    if ($team) {
+                        $team->update(['name' => $this->teamName]);
+                    }
+                }
+            } else {
+                SalesTeamMember::whereIn('sales_team_id', $this->teams()->select('id'))
+                    ->where('user_id', $member->id)
+                    ->update(['is_active' => false]);
             }
 
             $after = $member->fresh()->only(['name', 'email', 'phone', 'status', 'user_code']);
@@ -357,6 +370,18 @@ class OrganizationMemberDetails extends Component
         });
         $this->dispatch('org-member-updated');
         $this->dispatch('toast', type: 'success', message: 'Team Leader assigned.');
+    }
+
+    public function getIsExecutiveProperty(): bool
+    {
+        $role = strtolower(trim(str_replace(['_', '-'], ' ', $this->role)));
+        return in_array($role, ['executive', 'sales executive']);
+    }
+
+    public function getIsTeamLeaderProperty(): bool
+    {
+        $role = strtolower(trim(str_replace(['_', '-'], ' ', $this->role)));
+        return in_array($role, ['team leader']);
     }
 
     public function getAvailableRolesProperty(): array

@@ -85,17 +85,6 @@
                                 <div>
                                     <div class="flex items-center justify-between mb-1.5">
                                         <x-input-label for="member-status" value="Account Status" class="text-xs font-semibold text-ink" />
-                                        @if($status === 'active')
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
-                                                Active
-                                            </span>
-                                        @else
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-danger/10 text-danger border border-danger/20">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-danger"></span>
-                                                Inactive
-                                            </span>
-                                        @endif
                                     </div>
                                     <x-ui.themed-select id="member-status" wire:model.live="status" :options="['active' => 'Active', 'inactive' => 'Inactive']" class="w-full" triggerClass="h-9" />
                                     <x-input-error :messages="$errors->get('status')" class="mt-1" />

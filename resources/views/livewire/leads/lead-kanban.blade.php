@@ -922,65 +922,246 @@
                 emptyMessage="No leads matched your search and filter criteria.">
                 <x-slot:action>
                     <div class="flex items-center gap-2">
-                        @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']))
-                            <button type="button" wire:click="openMultiClientDeliveryModal" @disabled(empty($selectedRows)) wire:loading.attr="disabled"
-                                class="px-3 h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg whitespace-nowrap disabled:opacity-50 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                                title="Distribute selected leads to multiple clients with individual project and rate billing">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                                <span>Multi-Client Delivery ({{ count($selectedRows) }})</span>
-                            </button>
-                        @endif
-                        @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']) && !empty($selectedRows))
-                            <button type="button" wire:click="openRevokeDeliveryModal" wire:loading.attr="disabled"
-                                class="px-3 h-8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                                title="Revoke client delivery for selected leads and return them to CRM">
-                                <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                                </svg>
-                                <span>Revoke Selected ({{ count($selectedRows) }})</span>
-                            </button>
-                            <button type="button" wire:click="bulkToggleDoNotSend(true)" wire:loading.attr="disabled"
-                                class="px-3 h-8 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-semibold rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                                title="Exclude selected leads from future client delivery">
-                                <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                </svg>
-                                <span>Do Not Send ({{ count($selectedRows) }})</span>
-                            </button>
-                        @endif
-                        @if($this->isClientContext())
-                            <button type="button" wire:click="pushSelectedToClient" @disabled(empty($selectedRows)) wire:loading.attr="disabled"
-                                class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg whitespace-nowrap disabled:opacity-50">
-                                Push Selected to Client ({{ count($selectedRows) }})
-                            </button>
-                        @endif
-                        @if(!$isSalesExecutive)
-                            @if(!empty($selectedRows))
-                                <button type="button" wire:click="openBulkAssignModal"
-                                    class="px-3 h-8 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-                                    <span>Assign Selected ({{ count($selectedRows) }})</span>
+                        <!-- 3-Dot (⋮) Lead Actions Dropdown Menu -->
+                        <x-ui.dropdown align="right" width="64" contentClasses="p-1.5 bg-surface shadow-xl border border-border rounded-xl">
+                            <x-slot:trigger>
+                                <button type="button"
+                                    class="h-8 px-2.5 bg-surface border border-border hover:bg-canvas text-ink rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer select-none font-medium text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    title="Lead Actions">
+                                    <svg class="w-4 h-4 text-muted group-hover:text-ink shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                    </svg>
+                                    <span class="text-xs font-semibold text-ink">Actions</span>
+                                    @if(count($selectedRows) > 0)
+                                        <span class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-primary text-white font-mono leading-none">
+                                            {{ count($selectedRows) }}
+                                        </span>
+                                    @endif
                                 </button>
-                                <button type="button" wire:click="unassignSelectedLeads"
-                                    wire:confirm="Remove executive assignments from all selected leads? They will be returned to the unassigned pool."
-                                    class="px-3 h-8 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                                    title="Unassign executive from selected leads (especially when no action was taken)">
-                                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" /></svg>
-                                    <span>Unassign Selected ({{ count($selectedRows) }})</span>
-                                </button>
-                            @endif
-                            @if(!$isBuilder && !$this->isClientContext())
-                                <button type="button" wire:click="autoDistributeUnassignedLeads"
-                                    class="px-3 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                                    title="Distribute unassigned leads using the Super Admin configured distribution rule">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                    <span>Auto-Assign</span>
-                                </button>
-                            @endif
-                        @endif
-                        <x-ui.export-button target="exportExcel" class="text-xs" />
+                            </x-slot:trigger>
+
+                            <x-slot:content>
+                                <div class="space-y-0.5">
+                                    <!-- SECTION 1: DELIVERY & CLIENT HANDOVER -->
+                                    <div class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted select-none">
+                                        Delivery & Client
+                                    </div>
+
+                                    @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin']))
+                                        @if(!empty($selectedRows))
+                                            <button type="button" wire:click="openMultiClientDeliveryModal" wire:loading.attr="disabled"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-indigo-600 transition text-left cursor-pointer group"
+                                                title="Distribute selected leads to multiple clients with individual project and rate billing">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-100">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Multi-Client Delivery</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-muted bg-canvas px-1.5 py-0.5 rounded border border-border shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+                                        @else
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to distribute">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Multi-Client Delivery</span>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endif
+
+                                    @if(auth()->user()?->hasAnyRole(['Super Admin', 'super-admin', 'Admin', 'admin']))
+                                        @if(!empty($selectedRows))
+                                            <button type="button" wire:click="openRevokeDeliveryModal" wire:loading.attr="disabled"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-rose-700 hover:bg-rose-50 transition text-left cursor-pointer group"
+                                                title="Revoke client delivery for selected leads and return them to CRM">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:bg-rose-100">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate font-semibold text-rose-700">Revoke Delivery</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+                                        @else
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to revoke delivery">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Revoke Delivery</span>
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if(!empty($selectedRows))
+                                            <button type="button" wire:click="bulkToggleDoNotSend(true)" wire:loading.attr="disabled"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-slate-800 transition text-left cursor-pointer group"
+                                                title="Exclude selected leads from future client delivery">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 group-hover:bg-slate-200">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Do Not Send</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-muted bg-canvas px-1.5 py-0.5 rounded border border-border shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+                                        @else
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to exclude from client delivery">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Do Not Send</span>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endif
+
+                                    @if($this->isClientContext())
+                                        @if(!empty($selectedRows))
+                                            <button type="button" wire:click="pushSelectedToClient" wire:loading.attr="disabled"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-primary transition text-left cursor-pointer group"
+                                                title="Push selected leads directly to this client organization">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary/20">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Push Selected to Client</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-muted bg-canvas px-1.5 py-0.5 rounded border border-border shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+                                        @else
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to push to client">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Push Selected to Client</span>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endif
+
+                                    <!-- SECTION 2: ASSIGNMENT & TEAM -->
+                                    @if(!$isSalesExecutive)
+                                        <div class="my-1.5 border-t border-border"></div>
+                                        <div class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted select-none">
+                                            Assignment
+                                        </div>
+
+                                        @if(!empty($selectedRows))
+                                            <button type="button" wire:click="openBulkAssignModal"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-primary transition text-left cursor-pointer group"
+                                                title="Assign selected leads to an executive or team leader">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary/20">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Assign Selected</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-muted bg-canvas px-1.5 py-0.5 rounded border border-border shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+
+                                            <button type="button" wire:click="unassignSelectedLeads"
+                                                wire:confirm="Remove executive assignments from all selected leads? They will be returned to the unassigned pool."
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-amber-800 hover:bg-amber-50 transition text-left cursor-pointer group"
+                                                title="Unassign executive from selected leads (especially when no action was taken)">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Unassign Selected</span>
+                                                </div>
+                                                <span class="text-[11px] font-mono font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                            </button>
+                                        @else
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to assign">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Assign Selected</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-muted opacity-50 cursor-not-allowed select-none" title="Select one or more leads to unassign">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-canvas text-muted flex items-center justify-center shrink-0">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Unassign Selected</span>
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if(!$isBuilder && !$this->isClientContext())
+                                            <button type="button" wire:click="autoDistributeUnassignedLeads"
+                                                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-indigo-600 transition text-left cursor-pointer group"
+                                                title="Distribute unassigned leads using the Super Admin configured distribution rule">
+                                                <div class="flex items-center gap-2.5 min-w-0">
+                                                    <div class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-100">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="truncate">Auto-Assign</span>
+                                                </div>
+                                            </button>
+                                        @endif
+                                    @endif
+
+                                    <!-- SECTION 3: EXPORT & REPORTS -->
+                                    <div class="my-1.5 border-t border-border"></div>
+                                    <div class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted select-none">
+                                        Export
+                                    </div>
+
+                                    <button type="button" wire:click="exportExcel" wire:loading.attr="disabled"
+                                        class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-ink hover:bg-canvas hover:text-emerald-700 transition text-left cursor-pointer group"
+                                        title="Export authorized leads matching current filters to Excel">
+                                        <div class="flex items-center gap-2.5 min-w-0">
+                                            <div class="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-100">
+                                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                            </div>
+                                            <span class="truncate">Export to Excel</span>
+                                        </div>
+                                        @if(!empty($selectedRows))
+                                            <span class="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0 ml-2">({{ count($selectedRows) }})</span>
+                                        @endif
+                                    </button>
+                                </div>
+                            </x-slot:content>
+                        </x-ui.dropdown>
+
                         @if(!$isBuilder && !$isSalesExecutive)
                             <button type="button" wire:click="openPullLeadsModal"
                                 class="px-3 h-8 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer">

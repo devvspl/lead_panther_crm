@@ -198,6 +198,15 @@ class LeadKanban extends Component
 
     public string $manualBudget = '';
 
+    // Leads Export Modal State
+    public bool $showExportModal = false;
+
+    public array $selectedExportColumns = [];
+
+    public string $exportScope = 'all';
+
+    public string $exportValidationError = '';
+
     public string $manualPropertyType = '';
 
     public string $manualRequirement = '';
@@ -2633,49 +2642,378 @@ class LeadKanban extends Component
         $this->dispatch('toast', type: 'success', message: "Lead '{$lead->name}' (#{$lead->lead_code}) added to pipeline.");
     }
 
-    public function exportExcel()
+    public static function exportCategories(): array
     {
+        return [
+            'lead_information' => [
+                'title' => 'Lead Information',
+                'description' => 'Core contact and system identification fields',
+                'fields' => [
+                    'lead_id' => [
+                        'label' => 'Lead ID',
+                        'default' => false,
+                        'getter' => fn($l) => (string) $l->id,
+                    ],
+                    'lead_code' => [
+                        'label' => 'Lead Code',
+                        'default' => true,
+                        'getter' => fn($l) => $l->lead_code,
+                    ],
+                    'name' => [
+                        'label' => 'Lead Name',
+                        'default' => true,
+                        'getter' => fn($l) => $l->name,
+                    ],
+                    'mobile' => [
+                        'label' => 'Mobile Number',
+                        'default' => true,
+                        'getter' => fn($l) => $l->mobile,
+                    ],
+                    'email' => [
+                        'label' => 'Email',
+                        'default' => true,
+                        'getter' => fn($l) => $l->email ?: '-',
+                    ],
+                    'city' => [
+                        'label' => 'City',
+                        'default' => true,
+                        'getter' => fn($l) => $l->city ?: '-',
+                    ],
+                    'state' => [
+                        'label' => 'State',
+                        'default' => false,
+                        'getter' => fn($l) => $l->state ?: ($l->getMetaAttribute('state') ?: '-'),
+                    ],
+                    'created_date' => [
+                        'label' => 'Created Date',
+                        'default' => true,
+                        'getter' => fn($l) => $l->created_at?->format('Y-m-d H:i') ?: '-',
+                    ],
+                ],
+            ],
+            'project_campaign' => [
+                'title' => 'Project & Campaign',
+                'description' => 'Associated project, client organization and marketing source',
+                'fields' => [
+                    'project_name' => [
+                        'label' => 'Project Name',
+                        'default' => true,
+                        'getter' => fn($l) => $l->projectName ?: ($l->campaign?->project?->name ?: '-'),
+                    ],
+                    'organization' => [
+                        'label' => 'Organization / Client',
+                        'default' => true,
+                        'getter' => fn($l) => $l->organizationName ?: ($l->client?->name ?: '-'),
+                    ],
+                    'campaign_name' => [
+                        'label' => 'Campaign Name',
+                        'default' => true,
+                        'getter' => fn($l) => $l->campaignName ?: ($l->campaign?->name ?: '-'),
+                    ],
+                    'campaign_id' => [
+                        'label' => 'Campaign ID',
+                        'default' => false,
+                        'getter' => fn($l) => (string) ($l->campaign?->remote_id ?: ($l->campaign_id ?: '-')),
+                    ],
+                    'lead_source' => [
+                        'label' => 'Lead Source',
+                        'default' => true,
+                        'getter' => fn($l) => $l->leadSourceName ?: ($l->leadSource?->name ?: '-'),
+                    ],
+                    'facebook_page' => [
+                        'label' => 'Facebook Page',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $pageName = $l->getMetaAttribute('page_name') ?: $l->getMetaAttribute('fb_page');
+                            if (!$pageName && $l->campaign_id) {
+                                $adRecord = \App\Models\MetaAdRecord::where('crm_campaign_id', $l->campaign_id)->first();
+                                $pageName = $adRecord?->account?->pages?->first()?->account_name ?: $adRecord?->account?->pages?->first()?->name;
+                            }
+                            return $pageName ?: '-';
+                        },
+                    ],
+                ],
+            ],
+            'assignment_details' => [
+                'title' => 'Assignment Details',
+                'description' => 'Sales team routing, assigned executives and leadership',
+                'fields' => [
+                    'team' => [
+                        'label' => 'Team',
+                        'default' => false,
+                        'getter' => fn($l) => $l->teamName ?: '-',
+                    ],
+                    'team_leader' => [
+                        'label' => 'Team Leader',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $member = $l->assignedTo?->salesTeamMembers?->first();
+                            return $member?->salesTeam?->leader?->name ?: '-';
+                        },
+                    ],
+                    'assigned_agent' => [
+                        'label' => 'Assigned Agent',
+                        'default' => true,
+                        'getter' => fn($l) => $l->assignedTo?->name ?: 'Unassigned',
+                    ],
+                    'assigned_date' => [
+                        'label' => 'Assigned Date',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $date = $l->executive_assigned_at ?: $l->assignments?->last()?->assigned_at;
+                            return $date ? Carbon::parse($date)->format('Y-m-d H:i') : '-';
+                        },
+                    ],
+                    'assigned_by' => [
+                        'label' => 'Assigned By',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $lastAssignment = $l->assignments?->last();
+                            return $lastAssignment?->assigner?->name ?: ($lastAssignment?->assigned_by ? \App\Models\User::find($lastAssignment->assigned_by)?->name : '-');
+                        },
+                    ],
+                ],
+            ],
+            'lead_status_followup' => [
+                'title' => 'Lead Status & Follow-up',
+                'description' => 'Lifecycle stage, engagement status, follow-up timeline and SLA',
+                'fields' => [
+                    'lead_stage' => [
+                        'label' => 'Lead Stage',
+                        'default' => true,
+                        'getter' => fn($l) => ucfirst(str_replace('_', ' ', (string) $l->current_stage)),
+                    ],
+                    'lead_status' => [
+                        'label' => 'Lead Status',
+                        'default' => true,
+                        'getter' => fn($l) => ucfirst(str_replace('_', ' ', (string) $l->status)),
+                    ],
+                    'last_activity' => [
+                        'label' => 'Last Activity',
+                        'default' => false,
+                        'getter' => fn($l) => $l->lastActivity,
+                    ],
+                    'next_followup_date' => [
+                        'label' => 'Next Follow-up Date',
+                        'default' => true,
+                        'getter' => fn($l) => $l->nextPendingFollowup()?->due_at?->format('Y-m-d H:i') ?: '-',
+                    ],
+                    'first_response_status' => [
+                        'label' => 'First Response Status',
+                        'default' => false,
+                        'getter' => fn($l) => $l->first_response_at ? 'Responded (' . $l->first_response_timing . ')' : 'Pending Response',
+                    ],
+                    'sla_status' => [
+                        'label' => 'SLA Status',
+                        'default' => true,
+                        'getter' => fn($l) => $l->slaBadge,
+                    ],
+                ],
+            ],
+            'additional_details' => [
+                'title' => 'Additional Details',
+                'description' => 'Form metadata, customer requirements, remarks and custom questions',
+                'fields' => [
+                    'lead_form_name' => [
+                        'label' => 'Lead Form Name',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $formName = $l->getMetaAttribute('form_name') ?: $l->getMetaAttribute('meta_form_name');
+                            if (!$formName && $l->campaign_id) {
+                                $adRecord = \App\Models\MetaAdRecord::where('crm_campaign_id', $l->campaign_id)->first();
+                                $formName = $adRecord?->leadForm?->form_name;
+                            }
+                            return $formName ?: '-';
+                        },
+                    ],
+                    'lead_remarks' => [
+                        'label' => 'Lead Remarks',
+                        'default' => false,
+                        'getter' => fn($l) => $l->requirement ?: ($l->getMetaAttribute('remarks') ?: '-'),
+                    ],
+                    'custom_lead_fields' => [
+                        'label' => 'Custom Lead Fields',
+                        'default' => false,
+                        'getter' => function ($l) {
+                            $answers = $l->getMetaAttribute('meta_form_answers') ?: $l->getMetaAttribute('custom_fields');
+                            if ($answers) {
+                                $arr = is_array($answers) ? $answers : (json_decode($answers, true) ?: []);
+                                if (!empty($arr)) {
+                                    $pairs = [];
+                                    foreach ($arr as $k => $v) {
+                                        $valStr = is_array($v) ? implode(', ', $v) : (string) $v;
+                                        $pairs[] = "{$k}: {$valStr}";
+                                    }
+                                    return implode(' | ', $pairs);
+                                }
+                            }
+                            return '-';
+                        },
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    public function defaultExportColumns(): array
+    {
+        $defaults = [];
+        foreach (static::exportCategories() as $cat) {
+            foreach ($cat['fields'] as $key => $field) {
+                if ($field['default']) {
+                    $defaults[] = $key;
+                }
+            }
+        }
+        return $defaults;
+    }
+
+    public function getExportMatchingCountProperty(): int
+    {
+        return $this->getScopedQuery()->count();
+    }
+
+    public function openExportModal(): void
+    {
+        if (empty($this->selectedExportColumns)) {
+            $this->selectedExportColumns = $this->defaultExportColumns();
+        }
+        $this->exportValidationError = '';
+        $this->exportScope = !empty($this->selectedRows) ? 'selected' : 'all';
+        $this->showExportModal = true;
+    }
+
+    public function closeExportModal(): void
+    {
+        $this->showExportModal = false;
+        $this->exportValidationError = '';
+    }
+
+    public function selectAllExportColumns(): void
+    {
+        $all = [];
+        foreach (static::exportCategories() as $cat) {
+            foreach ($cat['fields'] as $key => $field) {
+                $all[] = $key;
+            }
+        }
+        $this->selectedExportColumns = $all;
+        $this->exportValidationError = '';
+    }
+
+    public function clearAllExportColumns(): void
+    {
+        $this->selectedExportColumns = [];
+    }
+
+    public function resetExportColumnsToDefault(): void
+    {
+        $this->selectedExportColumns = $this->defaultExportColumns();
+        $this->exportValidationError = '';
+    }
+
+    public function toggleExportCategory(string $categoryKey): void
+    {
+        $categories = static::exportCategories();
+        if (!isset($categories[$categoryKey])) {
+            return;
+        }
+
+        $catFields = array_keys($categories[$categoryKey]['fields']);
+        $allSelected = empty(array_diff($catFields, $this->selectedExportColumns));
+
+        if ($allSelected) {
+            $this->selectedExportColumns = array_values(array_diff($this->selectedExportColumns, $catFields));
+        } else {
+            $this->selectedExportColumns = array_values(array_unique(array_merge($this->selectedExportColumns, $catFields)));
+        }
+        $this->exportValidationError = '';
+    }
+
+    public function exportExcel(): void
+    {
+        $this->openExportModal();
+    }
+
+    public function confirmExport()
+    {
+        if (empty($this->selectedExportColumns)) {
+            $this->exportValidationError = 'Please select at least one column to export.';
+            return null;
+        }
+
+        $this->exportValidationError = '';
+
         $baseQuery = $this->getScopedQuery();
+        if ($this->exportScope === 'selected' && !empty($this->selectedRows)) {
+            $baseQuery->whereIn('id', $this->selectedRows);
+        }
+
+        $baseQuery->with([
+            'client.organization',
+            'assignedTo.organization',
+            'assignedTo.salesTeamMembers.salesTeam.leader',
+            'campaign.project',
+            'leadSource',
+            'followups',
+            'assignments.assigner',
+            'metadata',
+        ]);
+
         $data = $baseQuery->latest('id')->get();
 
+        $categories = static::exportCategories();
+        $flatFields = [];
+        foreach ($categories as $cat) {
+            foreach ($cat['fields'] as $key => $field) {
+                $flatFields[$key] = $field;
+            }
+        }
+
+        $headings = [];
+        $columns = [];
+        $statusCols = [];
+
+        foreach ($this->selectedExportColumns as $colKey) {
+            if (isset($flatFields[$colKey])) {
+                // If lead source visibility is restricted, skip source fields
+                if (in_array($colKey, ['lead_source', 'facebook_page'], true) && ! \App\Support\LeadSourceVisibility::allowed()) {
+                    continue;
+                }
+                $headings[] = $flatFields[$colKey]['label'];
+                $columns[] = $flatFields[$colKey]['getter'];
+                if (in_array($colKey, ['lead_stage', 'lead_status', 'sla_status'], true)) {
+                    $statusCols[] = $flatFields[$colKey]['label'];
+                }
+            }
+        }
+
+        if (empty($headings)) {
+            $this->exportValidationError = 'None of the selected columns are available for your permission level.';
+            return null;
+        }
+
         $user = auth()->user();
-        $orgName = $user && $user->organization ? Str::slug($user->organization->name) : 'all';
-        $filename = "leads-directory_{$orgName}_".now()->format('Y-m-d').'.xlsx';
+        $orgName = $this->isClientContext() && isset($this->clientOrganizationId)
+            ? (\App\Models\Organization::find($this->clientOrganizationId)?->name ?: 'client')
+            : ($user && $user->organization ? $user->organization->name : 'all');
 
-        $isBuilderUser = $user && ($user->hasRole('builder') || $user->hasRole('Builder/Developer') || $this->isBuilder);
-        $dateHeading = $isBuilderUser ? 'Received Date' : 'Created At';
+        $slugName = Str::slug($orgName);
+        $filename = "leads-export_{$slugName}_" . now()->format('Y-m-d_His') . '.xlsx';
+        $title = $this->isClientContext() ? "{$orgName} - Leads Export" : 'Leads Directory & Pipeline Export';
+        $subtitle = 'Exported ' . now()->format('d M Y, H:i T') . ' | ' . count($headings) . ' columns' . ($this->search ? " | Search: {$this->search}" : '');
 
-        $headings = ['Lead Code', 'Name', 'Phone', 'Email', 'City', 'Property Type', 'Budget', 'Project', 'Campaign', 'Source', 'Assigned Agent', 'Stage', 'Score', $dateHeading];
-        $columns = [
-            'lead_code',
-            'name',
-            'mobile',
-            'email',
-            'city',
-            'property_type',
-            'budget_formatted',
-            fn($l) => $l->projectName,
-            fn($l) => $l->campaignName,
-            fn($l) => $l->leadSourceName,
-            fn($l) => $l->assignedTo?->name ?: 'Unassigned',
-            fn($l) => ucfirst(str_replace('_', ' ', (string)$l->current_stage)),
-            'lead_score',
-            fn($l) => ($isBuilderUser ? ($l->delivered_at ?: $l->created_at) : $l->created_at)?->format('M d, Y H:i') ?: '',
-        ];
-
-        $subtitle = 'Exported '.now()->format('d M Y, H:i T').($this->search ? " | Search: {$this->search}" : '').($this->project ? " | ProjectID: {$this->project}" : '');
-        if (! \App\Support\LeadSourceVisibility::allowed()) { unset($headings[9], $columns[9]); $headings = array_values($headings); $columns = array_values($columns); }
-
+        $this->showExportModal = false;
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
         return Excel::download(
             new BaseStyledExport(
                 data: $data,
-                title: 'Leads Directory & Pipeline Export',
+                title: $title,
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                statusColumns: ['current_stage']
+                statusColumns: $statusCols
             ),
             $filename
         );

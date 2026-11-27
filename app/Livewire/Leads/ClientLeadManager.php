@@ -277,21 +277,15 @@ class ClientLeadManager extends LeadKanban
         $this->dispatch('toast', type: 'success', message: 'Selected leads archived.');
     }
 
-    public function exportSelectedLeads()
+    public function exportSelectedLeads(): void
     {
         $this->assertSelectedLeads($this->selectedRows);
-        return $this->downloadClientExport(true);
+        $this->exportScope = 'selected';
+        $this->openExportModal();
     }
 
-    public function exportExcel() { return $this->downloadClientExport(false); }
-
-    protected function downloadClientExport(bool $selected)
+    public function exportExcel(): void
     {
-        $query = $this->getScopedQuery()->when($selected, fn ($q) => $q->whereIn('id', $this->selectedRows));
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BaseStyledExport(
-            data: $query->latest('id')->get(), title: 'Client Leads', subtitle: Organization::findOrFail($this->clientOrganizationId)->name,
-            headings: ['Lead ID', 'Name', 'Mobile', 'Email', 'Project', 'Campaign', 'Source', 'Assigned Executive', 'Stage', 'Status', 'Delivery Pending', 'Delivered At', 'Handover At'],
-            columns: ['lead_code', 'name', 'mobile', 'email', fn ($lead) => $lead->campaign?->project?->name, fn ($lead) => $lead->campaign?->name, fn ($lead) => $lead->leadSource?->name, fn ($lead) => $lead->assignedTo?->name, 'current_stage', 'status', fn ($lead) => $lead->delivery_pending ? 'Yes' : 'No', 'delivered_at', fn ($lead) => $lead->internalProcessing?->forwarded_at]
-        ), 'client-leads-'.$this->clientOrganizationId.'.xlsx');
+        $this->openExportModal();
     }
 }

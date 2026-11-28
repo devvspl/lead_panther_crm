@@ -166,13 +166,21 @@ class AdminCredits extends Component
 
         $headings = ['Date & Time', 'Client', 'Transaction Type', 'Lead Code', 'Credit Before', 'Credit Used/Added', 'Credit After'];
         $columns = [
-            fn($tx) => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') : '',
+            fn($tx) => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') : '—',
             fn($tx) => $tx->client?->name ?: 'System Client',
-            fn($tx) => $tx->transaction_type,
-            fn($tx) => $tx->lead?->lead_code ?: 'N/A',
-            'credit_before',
-            'credit_used',
-            'credit_after',
+            fn($tx) => match($tx->transaction_type) {
+                'deduct', 'reserve', 'lead_consumption' => 'Lead Consumption',
+                'recharge' => 'Recharge',
+                'refund', 'lead_refund' => 'Refund',
+                'reconciliation' => 'Reconciliation',
+                default => ucfirst(str_replace('_', ' ', (string) $tx->transaction_type)),
+            },
+            fn($tx) => $tx->lead?->lead_code ?: '—',
+            fn($tx) => $tx->credit_before !== null ? (int)$tx->credit_before : '—',
+            fn($tx) => ($tx->credit_after >= $tx->credit_before || in_array($tx->transaction_type, ['recharge', 'refund', 'lead_refund', 'opening_credit']))
+                ? '+' . number_format((int)$tx->credit_used)
+                : '-' . number_format((int)$tx->credit_used),
+            fn($tx) => $tx->credit_after !== null ? (int)$tx->credit_after : '—',
         ];
 
         $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->statusFilter ? " | Type: {$this->statusFilter}" : '');
@@ -186,7 +194,7 @@ class AdminCredits extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                statusColumns: ['transaction_type'],
+                statusColumns: ['Transaction Type'],
                 currencyColumns: [],
                 hasTotals: true
             ),

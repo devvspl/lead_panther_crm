@@ -187,35 +187,110 @@ class BaseStyledExport implements FromCollection, WithHeadings, WithMapping, Wit
                 $dataIdx = $r - $firstDataRow;
                 $rowItem = $this->data->values()->get($dataIdx);
 
+                $statusColIndices = [];
                 foreach ($this->statusColumns as $sColKey) {
-                    $colIndex = array_search($sColKey, array_values($this->columns), true);
-                    if ($colIndex !== false) {
-                        $cellLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
-                        $rowVal = is_object($rowItem) ? data_get($rowItem, $sColKey) : ($rowItem[$sColKey] ?? '');
-                        if (is_array($rowVal) || is_object($rowVal)) {
-                            $rowVal = json_encode($rowVal);
+                    if (is_int($sColKey)) {
+                        $statusColIndices[] = $sColKey;
+                        continue;
+                    }
+                    $found = false;
+                    foreach ($this->columns as $idx => $cVal) {
+                        if ((is_string($cVal) && strtolower($cVal) === strtolower($sColKey)) || (string)$idx === (string)$sColKey) {
+                            $statusColIndices[] = (int) $idx;
+                            $found = true;
+                            break;
                         }
-                        $val = strtolower(trim((string)$rowVal));
-
-                        $badgeBg = 'F1F5F9';
-                        $badgeText = '475569';
-
-                        if (in_array($val, ['approved', 'active', 'completed', 'closed_won', 'recharge', 'refund', 'yes'])) {
-                            $badgeBg = 'DCFCE7';
-                            $badgeText = '15803D';
-                        } elseif (in_array($val, ['pending', 'under_review', 'reserve', 'assigned'])) {
-                            $badgeBg = 'FEF3C7';
-                            $badgeText = 'B45309';
-                        } elseif (in_array($val, ['rejected', 'failed', 'suspended', 'missed', 'breached', 'deduct', 'no'])) {
-                            $badgeBg = 'FEE2E2';
-                            $badgeText = 'B91C1C';
+                    }
+                    if (!$found) {
+                        foreach ($this->headings as $idx => $heading) {
+                            $normH = strtolower(str_replace([' ', '_', '-', '/'], '', (string)$heading));
+                            $normK = strtolower(str_replace([' ', '_', '-', '/'], '', (string)$sColKey));
+                            if ($normH === $normK || str_contains($normH, $normK)) {
+                                $statusColIndices[] = (int) $idx;
+                                break;
+                            }
                         }
+                    }
+                }
 
-                        $sheet->getStyle("{$cellLetter}{$r}")->applyFromArray([
-                            'font' => ['bold' => true, 'color' => ['rgb' => $badgeText]],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => $badgeBg]],
-                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                // Auto-detect type/status column if none matched
+                if (empty($statusColIndices)) {
+                    foreach ($this->headings as $idx => $heading) {
+                        $normH = strtolower(trim((string)$heading));
+                        if (in_array($normH, ['status', 'type', 'transaction type', 'tx type'])) {
+                            $statusColIndices[] = (int) $idx;
+                        }
+                    }
+                }
+
+                foreach (array_unique($statusColIndices) as $colIndex) {
+                    $cellLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
+                    $cell = $sheet->getCell("{$cellLetter}{$r}");
+                    $cellVal = trim((string) $cell->getValue());
+                    $norm = strtolower(str_replace([' ', '_', '-'], '', $cellVal));
+
+                    $badgeBg = 'F1F5F9';
+                    $badgeText = '475569';
+
+                    if (in_array($norm, ['approved', 'active', 'completed', 'closedwon', 'recharge', 'refund', 'leadrefund', 'yes', 'verified'])) {
+                        $badgeBg = 'DCFCE7';
+                        $badgeText = '15803D';
+                    } elseif (in_array($norm, ['pending', 'underreview', 'reserve', 'assigned', 'processing'])) {
+                        $badgeBg = 'FEF3C7';
+                        $badgeText = 'B45309';
+                    } elseif (in_array($norm, ['leadconsumption', 'consumption', 'deduct', 'rejected', 'failed', 'suspended', 'missed', 'breached', 'no'])) {
+                        $badgeBg = 'FEE2E2';
+                        $badgeText = 'B91C1C';
+                    } elseif (in_array($norm, ['reconciliation', 'adjustment', 'creditadjustment', 'reconciled'])) {
+                        $badgeBg = 'EDE9FE';
+                        $badgeText = '6D28D9';
+                    }
+
+                    $sheet->getStyle("{$cellLetter}{$r}")->applyFromArray([
+                        'font' => ['bold' => true, 'color' => ['rgb' => $badgeText]],
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => $badgeBg]],
+                        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                    ]);
+                }
+
+                // Nature Color Formatting for Financial/Credit Movements (+ for additions, - for deductions)
+                for ($colIdx = 0; $colIdx < $colCount; $colIdx++) {
+                    $cLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx + 1);
+                    $cCell = $sheet->getCell("{$cLetter}{$r}");
+                    $cVal = trim((string) $cCell->getValue());
+                    $heading = $this->headings[$colIdx] ?? '';
+                    $headingNorm = strtolower(str_replace([' ', '_', '-', '/'], '', (string)$heading));
+                    $isMovementHeading = in_array($headingNorm, ['creditusedadded', 'creditinout', 'change', 'movement', 'inout']);
+
+                    if (str_starts_with($cVal, '+') || ($isMovementHeading && is_numeric($cVal) && ((float)$cVal > 0 || (is_object($rowItem) && in_array(data_get($rowItem, 'transaction_type'), ['recharge', 'refund', 'lead_refund', 'opening_credit']))))) {
+                        // Inflows / Additions: Emerald Green badge with explicit + formatting
+                        $dispVal = '+' . ltrim($cVal, '+');
+                        $sheet->setCellValueExplicit("{$cLetter}{$r}", $dispVal, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        $sheet->getStyle("{$cLetter}{$r}")->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['rgb' => '15803D'], 'size' => 10],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'DCFCE7']],
+                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                         ]);
+                    } elseif (str_starts_with($cVal, '-') || ($isMovementHeading && is_numeric($cVal) && (is_object($rowItem) && in_array(data_get($rowItem, 'transaction_type'), ['lead_consumption', 'deduct', 'reserve'])))) {
+                        // Outflows / Deductions: Rose / Red badge with explicit - formatting
+                        $dispVal = '-' . ltrim($cVal, '-');
+                        $sheet->setCellValueExplicit("{$cLetter}{$r}", $dispVal, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        $sheet->getStyle("{$cLetter}{$r}")->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['rgb' => 'B91C1C'], 'size' => 10],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FEE2E2']],
+                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                        ]);
+                    }
+                }
+
+                // Align codes and numbers cleanly
+                foreach ($this->headings as $hIdx => $hText) {
+                    $hNorm = strtolower(str_replace([' ', '_', '-'], '', (string)$hText));
+                    $hLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($hIdx + 1);
+                    if (in_array($hNorm, ['leadcode', 'leadreference', 'code', 'txid', 'id', 'date', 'datetime', 'dateandtime', 'timestamp'])) {
+                        $sheet->getStyle("{$hLetter}{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    } elseif (in_array($hNorm, ['creditbefore', 'creditafter', 'balance'])) {
+                        $sheet->getStyle("{$hLetter}{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     }
                 }
 

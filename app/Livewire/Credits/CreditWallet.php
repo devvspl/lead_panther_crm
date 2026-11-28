@@ -224,6 +224,23 @@ class CreditWallet extends Component
 
         $txQuery = $client ? CreditTransaction::with(['lead', 'package'])->where('client_id', $client->id) : CreditTransaction::query()->whereRaw('1 = 0');
 
+        if (!empty($this->search)) {
+            $term = trim($this->search);
+            $cleanTerm = ltrim($term, '#');
+            $txQuery->where(function ($q) use ($term, $cleanTerm) {
+                if (is_numeric($cleanTerm)) {
+                    $q->orWhere('id', (int) $cleanTerm);
+                }
+                $q->orWhere('transaction_type', 'like', "%{$term}%")
+                  ->orWhere('description', 'like', "%{$term}%")
+                  ->orWhereHas('lead', function ($lq) use ($term) {
+                      $lq->where('lead_code', 'like', "%{$term}%")
+                         ->orWhere('name', 'like', "%{$term}%")
+                         ->orWhere('mobile', 'like', "%{$term}%");
+                  });
+            });
+        }
+
         if ($this->filterType) {
             $txQuery->where('transaction_type', $this->filterType);
         }
@@ -252,15 +269,23 @@ class CreditWallet extends Component
 
         $headings = ['Date & Time', 'Transaction Type', 'Lead Code', 'Credit Before', 'Credit Used/Added', 'Credit After'];
         $columns = [
-            fn($tx) => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') : '',
-            fn($tx) => \App\Support\ClientFacingText::label($tx->transaction_type),
-            fn($tx) => $tx->lead?->lead_code ?: 'N/A',
-            'credit_before',
-            'credit_used',
-            'credit_after',
+            fn($tx) => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('M d, Y H:i') : '—',
+            fn($tx) => match($tx->transaction_type) {
+                'deduct', 'reserve', 'lead_consumption' => 'Lead Consumption',
+                'recharge' => 'Recharge',
+                'refund', 'lead_refund' => 'Refund',
+                'reconciliation' => 'Reconciliation',
+                default => ucfirst(str_replace('_', ' ', (string) $tx->transaction_type)),
+            },
+            fn($tx) => $tx->lead?->lead_code ?: '—',
+            fn($tx) => $tx->credit_before !== null ? (int)$tx->credit_before : '—',
+            fn($tx) => ($tx->credit_after >= $tx->credit_before || in_array($tx->transaction_type, ['recharge', 'refund', 'lead_refund', 'opening_credit']))
+                ? '+' . number_format((int)$tx->credit_used)
+                : '-' . number_format((int)$tx->credit_used),
+            fn($tx) => $tx->credit_after !== null ? (int)$tx->credit_after : '—',
         ];
 
-        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->filterType ? " | Type: {$this->filterType}" : '') . ($this->filterDateRange ? " | DateRange: {$this->filterDateRange}" : '');
+        $subtitle = "Exported " . now()->format('d M Y, H:i T') . ($this->filterType ? " | Type: {$this->filterType}" : '') . ($this->filterDateRange ? " | DateRange: {$this->filterDateRange}" : '') . ($this->search ? " | Search: {$this->search}" : '');
 
         $this->dispatch('toast', type: 'success', message: 'Export ready — downloading now.');
 
@@ -271,7 +296,7 @@ class CreditWallet extends Component
                 subtitle: $subtitle,
                 headings: $headings,
                 columns: $columns,
-                statusColumns: ['transaction_type'],
+                statusColumns: ['Transaction Type'],
                 currencyColumns: [],
                 hasTotals: true
             ),

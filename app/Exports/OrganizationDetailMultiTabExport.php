@@ -153,14 +153,22 @@ class OrganizationDetailMultiTabExport implements WithMultipleSheets
             columns: [
                 'id',
                 fn($tx) => $tx->client?->name ?: '—',
-                'transaction_type',
+                fn($tx) => match($tx->transaction_type) {
+                    'deduct', 'reserve', 'lead_consumption' => 'Lead Consumption',
+                    'recharge' => 'Recharge',
+                    'refund', 'lead_refund' => 'Refund',
+                    'reconciliation' => 'Reconciliation',
+                    default => ucfirst(str_replace('_', ' ', (string) $tx->transaction_type)),
+                },
                 fn($tx) => $tx->lead?->lead_code ?: 'Direct Adjustment',
-                'credit_before',
-                'credit_used',
-                'credit_after',
+                fn($tx) => $tx->credit_before !== null ? (int)$tx->credit_before : '—',
+                fn($tx) => ($tx->credit_after >= $tx->credit_before || in_array($tx->transaction_type, ['recharge', 'refund', 'lead_refund', 'opening_credit']))
+                    ? '+' . number_format((int)$tx->credit_used)
+                    : '-' . number_format((int)$tx->credit_used),
+                fn($tx) => $tx->credit_after !== null ? (int)$tx->credit_after : '—',
                 fn($tx) => $tx->created_at ? Carbon::parse($tx->created_at)->format('M d, Y H:i') : '—',
             ],
-            statusColumns: ['transaction_type'],
+            statusColumns: ['Type'],
             currencyColumns: [],
             hasTotals: true
         );

@@ -2080,6 +2080,18 @@ class OrganizationDetail extends Component
         $this->dispatch('toast', type: 'success', message: "Credits updated successfully for {$client->name}.");
     }
 
+    public function rebalanceOrgCredits(?int $clientId = null): void
+    {
+        $clients = $clientId ? [$this->billingClients()->findOrFail($clientId)] : $this->billingClients()->get();
+        $totalRepaired = 0;
+        foreach ($clients as $client) {
+            $res = app(\App\Services\LeadCreditService::class)->auditAndRebalanceLedger($client, auth()->user());
+            $totalRepaired += $res['repaired_count'];
+        }
+        $this->organization->load('clients.wallet');
+        $this->dispatch('toast', type: 'success', message: "Credit ledger audited and balanced. {$totalRepaired} transaction(s) re-aligned.");
+    }
+
     // ─────────────────────────────────────────────────────────────
     // EXCEL EXPORTS (MULTI-TAB WORKBOOK & INDIVIDUAL TABS)
     // ─────────────────────────────────────────────────────────────

@@ -64,18 +64,22 @@
                 @endif
             </div>
 
-            <!-- Three Clean Navigation Tabs -->
+            <!-- Four Clean Navigation Tabs -->
             <div class="flex items-center gap-1.5 p-1 bg-canvas rounded-xl border border-border">
                 <button type="button" wire:click="setSection('reconcile')"
-                    class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'reconcile' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
+                    class="flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'reconcile' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
                     Reconcile Credits
                 </button>
+                <button type="button" wire:click="setSection('rebalance')"
+                    class="flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'rebalance' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
+                    Audit &amp; Rebalance
+                </button>
                 <button type="button" wire:click="setSection('consumed')"
-                    class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'consumed' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
+                    class="flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'consumed' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
                     Mark as Consumed
                 </button>
                 <button type="button" wire:click="setSection('dispute')"
-                    class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'dispute' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
+                    class="flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer text-center {{ $activeSection === 'dispute' ? 'bg-surface text-ink font-bold shadow-2xs border border-border/80' : 'text-muted hover:text-ink' }}">
                     Raise Dispute
                 </button>
             </div>
@@ -254,6 +258,45 @@
                                 </div>
                             </div>
                         @endif
+                    </div>
+                @endif
+
+                <!-- TAB 4: AUDIT & REBALANCE LEDGER -->
+                @if($activeSection === 'rebalance')
+                    <div class="space-y-4">
+                        <div class="p-4 rounded-xl bg-canvas border border-border space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-ink flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Ledger Integrity &amp; Balance Audit
+                                </span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">Automatic Re-chaining</span>
+                            </div>
+                            <p class="text-xs text-muted">
+                                Scans all credit transaction entries chronologically. Re-calculates and re-links running before/after balances, removes gaps from refund adjustments, and synchronizes the wallet balance with verified transactions.
+                            </p>
+                            <div class="p-3 bg-surface rounded-lg border border-border/80 space-y-1.5 text-xs">
+                                <div class="flex justify-between text-muted">
+                                    <span>Selected Client:</span>
+                                    <span class="font-bold text-ink">{{ $client?->name }}</span>
+                                </div>
+                                <div class="flex justify-between text-muted">
+                                    <span>Current Live Wallet Balance:</span>
+                                    <span class="font-mono font-bold text-primary">{{ number_format($wallet?->balance ?? 0) }} Credits</span>
+                                </div>
+                            </div>
+                            <div class="pt-2">
+                                <button type="button" wire:click="rebalanceLedger"
+                                    class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shadow-2xs flex items-center justify-center gap-2 cursor-pointer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <span>Audit &amp; Rebalance Ledger Chains</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 @endif
             @else

@@ -341,6 +341,13 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
                 $this->command?->line("  [REVERTED] Lead {$lead->lead_code} ({$lead->name}) -> returned to Client ID {$origClientId}");
             }
 
+            // ========================================================================
+            // STEP 4: Audit & Rebalance Credit Ledger Chains
+            // ========================================================================
+            $this->command?->info("\n--- Auditing & Rebalancing Credit Ledger Chains ---");
+            $rebalanceRes = app(\App\Services\LeadCreditService::class)->auditAndRebalanceLedger($targetClient, $superAdmin ?? $targetClient);
+            $this->command?->info("Ledger Rebalanced : {$rebalanceRes['repaired_count']} transaction(s) re-aligned. Final balance: {$rebalanceRes['final_balance']} credits.");
+
             DB::commit();
 
             $this->command?->info('================================================================');

@@ -62,7 +62,7 @@ class Reconciliation extends Component
 
     public function setSection(string $section): void
     {
-        if (in_array($section, ['reconcile', 'consumed', 'dispute'])) {
+        if (in_array($section, ['reconcile', 'consumed', 'dispute', 'rebalance'])) {
             $this->activeSection = $section;
             $this->resetValidation();
             $this->reset('message');
@@ -111,6 +111,20 @@ class Reconciliation extends Component
         $this->showModal = false;
         $this->dispatch('close-modal', 'reconcile-manage-credits-modal');
         $this->dispatch('toast', type: 'success', message: 'Verified lead credits saved. Original history is preserved.');
+        $this->dispatch('lead-credits-updated');
+    }
+
+    public function rebalanceLedger(): void
+    {
+        if (!$this->clientId) {
+            $this->dispatch('toast', type: 'error', message: 'Please select a client first.');
+            return;
+        }
+
+        $result = app(LeadCreditService::class)->auditAndRebalanceLedger($this->client(), auth()->user());
+        $this->updatedClientId();
+        $this->message = "Ledger audited & balanced: {$result['repaired_count']} transaction(s) re-aligned. Final balance: {$result['final_balance']} credits.";
+        $this->dispatch('toast', type: 'success', message: $this->message);
         $this->dispatch('lead-credits-updated');
     }
 

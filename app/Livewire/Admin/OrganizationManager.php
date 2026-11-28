@@ -1118,7 +1118,7 @@ class OrganizationManager extends Component
     {
         $members = fn() => User::select('id')->whereColumn('users.organization_id', 'organizations.id');
         // Actual wallet movements: consumption less refunds. Funding/adjustments aren't lead usage.
-        $movement = "CASE WHEN lead_id IS NULL THEN 0 WHEN transaction_type IN ('lead_consumption','deduct','reserve') THEN CASE WHEN credit_before > credit_after THEN credit_before-credit_after ELSE 0 END WHEN transaction_type = 'refund' THEN CASE WHEN credit_after > credit_before THEN credit_before-credit_after ELSE 0 END ELSE 0 END";
+        $movement = "CASE WHEN lead_id IS NULL THEN 0 WHEN transaction_type IN ('lead_consumption','deduct','reserve') THEN CAST(credit_used AS SIGNED) WHEN transaction_type IN ('refund','lead_refund') THEN -CAST(credit_used AS SIGNED) ELSE 0 END";
         $metrics = Organization::query()->select('organizations.*')->withCount(['users', 'projects'])->addSelect([
             'available_credits' => CreditWallet::query()->selectRaw('COALESCE(SUM(balance),0)')->whereIn('client_id', $members()),
             'credits_used' => CreditTransaction::query()->selectRaw("CASE WHEN SUM($movement)>0 THEN SUM($movement) ELSE 0 END")->whereIn('client_id', $members()),

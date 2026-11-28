@@ -118,6 +118,79 @@ class LeadCreditService
         }, 3);
     }
 
+    /**
+     * Audit all credit transactions chronologically, repair running before/after balances,
+     * eliminate jumps or gaps, and synchronize wallet balance.
+     */
+    public function auditAndRebalanceLedger(User $client, User $actor): array
+    {
+        abort_unless($actor->status === 'active' && $actor->hasAnyRole(['Super Admin', 'super-admin']), 403);
+
+        return DB::transaction(function () use ($client, $actor) {
+            User::whereKey($client->id)->lockForUpdate()->firstOrFail();
+            $wallet = CreditWallet::firstOrCreate(['client_id' => $client->id], ['balance' => 0, 'opening_balance' => 0]);
+            $wallet = CreditWallet::whereKey($wallet->id)->lockForUpdate()->firstOrFail();
+
+            $txs = CreditTransaction::withoutGlobalScopes()
+                ->where('client_id', $client->id)
+                ->where('is_legacy', false)
+                ->orderBy('created_at', 'asc')
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get();
+
+            $repairedCount = 0;
+            $runningBalance = 0;
+
+            foreach ($txs as $tx) {
+                $expectedBefore = $runningBalance;
+                $type = $tx->transaction_type;
+                $used = (int) $tx->credit_used;
+
+                if (in_array($type, ['recharge', 'opening_credit', 'refund', 'lead_refund'])) {
+                    $runningBalance += $used;
+                } elseif ($type === 'reconciliation') {
+                    $runningBalance = (int) $tx->credit_after;
+                } else {
+                    $runningBalance = max(0, $runningBalance - $used);
+                }
+                $expectedAfter = $runningBalance;
+
+                if ((int) $tx->credit_before !== $expectedBefore || (int) $tx->credit_after !== $expectedAfter) {
+                    $tx->update([
+                        'credit_before' => $expectedBefore,
+                        'credit_after' => $expectedAfter,
+                    ]);
+                    $repairedCount++;
+                }
+            }
+
+            $wallet->update([
+                'balance' => $runningBalance,
+                'reconciled_at' => now(),
+                'reconciled_by' => $actor->id,
+            ]);
+
+            AuditLog::create([
+                'user_id' => $actor->id,
+                'organization_id' => $client->organization_id,
+                'action' => 'lead_credits.rebalanced',
+                'subject_type' => CreditWallet::class,
+                'subject_id' => $wallet->id,
+                'from_value' => ['repaired_count' => $repairedCount],
+                'to_value' => ['balance' => $runningBalance, 'repaired_count' => $repairedCount],
+                'context' => ['category' => 'lead_credits', 'status' => 'success'],
+                'created_at' => now(),
+            ]);
+
+            return [
+                'repaired_count' => $repairedCount,
+                'final_balance' => $runningBalance,
+                'total_transactions' => $txs->count(),
+            ];
+        }, 3);
+    }
+
     private function disputeAudit(\App\Models\CreditDispute $dispute, string $action, User $actor): void
     {
         AuditLog::create(['user_id' => $actor->id, 'action' => 'lead_credits.dispute_'.$action, 'subject_type' => get_class($dispute), 'subject_id' => $dispute->id,

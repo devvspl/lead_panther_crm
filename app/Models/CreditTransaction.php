@@ -45,7 +45,7 @@ class CreditTransaction extends Model
 
     public function lead()
     {
-        return $this->belongsTo(Lead::class);
+        return $this->belongsTo(Lead::class)->withoutGlobalScopes();
     }
 
     public function package()

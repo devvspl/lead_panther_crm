@@ -71,7 +71,8 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
         $this->command?->info('================================================================');
 
         // 1. Identify Truegrowth Realty organization and client
-        $targetOrg = Organization::where('name', 'like', '%Truegrowth%')->first();
+        $targetOrg = Organization::where('name', 'like', '%Truegrowth Realty%')->first()
+            ?? Organization::where('name', 'like', '%Truegrowth%')->first();
         if (!$targetOrg) {
             $this->command?->warn('Truegrowth Realty organization not found.');
             return;
@@ -91,6 +92,14 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
 
         $this->command?->info("Target Organization : {$targetOrg->name} (ID: {$targetOrg->id})");
         $this->command?->info("Target Client User   : {$targetClient->name} (ID: {$truegrowthClientId})");
+
+        // Identify source organization (Gulmohar Studio 135)
+        $sourceOrg = Organization::where('name', 'like', '%Gulmohar%')->where('name', 'like', '%135%')->first()
+            ?? Organization::where('name', 'like', '%Gulmohar%')->first();
+        $sourceClient = $sourceOrg?->clients()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder']))
+            ->first() ?? $sourceOrg?->clients()->first();
+        $sourceClientId = $sourceClient?->id ?? 110;
 
         // Locate target campaign and project
         $targetProject = Project::withoutGlobalScopes()
@@ -145,7 +154,6 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
 
             foreach ($leadsToReclaim as $lead) {
                 $rentProcessed++;
-                $prevClientId = $lead->client_id;
 
                 // Move lead to Master Lead Pool (client_id = 1)
                 Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
@@ -165,7 +173,7 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
                 LeadAssignment::where('lead_id', $lead->id)->whereNull('unassigned_at')->update(['unassigned_at' => now()]);
 
                 // Revoke delivery items for Truegrowth
-                LeadDeliveryItem::where('lead_id', $lead->id)->where('client_id', $truegrowthClientId)->update([
+                LeadDeliveryItem::where('lead_id', $lead->id)->whereIn('client_id', $clientUserIds)->update([
                     'status' => 'revoked',
                     'revoked_at' => now(),
                     'failure_reason' => 'Reconciled: Rent lead retained in Master Lead Pool',
@@ -243,7 +251,7 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
                     'delivery_revoke_reason' => null,
                 ]);
 
-                // Ensure Delivery Item exists with status = 'sent'
+                // Ensure Delivery Item exists with status = 'sent' for Truegrowth Realty
                 $deliveryItem = LeadDeliveryItem::firstOrNew(['lead_id' => $lead->id, 'client_id' => $truegrowthClientId]);
                 $deliveryItem->plan_id = $deliveryItem->plan_id ?? 1;
                 $deliveryItem->source_client_id = $deliveryItem->source_client_id ?? $defaultClientId;
@@ -283,35 +291,54 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
             }
 
             // ========================================================================
-            // STEP 3: Handle Any Other Leads with 'reconciliation_audit'
+            // STEP 3: Revert Historical / Transferred Leads Back to Source (Gulmohar)
+            // Only the official 15 Meta Buy Leads belong to Truegrowth Realty panel
             // ========================================================================
-            $otherReconciledMeta = LeadMetadata::where('key', 'reconciliation_audit')
-                ->whereNotIn('lead_id', LeadMetadata::whereIn('key', ['meta_leadgen_id'])->whereIn('value', array_merge(self::META_BUY_LEAD_IDS, self::META_RENT_LEAD_IDS))->pluck('lead_id'))
+            $this->command?->info("\n--- Reverting Non-Meta Leads back to Source Organization ---");
+            $revertedCount = 0;
+
+            $metaBuyLeadIds = LeadMetadata::where('key', 'meta_leadgen_id')
+                ->whereIn('value', self::META_BUY_LEAD_IDS)
+                ->pluck('lead_id')
+                ->all();
+
+            $nonMetaLeadsOnTruegrowth = Lead::withoutGlobalScopes()
+                ->where(function ($q) use ($clientUserIds) {
+                    $q->whereIn('client_id', $clientUserIds)
+                      ->orWhereHas('deliveryItems', fn ($di) => $di->whereIn('client_id', $clientUserIds)->whereIn('status', ['sent', 'accepted']));
+                })
+                ->whereNotIn('id', $metaBuyLeadIds)
+                ->with(['metadata', 'deliveryItems'])
                 ->get();
 
-            foreach ($otherReconciledMeta as $audit) {
-                $lead = Lead::withoutGlobalScopes()->find($audit->lead_id);
-                if (!$lead) continue;
+            foreach ($nonMetaLeadsOnTruegrowth as $lead) {
+                $origClientId = (int) ($lead->metadata->firstWhere('key', 'transferred_from_client_id')?->value ?: $sourceClientId);
+                $origCampaignId = (int) ($lead->metadata->firstWhere('key', 'transferred_from_campaign_id')?->value ?: $lead->campaign_id);
 
-                if ($this->isExplicitRentLead($lead)) {
-                    // Keep rent in master pool
-                    Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
-                        'client_id' => $defaultClientId,
-                        'delivered_at' => null,
-                        'delivery_pending' => false,
-                        'credit_delivery_confirmed' => false,
-                        'assigned_to' => null,
-                    ]);
-                } else {
-                    // Restore buy lead back to Truegrowth
-                    Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
-                        'client_id' => $truegrowthClientId,
-                        'delivered_at' => $lead->delivered_at ?: ($lead->created_at ?: now()),
-                        'delivery_pending' => false,
-                        'credit_delivery_confirmed' => true,
-                    ]);
-                    $audit->delete();
-                }
+                Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
+                    'client_id' => $origClientId,
+                    'campaign_id' => $origCampaignId,
+                    'assigned_to' => null,
+                ]);
+
+                // Revoke delivery items for Truegrowth
+                LeadDeliveryItem::where('lead_id', $lead->id)->whereIn('client_id', $clientUserIds)->update([
+                    'status' => 'revoked',
+                    'revoked_at' => now(),
+                    'failure_reason' => 'Reverted to source organization: only 15 Meta Buy leads belong to Truegrowth Realty',
+                ]);
+
+                LeadMetadata::where('lead_id', $lead->id)->whereIn('key', [
+                    'transferred_from_organization',
+                    'transferred_to_organization',
+                    'transferred_from_client_id',
+                    'transferred_from_campaign_id',
+                    'transferred_at',
+                    'reconciliation_audit',
+                ])->delete();
+
+                $revertedCount++;
+                $this->command?->line("  [REVERTED] Lead {$lead->lead_code} ({$lead->name}) -> returned to Client ID {$origClientId}");
             }
 
             DB::commit();
@@ -320,11 +347,12 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
             $this->command?->info("RECONCILIATION COMPLETE:");
             $this->command?->info("Rent Leads Kept in Master Lead Pool (client_id = 1) : {$rentProcessed}");
             $this->command?->info("Buy Leads Delivered to Truegrowth Realty (Panel)   : {$buyProcessed}");
+            $this->command?->info("Non-Meta Leads Reverted to Source (Gulmohar)       : {$revertedCount}");
             $this->command?->info("Credits Refunded for Rent Leads                    : {$rentRefunded}");
             $this->command?->info("Credits Rebalanced for Buy Leads                   : {$buyDebited}");
             $this->command?->info('================================================================');
 
-            Log::info("[ReconcileRentLeadsFromDeveloperPanelsSeeder] Finished. {$rentProcessed} rent leads in Master Pool, {$buyProcessed} buy leads assigned to Truegrowth.");
+            Log::info("[ReconcileRentLeadsFromDeveloperPanelsSeeder] Finished. {$rentProcessed} rent in Pool, {$buyProcessed} buy in Truegrowth, {$revertedCount} reverted to source.");
         } catch (\Throwable $e) {
             DB::rollBack();
             $this->command?->error("Reconciliation failed: " . $e->getMessage());

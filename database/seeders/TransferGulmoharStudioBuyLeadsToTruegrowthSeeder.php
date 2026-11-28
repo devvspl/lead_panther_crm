@@ -383,6 +383,13 @@ class TransferGulmoharStudioBuyLeadsToTruegrowthSeeder extends Seeder
      */
     protected function isEligibleDate(Lead $lead): bool
     {
+        // 1. If meta_created_time exists, it takes precedence to ensure October leads are never treated as November leads
+        $metaTime = $lead->metadata->firstWhere('key', 'meta_created_time')?->value;
+        if ($metaTime) {
+            $metaDt = \Carbon\Carbon::parse($metaTime)->timezone('Asia/Kolkata');
+            return (int)$metaDt->year === 2026 && (int)$metaDt->month === 11 && in_array((int)$metaDt->day, [25, 26, 27]);
+        }
+
         if (!$lead->created_at) {
             return false;
         }

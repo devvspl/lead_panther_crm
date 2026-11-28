@@ -151,6 +151,10 @@ class CreditWallet extends Component
 
         $txQuery = $client ? CreditTransaction::with(['lead', 'package'])->where('client_id', $client->id) : CreditTransaction::query()->whereRaw('1 = 0');
 
+        if ($wallet && $wallet->reconciled_at) {
+            $txQuery->where('is_legacy', false);
+        }
+
         if (!empty($this->search)) {
             $txQuery->where(function ($q) {
                 $q->where('transaction_type', 'like', "%{$this->search}%")
@@ -180,7 +184,7 @@ class CreditWallet extends Component
         $sortField = in_array($this->sortField, ['created_at', 'transaction_type', 'credit_used', 'credit_before', 'credit_after', 'id']) ? $this->sortField : 'created_at';
         $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $transactions = $txQuery->orderBy($sortField, $sortDir)->paginate($this->perPage);
+        $transactions = $txQuery->orderBy($sortField, $sortDir)->orderBy('id', $sortDir)->paginate($this->perPage);
         $packages = CreditPackage::all();
 
         $rechargeRequests = $client ? RechargeRequest::with('package')
@@ -229,7 +233,12 @@ class CreditWallet extends Component
             }
         }
 
-        $data = $txQuery->latest('created_at')->get();
+        $wallet = $client ? WalletModel::where('client_id', $client->id)->first() : null;
+        if ($wallet && $wallet->reconciled_at) {
+            $txQuery->where('is_legacy', false);
+        }
+
+        $data = $txQuery->orderBy('created_at', 'desc')->orderBy('id', 'desc')->get();
 
         $clientName = $client ? \Illuminate\Support\Str::slug($client->name) : 'all';
         $filename = "credit-transactions_{$clientName}_" . now()->format('Y-m-d') . ".xlsx";

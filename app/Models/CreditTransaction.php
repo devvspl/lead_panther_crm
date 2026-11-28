@@ -156,7 +156,7 @@ class CreditTransaction extends Model
                     'transaction_type' => 'lead_consumption',
                     'description' => "Lead credits consumed for {$lead->lead_code} ({$lead->name})",
                     'created_by' => auth()->id() ?? $clientId,
-                    'created_at' => now(),
+                    'created_at' => $lead->delivered_at ?: $lead->created_at ?: now(),
                 ]);
 
                 event(new CreditReserved($lead, $tx));

@@ -279,6 +279,7 @@ class CreditReservationTest extends TestCase
         Role::findOrCreate('Admin');
         Role::findOrCreate('super-admin');
         Role::findOrCreate('client');
+        Role::findOrCreate('Client');
         Role::findOrCreate('sales-executive');
     }
 

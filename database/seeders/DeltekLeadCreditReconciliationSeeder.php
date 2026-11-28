@@ -69,12 +69,26 @@ class DeltekLeadCreditReconciliationSeeder extends Seeder
             $service = app(LeadCreditService::class);
             $reconciliation = $service->reconcile($client, self::ALLOCATION - $used, $before,
                 'Deltek: replace the legacy/dummy allocation with 1,000 lead credits; retain already recorded credit consumption.', $actor);
+
+            $firstDelivered = $delivered->first();
+            $earliestDelivery = $firstDelivered && !empty($firstDelivered->delivered_at)
+                ? \Carbon\Carbon::parse($firstDelivered->delivered_at)->subHours(1)
+                : \Carbon\Carbon::parse('2026-11-18 07:00:00');
+            $reconciliation->update(['created_at' => $earliestDelivery]);
+
             foreach ($missing as $lead) {
                 $legacyId = (clone $transactions)->where('is_legacy', true)->where('lead_id', $lead->id)
                     ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])->orderBy('id')->value('id');
                 $entry = $service->adjust($client, self::HISTORICAL_LEAD_COST, 'deduct',
                     'Deltek allocation reconciliation: delivered lead '.$lead->lead_code.($legacyId ? '; legacy entry #'.$legacyId : '; historical delivery evidence'), $actor);
-                $entry->update(['transaction_type' => 'lead_consumption', 'lead_id' => $lead->id, 'delivery_charge_lead_id' => $lead->id]);
+                
+                $leadDeliveredAt = !empty($lead->delivered_at) ? $lead->delivered_at : (!empty($lead->created_at) ? $lead->created_at : now());
+                $entry->update([
+                    'transaction_type' => 'lead_consumption',
+                    'lead_id' => $lead->id,
+                    'delivery_charge_lead_id' => $lead->id,
+                    'created_at' => $leadDeliveredAt,
+                ]);
             }
             $wallet = CreditWallet::withoutGlobalScopes()->where('client_id', $client->id)->firstOrFail();
             $summary = ['allocation' => self::ALLOCATION, 'client_id' => $client->id, 'delivered_leads' => $delivered->count(),

@@ -210,7 +210,8 @@ class User extends Authenticatable
                 'channel partner' => 'Channel Partner',
                 'broker' => 'Broker',
                 'team leader' => 'Team Leader',
-                'executive', 'sales executive', 'account manager', 'client' => 'Executive',
+                'executive', 'sales executive', 'account manager' => 'Executive',
+                'client' => 'Client',
                 default => $role,
             };
 

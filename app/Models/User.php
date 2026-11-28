@@ -185,7 +185,7 @@ class User extends Authenticatable
 
     public static function getExistingRoleNames(): array
     {
-        if (static::$existingRoleNamesCache === null) {
+        if (static::$existingRoleNamesCache === null || app()->environment('testing')) {
             try {
                 static::$existingRoleNamesCache = \Spatie\Permission\Models\Role::pluck('name')->toArray();
             } catch (\Throwable $e) {
@@ -228,6 +228,9 @@ class User extends Authenticatable
             }
             if ($target === 'Executive' && in_array('Sales Executive', $existing, true)) {
                 return 'Sales Executive';
+            }
+            if ($target === 'Client' && in_array('client', $existing, true)) {
+                return 'client';
             }
 
             if (in_array($role, $existing, true)) {

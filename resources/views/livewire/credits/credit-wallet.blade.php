@@ -232,7 +232,7 @@
                     <p class="text-[11px] text-muted">Specify the exact number of leads / delivery credits you wish to add.</p>
                 </div>
 
-                <!-- Packages (if configured) -->
+                {{-- Packages (if configured) - Commented out as requested
                 @if($packages->isNotEmpty())
                     <div class="space-y-2">
                         <label class="block font-semibold text-ink">Or Select a Standard Package</label>
@@ -252,6 +252,7 @@
                         </div>
                     </div>
                 @endif
+                --}}
 
                 <!-- Reference Notes -->
                 <div class="space-y-1.5">

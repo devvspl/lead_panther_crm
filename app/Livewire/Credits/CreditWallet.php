@@ -73,10 +73,7 @@ class CreditWallet extends Component
 
     public function mount(): void
     {
-        $firstPkg = CreditPackage::first();
-        if ($firstPkg) {
-            $this->selectedPackageId = $firstPkg->id;
-        }
+        // Standard packages selection commented out; credit quantity entered directly
     }
 
     public function openRechargeModal(): void

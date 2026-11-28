@@ -489,4 +489,62 @@ class CreditReservationTest extends TestCase
 
         \Maatwebsite\Excel\Facades\Excel::assertDownloaded("credit-transactions_client-export_" . now()->format('Y-m-d') . ".xlsx");
     }
+
+    public function test_credit_wallet_search_by_lead_code_and_description(): void
+    {
+        $org = Organization::create(['name' => 'Search Org', 'type' => 'builder']);
+        $user = User::factory()->create(['organization_id' => $org->id, 'name' => 'Wallet Searcher']);
+        $user->assignRole('builder');
+        $client = Client::create(['id' => $user->id, 'organization_id' => $org->id, 'name' => 'Wallet Searcher']);
+        CreditWallet::create(['client_id' => $client->id, 'balance' => 500, 'reconciled_at' => now()]);
+
+        $source = LeadSource::create(['name' => 'WalletSearch']);
+        $leadA = Lead::factory()->create([
+            'client_id' => $client->id,
+            'lead_source_id' => $source->id,
+            'lead_code' => 'LP-2026-00000741',
+            'mobile' => '9876543210',
+            'name' => 'Test Lead 741',
+        ]);
+        $leadB = Lead::factory()->create([
+            'client_id' => $client->id,
+            'lead_source_id' => $source->id,
+            'lead_code' => 'LP-2026-00000999',
+            'mobile' => '9123456780',
+            'name' => 'Test Lead 999',
+        ]);
+
+        CreditTransaction::create([
+            'client_id' => $client->id,
+            'lead_id' => $leadA->id,
+            'transaction_type' => 'lead_consumption',
+            'credit_before' => 500,
+            'credit_used' => 1,
+            'credit_after' => 499,
+            'is_legacy' => false,
+            'created_at' => now()->subHour(),
+        ]);
+
+        CreditTransaction::create([
+            'client_id' => $client->id,
+            'lead_id' => $leadB->id,
+            'transaction_type' => 'lead_consumption',
+            'credit_before' => 499,
+            'credit_used' => 1,
+            'credit_after' => 498,
+            'is_legacy' => false,
+            'created_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CreditWalletComponent::class)
+            ->assertSee('LP-2026-00000741')
+            ->assertSee('LP-2026-00000999')
+            ->set('search', 'LP-2026-00000741')
+            ->assertSee('LP-2026-00000741')
+            ->assertDontSee('LP-2026-00000999')
+            ->set('search', '9876543210')
+            ->assertSee('LP-2026-00000741')
+            ->assertDontSee('LP-2026-00000999');
+    }
 }

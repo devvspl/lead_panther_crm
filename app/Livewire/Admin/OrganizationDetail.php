@@ -2201,7 +2201,7 @@ class OrganizationDetail extends Component
                       ->orWhereHas('lead', function ($lq) use ($term) {
                           $lq->where('lead_code', 'like', "%{$term}%")
                              ->orWhere('name', 'like', "%{$term}%")
-                             ->orWhere('phone', 'like', "%{$term}%");
+                             ->orWhere('mobile', 'like', "%{$term}%");
                       })
                       ->orWhereHas('client', function ($cq) use ($term) {
                           $cq->where('name', 'like', "%{$term}%")
@@ -2390,7 +2390,7 @@ class OrganizationDetail extends Component
                   ->orWhereHas('lead', function ($lq) use ($term) {
                       $lq->where('lead_code', 'like', "%{$term}%")
                          ->orWhere('name', 'like', "%{$term}%")
-                         ->orWhere('phone', 'like', "%{$term}%");
+                         ->orWhere('mobile', 'like', "%{$term}%");
                   })
                   ->orWhereHas('client', function ($cq) use ($term) {
                       $cq->where('name', 'like', "%{$term}%")

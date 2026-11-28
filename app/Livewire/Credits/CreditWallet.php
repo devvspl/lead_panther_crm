@@ -167,7 +167,7 @@ class CreditWallet extends Component
                   ->orWhereHas('lead', function ($lq) use ($term) {
                       $lq->where('lead_code', 'like', "%{$term}%")
                          ->orWhere('name', 'like', "%{$term}%")
-                         ->orWhere('phone', 'like', "%{$term}%");
+                         ->orWhere('mobile', 'like', "%{$term}%");
                   });
             });
         }

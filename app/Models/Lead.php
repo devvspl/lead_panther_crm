@@ -96,8 +96,6 @@ class Lead extends Model
                   // (excluding unallocated pool leads and leads delivered to other clients)
                   ->orWhere(function ($sub) use ($orgUserIds) {
                       $sub->whereIn('client_id', $orgUserIds)
-                          ->whereNotNull('delivered_at')
-                          ->where('credit_delivery_confirmed', true)
                           ->where('do_not_send_to_client', false)
                           ->whereDoesntHave('deliveryItems', fn ($di) => $di->whereNotIn('client_id', $orgUserIds)->whereIn('status', ['sent', 'accepted']));
                   });

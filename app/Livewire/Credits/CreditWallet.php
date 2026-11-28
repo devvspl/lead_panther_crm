@@ -49,7 +49,7 @@ class CreditWallet extends Component
                     default => ucfirst(str_replace('_', ' ', (string) $type)),
                 };
                 $badgeClass = match($type) {
-                    'deduct', 'reserve', 'lead_consumption' => 'bg-indigo-50 text-indigo-700 border border-indigo-200/70',
+                    'deduct', 'reserve', 'lead_consumption' => 'bg-primary/10 text-primary border border-primary/20',
                     'recharge' => 'bg-emerald-50 text-emerald-700 border border-emerald-200/70',
                     'refund' => 'bg-blue-50 text-blue-700 border border-blue-200/70',
                     default => 'bg-canvas text-ink border border-border',

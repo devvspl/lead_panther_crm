@@ -272,9 +272,14 @@ class CreditReservationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Role::create(['name' => 'super-admin']);
-        Role::create(['name' => 'client']);
-        Role::create(['name' => 'sales-executive']);
+        Role::findOrCreate('Super Admin');
+        Role::findOrCreate('Executive');
+        Role::findOrCreate('Sales Executive');
+        Role::findOrCreate('Builder');
+        Role::findOrCreate('Admin');
+        Role::findOrCreate('super-admin');
+        Role::findOrCreate('client');
+        Role::findOrCreate('sales-executive');
     }
 
     public function test_client_credit_wallet_view_renders_successfully(): void

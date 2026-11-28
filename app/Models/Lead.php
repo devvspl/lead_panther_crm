@@ -63,10 +63,10 @@ class Lead extends Model
     }
 
     /** Owner IDs refer to users. Organization IDs must never be compared to client_id. */
-    public static function panelQuery(): Builder
+    public static function panelQuery(?User $user = null): Builder
     {
         $query = static::withoutGlobalScope(ClientScope::class);
-        $user = auth()->user();
+        $user ??= auth()->user();
         if (! $user) {
             return $query->whereRaw('1 = 0');
         }
@@ -83,18 +83,24 @@ class Lead extends Model
             });
         }
         if ($role === 'builder') {
-            return $query->where(function ($q) use ($user) {
-                $q->where('client_id', $user->id)
-                  ->orWhere('assigned_to', $user->id)
-                  ->orWhereHas('deliveryItems', fn ($di) => $di->where('client_id', $user->id)->whereIn('status', ['sent', 'accepted']));
-                if ($user->organization_id) {
-                    $orgId = $user->organization_id;
-                    $q->orWhereHas('client', fn ($owner) => $owner->where('organization_id', $orgId))
-                      ->orWhereHas('assignedTo', fn ($assignee) => $assignee->where('organization_id', $orgId))
-                      ->orWhereIn('client_id', User::where('organization_id', $orgId)->select('id'))
-                      ->orWhereIn('assigned_to', User::where('organization_id', $orgId)->select('id'))
-                      ->orWhereHas('deliveryItems', fn ($di) => $di->whereIn('client_id', User::where('organization_id', $orgId)->select('id'))->whereIn('status', ['sent', 'accepted']));
-                }
+            $orgUserIds = $user->organization_id
+                ? User::where('organization_id', $user->organization_id)->pluck('id')->all()
+                : [$user->id];
+
+            return $query->where(function ($q) use ($user, $orgUserIds) {
+                // 1. Leads explicitly delivered to this builder or their organization via LeadDeliveryItem
+                $q->whereHas('deliveryItems', fn ($di) => $di->whereIn('client_id', $orgUserIds)->whereIn('status', ['sent', 'accepted']))
+                  // 2. Leads assigned to the builder or team members in their organization
+                  ->orWhereIn('assigned_to', $orgUserIds)
+                  // 3. Leads directly confirmed and delivered to this builder/organization
+                  // (excluding unallocated pool leads and leads delivered to other clients)
+                  ->orWhere(function ($sub) use ($orgUserIds) {
+                      $sub->whereIn('client_id', $orgUserIds)
+                          ->whereNotNull('delivered_at')
+                          ->where('credit_delivery_confirmed', true)
+                          ->where('do_not_send_to_client', false)
+                          ->whereDoesntHave('deliveryItems', fn ($di) => $di->whereNotIn('client_id', $orgUserIds)->whereIn('status', ['sent', 'accepted']));
+                  });
             });
         }
 

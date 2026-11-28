@@ -152,6 +152,31 @@ class ProcessInboundLeadJob implements ShouldQueue
                 if ($campaignRoute) {
                     $projectId = (int) ($campaignRoute instanceof \App\Models\Project ? $campaignRoute->id : $campaignRoute->project_id);
                 }
+
+                // Project ownership must not automatically make the developer a lead recipient.
+                // The developer must receive leads only when explicitly authorized by an active allocation or order.
+                $isExplicitlyAuthorized = false;
+                if (!empty($mapping?->client_id)) {
+                    $isExplicitlyAuthorized = true;
+                } elseif ($clientId && (int)$clientId !== (int)$defaultClientId) {
+                    $candidateUser = \App\Models\User::find($clientId);
+                    $candidateOrgId = $candidateUser?->organization_id;
+                    $hasActivePlan = \App\Models\LeadDeliveryPlan::where(function ($q) use ($clientId, $candidateOrgId) {
+                        $q->where('client_id', $clientId);
+                        if ($candidateOrgId) {
+                            $q->orWhere('organization_id', $candidateOrgId);
+                        }
+                    })->where('state', 'active')->exists();
+
+                    if ($hasActivePlan) {
+                        $isExplicitlyAuthorized = true;
+                    }
+                }
+
+                if (!$isExplicitlyAuthorized) {
+                    $clientId = $defaultClientId;
+                }
+
                 $leadSource = LeadSource::firstOrCreate(['name' => $mapped['source'] ?? $type]);
                 $remoteCampaign = $type === 'meta' && $account ? app(\App\Services\MetaAdAccountService::class)->campaignRecord($account, $mapped) : null;
 
@@ -161,7 +186,9 @@ class ProcessInboundLeadJob implements ShouldQueue
                     if ($scoped) {
                         $campaignId = $scoped->id;
                         $projectId = $scoped->project_id;
-                        $clientId = $scoped->project?->client_id ?: $clientId;
+                        if ($isExplicitlyAuthorized) {
+                            $clientId = $scoped->project?->client_id ?: $clientId;
+                        }
                     }
                 }
 
@@ -198,9 +225,10 @@ class ProcessInboundLeadJob implements ShouldQueue
                 }
 
                 // 2. Custom Lead Filtering Rules Check (Builder / Developer Campaign Filters)
+                $unmatchedFilterSkipped = false;
                 $clientUser = \App\Models\User::find($clientId);
                 $organizationId = $clientUser?->organization_id;
-                if ($organizationId) {
+                if ($organizationId && (int)$clientId !== (int)$defaultClientId) {
                     $ruleEngine = app(\App\Services\LeadFilterRuleEngine::class);
                     $filterEval = $ruleEngine->evaluateLead($mapped, $organizationId, $campaignId, $projectId);
 
@@ -218,11 +246,9 @@ class ProcessInboundLeadJob implements ShouldQueue
                             payload: $mapped
                         );
 
-                        $this->webhookLog->update([
-                            'processed' => true,
-                            'error_message' => 'Lead skipped by custom filter rule: ' . $filterEval->reason,
-                        ]);
-                        return;
+                        // Invalid or unmatched leads must remain in the Master Lead Pool as unallocated
+                        $clientId = $defaultClientId;
+                        $unmatchedFilterSkipped = true;
                     }
                 }
 
@@ -382,11 +408,13 @@ class ProcessInboundLeadJob implements ShouldQueue
 
                 $this->webhookLog->update([
                     'processed' => true,
-                    'error_message' => null,
+                    'error_message' => $unmatchedFilterSkipped ? 'Lead unallocated to Master Lead Pool (unmatched filter rule).' : null,
                 ]);
 
-                // Dispatch LeadCreated event to trigger Credit Reservation
-                event(new LeadCreated($lead));
+                // Dispatch LeadCreated event to trigger Credit Reservation only for authorized client delivery
+                if (!$unmatchedFilterSkipped && (int)$clientId !== (int)$defaultClientId) {
+                    event(new LeadCreated($lead));
+                }
             });
         } catch (Throwable $e) {
             $this->webhookLog->update([

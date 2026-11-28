@@ -54,6 +54,11 @@ class LeadDistributionService
 
     public function scheduleDelivery(Lead $lead, bool $internalHandover = false): void
     {
+        if ($lead->delivery_pending === false) {
+            $lead->delivery_at = null;
+            return;
+        }
+
         $organization = User::find($lead->client_id)?->organization;
         if (! $internalHandover && $organization?->internal_processing_enabled) {
             $lead->internal_processing_pending = true;
@@ -81,7 +86,9 @@ class LeadDistributionService
         $project = Project::withoutGlobalScopes()->whereKey($campaign->project_id)->lockForUpdate()->first();
         if (! $project) return;
         if (! $this->deliveryRecipientBelongsToProject($lead, $project)) {
-            throw new \DomainException('Lead recipient does not belong to the campaign organization.');
+            $lead->delivery_pending = false;
+            $lead->delivery_at = null;
+            return;
         }
         $config = $this->effectiveDeliveryConfig($campaign, $project);
         $queue = $this->campaignDeliveryQuery($campaign->id);
@@ -124,6 +131,17 @@ class LeadDistributionService
                     ? \App\Models\LeadDeliveryPlan::find($lead->delivery_plan_id)?->organization_id
                     : User::find($lead?->client_id)?->organization_id;
                 if ($lead && $approvalOrganizationId && !$this->applyClientDeliveryApproval(Lead::withoutGlobalScopes()->whereKey($lead->id), $approvalOrganizationId)->exists()) return false;
+                if ($lead && $approvalOrganizationId) {
+                    $filterEval = app(\App\Services\LeadFilterRuleEngine::class)->evaluateLead($lead, $approvalOrganizationId, $lead->campaign_id, $project?->id);
+                    if (!$filterEval->passed) {
+                        $lead->update([
+                            'delivery_pending' => false,
+                            'delivery_failed_at' => now(),
+                            'delivery_error' => 'Lead does not match recipient organization filtering rules: ' . $filterEval->reason,
+                        ]);
+                        return false;
+                    }
+                }
                 if ($lead?->internal_processing_pending && Organization::find($approvalOrganizationId)?->internal_processing_enabled) {
                     $processing = \App\Models\InternalLeadProcessing::where('lead_id', $lead->id)->lockForUpdate()->first();
                     if (! $processing?->handover_requested_at || $processing->forwarded_at) return false;

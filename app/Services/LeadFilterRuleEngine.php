@@ -39,8 +39,10 @@ class LeadFilterRuleEngine
      *    if none match -> Lead is SKIPPED.
      * 4. Otherwise -> Lead is INCLUDED.
      */
-    public function evaluateLead(array $leadData, ?int $organizationId, ?int $campaignId = null, ?int $projectId = null): LeadFilterEvaluationResult
+    public function evaluateLead(array|object $leadData, ?int $organizationId, ?int $campaignId = null, ?int $projectId = null): LeadFilterEvaluationResult
     {
+        $payload = $this->normalizeLeadPayload($leadData);
+
         if (!$organizationId) {
             return new LeadFilterEvaluationResult(
                 passed: true,
@@ -80,7 +82,7 @@ class LeadFilterRuleEngine
 
         // 1. Evaluate Exclude Rules: Any match excludes the lead immediately
         foreach ($excludeRules as $rule) {
-            $eval = $this->evaluateRule($rule, $leadData);
+            $eval = $this->evaluateRule($rule, $payload);
             if ($eval['matches']) {
                 $reason = "Excluded by rule '{$rule->name}' (" . implode(', ', $eval['reasons']) . ')';
                 return new LeadFilterEvaluationResult(
@@ -101,7 +103,7 @@ class LeadFilterRuleEngine
             $matchedReasons = [];
 
             foreach ($includeRules as $rule) {
-                $eval = $this->evaluateRule($rule, $leadData);
+                $eval = $this->evaluateRule($rule, $payload);
                 if ($eval['matches']) {
                     $anyIncludeMatched = true;
                     $matchedIncludeRule = $rule;
@@ -138,6 +140,82 @@ class LeadFilterRuleEngine
             action: 'include',
             reason: 'All filter checks passed successfully.'
         );
+    }
+
+    public function evaluateModel(\App\Models\Lead $lead, ?int $organizationId = null, ?int $campaignId = null, ?int $projectId = null): LeadFilterEvaluationResult
+    {
+        $orgId = $organizationId ?: (\App\Models\User::find($lead->client_id)?->organization_id ?: $lead->organization_id);
+        $campId = $campaignId ?: $lead->campaign_id;
+        $projId = $projectId ?: ($lead->campaign?->project_id ?: $lead->project_id);
+        return $this->evaluateLead($lead, $orgId, $campId, $projId);
+    }
+
+    /**
+     * Normalize lead payload whether passed as an array, an Eloquent Lead model,
+     * or an array with nested metadata relations.
+     */
+    public function normalizeLeadPayload(array|object $leadData): array
+    {
+        if ($leadData instanceof \App\Models\Lead) {
+            $payload = $leadData->toArray();
+            $metaCollection = $leadData->relationLoaded('metadata') ? $leadData->metadata : $leadData->metadata()->get();
+            $customFields = [];
+            $fieldData = [];
+            foreach ($metaCollection as $m) {
+                $payload[$m->key] = $m->value;
+                if ($m->key === 'meta_form_answers') {
+                    $decoded = is_array($m->value) ? $m->value : json_decode($m->value, true);
+                    if (is_array($decoded)) {
+                        $customFields = array_merge($customFields, $decoded);
+                    }
+                } elseif ($m->key === 'raw_json') {
+                    $raw = is_array($m->value) ? $m->value : json_decode($m->value, true);
+                    if (is_array($raw) && !empty($raw['field_data'])) {
+                        $fieldData = array_merge($fieldData, $raw['field_data']);
+                    }
+                }
+            }
+            if (!empty($customFields)) {
+                $payload['custom_fields'] = array_merge($payload['custom_fields'] ?? [], $customFields);
+            }
+            if (!empty($fieldData)) {
+                $payload['field_data'] = array_merge($payload['field_data'] ?? [], $fieldData);
+            }
+            return $payload;
+        }
+
+        if (is_array($leadData) && isset($leadData['metadata']) && is_iterable($leadData['metadata'])) {
+            $payload = $leadData;
+            $customFields = [];
+            $fieldData = [];
+            foreach ($leadData['metadata'] as $m) {
+                $k = is_array($m) ? ($m['key'] ?? null) : ($m->key ?? null);
+                $v = is_array($m) ? ($m['value'] ?? null) : ($m->value ?? null);
+                if ($k) {
+                    $payload[$k] = $v;
+                    if ($k === 'meta_form_answers') {
+                        $decoded = is_array($v) ? $v : json_decode((string)$v, true);
+                        if (is_array($decoded)) {
+                            $customFields = array_merge($customFields, $decoded);
+                        }
+                    } elseif ($k === 'raw_json') {
+                        $raw = is_array($v) ? $v : json_decode((string)$v, true);
+                        if (is_array($raw) && !empty($raw['field_data'])) {
+                            $fieldData = array_merge($fieldData, $raw['field_data']);
+                        }
+                    }
+                }
+            }
+            if (!empty($customFields)) {
+                $payload['custom_fields'] = array_merge($payload['custom_fields'] ?? [], $customFields);
+            }
+            if (!empty($fieldData)) {
+                $payload['field_data'] = array_merge($payload['field_data'] ?? [], $fieldData);
+            }
+            return $payload;
+        }
+
+        return (array) $leadData;
     }
 
     /**
@@ -218,12 +296,14 @@ class LeadFilterRuleEngine
      * Searches top-level keys, custom_fields dictionary, Meta field_data lists,
      * and performs fuzzy slug matching.
      */
-    public function extractFieldValue(array $leadData, string $fieldName): mixed
+    public function extractFieldValue(array|object $leadData, string $fieldName): mixed
     {
         $fieldName = trim($fieldName);
         if ($fieldName === '') {
             return null;
         }
+
+        $leadData = $this->normalizeLeadPayload($leadData);
 
         // 1. Direct top-level match
         if (array_key_exists($fieldName, $leadData)) {
@@ -250,12 +330,14 @@ class LeadFilterRuleEngine
             }
         }
 
-        // 4. Normalized slug / pattern search across top-level and custom_fields
+        // 4. Normalized slug / pattern search across top-level, custom_fields, and field_data
         $normalizedTarget = preg_replace('/[^a-z0-9]/', '', strtolower($fieldName));
         if ($normalizedTarget !== '') {
             foreach ($leadData as $k => $v) {
-                if (preg_replace('/[^a-z0-9]/', '', strtolower((string)$k)) === $normalizedTarget) {
-                    return $v;
+                if ($k !== 'metadata' && $k !== 'field_data' && $k !== 'custom_fields') {
+                    if (preg_replace('/[^a-z0-9]/', '', strtolower((string)$k)) === $normalizedTarget) {
+                        return $v;
+                    }
                 }
             }
 
@@ -263,6 +345,15 @@ class LeadFilterRuleEngine
                 foreach ($customFields as $k => $v) {
                     if (preg_replace('/[^a-z0-9]/', '', strtolower((string)$k)) === $normalizedTarget) {
                         return $v;
+                    }
+                }
+            }
+
+            if (is_array($fieldData)) {
+                foreach ($fieldData as $item) {
+                    if (isset($item['name']) && preg_replace('/[^a-z0-9]/', '', strtolower((string)$item['name'])) === $normalizedTarget) {
+                        $vals = $item['values'] ?? [];
+                        return is_array($vals) ? (count($vals) === 1 ? $vals[0] : $vals) : $vals;
                     }
                 }
             }

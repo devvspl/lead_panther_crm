@@ -216,6 +216,17 @@ trait ProcessesClientDelivery
                 foreach ($leads as $candidate) {
                     $lead = $this->eligibleClientDeliveryLeads($plan->organization_id)->whereKey($candidate->id)->lockForUpdate()->first();
                     if (!$lead || LeadDeliveryItem::where('lead_id', $lead->id)->exists()) continue;
+
+                    // Verify destination client filtering rules before auto-enrolling
+                    $destClient = User::find($plan->client_id);
+                    $destOrgId = $destClient?->organization_id ?: $plan->organization_id;
+                    if ($destOrgId) {
+                        $filterEval = app(\App\Services\LeadFilterRuleEngine::class)->evaluateLead($lead, $destOrgId, $plan->campaign_id, $plan->project_id);
+                        if (!$filterEval->passed) {
+                            continue;
+                        }
+                    }
+
                     $item = LeadDeliveryItem::create([
                         'plan_id' => $plan->id,
                         'lead_id' => $lead->id,
@@ -236,6 +247,17 @@ trait ProcessesClientDelivery
     public function captureClientDeliveryLead(Lead $lead): void
     {
         $plan = LeadDeliveryPlan::findOrFail($lead->delivery_plan_id);
+
+        // Verify destination client filtering rules before capturing
+        $destClient = User::find($plan->client_id);
+        $destOrgId = $destClient?->organization_id ?: $plan->organization_id;
+        if ($destOrgId) {
+            $filterEval = app(\App\Services\LeadFilterRuleEngine::class)->evaluateLead($lead, $destOrgId, $plan->campaign_id, $plan->project_id);
+            if (!$filterEval->passed) {
+                return;
+            }
+        }
+
         $item = LeadDeliveryItem::firstOrCreate(['lead_id' => $lead->id], [
             'plan_id' => $plan->id,
             'source_client_id' => $lead->client_id,
@@ -493,6 +515,10 @@ trait ProcessesClientDelivery
                     $q->whereIn('mobile', [$lead->mobile, $digits, '+' . $digits, '+91' . substr($digits, -10), substr($digits, -10)]);
                     if ($lead->email) $q->orWhere('email', $lead->email);
                 })->exists()) $reason = 'A matching customer lead was already delivered to this client.';
+                elseif ($client->organization_id && !app(\App\Services\LeadFilterRuleEngine::class)->evaluateLead($lead, $client->organization_id, $item->campaign_id, $item->project_id)->passed) {
+                    $ruleEval = app(\App\Services\LeadFilterRuleEngine::class)->evaluateLead($lead, $client->organization_id, $item->campaign_id, $item->project_id);
+                    $reason = 'Lead does not match destination client filtering rules: ' . $ruleEval->reason;
+                }
                 if (!$reason) {
                     $lead->update([
                         'client_id' => $item->client_id,

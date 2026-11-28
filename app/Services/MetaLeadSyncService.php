@@ -412,17 +412,64 @@ class MetaLeadSyncService
 
                         // Resolve per-lead campaign routing before duplicate checks. Shared forms can serve multiple clients.
                         $campaignRoute = app(MetaCampaignLeadService::class)->routing($account, $mapped);
-                        $leadClientId = $campaignRoute instanceof \App\Models\Project
+                        $defaultPoolClientId = $defaultConfiguredClientId ?: ($clientId ?: 1);
+                        $targetClientId = $campaignRoute instanceof \App\Models\Project
                             ? $campaignRoute->client_id
-                            : ($campaignRoute?->project?->client_id ?: ($mapping?->client_id ?: ($defaultConfiguredClientId ?: $clientId)));
+                            : ($campaignRoute?->project?->client_id ?: ($mapping?->client_id ?: $defaultPoolClientId));
                         $projectId = $campaignRoute instanceof \App\Models\Project
                             ? $campaignRoute->id
                             : ($campaignRoute?->project_id ?: $project?->id);
+
+                        // Project ownership must not automatically make the developer a lead recipient.
+                        // Developer must receive leads only when explicitly authorized by an active allocation or order.
+                        $isExplicitlyAuthorized = false;
+                        if (!empty($mapping?->client_id)) {
+                            $isExplicitlyAuthorized = true;
+                        } elseif ($targetClientId && (int)$targetClientId !== (int)$defaultPoolClientId) {
+                            $candidateUser = \App\Models\User::find($targetClientId);
+                            $candidateOrgId = $candidateUser?->organization_id;
+                            $hasActivePlan = \App\Models\LeadDeliveryPlan::where(function ($q) use ($targetClientId, $candidateOrgId) {
+                                $q->where('client_id', $targetClientId);
+                                if ($candidateOrgId) {
+                                    $q->orWhere('organization_id', $candidateOrgId);
+                                }
+                            })->where('state', 'active')->exists();
+
+                            if ($hasActivePlan) {
+                                $isExplicitlyAuthorized = true;
+                            }
+                        }
+
+                        $leadClientId = $isExplicitlyAuthorized ? $targetClientId : $defaultPoolClientId;
                         $mobile = $mapped['mobile'] ?: '';
                         $email = !empty($mapped['email']) ? $mapped['email'] : null;
                         $metaLeadId = $rawLead['id'] ?? 'unknown';
 
                         Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] [Form #{$currentFormId}] Lead {$leadIndex}/{$formFetched} (Meta ID: {$metaLeadId}) - Name: '{$mapped['name']}', Phone: {$mobile}, Email: {$email}");
+
+                        // Custom Lead Filtering Rules Check (Builder / Developer Campaign Filters)
+                        $unmatchedFilterSkipped = false;
+                        $clientUser = \App\Models\User::find($leadClientId);
+                        $targetOrgId = $clientUser?->organization_id;
+                        if ($targetOrgId && (int)$leadClientId !== (int)$defaultPoolClientId) {
+                            $ruleEngine = app(\App\Services\LeadFilterRuleEngine::class);
+                            $filterEval = $ruleEngine->evaluateLead($mapped, $targetOrgId, $campaignRoute?->id, $projectId);
+                            if (!$filterEval->passed) {
+                                $ruleEngine->recordLog(
+                                    organizationId: $targetOrgId,
+                                    campaignId: $campaignRoute?->id,
+                                    ruleId: $filterEval->matchedRule?->id,
+                                    leadIdentifier: (string) ($mapped['name'] ?? ($mobile ?: ($rawLead['id'] ?? 'Inbound Lead'))),
+                                    action: 'skipped',
+                                    reason: $filterEval->reason,
+                                    matchedConditions: $filterEval->matchedConditions,
+                                    payload: $mapped
+                                );
+                                // Invalid or unmatched leads remain in the Master Lead Pool as unallocated
+                                $leadClientId = $defaultPoolClientId;
+                                $unmatchedFilterSkipped = true;
+                            }
+                        }
 
                         // 90-Day Deduplication Check
                         $existingLead = Lead::where('client_id', $leadClientId)
@@ -627,9 +674,11 @@ class MetaLeadSyncService
                             'value' => json_encode($rawLead),
                         ]);
 
-                        // Fire LeadCreated event to reserve credits & auto-assign
-                        event(new LeadCreated($lead));
-                        Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Dispatched LeadCreated event for Lead #{$lead->lead_code}");
+                        // Fire LeadCreated event to reserve credits & auto-assign only when authorized and matched
+                        if (!$unmatchedFilterSkipped && (int)$leadClientId !== (int)$defaultPoolClientId) {
+                            event(new LeadCreated($lead));
+                            Log::debug("[MetaLeadSyncService] [Step 7: Ingestion] Dispatched LeadCreated event for Lead #{$lead->lead_code}");
+                        }
 
                         $formCreated++;
                         $totalCreated++;

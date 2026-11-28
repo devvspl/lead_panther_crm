@@ -187,6 +187,7 @@ class StudioLeadTransferAndFilteringTest extends TestCase
             'email' => 'buyer@example.com',
             'status' => 'new',
             'current_stage' => 'new',
+            'created_at' => '2026-11-26 10:00:00',
         ]);
         LeadMetadata::create([
             'lead_id' => $buyLead->id,
@@ -205,6 +206,7 @@ class StudioLeadTransferAndFilteringTest extends TestCase
             'email' => 'renter@example.com',
             'status' => 'new',
             'current_stage' => 'new',
+            'created_at' => '2026-11-26 10:00:00',
         ]);
         LeadMetadata::create([
             'lead_id' => $rentLead->id,
@@ -223,6 +225,7 @@ class StudioLeadTransferAndFilteringTest extends TestCase
             'email' => 'blank@example.com',
             'status' => 'new',
             'current_stage' => 'new',
+            'created_at' => '2026-11-26 10:00:00',
         ]);
 
         // Run the transfer seeder

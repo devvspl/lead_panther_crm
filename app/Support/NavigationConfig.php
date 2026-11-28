@@ -98,6 +98,11 @@ class NavigationConfig
             default => route('replacements.queue'),
         };
 
+        $creditsRoute = match ($roleKey) {
+            'super-admin' => route('admin.credits'),
+            default => route('credits.wallet'),
+        };
+
         $devToolsUrl = route('admin.dev-tools');
 
         $isBuilderOrSales = in_array($roleKey, ['builder', 'sales-executive']);
@@ -163,8 +168,8 @@ class NavigationConfig
             'credits' => [
                 'key' => 'credits',
                 'label' => 'Lead Credits',
-                'url' => route('credits.wallet'),
-                'data_nav_route' => 'credits',
+                'url' => $creditsRoute,
+                'data_nav_route' => $roleKey === 'super-admin' ? 'admin/credits' : 'credits',
                 'data_nav_exact' => 'true',
                 'section' => 'main',
                 'icon' => '<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>',

@@ -31,6 +31,8 @@ class BuilderLeadCreditRequestTest extends TestCase
         Role::findOrCreate('Super Admin');
         Role::findOrCreate('Builder/Developer');
         Role::findOrCreate('Client');
+        Role::findOrCreate('Executive');
+        Role::findOrCreate('Sales Executive');
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('Super Admin');
@@ -228,5 +230,28 @@ class BuilderLeadCreditRequestTest extends TestCase
             ->assertSee('Pending Approval')
             ->assertSee('Approved on')
             ->assertSee('Rejected: Budget cap');
+    }
+
+    public function test_builder_can_access_credits_route_without_403_and_sales_executive_is_forbidden(): void
+    {
+        Role::findOrCreate('Sales Executive');
+
+        $salesExec = User::factory()->create([
+            'organization_id' => $this->org->id,
+            'name' => 'Apex Sales Exec',
+            'status' => 'active',
+        ]);
+        $salesExec->assignRole('Sales Executive');
+
+        // Builder visits /credits route - must succeed (200 OK, not 403)
+        $this->actingAs($this->builder)
+            ->get(route('credits.wallet'))
+            ->assertStatus(200)
+            ->assertSee('Available Lead Credits');
+
+        // Sales executive visits /credits route - must be forbidden (403)
+        $this->actingAs($salesExec)
+            ->get(route('credits.wallet'))
+            ->assertStatus(403);
     }
 }

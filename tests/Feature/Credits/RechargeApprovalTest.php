@@ -22,8 +22,10 @@ class RechargeApprovalTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Role::create(['name' => 'Super Admin']);
-        Role::create(['name' => 'Client']);
+        Role::findOrCreate('Super Admin');
+        Role::findOrCreate('Client');
+        Role::findOrCreate('Executive');
+        Role::findOrCreate('Sales Executive');
     }
 
     public function test_recharge_approval_queue_renders_and_approves_request(): void

@@ -52,12 +52,13 @@ class AuditActivityMiddleware
         $actor = auth()->user();
         $request->attributes->set('audit_actor_snapshot', $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email, 'roles' => $actor->getRoleNames()->all(), 'organization_id' => $actor->organization_id] : null);
         $role = NavigationConfig::getRoleKey(auth()->user());
-        if (in_array($role, ['builder', 'sales-executive'])) {
-            foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*', 'credits*'] as $path) {
+        if ($role === 'builder') {
+            foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*'] as $path) {
                 abort_if($request->is($path), 403);
             }
-            if ($role === 'sales-executive') {
-                abort_if($request->is('client/replacements*', 'client/leads*'), 403);
+        } elseif ($role === 'sales-executive') {
+            foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*', 'credits*', 'client/replacements*', 'client/leads*'] as $path) {
+                abort_if($request->is($path), 403);
             }
         }
         /** @var Response $response */

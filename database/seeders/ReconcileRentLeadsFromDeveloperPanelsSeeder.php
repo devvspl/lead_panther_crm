@@ -2,14 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\Campaign;
 use App\Models\CreditTransaction;
 use App\Models\CreditWallet;
 use App\Models\Lead;
 use App\Models\LeadAssignment;
 use App\Models\LeadDeliveryItem;
-use App\Models\LeadFilterRule;
 use App\Models\LeadMetadata;
 use App\Models\Organization;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -18,258 +19,312 @@ use Illuminate\Support\Facades\Log;
 class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
 {
     /**
+     * Official Meta Lead IDs exported directly from Meta Ads for the Studio Campaign:
+     * - EXACTLY 15 Buy Leads
+     * - EXACTLY 17 Rent Leads
+     */
+    public const META_BUY_LEAD_IDS = [
+        '1792946815340165', // parmannd gaud (+18076776642)
+        '2431330290730477', // 𝕸𝖊𝖊𝖙 𝕭𝖆𝖎𝖘𝖑𝖆 (+919548810007)
+        '2704859793289128', // S A Rizvi (+919419003835)
+        '4225391184262318', // pankaj verma (+917351198894)
+        '2515022295570132', // IvorEgbert (+919810980774)
+        '1751184556349028', // Bobby Verma (+919897833367)
+        '4167815900022565', // 𝐑𝐎𝐇𝐀𝐍 (+916205481173)
+        '4824423581120963', // Shailender Singh (+919456272980)
+        '1171824265379756', // Rajeev Srivastava (+919935637538)
+        '1614316630735420', // Jayanta Moitra (+919810032481)
+        '1825110525207900', // Arvind Kushwaha (+919560740048)
+        '2404069763664307', // Arun Kumar Rana (+918941049274)
+        '1197179182662858', // Bachan Bisht (+919410393935)
+        '1367388575366608', // Nandu Rana (+918825047826)
+        '2405215573516205', // Amala Mary G (+919443626502)
+    ];
+
+    public const META_RENT_LEAD_IDS = [
+        '1850113739520768',  // shaleen (+919516908083)
+        '1007547355746646',  // Aparna (+917838857933)
+        '28973044469063912', // Vikas (+918571089707)
+        '1615048679891342',  // Manish (+918580741116)
+        '1492554516142457',  // Nitesh Pratap Singh (+917974044299)
+        '1661071275698755',  // MUKUL SEN (+916294110078)
+        '1158514093768503',  // Anil dhaakad (+918085405256)
+        '1903723190797454',  // Dr sunil Kumar chaudhary (+918969761969)
+        '4694797637514660',  // Dr. Ayushi Sharma (+919204766255)
+        '1869125570779285',  // Parmod Sehgal (+918130894622)
+        '1545977224031903',  // Anwar (+917983014868)
+        '1870922554572180',  // Amit Jha (+918130297005)
+        '1439161037923066',  // یاور عباس وانی (+917006905866)
+        '1443179321218085',  // sohan singh (+919829257843)
+        '1656131196540959',  // Tushar Pundir (+919711104737)
+        '1407045808171745',  // Sachin Bej (+919883678419)
+        '2395326834629175',  // Shaili Gupta (+918802608428)
+    ];
+
+    /**
      * Run the database seeds.
-     *
-     * Precisely identifies rent leads (intent = 'rent') delivered to developer/builder
-     * panels (such as Truegrowth Realty / Gulmohar Studio) despite active "Buy Leads Only"
-     * rules, moves them to the Master Lead Pool (client_id = 1), and refunds credits.
-     *
-     * Also automatically detects and RESTORES any legitimate Buy leads that were mistakenly
-     * moved to the Master Lead Pool, restoring their ownership, delivery status, and wallet balance.
      */
     public function run(): void
     {
         $this->command?->info('================================================================');
-        $this->command?->info('Starting Reconciliation: Precise Rent Lead Reclaim & Buy Lead Restoration');
+        $this->command?->info('Reconciliation: Reconciling Studio Meta Leads via Official Meta Dataset');
         $this->command?->info('================================================================');
 
-        // 1. Identify target organizations that have Buy-Only filtering rules
-        $targetOrgs = Organization::where(function ($q) {
-            $q->where('name', 'like', '%Truegrowth%')
-              ->orWhere('name', 'like', '%Gulmohar Studio%');
-        })->get();
-
-        if ($targetOrgs->isEmpty()) {
-            $this->command?->warn('No target organizations found.');
+        // 1. Identify Truegrowth Realty organization and client
+        $targetOrg = Organization::where('name', 'like', '%Truegrowth%')->first();
+        if (!$targetOrg) {
+            $this->command?->warn('Truegrowth Realty organization not found.');
             return;
         }
 
-        $allTargetOrgIds = $targetOrgs->pluck('id')->all();
-        $this->command?->info('Target organizations: ' . $targetOrgs->pluck('name')->implode(', '));
+        $targetClient = $targetOrg->clients()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Builder/Developer', 'Builder', 'builder']))
+            ->first() ?? $targetOrg->clients()->first() ?? User::where('organization_id', $targetOrg->id)->first();
 
-        $clientUserIds = User::whereIn('organization_id', $allTargetOrgIds)->pluck('id')->all();
+        if (!$targetClient) {
+            $this->command?->warn('Target client user not found for Truegrowth Realty.');
+            return;
+        }
 
-        // 2. Default platform / admin client ID
+        $truegrowthClientId = $targetClient->id;
+        $clientUserIds = User::where('organization_id', $targetOrg->id)->pluck('id')->all();
+
+        $this->command?->info("Target Organization : {$targetOrg->name} (ID: {$targetOrg->id})");
+        $this->command?->info("Target Client User   : {$targetClient->name} (ID: {$truegrowthClientId})");
+
+        // Locate target campaign and project
+        $targetProject = Project::withoutGlobalScopes()
+            ->where('client_id', $truegrowthClientId)
+            ->where('name', 'like', '%Studio%')
+            ->first() ?? Project::withoutGlobalScopes()->where('name', 'like', '%Studio%')->first();
+
+        $targetCampaign = Campaign::withoutGlobalScopes()
+            ->where(function ($q) {
+                $q->where('name', 'like', '%Studio Noida Exp 50%')
+                  ->orWhere('name', 'like', '%Studio%');
+            })
+            ->latest('id')
+            ->first();
+
+        $targetCampaignId = $targetCampaign?->id;
+        $targetProjectId = $targetProject?->id ?? ($targetCampaign?->project_id);
+
         $superAdmin = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['Super Admin', 'super-admin']))->first();
         $defaultClientId = $superAdmin?->id ?? 1;
 
-        // 3. Truegrowth Realty primary client user ID
-        $truegrowthOrg = $targetOrgs->first(fn ($o) => str_contains($o->name, 'Truegrowth'));
-        $truegrowthClient = $truegrowthOrg?->clients()->first() ?? User::where('organization_id', $truegrowthOrg?->id)->first();
-        $truegrowthClientId = $truegrowthClient?->id ?? 112;
-
-        // 4. Candidate leads:
-        //    a) Leads currently belonging to target developer clients
-        //    b) Leads currently in Master Lead Pool (client_id = 1) that have reconciliation_audit metadata
-        $reconciledMetaLeadIds = LeadMetadata::where('key', 'reconciliation_audit')->pluck('lead_id')->all();
-
-        $candidateLeads = Lead::withoutGlobalScopes()
-            ->where(function ($q) use ($clientUserIds, $reconciledMetaLeadIds) {
-                $q->whereIn('client_id', $clientUserIds);
-                if (!empty($reconciledMetaLeadIds)) {
-                    $q->orWhereIn('id', $reconciledMetaLeadIds);
-                }
-            })
-            ->with(['metadata', 'deliveryItems'])
-            ->get();
-
-        $this->command?->info("Found {$candidateLeads->count()} total candidate leads to evaluate.");
-
-        $rentReclaimedCount = 0;
-        $buyRestoredCount = 0;
-        $refundedCredits = 0;
-        $debitedCredits = 0;
+        $wallet = CreditWallet::firstOrCreate(['client_id' => $truegrowthClientId], ['balance' => 0]);
 
         DB::beginTransaction();
         try {
-            foreach ($candidateLeads as $lead) {
-                $isRent = $this->isExplicitRentLead($lead);
-                $auditMeta = $lead->metadata->firstWhere('key', 'reconciliation_audit');
-                $auditData = $auditMeta ? json_decode($auditMeta->value, true) : null;
-                $originalClientId = $auditData['previous_client_id'] ?? ($lead->client_id != $defaultClientId ? $lead->client_id : $truegrowthClientId);
+            // ========================================================================
+            // STEP 1: Process RENT Leads (Keep in Master Lead Pool)
+            // ========================================================================
+            $this->command?->info("\n--- Processing RENT Leads (Enforcing Master Lead Pool) ---");
+            $rentProcessed = 0;
+            $rentRefunded = 0;
 
-                if ($isRent) {
-                    // ==========================================
-                    // ACTION: RECLAIM RENT LEAD TO MASTER POOL
-                    // ==========================================
-                    if ((int)$lead->client_id !== (int)$defaultClientId) {
-                        $rentReclaimedCount++;
-                        $prevClientId = $lead->client_id;
-                        $prevClient = User::find($prevClientId);
+            // Find all rent leads: known rent Meta IDs OR explicit rent intent on target developer
+            $rentCandidateLeadIds = LeadMetadata::where('key', 'meta_leadgen_id')
+                ->whereIn('value', self::META_RENT_LEAD_IDS)
+                ->pluck('lead_id')
+                ->all();
 
-                        $this->command?->line("------------------------------------------------------------");
-                        $this->command?->warn("[RENT LEAD RECLAIMED] Lead {$lead->lead_code} (ID: {$lead->id}): '{$lead->name}', Mobile: {$lead->mobile}");
-                        $this->command?->line("  Intent: RENT (Violates Buy Leads Only rule)");
-                        $this->command?->line("  Moving from {$prevClient?->name} (User ID: {$prevClientId}) to Master Lead Pool (ID: {$defaultClientId})");
+            $leadsToReclaim = Lead::withoutGlobalScopes()
+                ->where(function ($q) use ($clientUserIds, $rentCandidateLeadIds) {
+                    if (!empty($rentCandidateLeadIds)) {
+                        $q->whereIn('id', $rentCandidateLeadIds);
+                    }
+                    $q->orWhereIn('client_id', $clientUserIds);
+                })
+                ->with(['metadata'])
+                ->get()
+                ->filter(function ($lead) {
+                    $metaId = $lead->metadata->firstWhere('key', 'meta_leadgen_id')?->value;
+                    return in_array($metaId, self::META_RENT_LEAD_IDS) || $this->isExplicitRentLead($lead);
+                });
 
-                        // Refund charged credits
-                        $chargedTx = CreditTransaction::withoutGlobalScopes()
-                            ->where('client_id', $prevClientId)
-                            ->where('lead_id', $lead->id)
-                            ->where('is_legacy', false)
-                            ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
-                            ->first();
+            foreach ($leadsToReclaim as $lead) {
+                $rentProcessed++;
+                $prevClientId = $lead->client_id;
 
-                        if ($chargedTx) {
-                            $cost = (int) $chargedTx->credit_used;
-                            $alreadyRefunded = CreditTransaction::withoutGlobalScopes()
-                                ->where('client_id', $prevClientId)
-                                ->where('lead_id', $lead->id)
-                                ->where('is_legacy', false)
-                                ->where('transaction_type', 'refund')
-                                ->exists();
+                // Move lead to Master Lead Pool (client_id = 1)
+                Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
+                    'client_id' => $defaultClientId,
+                    'delivered_at' => null,
+                    'delivery_pending' => false,
+                    'credit_delivery_confirmed' => false,
+                    'assigned_to' => null,
+                    'executive_assigned_at' => null,
+                    'executive_response_due_at' => null,
+                    'executive_first_response_at' => null,
+                    'delivery_revoked_at' => now(),
+                    'delivery_revoke_reason' => 'Reconciled: Rent lead retained in Master Lead Pool (violates Buy Leads Only rule)',
+                ]);
 
-                            if (!$alreadyRefunded && $cost > 0) {
-                                $wallet = CreditWallet::firstOrCreate(['client_id' => $prevClientId], ['balance' => 0]);
-                                $before = (int) $wallet->balance;
-                                $after = $before + $cost;
-                                $wallet->update(['balance' => $after]);
+                // Reset assignment
+                LeadAssignment::where('lead_id', $lead->id)->whereNull('unassigned_at')->update(['unassigned_at' => now()]);
 
-                                CreditTransaction::create([
-                                    'client_id' => $prevClientId,
-                                    'lead_id' => $lead->id,
-                                    'package_id' => null,
-                                    'credit_before' => $before,
-                                    'credit_used' => $cost,
-                                    'credit_after' => $after,
-                                    'transaction_type' => 'refund',
-                                    'description' => "Reconciliation refund for Lead {$lead->lead_code}: returned to Master Lead Pool (Rent lead violation of Buy Leads Only rule)",
-                                    'is_legacy' => false,
-                                    'created_by' => $defaultClientId,
-                                    'created_at' => now(),
-                                ]);
+                // Revoke delivery items for Truegrowth
+                LeadDeliveryItem::where('lead_id', $lead->id)->where('client_id', $truegrowthClientId)->update([
+                    'status' => 'revoked',
+                    'revoked_at' => now(),
+                    'failure_reason' => 'Reconciled: Rent lead retained in Master Lead Pool',
+                ]);
 
-                                $refundedCredits += $cost;
-                                $this->command?->info("  Refunded {$cost} credits to {$prevClient?->name} wallet (New balance: {$after})");
-                            }
-                        }
+                // Refund credits if previously charged and not yet refunded
+                $chargedTx = CreditTransaction::withoutGlobalScopes()
+                    ->where('client_id', $truegrowthClientId)
+                    ->where('lead_id', $lead->id)
+                    ->where('is_legacy', false)
+                    ->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve'])
+                    ->first();
 
-                        // Revoke delivery items
-                        $deliveryItems = LeadDeliveryItem::where('lead_id', $lead->id)
-                            ->whereIn('client_id', $clientUserIds)
-                            ->get();
+                if ($chargedTx) {
+                    $cost = (int) $chargedTx->credit_used;
+                    $alreadyRefunded = CreditTransaction::withoutGlobalScopes()
+                        ->where('client_id', $truegrowthClientId)
+                        ->where('lead_id', $lead->id)
+                        ->where('is_legacy', false)
+                        ->where('transaction_type', 'refund')
+                        ->exists();
 
-                        foreach ($deliveryItems as $item) {
-                            $updateData = [
-                                'status' => 'revoked',
-                                'revoked_at' => now(),
-                                'failure_reason' => 'Reconciled: Rent lead returned to Master Lead Pool (violates Buy Leads Only rule)',
-                            ];
-                            if (\Illuminate\Support\Facades\Schema::hasColumn('lead_delivery_items', 'revocation_reason')) {
-                                $updateData['revocation_reason'] = 'Reconciled: Rent lead returned to Master Lead Pool (violates Buy Leads Only rule)';
-                            }
-                            $item->update($updateData);
-                        }
+                    if (!$alreadyRefunded && $cost > 0) {
+                        $before = (int) $wallet->balance;
+                        $after = $before + $cost;
+                        $wallet->update(['balance' => $after]);
 
-                        // Reset assignment
-                        LeadAssignment::where('lead_id', $lead->id)
-                            ->whereNull('unassigned_at')
-                            ->update(['unassigned_at' => now()]);
-
-                        // Update Lead master record
-                        Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
-                            'client_id' => $defaultClientId,
-                            'delivered_at' => null,
-                            'delivery_pending' => false,
-                            'credit_delivery_confirmed' => false,
-                            'assigned_to' => null,
-                            'executive_assigned_at' => null,
-                            'executive_response_due_at' => null,
-                            'executive_first_response_at' => null,
-                            'delivery_revoked_at' => now(),
-                            'delivery_revoke_reason' => 'Reconciled: Rent lead returned to Master Lead Pool (violates Buy Leads Only rule)',
+                        CreditTransaction::create([
+                            'client_id' => $truegrowthClientId,
+                            'lead_id' => $lead->id,
+                            'package_id' => null,
+                            'credit_before' => $before,
+                            'credit_used' => $cost,
+                            'credit_after' => $after,
+                            'transaction_type' => 'refund',
+                            'description' => "Reconciliation refund for Lead {$lead->lead_code}: returned to Master Lead Pool (Rent lead violation of Buy Leads Only rule)",
+                            'is_legacy' => false,
+                            'created_by' => $defaultClientId,
+                            'created_at' => now(),
                         ]);
 
-                        LeadMetadata::updateOrCreate(
-                            ['lead_id' => $lead->id, 'key' => 'reconciliation_audit'],
-                            ['value' => json_encode([
-                                'reconciled_at' => now()->toIso8601String(),
-                                'previous_client_id' => $prevClientId,
-                                'transferred_to_client_id' => $defaultClientId,
-                                'reason' => 'Rent lead returned to Master Lead Pool (violates Buy Leads Only rule)',
-                            ])]
-                        );
+                        $rentRefunded += $cost;
                     }
+                }
+
+                $this->command?->line("  [RENT] Lead {$lead->lead_code} ({$lead->name}) kept in Master Pool (client_id = {$defaultClientId})");
+            }
+
+            // ========================================================================
+            // STEP 2: Process the 15 Explicit BUY Leads (Deliver to Truegrowth Realty)
+            // ========================================================================
+            $this->command?->info("\n--- Processing 15 BUY Leads (Assigning to Truegrowth Realty) ---");
+            $buyProcessed = 0;
+            $buyDebited = 0;
+
+            foreach (self::META_BUY_LEAD_IDS as $buyMetaId) {
+                $leadMeta = LeadMetadata::where('key', 'meta_leadgen_id')->where('value', $buyMetaId)->first();
+                $lead = $leadMeta ? Lead::withoutGlobalScopes()->find($leadMeta->lead_id) : null;
+
+                if (!$lead) {
+                    continue;
+                }
+
+                $buyProcessed++;
+
+                // Ensure lead belongs to Truegrowth Realty
+                Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
+                    'client_id' => $truegrowthClientId,
+                    'campaign_id' => $targetCampaignId ?: $lead->campaign_id,
+                    'delivered_at' => $lead->delivered_at ?: ($lead->created_at ?: now()),
+                    'delivery_pending' => false,
+                    'credit_delivery_confirmed' => true,
+                    'do_not_send_to_client' => false,
+                    'delivery_revoked_at' => null,
+                    'delivery_revoke_reason' => null,
+                ]);
+
+                // Ensure Delivery Item exists with status = 'sent'
+                $deliveryItem = LeadDeliveryItem::firstOrNew(['lead_id' => $lead->id, 'client_id' => $truegrowthClientId]);
+                $deliveryItem->plan_id = $deliveryItem->plan_id ?? 1;
+                $deliveryItem->source_client_id = $deliveryItem->source_client_id ?? $defaultClientId;
+                $deliveryItem->source_campaign_id = $deliveryItem->source_campaign_id ?? $lead->campaign_id;
+                $deliveryItem->project_id = $targetProjectId ?? $lead->campaign?->project_id;
+                $deliveryItem->campaign_id = $targetCampaignId ?: $lead->campaign_id;
+                $deliveryItem->requested_by = $deliveryItem->requested_by ?? $defaultClientId;
+                $deliveryItem->status = 'sent';
+                $deliveryItem->sent_at = $deliveryItem->sent_at ?: ($lead->created_at ?: now());
+                $deliveryItem->revoked_at = null;
+                $deliveryItem->failure_reason = null;
+                $deliveryItem->save();
+
+                // Reverse any mistaken reconciliation refund if one was issued by the earlier seeder run
+                $refundTx = CreditTransaction::withoutGlobalScopes()
+                    ->where('client_id', $truegrowthClientId)
+                    ->where('lead_id', $lead->id)
+                    ->where('is_legacy', false)
+                    ->where('transaction_type', 'refund')
+                    ->where('description', 'like', '%Reconciliation refund%')
+                    ->first();
+
+                if ($refundTx) {
+                    $cost = (int) $refundTx->credit_used;
+                    $before = (int) $wallet->balance;
+                    $after = max(0, $before - $cost);
+                    $wallet->update(['balance' => $after]);
+
+                    $refundTx->delete();
+                    $buyDebited += $cost;
+                }
+
+                // Delete reconciliation audit if present
+                LeadMetadata::where('lead_id', $lead->id)->where('key', 'reconciliation_audit')->delete();
+
+                $this->command?->info("  [BUY RESTORED] Lead {$lead->lead_code} ({$lead->name}) -> Truegrowth Realty (client_id = {$truegrowthClientId})");
+            }
+
+            // ========================================================================
+            // STEP 3: Handle Any Other Leads with 'reconciliation_audit'
+            // ========================================================================
+            $otherReconciledMeta = LeadMetadata::where('key', 'reconciliation_audit')
+                ->whereNotIn('lead_id', LeadMetadata::whereIn('key', ['meta_leadgen_id'])->whereIn('value', array_merge(self::META_BUY_LEAD_IDS, self::META_RENT_LEAD_IDS))->pluck('lead_id'))
+                ->get();
+
+            foreach ($otherReconciledMeta as $audit) {
+                $lead = Lead::withoutGlobalScopes()->find($audit->lead_id);
+                if (!$lead) continue;
+
+                if ($this->isExplicitRentLead($lead)) {
+                    // Keep rent in master pool
+                    Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
+                        'client_id' => $defaultClientId,
+                        'delivered_at' => null,
+                        'delivery_pending' => false,
+                        'credit_delivery_confirmed' => false,
+                        'assigned_to' => null,
+                    ]);
                 } else {
-                    // ==========================================
-                    // ACTION: RESTORE BUY LEAD BACK TO DEVELOPER
-                    // ==========================================
-                    // If this buy lead is currently in Master Lead Pool (client_id = 1), restore it!
-                    if ((int)$lead->client_id === (int)$defaultClientId) {
-                        $buyRestoredCount++;
-                        $targetClientId = $originalClientId ?: $truegrowthClientId;
-                        $targetClient = User::find($targetClientId);
-
-                        $this->command?->line("------------------------------------------------------------");
-                        $this->command?->info("[BUY LEAD RESTORED] Lead {$lead->lead_code} (ID: {$lead->id}): '{$lead->name}', Mobile: {$lead->mobile}");
-                        $this->command?->line("  Intent: BUY / Valid Lead");
-                        $this->command?->line("  Restoring to {$targetClient?->name} (User ID: {$targetClientId}, Org: {$targetClient?->organization?->name})");
-
-                        // Reverse any previous reconciliation refund if one was issued
-                        $refundTx = CreditTransaction::withoutGlobalScopes()
-                            ->where('client_id', $targetClientId)
-                            ->where('lead_id', $lead->id)
-                            ->where('is_legacy', false)
-                            ->where('transaction_type', 'refund')
-                            ->where('description', 'like', '%Reconciliation refund%')
-                            ->latest('created_at')
-                            ->first();
-
-                        if ($refundTx) {
-                            $wallet = CreditWallet::firstOrCreate(['client_id' => $targetClientId], ['balance' => 0]);
-                            $before = (int) $wallet->balance;
-                            $cost = (int) $refundTx->credit_used;
-                            $after = max(0, $before - $cost);
-                            $wallet->update(['balance' => $after]);
-
-                            // Clean up the reconciliation refund or create reversing consumption
-                            $refundTx->delete();
-                            $debitedCredits += $cost;
-                            $this->command?->info("  Reversed reconciliation credit refund for {$targetClient?->name} (New balance: {$after})");
-                        }
-
-                        // Restore delivery items to 'sent'
-                        $deliveryItems = LeadDeliveryItem::where('lead_id', $lead->id)
-                            ->where('client_id', $targetClientId)
-                            ->get();
-
-                        foreach ($deliveryItems as $item) {
-                            $item->update([
-                                'status' => 'sent',
-                                'revoked_at' => null,
-                                'failure_reason' => null,
-                            ]);
-                        }
-
-                        // Restore Lead Master Record to target developer
-                        Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
-                            'client_id' => $targetClientId,
-                            'delivered_at' => $lead->delivered_at ?: ($lead->created_at ?: now()),
-                            'delivery_pending' => false,
-                            'credit_delivery_confirmed' => true,
-                            'delivery_revoked_at' => null,
-                            'delivery_revoke_reason' => null,
-                        ]);
-
-                        // Remove reconciliation audit metadata so lead is clean
-                        LeadMetadata::where('lead_id', $lead->id)->where('key', 'reconciliation_audit')->delete();
-
-                        $this->command?->info("  Lead {$lead->lead_code} successfully restored to {$targetClient?->name}.");
-                    }
+                    // Restore buy lead back to Truegrowth
+                    Lead::withoutGlobalScopes()->whereKey($lead->id)->update([
+                        'client_id' => $truegrowthClientId,
+                        'delivered_at' => $lead->delivered_at ?: ($lead->created_at ?: now()),
+                        'delivery_pending' => false,
+                        'credit_delivery_confirmed' => true,
+                    ]);
+                    $audit->delete();
                 }
             }
 
             DB::commit();
 
             $this->command?->info('================================================================');
-            $this->command?->info("Reconciliation & Restoration Complete!");
-            $this->command?->info("Rent Leads Kept/Reclaimed to Master Lead Pool : {$rentReclaimedCount}");
-            $this->command?->info("Buy Leads Restored to Builder/Developer Panel : {$buyRestoredCount}");
-            $this->command?->info("Credits Refunded for Rent Leads               : {$refundedCredits}");
-            $this->command?->info("Credits Rebalanced for Restored Buy Leads     : {$debitedCredits}");
+            $this->command?->info("RECONCILIATION COMPLETE:");
+            $this->command?->info("Rent Leads Kept in Master Lead Pool (client_id = 1) : {$rentProcessed}");
+            $this->command?->info("Buy Leads Delivered to Truegrowth Realty (Panel)   : {$buyProcessed}");
+            $this->command?->info("Credits Refunded for Rent Leads                    : {$rentRefunded}");
+            $this->command?->info("Credits Rebalanced for Buy Leads                   : {$buyDebited}");
             $this->command?->info('================================================================');
 
-            Log::info("[ReconcileRentLeadsFromDeveloperPanelsSeeder] Reclaimed {$rentReclaimedCount} rent leads, restored {$buyRestoredCount} buy leads.");
+            Log::info("[ReconcileRentLeadsFromDeveloperPanelsSeeder] Finished. {$rentProcessed} rent leads in Master Pool, {$buyProcessed} buy leads assigned to Truegrowth.");
         } catch (\Throwable $e) {
             DB::rollBack();
             $this->command?->error("Reconciliation failed: " . $e->getMessage());
@@ -279,11 +334,10 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
     }
 
     /**
-     * Precisely determine if a lead explicitly expressed rent intent.
+     * Check if a lead has explicit rent intent.
      */
     protected function isExplicitRentLead(Lead $lead): bool
     {
-        // 1. Check meta_form_answers metadata
         $m = $lead->metadata->firstWhere('key', 'meta_form_answers');
         if ($m && !empty($m->value)) {
             $dec = json_decode($m->value, true);
@@ -292,15 +346,12 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
                     $normK = preg_replace('/[^a-z0-9]/', '', strtolower((string)$k));
                     $valStr = strtolower(trim(is_array($v) ? implode(' ', $v) : (string)$v));
                     if (str_contains($normK, 'wanttobuystudio') || str_contains($normK, 'wanttobuy')) {
-                        if ($valStr === 'rent' || str_contains($valStr, 'rent')) {
-                            return true;
-                        }
+                        if ($valStr === 'rent' || str_contains($valStr, 'rent')) return true;
                     }
                 }
             }
         }
 
-        // 2. Check raw_json metadata
         $r = $lead->metadata->firstWhere('key', 'raw_json');
         if ($r && !empty($r->value)) {
             $raw = json_decode($r->value, true);
@@ -310,26 +361,12 @@ class ReconcileRentLeadsFromDeveloperPanelsSeeder extends Seeder
                     if (str_contains($normK, 'wanttobuystudio') || str_contains($normK, 'wanttobuy')) {
                         $vals = $fd['values'] ?? [];
                         $valStr = strtolower(trim(is_array($vals) ? ($vals[0] ?? '') : (string)$vals));
-                        if ($valStr === 'rent' || str_contains($valStr, 'rent')) {
-                            return true;
-                        }
+                        if ($valStr === 'rent' || str_contains($valStr, 'rent')) return true;
                     }
                 }
             }
         }
 
-        // 3. Check individual metadata keys
-        foreach ($lead->metadata as $meta) {
-            $normK = preg_replace('/[^a-z0-9]/', '', strtolower((string)$meta->key));
-            if (str_contains($normK, 'wanttobuystudio') || str_contains($normK, 'wanttobuy')) {
-                $valStr = strtolower(trim((string)$meta->value));
-                if ($valStr === 'rent' || str_contains($valStr, 'rent')) {
-                    return true;
-                }
-            }
-        }
-
-        // 4. Check requirement text
         $req = strtolower((string)$lead->requirement);
         if (str_contains($req, 'want to buy studio: rent') || str_contains($req, 'want to buy studio__: rent')) {
             return true;

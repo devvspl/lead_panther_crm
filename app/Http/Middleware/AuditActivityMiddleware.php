@@ -52,6 +52,13 @@ class AuditActivityMiddleware
         $actor = auth()->user();
         $request->attributes->set('audit_actor_snapshot', $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email, 'roles' => $actor->getRoleNames()->all(), 'organization_id' => $actor->organization_id] : null);
         $role = NavigationConfig::getRoleKey(auth()->user());
+        if ($request->is('credits*') && $role === 'sales-executive') {
+            \Illuminate\Support\Facades\Log::info('AUDIT 403 DEBUG', [
+                'user_id' => auth()->id(),
+                'roles' => auth()->user()?->getRoleNames()->all(),
+                'role_key' => $role,
+            ]);
+        }
         if ($role === 'builder') {
             foreach (['leads/upload*', 'leads/download-*', 'settings/organization*', 'settings/users*', 'distribution/*'] as $path) {
                 abort_if($request->is($path), 403);

@@ -184,4 +184,59 @@ class OrganizationCreditReconciliationModalTest extends TestCase
             'reason' => 'Billing statement discrepancy claimed by client',
         ]);
     }
+
+    public function test_credit_ledger_search_filters_transactions_by_lead_code_note_or_id(): void
+    {
+        $source = \App\Models\LeadSource::create(['name' => 'SearchTest']);
+        $leadA = \App\Models\Lead::factory()->create([
+            'client_id' => $this->client->id,
+            'lead_source_id' => $source->id,
+            'lead_code' => 'LP-2026-00000741',
+            'name' => 'John Panther',
+        ]);
+        $leadB = \App\Models\Lead::factory()->create([
+            'client_id' => $this->client->id,
+            'lead_source_id' => $source->id,
+            'lead_code' => 'LP-2026-00000888',
+            'name' => 'Sara Smith',
+        ]);
+
+        $txA = CreditTransaction::create([
+            'client_id' => $this->client->id,
+            'lead_id' => $leadA->id,
+            'transaction_type' => 'lead_consumption',
+            'description' => 'Deltek allocation reconciliation: delivered lead LP-2026-00000741',
+            'credit_before' => 100,
+            'credit_used' => 1,
+            'credit_after' => 99,
+            'is_legacy' => false,
+            'created_at' => now()->subDay(),
+        ]);
+
+        $txB = CreditTransaction::create([
+            'client_id' => $this->client->id,
+            'lead_id' => $leadB->id,
+            'transaction_type' => 'lead_consumption',
+            'description' => 'Deltek normal delivery: delivered lead LP-2026-00000888',
+            'credit_before' => 99,
+            'credit_used' => 1,
+            'credit_after' => 98,
+            'is_legacy' => false,
+            'created_at' => now(),
+        ]);
+
+        Livewire::test(OrganizationDetail::class, ['organization' => $this->org])
+            ->call('setTab', 'credits')
+            ->assertSee('LP-2026-00000741')
+            ->assertSee('LP-2026-00000888')
+            ->set('creditSearch', '00000741')
+            ->assertSee('LP-2026-00000741')
+            ->assertDontSee('LP-2026-00000888')
+            ->set('creditSearch', 'nonexistent-xyz-999')
+            ->assertSee('No credit transactions match your search or filter criteria')
+            ->assertSee('Reset Filters')
+            ->set('creditSearch', '')
+            ->assertSee('LP-2026-00000741')
+            ->assertSee('LP-2026-00000888');
+    }
 }

@@ -1594,6 +1594,7 @@ class OrganizationDetail extends Component
 
     // Lead Credits Management
     public string $creditFilterType = 'all'; // 'all' | 'recharge' | 'deduct' | 'refund' | 'reserve'
+    public string $creditSearch = '';
     public bool $showCreditModal = false;
     public ?int $selectedCreditClientId = null;
     public string $creditAdjustmentType = 'recharge'; // 'recharge' | 'refund' | 'deduct'
@@ -1671,6 +1672,11 @@ class OrganizationDetail extends Component
     }
 
     public function updatedCreditFilterType(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCreditSearch(): void
     {
         $this->resetPage();
     }
@@ -2171,11 +2177,40 @@ class OrganizationDetail extends Component
         }
 
         if ($tab === 'credits') {
-            $data = CreditTransaction::withoutGlobalScopes()
+            $exportQuery = CreditTransaction::withoutGlobalScopes()
                 ->whereIn('client_id', $clientIds)
-                ->with(['client', 'lead'])
-                ->latest('created_at')
-                ->get();
+                ->with(['client', 'lead']);
+
+            if ($this->creditFilterType !== 'all') {
+                if ($this->creditFilterType === 'consumption') {
+                    $exportQuery->whereIn('transaction_type', ['lead_consumption', 'deduct', 'reserve']);
+                } else {
+                    $exportQuery->where('transaction_type', $this->creditFilterType);
+                }
+            }
+
+            if (!empty($this->creditSearch)) {
+                $term = trim($this->creditSearch);
+                $cleanTerm = ltrim($term, '#');
+                $exportQuery->where(function ($q) use ($term, $cleanTerm) {
+                    if (is_numeric($cleanTerm)) {
+                        $q->orWhere('credit_transactions.id', (int) $cleanTerm);
+                    }
+                    $q->orWhere('credit_transactions.description', 'like', "%{$term}%")
+                      ->orWhere('credit_transactions.transaction_type', 'like', "%{$term}%")
+                      ->orWhereHas('lead', function ($lq) use ($term) {
+                          $lq->where('lead_code', 'like', "%{$term}%")
+                             ->orWhere('name', 'like', "%{$term}%")
+                             ->orWhere('phone', 'like', "%{$term}%");
+                      })
+                      ->orWhereHas('client', function ($cq) use ($term) {
+                          $cq->where('name', 'like', "%{$term}%")
+                             ->orWhere('email', 'like', "%{$term}%");
+                      });
+                });
+            }
+
+            $data = $exportQuery->latest('created_at')->orderBy('id', 'desc')->get();
 
             $filename = "organization_{$slug}_credits_transactions_{$date}.xlsx";
             return Excel::download(new BaseStyledExport(
@@ -2343,7 +2378,28 @@ class OrganizationDetail extends Component
             }
         }
 
-        $creditTransactions = $creditTxQuery->latest('created_at')->paginate(15);
+        if (!empty($this->creditSearch)) {
+            $term = trim($this->creditSearch);
+            $cleanTerm = ltrim($term, '#');
+            $creditTxQuery->where(function ($q) use ($term, $cleanTerm) {
+                if (is_numeric($cleanTerm)) {
+                    $q->orWhere('credit_transactions.id', (int) $cleanTerm);
+                }
+                $q->orWhere('credit_transactions.description', 'like', "%{$term}%")
+                  ->orWhere('credit_transactions.transaction_type', 'like', "%{$term}%")
+                  ->orWhereHas('lead', function ($lq) use ($term) {
+                      $lq->where('lead_code', 'like', "%{$term}%")
+                         ->orWhere('name', 'like', "%{$term}%")
+                         ->orWhere('phone', 'like', "%{$term}%");
+                  })
+                  ->orWhereHas('client', function ($cq) use ($term) {
+                      $cq->where('name', 'like', "%{$term}%")
+                         ->orWhere('email', 'like', "%{$term}%");
+                  });
+            });
+        }
+
+        $creditTransactions = $creditTxQuery->latest('created_at')->orderBy('id', 'desc')->paginate(15);
 
         // Recharge requests for clients of this org
         $rechargeRequests = RechargeRequest::whereIn('client_id', $clientIds)->latest('created_at')->take(10)->get();

@@ -156,11 +156,18 @@ class CreditWallet extends Component
         }
 
         if (!empty($this->search)) {
-            $txQuery->where(function ($q) {
-                $q->where('transaction_type', 'like', "%{$this->search}%")
-                  ->orWhereHas('lead', function ($lq) {
-                      $lq->where('lead_code', 'like', "%{$this->search}%")
-                         ->orWhere('name', 'like', "%{$this->search}%");
+            $term = trim($this->search);
+            $cleanTerm = ltrim($term, '#');
+            $txQuery->where(function ($q) use ($term, $cleanTerm) {
+                if (is_numeric($cleanTerm)) {
+                    $q->orWhere('id', (int) $cleanTerm);
+                }
+                $q->orWhere('transaction_type', 'like', "%{$term}%")
+                  ->orWhere('description', 'like', "%{$term}%")
+                  ->orWhereHas('lead', function ($lq) use ($term) {
+                      $lq->where('lead_code', 'like', "%{$term}%")
+                         ->orWhere('name', 'like', "%{$term}%")
+                         ->orWhere('phone', 'like', "%{$term}%");
                   });
             });
         }

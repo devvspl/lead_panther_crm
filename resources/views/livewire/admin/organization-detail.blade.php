@@ -1019,38 +1019,62 @@
 
             <!-- Controls bar for Credits Ledger -->
             <div
-                class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs text-muted font-semibold">Filter Ledger:</span>
-                    <div class="inline-flex p-0.5 rounded-lg bg-canvas border border-border text-xs flex-wrap">
-                        <button type="button" wire:click="$set('creditFilterType', 'all')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'all' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            All
-                        </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'opening_credit')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'opening_credit' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Opening
-                        </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'recharge')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'recharge' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Recharges
-                        </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'consumption')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'consumption' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Consumption
-                        </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'refund')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'refund' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Refunds
-                        </button>
-                        <button type="button" wire:click="$set('creditFilterType', 'manual_adjustment')"
-                            class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'manual_adjustment' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
-                            Adjustments
-                        </button>
+                class="p-4 rounded-2xl bg-surface border border-border shadow-2xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 flex-wrap">
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-64 md:w-80">
+                        <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text" wire:model.live.debounce.300ms="creditSearch"
+                            placeholder="Search by lead code, note, client, ID..."
+                            class="w-full h-9 pl-9 pr-8 text-xs bg-canvas border border-border rounded-xl text-ink placeholder:text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+                        @if(!empty($creditSearch))
+                            <button type="button" wire:click="$set('creditSearch', '')"
+                                class="absolute right-2.5 top-2.5 text-muted hover:text-ink transition cursor-pointer"
+                                title="Clear search">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        @endif
+                    </div>
+
+                    <!-- Filter Ledger Pills -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs text-muted font-semibold">Filter Ledger:</span>
+                        <div class="inline-flex p-0.5 rounded-lg bg-canvas border border-border text-xs flex-wrap">
+                            <button type="button" wire:click="$set('creditFilterType', 'all')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'all' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                All
+                            </button>
+                            <button type="button" wire:click="$set('creditFilterType', 'opening_credit')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'opening_credit' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                Opening
+                            </button>
+                            <button type="button" wire:click="$set('creditFilterType', 'recharge')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'recharge' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                Recharges
+                            </button>
+                            <button type="button" wire:click="$set('creditFilterType', 'consumption')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'consumption' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                Consumption
+                            </button>
+                            <button type="button" wire:click="$set('creditFilterType', 'refund')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'refund' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                Refunds
+                            </button>
+                            <button type="button" wire:click="$set('creditFilterType', 'manual_adjustment')"
+                                class="px-2.5 py-1 rounded-md font-semibold transition cursor-pointer {{ $creditFilterType === 'manual_adjustment' ? 'bg-surface text-ink shadow-2xs font-bold' : 'text-muted hover:text-ink' }}">
+                                Adjustments
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-shrink-0">
                     <button type="button" wire:click="exportTabExcel('credits')"
                         class="px-3 py-2 border border-border bg-surface hover:bg-canvas text-ink text-xs font-semibold rounded-lg transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
                         title="Export Credits History to Excel">
@@ -1144,7 +1168,12 @@
                             @empty
                                 <tr>
                                     <td colspan="10" class="p-8 text-center text-xs text-muted">
-                                        No credit transactions recorded yet for this organization.
+                                        @if(!empty($creditSearch) || $creditFilterType !== 'all')
+                                            No credit transactions match your search or filter criteria.
+                                            <button type="button" wire:click="$set('creditSearch', ''); $set('creditFilterType', 'all');" class="text-primary font-semibold underline hover:text-primary/80 ml-1 cursor-pointer">Reset Filters</button>
+                                        @else
+                                            No credit transactions recorded yet for this organization.
+                                        @endif
                                     </td>
                                 </tr>
                             @endforelse

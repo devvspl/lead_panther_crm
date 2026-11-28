@@ -666,10 +666,6 @@ class ClientDeliveryCenter extends Component
             'history' => $this->historyQuery()->latest('id')->paginate(10, ['*'], 'deliveryPage'),
             'inspectedItem' => $this->inspectedItemId ? $this->historyQuery(false)->with(['attemptHistory.run'])->find($this->inspectedItemId) : null,
             'deliveryHealth' => $deliveryHealth,
-            'revokeLeads' => $this->revokeQuery()->latest('sent_at')->paginate(10, ['*'], 'revokePage'),
-            'totalRevokeMatching' => $this->revokeQuery()->whereIn('status', ['sent', 'accepted'])->count(),
-            'revokeClients' => User::whereIn('id', (clone $items)->select('client_id'))->get(),
-            'revokeProjects' => Project::withoutGlobalScopes()->whereIn('id', (clone $items)->select('project_id'))->get(),
         ]);
     }
 }

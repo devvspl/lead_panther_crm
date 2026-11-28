@@ -40,15 +40,16 @@ class RechargeApprovalQueue extends Component
         return [
             ['key' => 'id', 'label' => 'Req ID', 'type' => 'text', 'sortable' => true, 'priority' => 1, 'class' => 'font-mono font-bold text-ink'],
             ['key' => 'client_name', 'label' => 'Client / Organization', 'type' => 'text', 'priority' => 1, 'class' => 'font-bold text-ink'],
-            ['key' => 'package_name', 'label' => 'Package', 'type' => 'text', 'priority' => 2],
-            ['key' => 'credits_formatted', 'label' => 'Credits', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-primary font-bold'],
-            ['key' => 'payment_reference', 'label' => 'Reference / UTR', 'type' => 'text', 'priority' => 2, 'class' => 'font-mono text-muted text-[11px]'],
+            ['key' => 'package_name', 'label' => 'Package / Type', 'type' => 'text', 'priority' => 2],
+            ['key' => 'credits_formatted', 'label' => 'Requested Credits', 'type' => 'text', 'priority' => 1, 'class' => 'font-mono text-primary font-bold'],
+            ['key' => 'current_balance', 'label' => 'Current Balance', 'type' => 'text', 'priority' => 1, 'sortable' => false, 'render' => fn($row) => '<span class="font-mono font-semibold text-ink">' . number_format((int) ($row->client?->wallet?->balance ?? 0)) . ' Credits</span>'],
+            ['key' => 'payment_reference', 'label' => 'Reference / Notes', 'type' => 'text', 'priority' => 2, 'render' => fn($row) => '<span class="font-mono text-muted text-[11px]">' . e($row->reference_note ?: $row->payment_reference ?: '—') . '</span>'],
             ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'sortable' => true, 'priority' => 1, 'badgeMap' => [
                 'pending' => 'bg-amber-50 text-amber-700 border border-amber-200',
                 'approved' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 'rejected' => 'bg-red-50 text-red-700 border border-red-200',
             ]],
-            ['key' => 'created_at', 'label' => 'Requested', 'type' => 'date', 'sortable' => true, 'priority' => 2],
+            ['key' => 'created_at', 'label' => 'Requested Date', 'type' => 'date', 'sortable' => true, 'priority' => 2],
             ['key' => 'actions', 'label' => 'Actions', 'type' => 'recharge_actions', 'priority' => 1],
         ];
     }
@@ -88,15 +89,22 @@ class RechargeApprovalQueue extends Component
 
         try {
             DB::transaction(function () use ($targetId) {
-                $req = RechargeRequest::with('package')->lockForUpdate()->findOrFail($targetId);
+                $req = RechargeRequest::with(['client.wallet', 'package'])->lockForUpdate()->findOrFail($targetId);
 
                 if ($req->status !== 'pending') {
                     throw new \Exception('Recharge request is no longer pending.');
                 }
 
+                $targetUser = \App\Models\User::findOrFail($req->client_id);
+                // Ensure wallet exists and has reconciled_at set
+                $wallet = CreditWallet::firstOrCreate(['client_id' => $targetUser->id], ['balance' => 0, 'opening_balance' => 0]);
+                if (!$wallet->reconciled_at) {
+                    $wallet->update(['reconciled_at' => now()]);
+                }
+
                 $creditToAdd = \App\Support\LeadCredits::quantity($this->approvalQuantity ?? $req->amount, 'quantity', 1);
                 app(\App\Services\LeadCreditService::class)->adjust(
-                    \App\Models\User::findOrFail($req->client_id), $creditToAdd, 'recharge',
+                    $targetUser, $creditToAdd, 'recharge',
                     $this->referenceNote ?: 'Lead credit request #'.$req->id.' approved', auth()->user());
 
                 // Update recharge_requests row
@@ -110,6 +118,7 @@ class RechargeApprovalQueue extends Component
                 // Write to audit_logs
                 AuditLog::create([
                     'user_id' => auth()->id(),
+                    'organization_id' => $targetUser->organization_id,
                     'action' => 'recharge.approved',
                     'subject_type' => RechargeRequest::class,
                     'subject_id' => $req->id,
@@ -157,14 +166,19 @@ class RechargeApprovalQueue extends Component
                     throw new \Exception('Recharge request is no longer pending.');
                 }
 
+                $reason = $this->rejectionReason ?: 'Request declined by administrator.';
+
                 $req->update([
                     'status' => 'rejected',
-                    'rejection_reason' => $this->rejectionReason ?: 'Request declined by administrator.',
+                    'rejection_reason' => $reason,
                 ]);
+
+                $targetUser = \App\Models\User::find($req->client_id);
 
                 // Write to audit_logs
                 AuditLog::create([
                     'user_id' => auth()->id(),
+                    'organization_id' => $targetUser?->organization_id,
                     'action' => 'recharge.rejected',
                     'subject_type' => RechargeRequest::class,
                     'subject_id' => $req->id,
@@ -183,7 +197,7 @@ class RechargeApprovalQueue extends Component
                     'status' => 'sent',
                     'payload' => json_encode([
                         'title' => 'Recharge Request Declined',
-                        'message' => "Your recharge request was declined. Reason: {$this->rejectionReason}",
+                        'message' => "Your recharge request was declined. Reason: {$reason}",
                     ]),
                     'sent_at' => now(),
                 ]);
@@ -198,13 +212,17 @@ class RechargeApprovalQueue extends Component
 
     protected function getFilteredQuery()
     {
-        $query = RechargeRequest::with(['client', 'package']);
+        $query = RechargeRequest::with(['client.wallet', 'client.organization', 'package']);
 
         if (!empty($this->search)) {
             $query->where(function ($q) {
                 $q->where('payment_reference', 'like', '%' . $this->search . '%')
+                  ->orWhere('reference_note', 'like', '%' . $this->search . '%')
                   ->orWhere('amount', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('client', fn($cq) => $cq->where('name', 'like', '%' . $this->search . '%'));
+                  ->orWhereHas('client', function ($cq) {
+                      $cq->where('name', 'like', '%' . $this->search . '%')
+                         ->orWhereHas('organization', fn($oq) => $oq->where('name', 'like', '%' . $this->search . '%'));
+                  });
             });
         }
 

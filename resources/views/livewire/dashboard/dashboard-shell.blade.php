@@ -1147,32 +1147,166 @@
             </div>
         </div>
 
-        <!-- 3. Small Credit Summary (Read-Only) -->
+        <!-- 3. Small Credit Summary & Request Credits -->
         @if($builderData['organization']?->show_builder_credit_balance ?? true)
-        <div class="bg-surface rounded-xl border border-border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-ink uppercase tracking-wider">Available Lead Credits</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600 border border-neutral-200">
-                    Read-Only
-                </span>
-            </div>
-            <div class="flex items-center gap-4 text-xs">
-                <div class="flex items-center gap-1.5">
-                    <span class="text-muted">Available Credits:</span>
-                    <span class="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        {{ number_format($builderData['credits']['available_credits'] ?? 0, 0) }} Credits
+        <div class="bg-surface rounded-xl border border-border p-4 shadow-2xs space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-ink uppercase tracking-wider">Available Lead Credits</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Active
                     </span>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-muted">Credits Consumed:</span>
-                    <span class="font-mono font-bold text-ink bg-canvas px-2 py-0.5 rounded border border-border">
-                        {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 0) }} Credits
+                <div class="flex items-center gap-2">
+                    <x-ui.button wire:click="openBuilderRechargeModal" variant="primary" size="sm" class="flex items-center gap-1.5 text-xs font-bold shadow-2xs cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        <span>Request Lead Credits</span>
+                    </x-ui.button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div class="p-3 bg-canvas rounded-lg border border-border">
+                    <span class="text-muted text-[11px] block mb-1">Available Credits:</span>
+                    <span class="font-mono font-bold text-emerald-600 text-lg">
+                        {{ number_format($builderData['credits']['available_credits'] ?? 0, 0) }} <span class="text-xs text-muted font-normal">Credits</span>
+                    </span>
+                </div>
+                <div class="p-3 bg-canvas rounded-lg border border-border">
+                    <span class="text-muted text-[11px] block mb-1">Total Credits:</span>
+                    <span class="font-mono font-bold text-ink text-lg">
+                        {{ number_format($builderData['credits']['total_credits'] ?? (($builderData['credits']['available_credits'] ?? 0) + ($builderData['credits']['credits_consumed'] ?? 0)), 0) }} <span class="text-xs text-muted font-normal">Credits</span>
+                    </span>
+                </div>
+                <div class="p-3 bg-canvas rounded-lg border border-border">
+                    <span class="text-muted text-[11px] block mb-1">Credits Consumed:</span>
+                    <span class="font-mono font-bold text-muted text-lg">
+                        {{ number_format($builderData['credits']['credits_consumed'] ?? 0, 0) }} <span class="text-xs text-muted font-normal">Credits</span>
                     </span>
                 </div>
             </div>
+
+            <!-- Recent Credit Requests Panel -->
+            @if(!empty($builderData['credits']['recent_requests']) && count($builderData['credits']['recent_requests']) > 0)
+                <div class="border-t border-border pt-3 mt-2 space-y-2">
+                    <div class="flex items-center justify-between text-[11px] font-bold text-ink uppercase tracking-wider">
+                        <span>Submitted Lead Credit Requests</span>
+                    </div>
+                    <div class="space-y-1.5">
+                        @foreach($builderData['credits']['recent_requests'] as $req)
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-canvas rounded-lg border border-border text-xs gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-bold font-mono text-ink">#REQ-{{ str_pad($req->id ?? $req['id'], 4, '0', STR_PAD_LEFT) }}</span>
+                                    <span class="text-muted text-[11px]">Requested: <strong class="font-mono text-ink">{{ number_format($req->amount ?? $req['amount'] ?? 0) }}</strong> Credits</span>
+                                    <span class="text-muted text-[11px]">Approved: <strong class="font-mono text-emerald-600">{{ ($req->status ?? $req['status']) === 'approved' ? number_format($req->approved_quantity ?? $req['approved_quantity'] ?? $req->amount ?? 0) : '—' }}</strong></span>
+                                    <span class="text-muted text-[10px] font-mono">{{ $req->created_at ? $req->created_at->format('M d, Y H:i') : ($req['requested_at_formatted'] ?? '') }}</span>
+                                </div>
+                                <div>
+                                    @php $st = $req->status ?? $req['status'] ?? 'pending'; @endphp
+                                    @if($st === 'pending')
+                                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>
+                                    @elseif($st === 'approved')
+                                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-green-50 text-green-700 border border-green-200">Approved</span>
+                                    @else
+                                        @php $rej = $req->rejection_reason ?? $req['rejection_reason'] ?? ''; @endphp
+                                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-red-50 text-red-700 border border-red-200" title="{{ $rej }}">Rejected{{ $rej ? ': ' . \Illuminate\Support\Str::limit($rej, 25) : '' }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
-        <!-- 4. Six Compact KPI Cards -->
+        <!-- BUILDER REQUEST LEAD CREDITS MODAL -->
+        @if($showBuilderRechargeModal)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
+                <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+                    <div class="flex items-center justify-between border-b border-border pb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-ink">Request Lead Credits</h3>
+                                <p class="text-[11px] text-muted">Submit a lead credit request to Super Admin for approval.</p>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="closeBuilderRechargeModal" class="text-muted hover:text-ink cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Current Balance Standing -->
+                    <div class="grid grid-cols-2 gap-3 p-3 bg-canvas rounded-lg border border-border">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-muted block mb-0.5">Available Credits</span>
+                            <span class="font-mono font-bold text-emerald-600 text-sm">
+                                {{ number_format($builderData['credits']['available_credits'] ?? 0, 0) }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-muted block mb-0.5">Total Credits</span>
+                            <span class="font-mono font-bold text-ink text-sm">
+                                {{ number_format($builderData['credits']['total_credits'] ?? 0, 0) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Form Fields -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink mb-1">
+                                Required Credit Quantity <span class="text-rose-500">*</span>
+                            </label>
+                            <input 
+                                type="number" 
+                                min="1" 
+                                step="1" 
+                                wire:model="builderRechargeAmount" 
+                                placeholder="e.g. 500" 
+                                class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono" 
+                            />
+                            @error('builderRechargeAmount') 
+                                <span class="text-rose-500 text-[10px] mt-1 block">{{ $message }}</span> 
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-ink mb-1">
+                                Notes / Justification (Optional)
+                            </label>
+                            <textarea 
+                                wire:model="builderRechargeNote" 
+                                rows="2" 
+                                placeholder="Add any allocation details or purchase reference..." 
+                                class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            ></textarea>
+                            @error('builderRechargeNote') 
+                                <span class="text-rose-500 text-[10px] mt-1 block">{{ $message }}</span> 
+                            @enderror
+                        </div>
+                    </div>
+
+                    <!-- Confirmation & Actions -->
+                    <div class="flex items-center justify-between pt-3 border-t border-border">
+                        <button type="button" wire:click="closeBuilderRechargeModal" class="px-3 py-1.5 text-xs text-muted hover:text-ink font-semibold cursor-pointer">
+                            Cancel
+                        </button>
+                        <button 
+                            type="button" 
+                            wire:click="submitBuilderRechargeRequest" 
+                            wire:confirm="Are you sure you want to request {{ number_format($builderRechargeAmount ?: 0) }} lead credits?"
+                            class="px-4 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5"
+                        >
+                            <span>Confirm & Submit Request</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
         @endif
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <!-- 1. Total Leads -->

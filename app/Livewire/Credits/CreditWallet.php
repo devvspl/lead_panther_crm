@@ -16,6 +16,8 @@ class CreditWallet extends Component
 
     public bool $showRechargeModal = false;
     public ?int $selectedPackageId = null;
+    public ?int $customCredits = null;
+    public string $rechargeNotes = '';
 
     public string $filterType = '';
     public string $filterDateRange = '';
@@ -80,24 +82,50 @@ class CreditWallet extends Component
         $user = auth()->user();
         $client = $this->billingClient();
 
-        if (!$client || !$this->selectedPackageId) {
-            $this->dispatch('toast', type: 'error', message: 'Please select a valid package.');
+        if (!$client) {
+            $this->dispatch('toast', type: 'error', message: 'Billing client not found.');
             return;
         }
 
-        $package = CreditPackage::find($this->selectedPackageId);
-        if ($package) {
-            RechargeRequest::create([
-                'client_id' => $client->id,
-                'package_id' => $package->id,
-                'amount' => (int) $package->credit_count,
-                'status' => 'pending',
-                'requested_at' => now(),
-            ]);
+        $amount = 0;
+        $packageId = null;
 
-            $this->dispatch('toast', type: 'success', message: 'Recharge Request Sent! Status is now Pending Approval.');
-            $this->closeRechargeModal();
+        if ($this->customCredits && $this->customCredits > 0) {
+            $amount = (int) $this->customCredits;
+        } elseif ($this->selectedPackageId && ($package = CreditPackage::find($this->selectedPackageId))) {
+            $amount = (int) $package->credit_count;
+            $packageId = $package->id;
+        } else {
+            $this->dispatch('toast', type: 'error', message: 'Please select a package or specify a credit quantity.');
+            return;
         }
+
+        // Prevent duplicate requests within 2 minutes
+        $existing = RechargeRequest::where('client_id', $client->id)
+            ->where('status', 'pending')
+            ->where('amount', $amount)
+            ->where('created_at', '>=', now()->subMinutes(2))
+            ->first();
+
+        if ($existing) {
+            $this->dispatch('toast', type: 'warning', message: 'A pending request for this quantity was recently submitted. Please wait for approval.');
+            $this->closeRechargeModal();
+            return;
+        }
+
+        RechargeRequest::create([
+            'client_id' => $client->id,
+            'package_id' => $packageId,
+            'amount' => $amount,
+            'status' => 'pending',
+            'reference_note' => $this->rechargeNotes ?: 'Credit request via Client Portal',
+            'requested_at' => now(),
+        ]);
+
+        $this->dispatch('toast', type: 'success', message: 'Recharge Request Sent! Status is now Pending Approval.');
+        $this->customCredits = null;
+        $this->rechargeNotes = '';
+        $this->closeRechargeModal();
     }
 
     public function render()

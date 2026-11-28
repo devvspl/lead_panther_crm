@@ -34,12 +34,52 @@
 
     <!-- APPROVE CONFIRMATION MODAL -->
     @if($showApproveModal)
+        @php
+            $selectedReq = $selectedRequestId ? \App\Models\RechargeRequest::with(['client.wallet', 'client.organization', 'package'])->find($selectedRequestId) : null;
+        @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
             <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-                <h3 class="text-base font-bold text-ink">Approve Credit Recharge Request</h3>
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                    <h3 class="text-base font-bold text-ink">Approve Credit Recharge Request</h3>
+                    <button type="button" wire:click="$set('showApproveModal', false)" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
                 <p class="text-xs text-muted">Confirming this request will immediately credit the client's wallet with the approved lead credit quantity.</p>
 
-                <div><label class="block text-xs font-semibold text-ink mb-1">Approved Lead Credits</label><input type="number" min="1" step="1" wire:model="approvalQuantity" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink" /></div>
+                <!-- Request Summary Details -->
+                @if($selectedReq)
+                    <div class="p-3 bg-canvas rounded-lg border border-border space-y-1.5 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-muted">Client / Org:</span>
+                            <strong class="text-ink">{{ $selectedReq->client_name }}</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Current Balance:</span>
+                            <span class="font-mono font-bold text-ink">{{ number_format($selectedReq->current_balance) }} Credits</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Requested Credits:</span>
+                            <span class="font-mono font-bold text-primary">{{ number_format($selectedReq->amount ?? 0) }} Credits</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Requested Date:</span>
+                            <span class="text-muted font-mono">{{ $selectedReq->created_at?->format('M d, Y H:i') }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Status:</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>
+                        </div>
+                        @if($selectedReq->reference_note)
+                            <div class="flex justify-between">
+                                <span class="text-muted">Client Note:</span>
+                                <span class="text-ink italic">{{ $selectedReq->reference_note }}</span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <div><label class="block text-xs font-semibold text-ink mb-1">Approved Lead Credits</label><input type="number" min="1" step="1" wire:model="approvalQuantity" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink font-mono" /></div>
                 <div>
                     <label class="block text-xs font-semibold text-ink mb-1">Approval note (optional)</label>
                     <input type="text" wire:model="referenceNote" placeholder="Reason or allocation reference" class="w-full text-xs rounded-lg border border-border p-2 bg-canvas text-ink focus:ring-2 focus:ring-primary/20 focus:border-primary">
@@ -55,15 +95,48 @@
 
     <!-- REJECT MODAL -->
     @if($showRejectModal)
+        @php
+            $selectedReq = $selectedRequestId ? \App\Models\RechargeRequest::with(['client.wallet', 'client.organization', 'package'])->find($selectedRequestId) : null;
+        @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto overscroll-contain">
             <div class="bg-surface rounded-card max-w-md w-full p-6 shadow-2xl border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-                <h3 class="text-base font-bold text-ink">Decline Credit Recharge Request</h3>
-                <p class="text-xs text-muted">Please specify a reason for rejecting this recharge request. This will be sent to the client.</p>
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                    <h3 class="text-base font-bold text-ink">Decline Credit Recharge Request</h3>
+                    <button type="button" wire:click="$set('showRejectModal', false)" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <p class="text-xs text-muted">Decline this lead credit request. No credits will be added to the client's balance.</p>
+
+                <!-- Request Summary Details -->
+                @if($selectedReq)
+                    <div class="p-3 bg-canvas rounded-lg border border-border space-y-1.5 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-muted">Client / Org:</span>
+                            <strong class="text-ink">{{ $selectedReq->client_name }}</strong>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Current Balance:</span>
+                            <span class="font-mono font-bold text-ink">{{ number_format($selectedReq->current_balance) }} Credits</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Requested Credits:</span>
+                            <span class="font-mono font-bold text-rose-600">{{ number_format($selectedReq->amount ?? 0) }} Credits</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Requested Date:</span>
+                            <span class="text-muted font-mono">{{ $selectedReq->created_at?->format('M d, Y H:i') }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted">Status:</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-pill bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>
+                        </div>
+                    </div>
+                @endif
 
                 <div>
-                    <label class="block text-xs font-semibold text-ink mb-1">Rejection Reason <span class="text-rose-500">*</span></label>
-                    <textarea wire:model="rejectionReason" rows="3" placeholder="Explain why the credit request is declined." class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
-                    @error('rejectionReason') <span class="text-rose-500 text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                    <label class="block text-xs font-semibold text-ink mb-1">Rejection Reason (Optional)</label>
+                    <textarea wire:model="rejectionReason" rows="3" placeholder="Optional explanation for declining the request." class="w-full text-xs rounded-lg border border-border p-2.5 bg-canvas text-ink focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
                 </div>
 
                 <div class="flex justify-end space-x-2 pt-2 border-t border-border">

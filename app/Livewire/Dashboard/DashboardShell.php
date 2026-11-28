@@ -1616,19 +1616,41 @@ class DashboardShell extends Component
 
     public function submitBuilderRechargeRequest(): void
     {
-        abort_if(Lead::usesSalesPanel(), 403);
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
         $this->validate([
-            'builderRechargeAmount' => 'required|integer|min:1',
+            'builderRechargeAmount' => 'required|integer|min:1|max:100000000',
             'builderRechargeNote' => 'nullable|string|max:500',
         ]);
 
-        $user = auth()->user();
-        $client = $user;
+        $clientId = $user->id;
+        if ($user->organization_id) {
+            $orgClient = Client::where('organization_id', $user->organization_id)->whereHas('wallet')->first();
+            if ($orgClient) {
+                $clientId = $orgClient->id;
+            }
+        }
+
+        CreditWallet::firstOrCreate(['client_id' => $clientId], ['balance' => 0, 'opening_balance' => 0]);
+
+        $existingPending = RechargeRequest::where('client_id', $clientId)
+            ->where('status', 'pending')
+            ->where('amount', (int) $this->builderRechargeAmount)
+            ->exists();
+
+
+        if ($existingPending) {
+            $this->addError('builderRechargeAmount', 'A pending credit request for ' . number_format((int) $this->builderRechargeAmount) . ' credits was recently submitted. Please wait for Super Admin approval.');
+            return;
+        }
 
         RechargeRequest::create([
-            'client_id' => $client->id,
+            'client_id' => $clientId,
             'package_id' => null,
-            'amount' => $this->builderRechargeAmount,
+            'amount' => (int) $this->builderRechargeAmount,
             'status' => 'pending',
             'reference_note' => $this->builderRechargeNote ?: 'Credit recharge request from Builder Dashboard',
             'requested_at' => now(),
@@ -1822,6 +1844,18 @@ class DashboardShell extends Component
         ->sum('credit_used');
 
         $totalLeadsAllTime = (clone $baseQuery)->count();
+        $totalCredits = $availableCredits + $creditsConsumed;
+
+        $recentRechargeRequests = RechargeRequest::where(function ($q) use ($orgUserIds, $user) {
+            if (!empty($orgUserIds)) {
+                $q->whereIn('client_id', $orgUserIds);
+            } else {
+                $q->where('client_id', $user?->id);
+            }
+        })
+        ->latest('requested_at')
+        ->take(5)
+        ->get();
 
         $creditHistory = CreditTransaction::where(function ($q) use ($orgUserIds, $baseQuery) {
             $q->whereIn('client_id', $orgUserIds)
@@ -1902,9 +1936,11 @@ class DashboardShell extends Component
             ],
             'credits' => ($org?->show_builder_credit_balance ?? true) ? [
                 'available_credits' => $availableCredits,
+                'total_credits' => $totalCredits,
                 'credits_consumed' => $creditsConsumed,
                 'total_leads_received' => $totalLeadsAllTime,
                 'history' => $creditHistory,
+                'recent_requests' => $recentRechargeRequests,
             ] : [],
             'team_performance' => $teamPerformance,
             'monthly_trend' => [

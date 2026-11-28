@@ -86,13 +86,19 @@
     <!-- Recent Recharge Requests Status Panel -->
     @if($rechargeRequests->isNotEmpty())
         <div class="bg-surface rounded-card border border-border p-6 shadow-sm space-y-3">
-            <h3 class="text-xs font-bold uppercase text-muted tracking-wider">Recent Recharge Requests</h3>
+            <h3 class="text-xs font-bold uppercase text-muted tracking-wider">Recent Credit Requests</h3>
             <div class="space-y-2">
                 @foreach($rechargeRequests as $req)
-                    <div class="flex items-center justify-between p-3 bg-canvas rounded border border-border text-xs">
-                        <div>
-                            <span class="font-bold text-ink">{{ $req->package->name ?? 'Package' }}</span>
-                            <span class="text-muted text-[11px] ml-2">{{ $req->credits_formatted }}</span>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-canvas rounded-lg border border-border text-xs gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-bold text-ink">{{ $req->package_name }}</span>
+                            <span class="text-muted text-[11px]">Requested: <strong class="font-mono text-ink">{{ number_format($req->amount ?? 0) }}</strong> Credits</span>
+                            @if($req->approved_quantity)
+                                <span class="text-muted text-[11px]">Approved: <strong class="font-mono text-emerald-600">{{ number_format($req->approved_quantity) }}</strong> Credits</span>
+                            @elseif($req->status === 'approved')
+                                <span class="text-muted text-[11px]">Approved: <strong class="font-mono text-emerald-600">{{ number_format($req->amount ?? 0) }}</strong> Credits</span>
+                            @endif
+                            <span class="text-muted text-[10px] font-mono">{{ $req->created_at ? $req->created_at->format('M d, Y H:i') : '' }}</span>
                         </div>
                         <div>
                             @if($req->status === 'pending')
@@ -114,31 +120,45 @@
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain">
             <div class="bg-surface rounded-card border border-border p-6 max-w-xl w-full shadow-2xl space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
                 <div class="flex items-center justify-between border-b border-border pb-3">
-                    <h3 class="text-base font-bold text-ink">Select Credit Recharge Package</h3>
+                    <h3 class="text-base font-bold text-ink">Request Lead Credits</h3>
                     <button wire:click="closeRechargeModal" class="text-muted hover:text-ink">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
-                    @foreach($packages as $pkg)
-                        <div 
-                            wire:click="$set('selectedPackageId', {{ $pkg->id }})"
-                            class="p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $selectedPackageId === $pkg->id ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}"
-                        >
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <span class="text-xs font-bold text-ink">{{ $pkg->name }}</span>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-ink text-white">{{ $pkg->credit_count }} Creditsedits</span>
+                <div class="space-y-3">
+                    <label class="block text-xs font-semibold text-ink">Choose a Credit Package</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
+                        @foreach($packages as $pkg)
+                            <div 
+                                wire:click="$set('selectedPackageId', {{ $pkg->id }}); $set('customCredits', null)"
+                                class="p-4 rounded-xl border transition cursor-pointer flex flex-col justify-between space-y-2 {{ $selectedPackageId === $pkg->id && empty($customCredits) ? 'border-ink bg-canvas ring-2 ring-ink' : 'border-border bg-surface hover:border-gray-400' }}"
+                            >
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <span class="text-xs font-bold text-ink">{{ $pkg->name }}</span>
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-ink text-white">{{ $pkg->credit_count }} Credits</span>
+                                </div>
+                                <div class="text-lg font-black text-ink">{{ number_format($pkg->credit_count) }} Lead Credits</div>
+                                <div class="text-[10px] text-muted">Valid for {{ $pkg->validity_days }} days</div>
                             </div>
-                            <div class="text-lg font-black text-ink">{{ number_format($pkg->credit_count) }} Lead Credits</div>
-                            <div class="text-[10px] text-muted">Valid for {{ $pkg->validity_days }} days</div>
-                        </div>
-                    @endforeach
+                        @endforeach
+                    </div>
+
+                    <div class="p-3 bg-canvas rounded-xl border border-border space-y-2">
+                        <label class="block text-xs font-semibold text-ink">Or Enter Custom Credit Quantity</label>
+                        <input 
+                            type="number" 
+                            min="1" 
+                            wire:model.live="customCredits" 
+                            placeholder="e.g. 500" 
+                            class="w-full text-xs rounded-lg border border-border p-2 bg-surface text-ink font-mono"
+                        />
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-end space-x-3 pt-3 border-t border-border">
                     <x-ui.button wire:click="closeRechargeModal" variant="secondary" class="text-xs">Cancel</x-ui.button>
-                    <x-ui.button wire:click="submitRechargeRequest" variant="primary" class="text-xs">Submit Recharge Request</x-ui.button>
+                    <x-ui.button wire:click="submitRechargeRequest" variant="primary" class="text-xs">Submit Credit Request</x-ui.button>
                 </div>
             </div>
         </div>

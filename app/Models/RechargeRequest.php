@@ -35,7 +35,17 @@ class RechargeRequest extends Model
 
     public function getClientNameAttribute(): string
     {
-        return $this->client?->name ?: 'N/A';
+        $orgName = $this->client?->organization?->name;
+        $name = $this->client?->name ?: 'N/A';
+        if ($orgName && $orgName !== $name) {
+            return $name . ' (' . $orgName . ')';
+        }
+        return $name;
+    }
+
+    public function getCurrentBalanceAttribute(): int
+    {
+        return (int) ($this->client?->wallet?->balance ?? 0);
     }
 
     public function getAmountFormattedAttribute(): string
@@ -51,7 +61,7 @@ class RechargeRequest extends Model
 
     public function getPackageNameAttribute(): string
     {
-        return $this->package?->name ?: 'Custom Recharge';
+        return $this->package?->name ?: 'Custom Request';
     }
 
     public function getRequestedAtFormattedAttribute(): string

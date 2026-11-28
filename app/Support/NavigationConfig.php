@@ -38,7 +38,7 @@ class NavigationConfig
                 'backups', 'git-sync', 'archived-leads'
             ], app()->environment(['local', 'staging', 'testing']) ? ['dev-tools'] : []),
             'builder' => [
-                'dashboard', 'leads', 'followups', 'team', 'replacements', 'reports'
+                'dashboard', 'leads', 'credits', 'followups', 'team', 'replacements', 'reports'
             ],
             'team-leader' => ['dashboard','leads','team','followups','reports'],
             'broker' => [

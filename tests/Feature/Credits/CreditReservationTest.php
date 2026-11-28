@@ -495,7 +495,7 @@ class CreditReservationTest extends TestCase
         $org = Organization::create(['name' => 'Search Org', 'type' => 'builder']);
         $user = User::factory()->create(['organization_id' => $org->id, 'name' => 'Wallet Searcher']);
         $user->assignRole('builder');
-        $client = Client::create(['id' => $user->id, 'organization_id' => $org->id, 'name' => 'Wallet Searcher']);
+        $client = Client::find($user->id);
         CreditWallet::create(['client_id' => $client->id, 'balance' => 500, 'reconciled_at' => now()]);
 
         $source = LeadSource::create(['name' => 'WalletSearch']);

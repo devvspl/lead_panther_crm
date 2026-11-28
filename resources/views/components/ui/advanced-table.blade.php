@@ -27,6 +27,7 @@
     'loading' => false,
     'loadingTarget' => null,
     'reorderableColumns' => false,
+    'tableTitle' => null,
 ])
 
 @php
@@ -54,6 +55,11 @@
     @if($hasToolbar)
         <div
             class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-surface p-3 sm:p-4 rounded-card border border-border shadow-2xs">
+            @if(!empty($tableTitle))
+                <div class="flex items-center gap-2 shrink-0 mr-auto lg:mr-2">
+                    <h3 class="text-base sm:text-lg font-bold text-ink whitespace-nowrap">{{ $tableTitle }}</h3>
+                </div>
+            @endif
             <!-- Search Input -->
             @if($showSearch)
                 <div class="relative min-w-0 w-full flex-1 max-w-md">

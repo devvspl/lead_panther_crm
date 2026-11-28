@@ -39,23 +39,35 @@ class CreditWallet extends Component
     public function tableColumns(): array
     {
         return [
-            ['key' => 'created_at', 'label' => 'Date & Time', 'type' => 'date', 'sortable' => true, 'priority' => 1],
-            ['key' => 'transaction_type', 'label' => 'Type', 'type' => 'badge', 'badgeMap' => [
-                'recharge' => 'bg-green-50 text-green-700 border border-green-200',
-                'reserve' => 'bg-amber-50 text-amber-700 border border-amber-200',
-                'refund' => 'bg-purple-50 text-purple-700 border border-purple-200',
-                'deduct' => 'bg-blue-50 text-blue-700 border border-blue-200',
-            ], 'sortable' => true, 'priority' => 1],
-            ['key' => 'lead', 'label' => 'Associated Lead', 'render' => fn($row) => $row->lead ? '<a href="' . route('leads.index') . '" class="font-semibold font-mono text-ink hover:underline">' . e($row->lead->lead_code) . '</a>' : '<span class="text-muted">—</span>', 'sortable' => false, 'priority' => 1],
-            ['key' => 'credit_before', 'label' => 'Credit Before', 'formatter' => fn($v) => $v === null ? 'Legacy entry' : number_format((int)$v), 'class' => 'font-mono text-muted', 'sortable' => false, 'priority' => 2],
-            ['key' => 'credit_used', 'label' => 'Used / Added', 'render' => function($row) {
-                if ($row->is_legacy) return '<span class="text-muted">Legacy entry</span>';
+            ['key' => 'created_at', 'label' => 'Date & Time', 'type' => 'date', 'sortable' => true, 'priority' => 1, 'formatter' => fn($val) => $val ? \Carbon\Carbon::parse($val)->format('M d, Y H:i') : '-'],
+            ['key' => 'transaction_type', 'label' => 'Type', 'sortable' => true, 'priority' => 1, 'render' => function($row) {
+                $type = $row->transaction_type;
+                $label = match($type) {
+                    'deduct', 'reserve', 'lead_consumption' => 'Lead Consumption',
+                    'recharge' => 'Recharge',
+                    'refund' => 'Refund',
+                    default => ucfirst(str_replace('_', ' ', (string) $type)),
+                };
+                $badgeClass = match($type) {
+                    'deduct', 'reserve', 'lead_consumption' => 'bg-indigo-50 text-indigo-700 border border-indigo-200/70',
+                    'recharge' => 'bg-emerald-50 text-emerald-700 border border-emerald-200/70',
+                    'refund' => 'bg-blue-50 text-blue-700 border border-blue-200/70',
+                    default => 'bg-canvas text-ink border border-border',
+                };
+                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ' . $badgeClass . '">' . e($label) . '</span>';
+            }],
+            ['key' => 'lead', 'label' => 'Lead Code', 'render' => fn($row) => $row->lead ? '<a href="' . route('leads.index') . '" class="font-semibold font-mono text-xs text-ink hover:text-primary hover:underline transition">' . e($row->lead->lead_code) . '</a>' : '<span class="text-muted font-mono text-xs">—</span>', 'sortable' => false, 'priority' => 1],
+            ['key' => 'credit_before', 'label' => 'Credit Before', 'formatter' => fn($v) => $v === null ? '-' : number_format((int)$v), 'class' => 'font-mono text-xs text-muted', 'sortable' => false, 'priority' => 2],
+            ['key' => 'credit_used', 'label' => 'Change', 'render' => function($row) {
+                if ($row->is_legacy) return '<span class="text-muted text-xs">Legacy</span>';
                 $isPlus = $row->credit_after >= $row->credit_before;
                 $sign = $isPlus ? '+' : '-';
-                $color = $isPlus ? 'text-success' : 'text-danger';
-                return '<span class="font-mono font-bold ' . $color . '">' . $sign . number_format((int)$row->credit_used) . '</span>';
-            }, 'sortable' => false, 'priority' => 1],
-            ['key' => 'credit_after', 'label' => 'Credit After', 'formatter' => fn($v) => $v === null ? 'Legacy entry' : number_format((int)$v), 'class' => 'font-mono font-bold text-ink', 'sortable' => false, 'priority' => 2],
+                $badgeClass = $isPlus
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                    : 'bg-rose-50 text-rose-600 border border-rose-200/70';
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full font-mono text-xs font-bold ' . $badgeClass . '">' . $sign . number_format((int)$row->credit_used) . '</span>';
+            }, 'sortable' => true, 'priority' => 1],
+            ['key' => 'credit_after', 'label' => 'Credit After', 'formatter' => fn($v) => $v === null ? '-' : number_format((int)$v), 'class' => 'font-mono text-xs font-bold text-ink', 'sortable' => false, 'priority' => 1],
         ];
     }
 
@@ -168,7 +180,7 @@ class CreditWallet extends Component
             }
         }
 
-        $sortField = in_array($this->sortField, ['created_at', 'transaction_type', 'id']) ? $this->sortField : 'created_at';
+        $sortField = in_array($this->sortField, ['created_at', 'transaction_type', 'credit_used', 'credit_before', 'credit_after', 'id']) ? $this->sortField : 'created_at';
         $sortDir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
 
         $transactions = $txQuery->orderBy($sortField, $sortDir)->paginate($this->perPage);
